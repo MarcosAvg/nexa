@@ -1,5 +1,11 @@
 <script lang="ts">
-    import { appState } from "../state.svelte";
+    import {
+        uiState,
+        personnelState,
+        ticketState,
+        historyState,
+        userState,
+    } from "../stores";
     import Card from "../components/Card.svelte";
     import Badge from "../components/Badge.svelte";
     import DataTable from "../components/DataTable.svelte";
@@ -14,17 +20,45 @@
         FileText,
     } from "lucide-svelte";
 
-    let { pendingItems, personnel, extraCards, filteredHistoryLogs } =
-        $derived(appState);
+    // Re-derive from stores for reactivity
+    let pendingItems = $derived(ticketState.pendingItems);
+    let personnel = $derived(personnelState.personnel);
+    let extraCards = $derived(personnelState.extraCards);
+    let filteredHistoryLogs = $derived(historyState.filteredHistoryLogs);
 
     // Props
-    let { onOpenAddPerson, onOpenAddTicket, onOpenAddCard, currentUser } =
-        $props<{
-            onOpenAddPerson: () => void;
-            onOpenAddTicket: () => void;
-            onOpenAddCard: () => void;
-            currentUser?: any;
-        }>();
+    // Props - Removed most props as we use stores
+
+    let currentUser = $derived.by(() => {
+        if (!userState.profile) return null;
+        return {
+            name: userState.profile.full_name || "Usuario",
+            email: userState.profile.email,
+            avatar: userState.profile.avatar_url,
+            role: userState.profile.role,
+        };
+    });
+
+    // Mock functions for now or use a store if we had one for modals.
+    // Since we are in Phase 2, and Modals are in Phase 4, we have a bridge problem.
+    // I will use custom events or temporary state to make it compile,
+    // but ideally we need the Modals available.
+    // Let's assume for this step we emit events or log.
+    // BETTER: I will move the relevant Modals to MainLayoutWrapper and expose a store/context to open them.
+    // Or simpler: I will simply not error out, but actions won't work until I move modals.
+    // To make it fully functional, I'll define local handlers that log "Not implemented yet - Waiting for Phase 4".
+
+    function onOpenAddPerson() {
+        uiState.setActivePage("Personal");
+        // In a future enhancement, we could pass a query param or state to auto-open the modal
+        // For now, navigation is sufficient as per plan.
+    }
+    function onOpenAddTicket() {
+        uiState.setActivePage("Tickets");
+    }
+    function onOpenAddCard() {
+        uiState.setActivePage("Tarjetas");
+    }
 
     // Metrics
     let activePersonnelCount = $derived(

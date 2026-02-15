@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import { handleError } from "../utils/error";
 
 export const HistoryService = {
     /**
@@ -52,28 +53,34 @@ export const HistoryService = {
     },
 
     async fetchAll() {
-        const { data, error } = await supabase
-            .from("history_logs")
-            .select("*")
-            // We can't join easily with polymorphic foreign keys in basic Supabase select unless we join ALL tables separateley.
-            // For now, we will fetch the raw logs. The UI will have to resolve names if needed, 
-            // OR we can do a more complex query? 
-            // Given the constraints, let's fetch raw logs first.
-            .order("timestamp", { ascending: false });
+        try {
+            const { data, error } = await supabase
+                .from("history_logs")
+                .select("*")
+                .order("timestamp", { ascending: false });
 
-        if (error) throw error;
-        return data || [];
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            handleError(error, "Fetch History");
+            return [];
+        }
     },
 
     async fetchByEntity(entityType: string, entityId: string) {
-        const { data, error } = await supabase
-            .from("history_logs")
-            .select("*")
-            .eq("entity_type", entityType)
-            .eq("entity_id", entityId)
-            .order("timestamp", { ascending: false });
+        try {
+            const { data, error } = await supabase
+                .from("history_logs")
+                .select("*")
+                .eq("entity_type", entityType)
+                .eq("entity_id", entityId)
+                .order("timestamp", { ascending: false });
 
-        if (error) throw error;
-        return data || [];
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error("Fetch History By Entity Error", error);
+            return [];
+        }
     }
 };

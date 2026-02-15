@@ -25,23 +25,25 @@
     import Input from "./Input.svelte";
     import Select from "./Select.svelte";
 
-    type Props = {
-        currentUser: any;
-    };
-
-    let { currentUser }: Props = $props();
+    import { catalogState, userState } from "../stores"; // Import stores
+    // Remove currentUser prop
 
     let activeTab = $state<"catalogos" | "usuarios">("catalogos");
     let activeCatalog = $state<
         "edificios" | "dependencias" | "accesos" | "dias"
     >("edificios");
 
-    // --- Supabase Data ---
-    let buildings = $state<any[]>([]);
-    let dependencies = $state<any[]>([]);
-    let specialAccesses = $state<any[]>([]);
-    let schedules = $state<any[]>([]);
-    let users = $state<any[]>([]);
+    // --- Global State ---
+    let buildings = $derived(catalogState.buildings);
+    let dependencies = $derived(catalogState.dependencies);
+    let specialAccesses = $derived(catalogState.specialAccesses);
+    let schedules = $derived(catalogState.schedules);
+    let users = $state<any[]>([]); // Users still local as they are specific to this admin view
+
+    let currentUser = $derived.by(() => {
+        if (!userState.profile) return { role: "viewer" }; // Fallback
+        return userState.profile;
+    });
 
     onMount(async () => {
         await fetchAll();
@@ -59,22 +61,22 @@
 
     async function fetchBuildings() {
         const data = await catalogService.fetchBuildings();
-        buildings = data;
+        catalogState.setBuildings(data);
     }
 
     async function fetchDependencies() {
         const data = await catalogService.fetchDependencies();
-        dependencies = data;
+        catalogState.setDependencies(data);
     }
 
     async function fetchAccesses() {
         const data = await catalogService.fetchAccesses();
-        specialAccesses = data;
+        catalogState.setSpecialAccesses(data);
     }
 
     async function fetchSchedules() {
         const data = await catalogService.fetchSchedules();
-        schedules = data;
+        catalogState.setSchedules(data);
     }
 
     async function fetchUsers() {

@@ -28,7 +28,9 @@
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "html2pdf.js": "^0.14.0",
+    "regexparam": "^3.0.0",
     "svelte-sonner": "^1.0.7",
+    "svelte-spa-router": "^4.0.1",
     "tailwindcss": "^4.1.18"
   }
 }

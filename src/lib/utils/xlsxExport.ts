@@ -4,7 +4,7 @@ import { saveAs } from 'file-saver';
 export interface ExportPersonnelData {
     first_name: string;
     last_name: string;
-    employeeNo: string;
+    employee_no: string;
     building: string;
     dependency: string;
     area: string;
@@ -19,8 +19,10 @@ export interface ExportPersonnelData {
         entry: string;
         exit: string;
     } | null;
-    email?: string;
+    email?: string | null;
     cards?: { type: string; folio: string }[];
+    // Allow any other props from Person to avoid strict casting errors during development
+    [key: string]: any;
 }
 
 export interface ExportOptions {
@@ -78,7 +80,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
     worksheet.columns = [
         { key: 'last_name', width: 25 },
         { key: 'first_name', width: 25 },
-        { key: 'employeeNo', width: 15 },
+        { key: 'employee_no', width: 15 },
         { key: 'building', width: 22 },
         { key: 'dependency', width: 28 },
         { key: 'area', width: 22 },
@@ -194,7 +196,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         const rowData = {
             last_name: person.last_name || '-',
             first_name: person.first_name || '-',
-            employeeNo: person.employeeNo || '-',
+            employee_no: person.employee_no || '-',
             building: person.building || '-',
             dependency: person.dependency || '-',
             area: person.area || '-',

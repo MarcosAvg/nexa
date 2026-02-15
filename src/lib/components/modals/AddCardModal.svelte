@@ -1,8 +1,8 @@
 <script lang="ts">
-    import Modal from "./Modal.svelte";
-    import Button from "./Button.svelte";
-    import Badge from "./Badge.svelte";
-    import { appState } from "../state.svelte";
+    import Modal from "../Modal.svelte";
+    import Button from "../Button.svelte";
+    import Badge from "../Badge.svelte";
+    import { personnelState } from "../../stores";
     import {
         Search,
         CreditCard,
@@ -15,14 +15,21 @@
 
     type Props = {
         isOpen: boolean;
-        availableCards?: any[]; // Legacy prop, we'll use appState but keep for compat
+        mode?: "assign" | "inventory";
+        availableCards?: any[]; // Legacy prop, we'll use personnelState but keep for compat
         onSave?: (card: { type: string; folio: string }) => void;
         onclose?: () => void;
     };
 
-    let { isOpen = $bindable(), onSave, onclose }: Props = $props();
+    let {
+        isOpen = $bindable(),
+        mode = "assign",
+        onSave,
+        onclose,
+    }: Props = $props();
 
-    const { personnel, extraCards } = $derived(appState);
+    let personnel = $derived(personnelState.personnel);
+    let extraCards = $derived(personnelState.extraCards);
 
     let cardType = $state<"P2000" | "KONE">("P2000");
     let searchQuery = $state("");
@@ -32,7 +39,10 @@
     // List of cards in inventory filtered by type
     let filteredInventory = $derived.by(() => {
         return extraCards.filter(
-            (c) => c.type === cardType && c.status === "available",
+            (c) =>
+                c.type === cardType &&
+                c.status !== "blocked" &&
+                c.status !== "inactive",
         );
     });
 
@@ -54,8 +64,11 @@
             (c) => c.folio === query && c.type === cardType,
         );
         if (inAvailable) {
-            // Check if it's actually available or if it's blocked/inactive in the extra pool
-            if (inAvailable.status !== "available") {
+            // Check if it's actually blocked/inactive
+            if (
+                inAvailable.status === "blocked" ||
+                inAvailable.status === "inactive"
+            ) {
                 return {
                     type: "restricted",
                     status: inAvailable.status,
@@ -111,22 +124,44 @@
 
         isSubmitting = true;
         try {
-            await onSave?.({ type: cardType, folio: searchQuery.trim() });
+            // In inventory mode, we don't assign to a person.
+            // In assign mode, we mark it as active.
+            const savePayload: any = {
+                type: cardType,
+                folio: searchQuery.trim(),
+                person_id: mode === "inventory" ? null : undefined,
+                status: mode === "assign" ? "active" : "available",
+            };
 
-            if (status.type === "new") {
+            // CRITICAL: If the card already exists in inventory, we MUST pass its ID
+            // to update it instead of attempting to create a duplicate folio.
+            if (status.type === "available" && status.card?.id) {
+                savePayload.id = status.card.id;
+            }
+
+            await onSave?.(savePayload);
+
+            if (mode === "inventory") {
+                toast.success("Tarjeta Registrada", {
+                    description: `El folio ${searchQuery} (${cardType}) se agregó al inventario.`,
+                });
+            } else if (status.type === "new") {
                 toast.success("Nueva Tarjeta Registrada", {
                     description: `Se ha creado y asignado el folio ${searchQuery} (${cardType}).`,
                 });
             } else {
                 toast.success("Tarjeta Asignada", {
-                    description: `Se vinculó el folio existente ${searchQuery} (${cardType}).`,
+                    description: `Se vinculó el folio existente ${searchQuery} (${cardType}) y ahora está activa.`,
                 });
             }
 
             resetAndClose();
         } catch (e) {
             toast.error("Error", {
-                description: "No se pudo asignar la tarjeta.",
+                description:
+                    mode === "inventory"
+                        ? "No se pudo registrar la tarjeta."
+                        : "No se pudo asignar la tarjeta.",
             });
         } finally {
             isSubmitting = false;
@@ -136,8 +171,10 @@
 
 <Modal
     bind:isOpen
-    title="Asignar Tarjeta"
-    description="Ingrese el folio para buscarlo en inventario o registrar uno nuevo."
+    title={mode === "inventory" ? "Nueva Tarjeta" : "Asignar Tarjeta"}
+    description={mode === "inventory"
+        ? "Registre un nuevo folio en el inventario del sistema."
+        : "Ingrese el folio para buscarlo en inventario o registrar uno nuevo."}
     size="md"
     onclose={resetAndClose}
 >
@@ -205,7 +242,9 @@
                 </div>
                 <input
                     type="text"
-                    placeholder="Ingrese folio a buscar o crear..."
+                    placeholder={mode === "inventory"
+                        ? "Ingrese el folio a crear..."
+                        : "Ingrese folio a buscar o crear..."}
                     bind:value={searchQuery}
                     class="w-full pl-10 pr-4 h-12 text-base font-bold border-2 border-slate-200 rounded-xl focus:outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all"
                     onkeydown={(e) => {
@@ -214,54 +253,60 @@
                 />
             </div>
 
-            <!-- Folio Results List -->
-            <div
-                class="max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100 shadow-sm"
-            >
-                {#if inventoryResults.length > 0}
-                    <div
-                        class="px-3 py-1.5 bg-slate-50 border-b border-slate-100"
-                    >
-                        <span
-                            class="text-[9px] font-bold text-slate-400 uppercase tracking-widest"
+            <!-- Folio Results List (Only in assign mode) -->
+            {#if mode === "assign"}
+                <div
+                    class="max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100 shadow-sm"
+                >
+                    {#if inventoryResults.length > 0}
+                        <div
+                            class="px-3 py-1.5 bg-slate-50 border-b border-slate-100"
                         >
-                            Inventario {cardType} ({filteredInventory.length})
-                        </span>
-                    </div>
-                    {#each inventoryResults as card}
-                        <button
-                            type="button"
-                            class="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors text-left"
-                            onclick={() => {
-                                searchQuery = card.folio;
-                                confirmCreate = false;
-                            }}
-                        >
-                            <div class="flex items-center gap-2">
-                                <CreditCard size={14} class="text-slate-400" />
-                                <span class="text-sm font-bold text-slate-700"
-                                    >{card.folio}</span
+                            <span
+                                class="text-[9px] font-bold text-slate-400 uppercase tracking-widest"
+                            >
+                                Inventario {cardType} ({filteredInventory.length})
+                            </span>
+                        </div>
+                        {#each inventoryResults as card}
+                            <button
+                                type="button"
+                                class="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors text-left"
+                                onclick={() => {
+                                    searchQuery = card.folio;
+                                    confirmCreate = false;
+                                }}
+                            >
+                                <div class="flex items-center gap-2">
+                                    <CreditCard
+                                        size={14}
+                                        class="text-slate-400"
+                                    />
+                                    <span
+                                        class="text-sm font-bold text-slate-700"
+                                        >{card.folio}</span
+                                    >
+                                </div>
+                                <Badge variant="emerald">Disponible</Badge>
+                            </button>
+                        {/each}
+
+                        {#if filteredInventory.length > 10 && !searchQuery}
+                            <div class="px-4 py-2 text-center bg-slate-50/30">
+                                <span class="text-[10px] text-slate-400 italic"
+                                    >Usa el buscador para ver más...</span
                                 >
                             </div>
-                            <Badge variant="emerald">Disponible</Badge>
-                        </button>
-                    {/each}
-
-                    {#if filteredInventory.length > 10 && !searchQuery}
-                        <div class="px-4 py-2 text-center bg-slate-50/30">
-                            <span class="text-[10px] text-slate-400 italic"
-                                >Usa el buscador para ver más...</span
-                            >
+                        {/if}
+                    {:else if !searchQuery.trim()}
+                        <div class="px-4 py-6 text-center">
+                            <p class="text-sm text-slate-400 italic">
+                                No hay tarjetas {cardType} disponibles en inventario.
+                            </p>
                         </div>
                     {/if}
-                {:else if !searchQuery.trim()}
-                    <div class="px-4 py-6 text-center">
-                        <p class="text-sm text-slate-400 italic">
-                            No hay tarjetas {cardType} disponibles en inventario.
-                        </p>
-                    </div>
-                {/if}
-            </div>
+                </div>
+            {/if}
 
             <!-- Real-time Status Feedback -->
             {#if searchQuery.trim()}
@@ -270,13 +315,26 @@
                 >
                     {#if searchStatus?.type === "available"}
                         <div
-                            class="flex items-center gap-3 p-3 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700"
+                            class="flex items-center gap-3 p-3 rounded-lg {mode ===
+                            'inventory'
+                                ? 'bg-slate-100 border-slate-200 text-slate-600'
+                                : 'bg-emerald-50 border-emerald-100 text-emerald-700'}"
                         >
-                            <CheckCircle2 size={18} />
+                            {#if mode === "inventory"}
+                                <AlertCircle size={18} />
+                            {:else}
+                                <CheckCircle2 size={18} />
+                            {/if}
                             <div class="text-sm">
-                                <p class="font-bold">Tarjeta Disponible</p>
+                                <p class="font-bold">
+                                    {mode === "inventory"
+                                        ? "Ya existe en inventario"
+                                        : "Tarjeta Disponible"}
+                                </p>
                                 <p class="text-xs opacity-80">
-                                    Lista para ser asignada inmediatamente.
+                                    {mode === "inventory"
+                                        ? "Este folio ya está registrado y disponible."
+                                        : "Lista para ser asignada inmediatamente."}
                                 </p>
                             </div>
                         </div>
@@ -362,16 +420,19 @@
             class="px-8 min-w-[120px]"
             disabled={!searchQuery.trim() ||
                 searchStatus?.type === "occupied" ||
-                searchStatus?.type === "restricted"}
+                searchStatus?.type === "restricted" ||
+                (searchStatus?.type === "available" && mode === "inventory")}
         >
             {#if confirmCreate}
-                ¡Sí, crear y asignar!
+                ¡Sí, crear!
             {:else if searchStatus?.type === "new"}
-                Crear nueva
+                Crear tarjeta
             {:else if searchStatus?.type === "occupied"}
                 Ocupada
             {:else if searchStatus?.type === "restricted"}
                 Restringida
+            {:else if searchStatus?.type === "available" && mode === "inventory"}
+                Existente
             {:else}
                 Asignar
             {/if}

@@ -26,28 +26,24 @@
         id: number | string;
         title: string;
         description: string;
-        type:
-            | "Programación"
-            | "Firma Responsiva"
-            | "Cobro"
-            | "Bloqueo"
-            | "Otro";
+        type: string;
         personName: string;
-        cardType?: "P2000" | "KONE";
+        cardType?: string;
         cardFolio?: string;
-        priority: "Alta" | "Media" | "Baja";
-        status: "Pendiente" | "En Proceso" | "Completado";
+        priority: string;
+        status: string;
         created_at?: string;
     };
 
     type Props = {
         ticket: Ticket;
         onManage?: (ticket: Ticket) => void;
+        onComplete?: (ticket: Ticket) => void;
     };
 
-    let { ticket, onManage }: Props = $props();
+    let { ticket, onManage, onComplete }: Props = $props();
 
-    const iconMap = {
+    const iconMap: Record<string, any> = {
         Programación: CreditCard,
         "Firma Responsiva": FileSignature,
         Cobro: Wallet,
@@ -61,7 +57,7 @@
         Baja: "blue",
     };
 
-    const typeStyles = {
+    const typeStyles: Record<string, string> = {
         Programación: "bg-white border-slate-200",
         "Firma Responsiva": "bg-white border-slate-200",
         Cobro: "bg-white border-slate-200",
@@ -69,7 +65,7 @@
         Otro: "bg-white border-slate-200",
     };
 
-    const iconStyles = {
+    const iconStyles: Record<string, string> = {
         Programación: "bg-blue-50 text-blue-600",
         "Firma Responsiva": "bg-violet-50 text-violet-600",
         Cobro: "bg-emerald-50 text-emerald-600",
@@ -193,17 +189,28 @@
                 {ticket.priority}
             </Badge>
 
-            <Button
-                variant="secondary"
-                class="h-8.5 px-3.5 rounded-lg text-xs font-bold border-slate-200 hover:bg-slate-50 hover:border-slate-300"
-                onclick={() => onManage?.(ticket)}
-            >
-                Gestionar
-                <ArrowRight
-                    size={14}
-                    class="ml-1.5 text-slate-400 group-hover:translate-x-0.5 transition-transform"
-                />
-            </Button>
+            {#if ticket.type === "Programación" || ticket.type === "Firma Responsiva"}
+                <Button
+                    variant="primary"
+                    class="h-8.5 px-3.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 border-none"
+                    onclick={() => onComplete?.(ticket)}
+                >
+                    <CheckCircle2 size={14} class="mr-1.5" />
+                    Completar
+                </Button>
+            {:else}
+                <Button
+                    variant="secondary"
+                    class="h-8.5 px-3.5 rounded-lg text-xs font-bold border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+                    onclick={() => onManage?.(ticket)}
+                >
+                    Gestionar
+                    <ArrowRight
+                        size={14}
+                        class="ml-1.5 text-slate-400 group-hover:translate-x-0.5 transition-transform"
+                    />
+                </Button>
+            {/if}
         </div>
     </div>
 </article>

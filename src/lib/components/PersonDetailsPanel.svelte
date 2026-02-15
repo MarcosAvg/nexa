@@ -21,40 +21,10 @@
     import ResponsivaTemplate from "./ResponsivaTemplate.svelte";
     import ResponsivaPreviewModal from "./ResponsivaPreviewModal.svelte";
     import { toast } from "svelte-sonner";
-    import { cardService } from "../services/data";
+    import { cardService } from "../services/cards";
     import { responsivaService } from "../services/responsiva";
-
-    type Person = {
-        id: string;
-        name: string;
-        first_name: string;
-        last_name: string;
-        employeeNo: string;
-        dependency: string;
-        area?: string;
-        position?: string;
-        building: string;
-        floor: string;
-        floors_p2000?: string[];
-        floors_kone?: string[];
-        schedule?: {
-            days: string;
-            entry: string;
-            exit: string;
-        };
-        specialAccesses?: string[];
-        cards?: {
-            id: string;
-            type: "P2000" | "KONE";
-            folio: string;
-            status?: "active" | "blocked";
-            responsiva_status?: string;
-            programming_status?: string;
-        }[];
-        status: string;
-        status_raw?: "active" | "blocked" | "inactive";
-        email?: string;
-    };
+    import { personnelState } from "../stores";
+    import type { Person } from "../types";
 
     type Props = {
         isOpen: boolean;
@@ -88,6 +58,13 @@
         onRefresh,
     }: Props = $props();
 
+    // Reset highlight when closing
+    $effect(() => {
+        if (!isOpen) {
+            personnelState.highlightedCardId = null;
+        }
+    });
+
     let responsivaData = $state<any>(null);
     let selectedShowCard = $state<any>(null);
     let isPreviewModalOpen = $state(false);
@@ -107,7 +84,10 @@
                 person.id.toString(),
             );
         } catch (error) {
-            console.error(error);
+            console.error(
+                "[PersonDetailsPanel] Error loading responsivas:",
+                error,
+            );
         }
     }
 
@@ -152,7 +132,10 @@
                     (r) => r.folio === card.folio && r.card_type === card.type,
                 );
             } catch (e) {
-                console.error("Error refreshing responsivas:", e);
+                console.error(
+                    "[PersonDetailsPanel] Error refreshing responsivas:",
+                    e,
+                );
             }
         }
 
@@ -165,7 +148,7 @@
             : {
                   folio: card.folio,
                   nombre: person.name,
-                  numEmpleado: person.employeeNo,
+                  numEmpleado: person.employee_no,
                   dependencia: person.dependency,
                   usuarioEntrega: "Admin Sistema",
                   fecha: dateStr,
@@ -176,9 +159,12 @@
         isPreviewModalOpen = true;
     }
 
-    async function handleSignCard(card: any) {
+    async function handleSignCard(card: any, signature?: string) {
         try {
             await cardService.updateResponsivaStatus(card.id, "signed");
+            if (signature) {
+                selectedSignature = signature;
+            }
             if (onRefresh) await onRefresh();
             await loadResponsivas();
         } catch (error) {
@@ -242,7 +228,10 @@
             };
             isPreviewModalOpen = true;
         } catch (e) {
-            console.error(e);
+            console.error(
+                "[PersonDetailsPanel] Error in handleViewHistory:",
+                e,
+            );
             toast.error("Error al cargar datos actualizados");
         }
     }
@@ -278,7 +267,7 @@
                     <div class="flex justify-between items-center">
                         <span class="text-xs text-slate-500">No. Empleado</span>
                         <span class="text-sm font-bold text-slate-800"
-                            >{person.employeeNo}</span
+                            >{person.employee_no}</span
                         >
                     </div>
                     <div class="flex justify-between items-center">
@@ -366,6 +355,26 @@
                                 </div>
                             </div>
                         {/if}
+                    </div>
+                {/if}
+
+                <!-- Special Accesses -->
+                {#if person.specialAccesses && person.specialAccesses.length > 0}
+                    <div class="pt-3 border-t border-slate-200">
+                        <div
+                            class="flex items-center gap-2 text-slate-600 mb-2"
+                        >
+                            <Shield size={14} />
+                            <span
+                                class="text-xs font-bold uppercase tracking-wider"
+                                >Accesos Especiales</span
+                            >
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                            {#each person.specialAccesses as access}
+                                <Badge variant="violet">{access}</Badge>
+                            {/each}
+                        </div>
                     </div>
                 {/if}
 
@@ -500,11 +509,13 @@
                     <div class="space-y-3">
                         {#each person.cards as card}
                             <CardItem
-                                type={card.type}
+                                type={card.type as any}
                                 folio={card.folio}
-                                status={card.status}
-                                responsiva_status={card.responsiva_status}
-                                programming_status={card.programming_status}
+                                status={card.status as any}
+                                responsiva_status={card.responsiva_status as any}
+                                programming_status={card.programming_status as any}
+                                isHighlighted={personnelState.highlightedCardId ===
+                                    card.id}
                                 onGenerateResponsiva={() =>
                                     handleGenerateResponsiva(card)}
                                 onBlock={() => onCardBlock?.(card)}

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { appState } from "../state.svelte";
+    import { historyState, personnelState, ticketState } from "../stores";
     import SectionHeader from "../components/SectionHeader.svelte";
     import Card from "../components/Card.svelte";
     import DataTable from "../components/DataTable.svelte";
@@ -13,10 +13,11 @@
     let historyFilterFolio = $state("");
     let historyFilterAction = $state("Todas");
 
-    // Get data from AppState
-    let { filteredHistoryLogs, personnel, extraCards, pendingItems } = $derived(
-        appState as any,
-    );
+    // Get data from Stores
+    let filteredHistoryLogs = $derived(historyState.filteredHistoryLogs);
+    let personnel = $derived(personnelState.personnel);
+    let extraCards = $derived(personnelState.extraCards);
+    let pendingItems = $derived(ticketState.pendingItems);
 
     // Helper to resolve entity name based on type and ID
     function resolveEntity(type: string, id: string) {

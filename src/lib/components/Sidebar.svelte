@@ -1,5 +1,7 @@
 <script lang="ts">
-    import { appState } from "../state.svelte";
+    import { link } from "svelte-spa-router";
+    import active from "svelte-spa-router/active";
+    import { uiState } from "../stores/ui.svelte"; // Correct path to store
     import Logo from "./Logo.svelte";
     import { LogOut } from "lucide-svelte";
 
@@ -13,7 +15,7 @@
 </script>
 
 <aside
-    class="fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col bg-slate-950 text-slate-300 transition-transform duration-300 ease-in-out lg:translate-x-0 {appState.isSidebarOpen
+    class="fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col bg-slate-950 text-slate-300 transition-transform duration-300 ease-in-out lg:translate-x-0 {uiState.isSidebarOpen
         ? 'translate-x-0'
         : '-translate-x-full'} shadow-xl"
 >
@@ -27,16 +29,16 @@
         {#each items as item}
             <a
                 href={item.href}
-                class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200 {appState.activePage ===
-                item.label
-                    ? 'bg-slate-900 text-white shadow-sm ring-1 ring-slate-800'
-                    : 'text-slate-400 hover:bg-slate-900 hover:text-white'}"
-                onclick={(e) => {
-                    e.preventDefault();
-                    appState.setActivePage(item.label);
-                    // On mobile, close sidebar after selection
+                use:link
+                use:active={{
+                    className:
+                        "bg-slate-900 text-white shadow-sm ring-1 ring-slate-800",
+                }}
+                class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200 text-slate-400 hover:bg-slate-900 hover:text-white"
+                onclick={() => {
+                    // Mobile handling
                     if (window.innerWidth < 1024) {
-                        appState.toggleSidebar();
+                        uiState.toggleSidebar();
                     }
                 }}
             >
@@ -89,12 +91,12 @@
 </aside>
 
 <!-- Mobile overlay -->
-{#if appState.isSidebarOpen}
+{#if uiState.isSidebarOpen}
     <div
         class="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden"
-        onclick={() => appState.toggleSidebar()}
+        onclick={() => uiState.toggleSidebar()}
         role="button"
         tabindex="0"
-        onkeydown={(e) => e.key === "Escape" && appState.toggleSidebar()}
+        onkeydown={(e) => e.key === "Escape" && uiState.toggleSidebar()}
     ></div>
 {/if}

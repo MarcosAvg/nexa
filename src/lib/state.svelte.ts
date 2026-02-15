@@ -1,19 +1,21 @@
+import type { Person, Card, Ticket, UserProfile, CatalogItem } from './types';
+
 export class AppState {
     activePage = $state('Dashboard');
     isSidebarOpen = $state(false);
 
     // Global Data
-    personnel = $state<any[]>([]);
-    extraCards = $state<any[]>([]);
-    pendingItems = $state<any[]>([]);
+    personnel = $state<Person[]>([]);
+    extraCards = $state<Card[]>([]);
+    pendingItems = $state<Ticket[]>([]);
 
     // Catalogs
-    dependencies = $state<any[]>([]);
-    buildings = $state<any[]>([]);
-    specialAccesses = $state<any[]>([]);
-    schedules = $state<any[]>([]);
-    filteredHistoryLogs = $state<any[]>([]);
-    userProfile = $state<{ id: string, role: 'admin' | 'operator' | 'viewer', full_name: string, email: string } | null>(null);
+    dependencies = $state<CatalogItem[]>([]);
+    buildings = $state<CatalogItem[]>([]);
+    specialAccesses = $state<CatalogItem[]>([]);
+    schedules = $state<CatalogItem[]>([]);
+    filteredHistoryLogs = $state<any[]>([]); // To be typed later
+    userProfile = $state<UserProfile | null>(null);
 
     setActivePage(page: string) {
         this.activePage = page;
@@ -23,7 +25,9 @@ export class AppState {
         this.isSidebarOpen = !this.isSidebarOpen;
     }
 
-    setData(key: string, data: any) {
+    // Generic setter with type safeguards could be better, but for now we keep it simple
+    // to match existing usage in App.svelte which passes strings dynamically.
+    setData<K extends keyof AppState>(key: K, data: AppState[K]) {
         (this as any)[key] = data;
     }
 }

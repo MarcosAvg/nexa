@@ -1,5 +1,10 @@
 <script lang="ts">
-    import { appState } from "../state.svelte";
+    import {
+        personnelState,
+        catalogState,
+        userState,
+        ticketState,
+    } from "../stores";
     import SectionHeader from "../components/SectionHeader.svelte";
     import FilterGroup from "../components/FilterGroup.svelte";
     import FilterSelect from "../components/FilterSelect.svelte";
@@ -9,15 +14,27 @@
     import Badge from "../components/Badge.svelte";
     import { Search, FileDown } from "lucide-svelte";
     import { personnelService } from "../services/personnel";
+    import { cardService } from "../services/cards";
     import { exportPersonnelToExcel } from "../utils/xlsxExport";
+    import { toast } from "svelte-sonner";
 
-    let { personnel, dependencies, buildings } = $derived(appState);
+    let personnel = $derived(personnelState.personnel);
+    let dependencies = $derived(catalogState.dependencies);
+    let buildings = $derived(catalogState.buildings);
+
     let dependencyNames = $derived(dependencies.map((d) => d.name));
 
-    // Local UI filters for this view
+    // Local UI filters
     let statusFilter = $state("Todos");
     let dependencyFilter = $state("");
     let personSearch = $state("");
+
+    // Modal State
+    let isDetailsOpen = $derived(personnelState.isDetailsOpen);
+    let selectedPersonId = $derived(personnelState.selectedPersonId);
+    let selectedPerson = $derived(
+        personnel.find((p) => p.id === selectedPersonId) || null,
+    );
 
     let filteredPersonnel = $derived.by(() => {
         return personnel.filter((person) => {
@@ -41,15 +58,30 @@
         });
     });
 
-    // Props/Events passed from App.svelte or handled here
-    let { onOpenAddModal, onOpenDetails, currentUser } = $props<{
-        onOpenAddModal: () => void;
-        onOpenDetails: (person: any) => void;
-        currentUser?: any;
-    }>();
+    let currentUser = $derived.by(() => {
+        if (!userState.profile) return null;
+        return {
+            name: userState.profile.full_name || "Usuario",
+            email: userState.profile.email,
+            avatar: userState.profile.avatar_url,
+            role: userState.profile.role,
+        };
+    });
+
+    function onOpenAddModal() {
+        personnelState.openEditModal(null);
+    }
+
+    function onOpenDetails(person: any) {
+        personnelState.selectPerson(person.id);
+    }
+
+    function onEditPerson(person: any) {
+        personnelState.openEditModal(person);
+    }
 
     function handleExportExcel() {
-        exportPersonnelToExcel(filteredPersonnel, {
+        exportPersonnelToExcel(filteredPersonnel as any[], {
             filters: {
                 status: statusFilter,
                 dependency: dependencyFilter,
@@ -58,18 +90,26 @@
         });
     }
 
-    // Snippets
     function getStatusVariant(status: string) {
         if (status === "Activo/a") return "emerald";
-        if (status === "Inactivo/a") return "slate"; // Or maybe "amber" if we want it to stand out
+        if (status === "Inactivo/a") return "slate";
         if (status === "Bloqueado/a") return "rose";
         if (status === "Baja") return "slate";
         return "slate";
     }
+
+    async function refreshData() {
+        const [updatedPeople, updatedCards] = await Promise.all([
+            personnelService.fetchAll(),
+            cardService.fetchExtra(),
+        ]);
+        personnelState.setPersonnel(updatedPeople);
+        personnelState.setCards(updatedCards);
+    }
 </script>
 
 {#snippet renderName(row: any)}
-    {@const hasPendingModification = appState.pendingItems?.some(
+    {@const hasPendingModification = ticketState.pendingItems?.some(
         (t: any) =>
             t.person_id === row.id && t.type === "Modificación de Datos",
     )}
@@ -129,7 +169,7 @@
                 {@render renderName(row)}
                 {@render renderStatus(row)}
             </div>
-            <div class="text-sm text-slate-500">ID: {row.employeeNo}</div>
+            <div class="text-sm text-slate-500">ID: {row.employee_no}</div>
             {@render renderDependency(row)}
             <div>
                 <div
@@ -216,7 +256,7 @@
             data={filteredPersonnel}
             columns={[
                 { key: "name", label: "Nombre completo", render: renderName },
-                { key: "employeeNo", label: "No. Empleado" },
+                { key: "employee_no", label: "No. Empleado" },
                 { key: "area", label: "Área" },
                 { key: "position", label: "Puesto" },
                 {

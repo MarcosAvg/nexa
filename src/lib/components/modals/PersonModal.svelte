@@ -1,41 +1,33 @@
 <script lang="ts">
-    import Modal from "./Modal.svelte";
-    import Button from "./Button.svelte";
-    import Badge from "./Badge.svelte";
-    import Input from "./Input.svelte";
-    import ToggleGroup from "./ToggleGroup.svelte";
+    import Modal from "../Modal.svelte";
+    import Button from "../Button.svelte";
+    import Badge from "../Badge.svelte";
+    import Input from "../Input.svelte";
+    import ToggleGroup from "../ToggleGroup.svelte";
     import AddCardModal from "./AddCardModal.svelte";
-    import Select from "./Select.svelte";
+    import Select from "../Select.svelte";
     import { Plus, CreditCard, Trash2 } from "lucide-svelte";
+    import { untrack } from "svelte";
 
-    import { ticketService } from "../services/data";
+    import { personnelService, ticketService } from "../../services";
+    import { personnelState, catalogState } from "../../stores";
     import { toast } from "svelte-sonner";
-
-    type Props = {
-        isOpen: boolean;
-        initialData?: any;
-        buildings: any[];
-        dependencies: any[];
-        specialAccesses: any[];
-        schedules: any[];
-        availableCards?: any[];
-        onSave?: (data: any) => void;
-        onSuccess?: () => void | Promise<void>;
-        onclose?: () => void;
-    };
+    import type { Person } from "../../types";
 
     let {
-        isOpen = $bindable(),
-        initialData = null,
-        buildings = [],
-        dependencies = [],
-        specialAccesses = [],
-        schedules = [],
-        availableCards = [],
-        onSave,
-        onSuccess,
-        onclose,
-    }: Props = $props();
+        isOpen = $bindable(false),
+        editingPerson = null,
+    }: {
+        isOpen: boolean;
+        editingPerson?: Person | null;
+    } = $props();
+
+    // Catalogs
+    let buildings = $derived(catalogState.buildings);
+    let dependencies = $derived(catalogState.dependencies);
+    let schedules = $derived(catalogState.schedules);
+    let specialAccesses = $derived(catalogState.specialAccesses);
+    let availableCards = $derived(personnelState.extraCards);
 
     // Form state
     let nombres = $state("");
@@ -61,15 +53,13 @@
 
     // Derived floors based on selected building
     let availableFloors = $derived.by(() => {
-        const b = buildings.find(
-            (b) => b.id === edificio || b.name === edificio,
-        );
+        const b = buildings.find((b) => b.name === edificio);
         return b?.floors || [];
     });
 
     // When building changes, reset floor selections
     $effect(() => {
-        if (edificio && !initialData) {
+        if (edificio && !editingPerson) {
             // Only reset if not loading initial data
             pisoBase = "";
             pisosP2000 = [];
@@ -78,49 +68,64 @@
     });
 
     // Auto-assign base floor to both access systems
+    let lastAutoAddedBase = $state("");
     $effect(() => {
-        if (pisoBase && !initialData) {
+        if (pisoBase) {
+            // Remove previous auto-added floor if it changed
+            if (lastAutoAddedBase && lastAutoAddedBase !== pisoBase) {
+                pisosP2000 = pisosP2000.filter((f) => f !== lastAutoAddedBase);
+                pisosKone = pisosKone.filter((f) => f !== lastAutoAddedBase);
+            }
+
             if (!pisosP2000.includes(pisoBase)) {
                 pisosP2000 = [...pisosP2000, pisoBase];
             }
             if (!pisosKone.includes(pisoBase)) {
                 pisosKone = [...pisosKone, pisoBase];
             }
+
+            lastAutoAddedBase = pisoBase;
         }
     });
 
-    const dayRanges = [
-        "Lunes a Viernes",
-        "Lunes a Sábado",
-        "Lunes a Domingo",
-        "Sábado y Domingo",
-        "Personalizado",
-    ];
+    // Populate form
+    let lastLoadedPersonId = $state("");
 
     $effect(() => {
-        if (isOpen && initialData) {
-            nombres = initialData.first_name || "";
-            apellidos = initialData.last_name || "";
-            noEmpleado = initialData.employeeNo;
-            dependency = initialData.dependency;
-            areaEquipo = initialData.area || "";
-            puestoFuncion = initialData.position || "";
-            edificio = initialData.building;
-            pisoBase = initialData.floor;
-            pisosP2000 = initialData.floors_p2000 || [];
-            pisosKone = initialData.floors_kone || [];
-            if (initialData.schedule) {
-                diasHorario = initialData.schedule.days;
-                horaEntrada = initialData.schedule.entry;
-                horaSalida = initialData.schedule.exit;
-            }
-            email = initialData.email || "";
-            accesosEspeciales = (initialData.specialAccesses || []).map(
-                (s: string) => s.trim(),
-            );
-            tarjetasAsignadas = initialData.cards || [];
-        } else if (isOpen && !initialData) {
+        if (
+            isOpen &&
+            editingPerson &&
+            lastLoadedPersonId !== editingPerson.id
+        ) {
+            untrack(() => {
+                nombres = editingPerson.first_name || "";
+                apellidos = editingPerson.last_name || "";
+                noEmpleado = editingPerson.employee_no;
+                dependency = editingPerson.dependency;
+                areaEquipo = (editingPerson as any).area || "";
+                puestoFuncion = (editingPerson as any).position || "";
+                edificio = editingPerson.building;
+                pisoBase = editingPerson.floor || "";
+                lastAutoAddedBase = pisoBase;
+                pisosP2000 = [...(editingPerson.floors_p2000 || [])];
+                pisosKone = [...(editingPerson.floors_kone || [])];
+
+                if (editingPerson.schedule) {
+                    diasHorario = editingPerson.schedule.days;
+                    horaEntrada = editingPerson.schedule.entry;
+                    horaSalida = editingPerson.schedule.exit;
+                }
+
+                email = editingPerson.email || "";
+                accesosEspeciales = [...(editingPerson.specialAccesses || [])];
+                tarjetasAsignadas = [...(editingPerson.cards || [])];
+                lastLoadedPersonId = editingPerson.id;
+            });
+        } else if (isOpen && !editingPerson && lastLoadedPersonId !== "new") {
             resetForm();
+            lastLoadedPersonId = "new";
+        } else if (!isOpen) {
+            lastLoadedPersonId = "";
         }
     });
 
@@ -138,91 +143,77 @@
 
         try {
             const data = {
-                id: initialData?.id,
+                id: editingPerson?.id,
                 nombres,
                 apellidos,
                 noEmpleado,
                 areaEquipo,
                 puestoFuncion,
-                dependency, // Include the name for better display/comparison
-                dependencyId: dependencies.find((d) => d.name === dependency)
+                dependency,
+                dependency_id: dependencies.find((d) => d.name === dependency)
                     ?.id,
                 edificio,
-                buildingId: buildings.find((b) => b.name === edificio)?.id,
+                building_id: buildings.find((b) => b.name === edificio)?.id,
                 pisoBase,
                 pisosP2000,
                 pisosKone,
-                scheduleId: schedules.find((s) => s.name === diasHorario)?.id,
-                horario: {
-                    dias: diasHorario,
-                    entrada: horaEntrada,
-                    salida: horaSalida,
-                },
+                first_name: nombres,
+                last_name: apellidos,
+                employee_no: noEmpleado,
                 email,
-                accesosEspeciales,
-                tarjetas: tarjetasAsignadas,
-                status: initialData?.status || "Activo/a", // Use display string to match normalizedOriginal
+                floor: pisoBase,
+                floors_p2000: pisosP2000,
+                floors_kone: pisosKone,
+                schedule_id: schedules.find((s) => s.name === diasHorario)?.id,
+                cards: tarjetasAsignadas,
+                specialAccesses: accesosEspeciales,
             };
 
-            // INTERCEPTION LOGIC
-            if (initialData) {
-                // Normalize original data to match the "modified" structure
+            if (editingPerson) {
                 const normalizedOriginal = {
-                    id: initialData.id,
-                    nombres: initialData.first_name || "",
-                    apellidos: initialData.last_name || "",
-                    noEmpleado: initialData.employeeNo,
-                    areaEquipo: initialData.area || "",
-                    puestoFuncion: initialData.position || "",
-                    dependency: initialData.dependency,
-                    edificio: initialData.building,
-                    pisoBase: initialData.floor,
-                    pisosP2000: initialData.floors_p2000 || [],
-                    pisosKone: initialData.floors_kone || [],
-                    horario: initialData.schedule
-                        ? {
-                              dias: initialData.schedule.days,
-                              entrada: initialData.schedule.entry,
-                              salida: initialData.schedule.exit,
-                          }
-                        : null,
-                    accesosEspeciales: initialData.specialAccesses || [],
-                    tarjetas: initialData.cards || [],
-                    status: initialData.status,
-                    email: initialData.email || "",
+                    id: editingPerson.id,
+                    nombres: editingPerson.first_name,
+                    apellidos: editingPerson.last_name,
+                    noEmpleado: editingPerson.employee_no,
+                    dependency: editingPerson.dependency,
+                    edificio: editingPerson.building,
+                    pisosP2000: editingPerson.floors_p2000,
+                    pisosKone: editingPerson.floors_kone,
+                    horario: editingPerson.schedule,
+                    accesosEspeciales: editingPerson.specialAccesses,
+                    tarjetas: editingPerson.cards,
+                    email: editingPerson.email,
+                    floor: editingPerson.floor,
                 };
 
-                // It's an EDIT -> Create Ticket
                 const ticketPayload = {
                     original: normalizedOriginal,
                     modified: data,
                 };
-
                 await ticketService.create({
                     title: "Modificación de Datos Personales",
                     description: `Solicitud de cambio de datos para ${nombres} ${apellidos} (${noEmpleado})`,
-                    type: "Modificación de Datos",
-                    priority: "Media",
-                    person_id: initialData.id,
+                    type: "Otro",
+                    priority: "media",
+                    person_id: editingPerson.id,
                     payload: ticketPayload,
                 });
 
                 toast.success("Solicitud Enviada", {
-                    description:
-                        "Los cambios se han enviado a aprobación y no se aplicarán inmediatamente.",
+                    description: "Los cambios se han enviado a aprobación.",
                 });
-                await onSuccess?.();
             } else {
-                // It's a NEW RECORD -> Save immediately
-                await onSave?.(data);
-                await onSuccess?.();
+                await personnelService.save(data);
+                const updated = await personnelService.fetchAll();
+                personnelState.setPersonnel(updated);
+                toast.success("Personal Registrado");
             }
 
             resetAndClose();
         } catch (e) {
             console.error(e);
             toast.error("Error", {
-                description: "Ocurrió un error al procesar la solicitud.",
+                description: "Ocurrió un error al guardar.",
             });
         } finally {
             isSubmitting = false;
@@ -246,19 +237,21 @@
         email = "";
         accesosEspeciales = [];
         tarjetasAsignadas = [];
+        lastAutoAddedBase = "";
     }
 
     function resetAndClose() {
         resetForm();
         isOpen = false;
-        onclose?.();
     }
 </script>
 
 <Modal
     bind:isOpen
-    title="Nueva Alta de Personal"
-    description="Complete la información para registrar una nueva persona."
+    title={editingPerson ? "Editar Personal" : "Nueva Alta de Personal"}
+    description={editingPerson
+        ? "Modifique los datos requeridos. Se generará un ticket."
+        : "Complete la información para registrar una nueva persona."}
     size="xl"
     onclose={resetAndClose}
 >
@@ -275,9 +268,8 @@
         >
             <legend
                 class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
+                >Datos Personales</legend
             >
-                Datos Personales
-            </legend>
 
             <div class="grid gap-4 md:grid-cols-2">
                 <div class="space-y-1.5">
@@ -286,12 +278,10 @@
                         class="text-xs font-bold text-slate-600 block"
                         >Nombres</label
                     >
-                    <input
+                    <Input
                         id="nombres"
-                        type="text"
-                        class="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5"
-                        placeholder="Juan Carlos"
                         bind:value={nombres}
+                        placeholder="Juan Carlos"
                     />
                 </div>
                 <div class="space-y-1.5">
@@ -300,12 +290,10 @@
                         class="text-xs font-bold text-slate-600 block"
                         >Apellidos</label
                     >
-                    <input
+                    <Input
                         id="apellidos"
-                        type="text"
-                        class="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5"
-                        placeholder="Pérez García"
                         bind:value={apellidos}
+                        placeholder="Pérez García"
                     />
                 </div>
             </div>
@@ -317,15 +305,12 @@
                         class="text-xs font-bold text-slate-600 block"
                         >No. Empleado</label
                     >
-                    <input
+                    <Input
                         id="noEmpleado"
-                        type="text"
-                        class="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5"
-                        placeholder="EMP-001"
                         bind:value={noEmpleado}
+                        placeholder="EMP-001"
                     />
                 </div>
-
                 <div class="md:col-span-2 space-y-1.5">
                     <label
                         for="dependencia"
@@ -343,30 +328,26 @@
             <div class="grid gap-4 md:grid-cols-2">
                 <div class="space-y-1.5">
                     <label
-                        for="areaEquipo"
+                        for="area"
                         class="text-xs font-bold text-slate-600 block"
                         >Área / Equipo</label
                     >
-                    <input
-                        id="areaEquipo"
-                        type="text"
-                        class="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5"
-                        placeholder="Sistemas"
+                    <Input
+                        id="area"
                         bind:value={areaEquipo}
+                        placeholder="Sistemas"
                     />
                 </div>
                 <div class="space-y-1.5">
                     <label
-                        for="puestoFuncion"
+                        for="puesto"
                         class="text-xs font-bold text-slate-600 block"
                         >Puesto / Función</label
                     >
-                    <input
-                        id="puestoFuncion"
-                        type="text"
-                        class="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all"
-                        placeholder="Analista de Sistemas"
+                    <Input
+                        id="puesto"
                         bind:value={puestoFuncion}
+                        placeholder="Analista"
                     />
                 </div>
             </div>
@@ -377,25 +358,23 @@
                     class="text-xs font-bold text-slate-600 block"
                     >Correo Electrónico</label
                 >
-                <input
+                <Input
                     id="email"
                     type="email"
-                    class="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all"
-                    placeholder="ejemplo@correo.com"
                     bind:value={email}
+                    placeholder="correo@ejemplo.com"
                 />
             </div>
         </fieldset>
 
-        <!-- SECTION: Building & Floors -->
+        <!-- SECTION: Location -->
         <fieldset
             class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
         >
             <legend
                 class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
+                >Ubicación</legend
             >
-                Ubicación
-            </legend>
 
             <div class="grid gap-4 md:grid-cols-2">
                 <div class="space-y-1.5">
@@ -421,8 +400,8 @@
                         bind:value={pisoBase}
                         disabled={!edificio}
                     >
-                        {#each availableFloors as floor}
-                            <option value={floor}>{floor}</option>
+                        {#each availableFloors as f}
+                            <option value={f}>{f}</option>
                         {/each}
                     </Select>
                 </div>
@@ -450,16 +429,13 @@
         >
             <legend
                 class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
+                >Horario</legend
             >
-                Horario
-            </legend>
-
             <div class="space-y-1.5">
-                <label
-                    for="diasHorario"
-                    class="text-xs font-bold text-slate-600 block">Días</label
+                <label for="dias" class="text-xs font-bold text-slate-600 block"
+                    >Días</label
                 >
-                <Select id="diasHorario" bind:value={diasHorario}>
+                <Select id="dias" bind:value={diasHorario}>
                     {#each schedules as s}
                         <option value={s.name}>{s.name}</option>
                     {/each}
@@ -469,29 +445,19 @@
             <div class="grid gap-4 md:grid-cols-2">
                 <div class="space-y-1.5">
                     <label
-                        for="horaEntrada"
+                        for="entrada"
                         class="text-xs font-bold text-slate-600 block"
-                        >Hora de Entrada</label
+                        >Entrada</label
                     >
-                    <input
-                        id="horaEntrada"
-                        type="time"
-                        class="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5"
-                        bind:value={horaEntrada}
-                    />
+                    <Input id="entrada" type="time" bind:value={horaEntrada} />
                 </div>
                 <div class="space-y-1.5">
                     <label
-                        for="horaSalida"
+                        for="salida"
                         class="text-xs font-bold text-slate-600 block"
-                        >Hora de Salida</label
+                        >Salida</label
                     >
-                    <input
-                        id="horaSalida"
-                        type="time"
-                        class="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5"
-                        bind:value={horaSalida}
-                    />
+                    <Input id="salida" type="time" bind:value={horaSalida} />
                 </div>
             </div>
         </fieldset>
@@ -502,10 +468,8 @@
         >
             <legend
                 class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
+                >Accesos Especiales</legend
             >
-                Accesos Especiales
-            </legend>
-
             <ToggleGroup
                 label=""
                 options={specialAccesses.map((a) => a.name)}
@@ -513,16 +477,15 @@
             />
         </fieldset>
 
-        <!-- SECTION: Cards (Only for new persons) -->
-        {#if !initialData}
+        <!-- SECTION: Cards -->
+        {#if !editingPerson}
             <fieldset
                 class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
             >
                 <legend
                     class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
+                    >Gestión de Tarjetas</legend
                 >
-                    Gestión de Tarjetas
-                </legend>
 
                 {#if tarjetasAsignadas.length > 0}
                     <div class="space-y-2">
@@ -538,10 +501,8 @@
                                     <Badge
                                         variant={card.type === "KONE"
                                             ? "blue"
-                                            : "amber"}
+                                            : "amber"}>{card.type}</Badge
                                     >
-                                        {card.type}
-                                    </Badge>
                                     <span
                                         class="text-sm font-bold text-slate-700"
                                         >{card.folio}</span
@@ -549,7 +510,7 @@
                                 </div>
                                 <button
                                     type="button"
-                                    class="p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                    class="p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50"
                                     onclick={() => removeCard(index)}
                                 >
                                     <Trash2 size={16} />
@@ -574,11 +535,10 @@
 
     {#snippet footer()}
         <Button variant="ghost" onclick={resetAndClose}>Cancelar</Button>
-        <Button variant="primary" onclick={handleSave} loading={isSubmitting}>
-            {isSubmitting ? "Guardando..." : "Guardar Alta"}
-        </Button>
+        <Button variant="primary" onclick={handleSave} loading={isSubmitting}
+            >{editingPerson ? "Actualizar (Ticket)" : "Guardar Alta"}</Button
+        >
     {/snippet}
 </Modal>
 
-<!-- Nested Card Modal -->
-<AddCardModal bind:isOpen={isCardModalOpen} {availableCards} onSave={addCard} />
+<AddCardModal bind:isOpen={isCardModalOpen} onSave={addCard} />
