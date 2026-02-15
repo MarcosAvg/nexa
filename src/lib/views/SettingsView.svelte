@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { supabase } from "../supabase";
+    import { toast } from "svelte-sonner";
     import {
         personnelService,
         catalogService,
@@ -17,13 +17,13 @@
         Edit2,
         Shield,
     } from "lucide-svelte";
-    import Card from "./Card.svelte";
-    import Button from "./Button.svelte";
-    import Badge from "./Badge.svelte";
-    import DataTable from "./DataTable.svelte";
-    import Modal from "./Modal.svelte";
-    import Input from "./Input.svelte";
-    import Select from "./Select.svelte";
+    import Card from "../components/Card.svelte";
+    import Button from "../components/Button.svelte";
+    import Badge from "../components/Badge.svelte";
+    import DataTable from "../components/DataTable.svelte";
+    import Modal from "../components/Modal.svelte";
+    import Input from "../components/Input.svelte";
+    import Select from "../components/Select.svelte";
 
     import { catalogState, userState } from "../stores"; // Import stores
     // Remove currentUser prop
@@ -44,6 +44,10 @@
         if (!userState.profile) return { role: "viewer" }; // Fallback
         return userState.profile;
     });
+
+    let canEdit = $derived(
+        currentUser.role === "admin" || currentUser.role === "operator",
+    );
 
     onMount(async () => {
         await fetchAll();
@@ -129,26 +133,32 @@
     }
 
     async function saveBuilding() {
+        if (!buildingName.trim()) {
+            toast.error("El nombre del edificio es requerido");
+            return;
+        }
         const floors = buildingFloors
             .split(",")
             .map((f) => f.trim())
             .filter((f) => f);
-
-        const payload = { name: buildingName, floors };
-
-        if (editingId) {
-            const { error } = await supabase
-                .from("buildings")
-                .update(payload)
-                .eq("id", editingId);
-            if (!error) await fetchBuildings();
-        } else {
-            const { error } = await supabase
-                .from("buildings")
-                .insert([payload]);
-            if (!error) await fetchBuildings();
+        if (floors.length === 0) {
+            toast.error("Debes agregar al menos un piso");
+            return;
         }
-        isBuildingModalOpen = false;
+
+        try {
+            await catalogService.saveBuilding(editingId, {
+                name: buildingName,
+                floors,
+            });
+            await fetchBuildings();
+            isBuildingModalOpen = false;
+            toast.success(
+                editingId ? "Edificio actualizado" : "Edificio creado",
+            );
+        } catch {
+            toast.error("Error al guardar el edificio");
+        }
     }
 
     function openDependencyModal(dep?: any) {
@@ -163,20 +173,22 @@
     }
 
     async function saveDependency() {
-        const payload = { name: dependencyName };
-        if (editingId) {
-            const { error } = await supabase
-                .from("dependencies")
-                .update(payload)
-                .eq("id", editingId);
-            if (!error) await fetchDependencies();
-        } else {
-            const { error } = await supabase
-                .from("dependencies")
-                .insert([payload]);
-            if (!error) await fetchDependencies();
+        if (!dependencyName.trim()) {
+            toast.error("El nombre de la dependencia es requerido");
+            return;
         }
-        isDependencyModalOpen = false;
+        try {
+            await catalogService.saveDependency(editingId, {
+                name: dependencyName,
+            });
+            await fetchDependencies();
+            isDependencyModalOpen = false;
+            toast.success(
+                editingId ? "Dependencia actualizada" : "Dependencia creada",
+            );
+        } catch {
+            toast.error("Error al guardar la dependencia");
+        }
     }
 
     function openAccessModal(access?: any) {
@@ -191,20 +203,18 @@
     }
 
     async function saveAccess() {
-        const payload = { name: accessName };
-        if (editingId) {
-            const { error } = await supabase
-                .from("special_accesses")
-                .update(payload)
-                .eq("id", editingId);
-            if (!error) await fetchAccesses();
-        } else {
-            const { error } = await supabase
-                .from("special_accesses")
-                .insert([payload]);
-            if (!error) await fetchAccesses();
+        if (!accessName.trim()) {
+            toast.error("El nombre del acceso es requerido");
+            return;
         }
-        isAccessModalOpen = false;
+        try {
+            await catalogService.saveAccess(editingId, { name: accessName });
+            await fetchAccesses();
+            isAccessModalOpen = false;
+            toast.success(editingId ? "Acceso actualizado" : "Acceso creado");
+        } catch {
+            toast.error("Error al guardar el acceso");
+        }
     }
 
     function openScheduleModal(schedule?: any) {
@@ -229,24 +239,25 @@
     }
 
     async function saveSchedule() {
-        const payload = {
-            name: scheduleName,
-            days: scheduleDays,
-        };
-
-        if (editingId) {
-            const { error } = await supabase
-                .from("schedules")
-                .update(payload)
-                .eq("id", editingId);
-            if (!error) await fetchSchedules();
-        } else {
-            const { error } = await supabase
-                .from("schedules")
-                .insert([payload]);
-            if (!error) await fetchSchedules();
+        if (!scheduleName.trim()) {
+            toast.error("El nombre del horario es requerido");
+            return;
         }
-        isScheduleModalOpen = false;
+        if (scheduleDays.length === 0) {
+            toast.error("Debes seleccionar al menos un día");
+            return;
+        }
+        try {
+            await catalogService.saveSchedule(editingId, {
+                name: scheduleName,
+                days: scheduleDays,
+            });
+            await fetchSchedules();
+            isScheduleModalOpen = false;
+            toast.success(editingId ? "Horario actualizado" : "Horario creado");
+        } catch {
+            toast.error("Error al guardar el horario");
+        }
     }
 
     function openUserModal(user?: any) {
@@ -265,14 +276,13 @@
     }
 
     async function saveUser() {
-        if (!editingId) return; // Only editing roles is allowed for now
+        if (!editingId) return;
 
         try {
-            // Update role via service
             await profileService.updateRole(editingId.toString(), userRole);
 
-            // Also update full name if changed
-            const { error: nameError } = await supabase
+            const { supabase: sb } = await import("../supabase");
+            const { error: nameError } = await sb
                 .from("profiles")
                 .update({ full_name: userName })
                 .eq("id", editingId);
@@ -281,8 +291,10 @@
 
             await fetchUsers();
             isUserModalOpen = false;
+            toast.success("Permisos actualizados correctamente");
         } catch (e) {
             console.error("Error saving user profile", e);
+            toast.error("Error al actualizar permisos");
         }
     }
 
@@ -300,22 +312,26 @@
     async function confirmDelete() {
         if (!deleteTarget || deleteConfirmation !== deleteTarget.name) return;
 
-        let table = "";
-        if (deleteTarget.type === "building") table = "buildings";
-        else if (deleteTarget.type === "dependency") table = "dependencies";
-        else if (deleteTarget.type === "access") table = "special_accesses";
-        else if (deleteTarget.type === "schedule") table = "schedules";
-        else if (deleteTarget.type === "user") table = "profiles";
+        const tableMap: Record<string, string> = {
+            building: "buildings",
+            dependency: "dependencies",
+            access: "special_accesses",
+            schedule: "schedules",
+        };
 
-        if (table) {
-            const { error } = await supabase
-                .from(table)
-                .delete()
-                .eq("id", deleteTarget.id);
+        const table = tableMap[deleteTarget.type];
+        if (!table) return;
 
-            if (!error) {
-                await fetchAll();
-            }
+        try {
+            await catalogService.deleteCatalogItem(
+                table,
+                deleteTarget.id,
+                deleteTarget.name,
+            );
+            await fetchAll();
+            toast.success(`"${deleteTarget.name}" eliminado correctamente`);
+        } catch {
+            toast.error("Error al eliminar el elemento");
         }
 
         isDeleteModalOpen = false;
@@ -386,9 +402,14 @@
                         <h3 class="text-lg font-bold text-slate-800">
                             Edificios y Pisos
                         </h3>
-                        <Button size="sm" onclick={() => openBuildingModal()}>
-                            <Plus size={16} class="mr-2" /> Nuevo Edificio
-                        </Button>
+                        {#if canEdit}
+                            <Button
+                                size="sm"
+                                onclick={() => openBuildingModal()}
+                            >
+                                <Plus size={16} class="mr-2" /> Nuevo Edificio
+                            </Button>
+                        {/if}
                     </div>
 
                     <div class="space-y-4">
@@ -407,25 +428,27 @@
                                             {building.floors.length} pisos configurados
                                         </p>
                                     </div>
-                                    <div class="flex gap-1">
-                                        <button
-                                            class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                            onclick={() =>
-                                                openBuildingModal(building)}
-                                        >
-                                            <Edit2 size={16} />
-                                        </button>
-                                        <button
-                                            class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                            onclick={() =>
-                                                openDeleteModal(
-                                                    building,
-                                                    "building",
-                                                )}
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
+                                    {#if canEdit}
+                                        <div class="flex gap-1">
+                                            <button
+                                                class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                onclick={() =>
+                                                    openBuildingModal(building)}
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <button
+                                                class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                onclick={() =>
+                                                    openDeleteModal(
+                                                        building,
+                                                        "building",
+                                                    )}
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    {/if}
                                 </div>
                                 <div class="flex flex-wrap gap-2">
                                     {#each building.floors as floor}
@@ -444,30 +467,37 @@
                         <h3 class="text-lg font-bold text-slate-800">
                             Dependencias
                         </h3>
-                        <Button size="sm" onclick={() => openDependencyModal()}>
-                            <Plus size={16} class="mr-2" /> Nueva Dependencia
-                        </Button>
+                        {#if canEdit}
+                            <Button
+                                size="sm"
+                                onclick={() => openDependencyModal()}
+                            >
+                                <Plus size={16} class="mr-2" /> Nueva Dependencia
+                            </Button>
+                        {/if}
                     </div>
                     <DataTable
                         data={dependencies}
                         columns={[{ key: "name", label: "Nombre" }]}
                     >
                         {#snippet actions(row: any)}
-                            <div class="flex justify-end gap-1">
-                                <button
-                                    class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    onclick={() => openDependencyModal(row)}
-                                >
-                                    <Edit2 size={16} />
-                                </button>
-                                <button
-                                    class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                    onclick={() =>
-                                        openDeleteModal(row, "dependency")}
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
+                            {#if canEdit}
+                                <div class="flex justify-end gap-1">
+                                    <button
+                                        class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        onclick={() => openDependencyModal(row)}
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button
+                                        class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                        onclick={() =>
+                                            openDeleteModal(row, "dependency")}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            {/if}
                         {/snippet}
                     </DataTable>
                 {:else if activeCatalog === "accesos"}
@@ -475,9 +505,11 @@
                         <h3 class="text-lg font-bold text-slate-800">
                             Accesos Especiales
                         </h3>
-                        <Button size="sm" onclick={() => openAccessModal()}>
-                            <Plus size={16} class="mr-2" /> Nuevo Acceso
-                        </Button>
+                        {#if canEdit}
+                            <Button size="sm" onclick={() => openAccessModal()}>
+                                <Plus size={16} class="mr-2" /> Nuevo Acceso
+                            </Button>
+                        {/if}
                     </div>
 
                     {#snippet renderAccessName(row: any)}
@@ -504,21 +536,23 @@
                         ]}
                     >
                         {#snippet actions(row: any)}
-                            <div class="flex justify-end gap-1">
-                                <button
-                                    class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    onclick={() => openAccessModal(row)}
-                                >
-                                    <Edit2 size={16} />
-                                </button>
-                                <button
-                                    class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                    onclick={() =>
-                                        openDeleteModal(row, "access")}
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
+                            {#if canEdit}
+                                <div class="flex justify-end gap-1">
+                                    <button
+                                        class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        onclick={() => openAccessModal(row)}
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button
+                                        class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                        onclick={() =>
+                                            openDeleteModal(row, "access")}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            {/if}
                         {/snippet}
                     </DataTable>
                 {:else if activeCatalog === "dias"}
@@ -526,9 +560,14 @@
                         <h3 class="text-lg font-bold text-slate-800">
                             Catálogo de Horarios
                         </h3>
-                        <Button size="sm" onclick={() => openScheduleModal()}>
-                            <Plus size={16} class="mr-2" /> Nuevo Horario
-                        </Button>
+                        {#if canEdit}
+                            <Button
+                                size="sm"
+                                onclick={() => openScheduleModal()}
+                            >
+                                <Plus size={16} class="mr-2" /> Nuevo Horario
+                            </Button>
+                        {/if}
                     </div>
 
                     {#snippet renderDays(row: any)}
@@ -551,21 +590,23 @@
                         ]}
                     >
                         {#snippet actions(row: any)}
-                            <div class="flex justify-end gap-1">
-                                <button
-                                    class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    onclick={() => openScheduleModal(row)}
-                                >
-                                    <Edit2 size={16} />
-                                </button>
-                                <button
-                                    class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                    onclick={() =>
-                                        openDeleteModal(row, "schedule")}
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
+                            {#if canEdit}
+                                <div class="flex justify-end gap-1">
+                                    <button
+                                        class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        onclick={() => openScheduleModal(row)}
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button
+                                        class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                        onclick={() =>
+                                            openDeleteModal(row, "schedule")}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            {/if}
                         {/snippet}
                     </DataTable>
                 {/if}

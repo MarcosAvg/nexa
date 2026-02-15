@@ -344,14 +344,14 @@
                     <p class="text-xs text-amber-600 bg-amber-50 p-2 rounded">
                         Persona externa o no registrada en el sistema.
                     </p>
-                    <Button
-                        variant="ghost"
-                        size="sm"
+                    <button
+                        type="button"
+                        class="mt-1 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors bg-blue-100 text-blue-700 border border-blue-200"
                         onclick={toggleNotListed}
-                        class="w-full text-xs"
                     >
-                        <Search size={14} class="mr-1" /> Buscar en sistema
-                    </Button>
+                        <Search size={14} />
+                        Buscar en sistema
+                    </button>
                 </div>
             {:else}
                 <div class="relative">
@@ -405,14 +405,15 @@
                         </div>
                     {/if}
 
-                    <Button
-                        variant="ghost"
-                        size="sm"
+                    <button
+                        type="button"
+                        class="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors {formData.personNotListed
+                            ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                            : 'text-slate-500 border border-slate-200 hover:bg-slate-50'}"
                         onclick={toggleNotListed}
-                        class="w-full mt-2 text-xs text-slate-500"
                     >
                         Persona no listada / Externa
-                    </Button>
+                    </button>
                 </div>
             {/if}
         </fieldset>

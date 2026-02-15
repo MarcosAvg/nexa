@@ -41,6 +41,7 @@
             const matchStatus =
                 statusFilter === "Todos" ||
                 (statusFilter === "Activo/a" && person.status === "Activo/a") ||
+                (statusFilter === "Parcial" && person.status === "Parcial") ||
                 (statusFilter === "Inactivo/a" &&
                     person.status === "Inactivo/a") ||
                 (statusFilter === "Bloqueado/a" &&
@@ -92,6 +93,7 @@
 
     function getStatusVariant(status: string) {
         if (status === "Activo/a") return "emerald";
+        if (status === "Parcial") return "amber";
         if (status === "Inactivo/a") return "slate";
         if (status === "Bloqueado/a") return "rose";
         if (status === "Baja") return "slate";
@@ -200,6 +202,7 @@
                 options={[
                     "Todos",
                     "Activo/a",
+                    "Parcial",
                     "Inactivo/a",
                     "Bloqueado/a",
                     "Baja",

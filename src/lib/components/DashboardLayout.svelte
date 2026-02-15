@@ -1,7 +1,7 @@
 <script lang="ts">
     import Sidebar from "./Sidebar.svelte";
     import Header from "./Header.svelte";
-    import { appState } from "../state.svelte";
+    import { uiState } from "../stores";
     import { type Snippet, type Component } from "svelte";
 
     type SidebarItem = {
@@ -32,7 +32,7 @@
             {#if headerTitle}
                 {@render headerTitle()}
             {:else}
-                {appState.activePage}
+                {uiState.activePage}
             {/if}
         </Header>
 

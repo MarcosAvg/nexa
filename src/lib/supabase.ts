@@ -5,9 +5,6 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
     console.error('❌ Error: Credenciales de Supabase no encontradas en .env');
-} else {
-    console.log('📡 Supabase conectado a:', supabaseUrl);
-    console.log('🔑 Anon Key presente:', !!supabaseAnonKey);
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

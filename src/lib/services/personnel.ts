@@ -13,11 +13,25 @@ export const personnelService = {
             if (error) throw error;
 
             return (data || []).map(p => {
-                const hasCards = p.cards && p.cards.length > 0;
+                const activeCards = (p.cards || []).filter((c: any) => c.status === "active");
+                const hasActiveCards = activeCards.length > 0;
                 let displayStatus = "Baja";
 
                 if (p.status === "active") {
-                    displayStatus = hasCards ? "Activo/a" : "Inactivo/a";
+                    if (!hasActiveCards) {
+                        displayStatus = "Inactivo/a";
+                    } else {
+                        const readyCards = activeCards.filter(
+                            (c: any) => c.programming_status === "done" && c.responsiva_status === "signed"
+                        );
+                        if (readyCards.length === activeCards.length) {
+                            displayStatus = "Activo/a";
+                        } else if (readyCards.length > 0) {
+                            displayStatus = "Parcial";
+                        } else {
+                            displayStatus = "Inactivo/a";
+                        }
+                    }
                 } else if (p.status === "blocked") {
                     displayStatus = "Bloqueado/a";
                 }
@@ -59,7 +73,7 @@ export const personnelService = {
     async save(data: any) { // Keeping 'any' for input data to be flexible with form binding, but logic inside is safer
         try {
             const payload = {
-                first_name: data.first_name || data.nombres, // Support both naming conventions if transitioning
+                first_name: data.first_name || data.nombres,
                 last_name: data.last_name || data.apellidos,
                 employee_no: data.employee_no || data.noEmpleado,
                 area: data.area || data.areaEquipo,
@@ -70,6 +84,9 @@ export const personnelService = {
                 floors_p2000: data.floors_p2000 || [],
                 floors_kone: data.floors_kone || [],
                 schedule_id: data.schedule_id || data.scheduleId,
+                entry_time: data.entry_time || null,
+                exit_time: data.exit_time || null,
+                special_accesses: data.specialAccesses || data.special_accesses || [],
                 email: data.email || null,
                 status: data.status || "active"
             };
@@ -85,6 +102,18 @@ export const personnelService = {
                 if (error) throw error;
                 personId = newPerson.id;
                 await HistoryService.log("PERSONNEL", personId, "CREATE", { message: `Registro de ${payload.first_name}` });
+            }
+
+            // Assign cards to the person
+            const cards = data.cards || [];
+            if (cards.length > 0) {
+                const { cardService } = await import("./cards");
+                for (const card of cards) {
+                    await cardService.save({
+                        ...card,
+                        person_id: personId,
+                    });
+                }
             }
         } catch (error) {
             handleError(error, "Save Personnel");
@@ -136,6 +165,7 @@ export const personnelService = {
 
 // Keeping other services here for now, but they should ideally be moved or typed too
 export const catalogService = {
+    // --- Fetch ---
     async fetchDependencies() {
         try {
             const { data, error } = await supabase.from("dependencies").select("*");
@@ -174,6 +204,87 @@ export const catalogService = {
         } catch (error) {
             handleError(error, "Fetch Schedules");
             return [];
+        }
+    },
+
+    // --- Save (Create/Update) ---
+    async saveBuilding(id: number | null, payload: { name: string; floors: string[] }) {
+        try {
+            if (id) {
+                const { error } = await supabase.from("buildings").update(payload).eq("id", id);
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Edificio actualizado: ${payload.name}` });
+            } else {
+                const { data, error } = await supabase.from("buildings").insert([payload]).select().single();
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Edificio creado: ${payload.name}` });
+            }
+        } catch (error) {
+            handleError(error, "Save Building");
+            throw error;
+        }
+    },
+
+    async saveDependency(id: number | null, payload: { name: string }) {
+        try {
+            if (id) {
+                const { error } = await supabase.from("dependencies").update(payload).eq("id", id);
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Dependencia actualizada: ${payload.name}` });
+            } else {
+                const { data, error } = await supabase.from("dependencies").insert([payload]).select().single();
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Dependencia creada: ${payload.name}` });
+            }
+        } catch (error) {
+            handleError(error, "Save Dependency");
+            throw error;
+        }
+    },
+
+    async saveAccess(id: number | null, payload: { name: string }) {
+        try {
+            if (id) {
+                const { error } = await supabase.from("special_accesses").update(payload).eq("id", id);
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Acceso especial actualizado: ${payload.name}` });
+            } else {
+                const { data, error } = await supabase.from("special_accesses").insert([payload]).select().single();
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Acceso especial creado: ${payload.name}` });
+            }
+        } catch (error) {
+            handleError(error, "Save Access");
+            throw error;
+        }
+    },
+
+    async saveSchedule(id: number | null, payload: { name: string; days: string[] }) {
+        try {
+            if (id) {
+                const { error } = await supabase.from("schedules").update(payload).eq("id", id);
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Horario actualizado: ${payload.name}` });
+            } else {
+                const { data, error } = await supabase.from("schedules").insert([payload]).select().single();
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Horario creado: ${payload.name}` });
+            }
+        } catch (error) {
+            handleError(error, "Save Schedule");
+            throw error;
+        }
+    },
+
+    // --- Delete ---
+    async deleteCatalogItem(table: string, id: number, itemName: string) {
+        try {
+            const { error } = await supabase.from(table).delete().eq("id", id);
+            if (error) throw error;
+            await HistoryService.log("SYSTEM", id, "DELETE_CATALOG", { message: `Eliminado de ${table}: ${itemName}` });
+        } catch (error) {
+            handleError(error, "Delete Catalog Item");
+            throw error;
         }
     }
 };

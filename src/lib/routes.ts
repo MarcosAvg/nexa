@@ -4,7 +4,7 @@ import PersonnelView from './views/PersonnelView.svelte';
 import CardsView from './views/CardsView.svelte';
 import TicketsView from './views/TicketsView.svelte';
 import HistoryView from './views/HistoryView.svelte';
-import SettingsView from './components/SettingsView.svelte';
+import SettingsView from './views/SettingsView.svelte';
 
 export const routes = {
     '/': DashboardView,

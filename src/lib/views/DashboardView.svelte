@@ -63,7 +63,10 @@
     // Metrics
     let activePersonnelCount = $derived(
         personnel.filter(
-            (p) => p.status === "active" || p.status === "Activo/a",
+            (p) =>
+                p.status === "active" ||
+                p.status === "Activo/a" ||
+                p.status === "Parcial",
         ).length,
     );
 

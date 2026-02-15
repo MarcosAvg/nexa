@@ -13,6 +13,7 @@
     import Input from "../components/Input.svelte";
     import TicketModal from "../components/modals/TicketModal.svelte";
     import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
+    import ModificationCompareModal from "../components/modals/ModificationCompareModal.svelte";
     import { Search, Plus } from "lucide-svelte";
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
@@ -34,6 +35,10 @@
     let isConfirm1Open = $state(false);
     let isConfirm2Open = $state(false);
     let ticketToComplete = $state<any>(null);
+
+    // Modification Compare Modal
+    let isCompareOpen = $state(false);
+    let compareTicket = $state<any>(null);
 
     let filteredTickets = $derived.by(() => {
         let items = pendingItems.filter((ticket) => {
@@ -92,6 +97,11 @@
 
     // Handlers
     function onManageTicket(ticket: any) {
+        if (ticket.type === "Modificación de datos") {
+            compareTicket = ticket;
+            isCompareOpen = true;
+            return;
+        }
         editingTicket = ticket;
         isModalOpen = true;
     }
@@ -109,6 +119,12 @@
             } else {
                 toast.error("Este ticket no tiene una persona vinculada");
             }
+            return;
+        }
+
+        if (ticket.type === "Modificación de datos") {
+            compareTicket = ticket;
+            isCompareOpen = true;
             return;
         }
 
@@ -243,4 +259,10 @@
     cancelText="Regresar"
     variant="info"
     onConfirm={handleFinalConfirm}
+/>
+
+<ModificationCompareModal
+    bind:isOpen={isCompareOpen}
+    ticket={compareTicket}
+    onComplete={refreshData}
 />

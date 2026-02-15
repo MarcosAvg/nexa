@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { supabase, auth } from "./lib/supabase";
-  // import { appState } from "./lib/state.svelte"; // Deprecated
   import {
     uiState,
     userState,
@@ -14,7 +13,7 @@
   import Router from "svelte-spa-router";
   import { routes } from "./lib/routes";
   import MainLayoutWrapper from "./lib/components/MainLayoutWrapper.svelte";
-  import LoginView from "./lib/components/LoginView.svelte";
+  import LoginView from "./lib/views/LoginView.svelte";
   import { Toaster } from "svelte-sonner";
   import {
     personnelService,
@@ -54,7 +53,6 @@
   });
 
   async function initData() {
-    console.log("Iniciando carga de datos desde Supabase...");
     try {
       const [_p, _c, _t, _d, _b, _a, _s, _h] = await Promise.all([
         personnelService.fetchAll(),
@@ -77,8 +75,6 @@
       catalogState.setSchedules(_s);
 
       historyState.setHistory(_h);
-
-      console.log("Carga de datos completada.");
     } catch (err) {
       console.error("Error general en onMount:", err);
     }

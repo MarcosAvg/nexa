@@ -1,7 +1,5 @@
 <script lang="ts">
-    import Input from "./Input.svelte";
-    import Button from "./Button.svelte";
-    import { appState } from "../state.svelte";
+    import { uiState } from "../stores";
     import { type Snippet } from "svelte";
 
     type Props = {
@@ -19,7 +17,7 @@
         <!-- Mobile toggle button -->
         <button
             class="text-slate-500 hover:text-slate-700 lg:hidden transition-colors"
-            onclick={() => appState.toggleSidebar()}
+            onclick={() => uiState.toggleSidebar()}
             aria-label="Toggle sidebar"
         >
             <svg
@@ -48,13 +46,6 @@
     </div>
 
     <div class="flex items-center gap-4">
-        <div class="hidden w-64 sm:block">
-            <Input
-                placeholder="Search..."
-                class="bg-slate-50 border-slate-200 focus:bg-white transition-colors"
-            />
-        </div>
-
         {#if actions}
             {@render actions()}
         {/if}

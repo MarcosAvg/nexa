@@ -54,11 +54,22 @@ export const ticketService = {
         }
     },
 
-    async delete(id: number) {
+    async delete(id: number, reason?: string) {
         try {
+            // Fetch ticket info before deleting for history
+            const { data: ticket } = await supabase
+                .from("tickets")
+                .select("title, type")
+                .eq("id", id)
+                .single();
+
             const { error } = await supabase.from("tickets").delete().eq("id", id);
             if (error) throw error;
             ticketState.removeTicket(id);
+
+            await HistoryService.log("TICKET", id, "COMPLETE_TICKET", {
+                message: reason || `Ticket completado: ${ticket?.title || `#${id}`}`,
+            });
         } catch (error) {
             handleError(error, "Delete Ticket");
             throw error;

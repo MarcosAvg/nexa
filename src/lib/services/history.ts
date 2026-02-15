@@ -67,6 +67,22 @@ export const HistoryService = {
         }
     },
 
+    async fetchMore(offset: number, limit: number = 200) {
+        try {
+            const { data, error } = await supabase
+                .from("history_logs")
+                .select("*")
+                .order("timestamp", { ascending: false })
+                .range(offset, offset + limit - 1);
+
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            handleError(error, "Fetch More History");
+            return [];
+        }
+    },
+
     async fetchByEntity(entityType: string, entityId: string) {
         try {
             const { data, error } = await supabase

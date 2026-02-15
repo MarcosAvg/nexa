@@ -15,9 +15,6 @@
         personnelState.personnel.find((p) => p.id === selectedPersonId) || null,
     );
 
-    let isEditModalOpen = $derived(personnelState.isEditModalOpen);
-    let editingPerson = $derived(personnelState.editingPerson);
-
     // Local state for Global Overlays (actions triggered from here)
     let isCardModalOpen = $state(false);
 
@@ -165,7 +162,11 @@
 />
 
 <!-- Global Edit Modal -->
-<PersonModal bind:isOpen={isEditModalOpen} {editingPerson} />
+<PersonModal
+    isOpen={personnelState.isEditModalOpen}
+    editingPerson={personnelState.editingPerson}
+    onclose={() => personnelState.closeEditModal()}
+/>
 
 <!-- Global Add Card Modal (triggered from Details Panel) -->
 <AddCardModal

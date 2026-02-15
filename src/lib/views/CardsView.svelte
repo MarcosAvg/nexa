@@ -189,7 +189,7 @@
     }
 
     function onReplaceCard(card: any) {
-        console.log("Replace Card - To be implemented", card);
+        toast.info("Función de reemplazo no disponible aún");
     }
 
     // Snippets

@@ -17,9 +17,11 @@
     let {
         isOpen = $bindable(false),
         editingPerson = null,
+        onclose,
     }: {
         isOpen: boolean;
         editingPerson?: Person | null;
+        onclose?: () => void;
     } = $props();
 
     // Catalogs
@@ -165,6 +167,8 @@
                 floors_p2000: pisosP2000,
                 floors_kone: pisosKone,
                 schedule_id: schedules.find((s) => s.name === diasHorario)?.id,
+                entry_time: horaEntrada,
+                exit_time: horaSalida,
                 cards: tarjetasAsignadas,
                 specialAccesses: accesosEspeciales,
             };
@@ -193,7 +197,7 @@
                 await ticketService.create({
                     title: "Modificación de Datos Personales",
                     description: `Solicitud de cambio de datos para ${nombres} ${apellidos} (${noEmpleado})`,
-                    type: "Otro",
+                    type: "Modificación de datos",
                     priority: "media",
                     person_id: editingPerson.id,
                     payload: ticketPayload,
@@ -242,7 +246,11 @@
 
     function resetAndClose() {
         resetForm();
-        isOpen = false;
+        if (onclose) {
+            onclose();
+        } else {
+            isOpen = false;
+        }
     }
 </script>
 

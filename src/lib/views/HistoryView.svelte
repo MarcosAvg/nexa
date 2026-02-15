@@ -6,12 +6,25 @@
     import Badge from "../components/Badge.svelte";
     import Button from "../components/Button.svelte";
     import HistoryFilters from "../components/HistoryFilters.svelte";
+    import { ChevronLeft, ChevronRight } from "lucide-svelte";
+
+    const PAGE_SIZE = 50;
 
     // State
     let historyFilterPerson = $state("");
     let historyFilterCardType = $state("Todos");
     let historyFilterFolio = $state("");
     let historyFilterAction = $state("Todas");
+    let currentPage = $state(1);
+
+    // Reset page when filters change
+    $effect(() => {
+        historyFilterPerson;
+        historyFilterCardType;
+        historyFilterFolio;
+        historyFilterAction;
+        currentPage = 1;
+    });
 
     // Get data from Stores
     let filteredHistoryLogs = $derived(historyState.filteredHistoryLogs);
@@ -60,12 +73,24 @@
         if (!filteredHistoryLogs) return [];
         return filteredHistoryLogs
             .map((log: any) => {
-                const details =
-                    typeof log.details === "string"
-                        ? log.details
-                        : log.details?.message ||
-                          JSON.stringify(log.details) ||
-                          "";
+                let details = "";
+                if (typeof log.details === "string") {
+                    details = log.details;
+                } else if (log.details?.message) {
+                    details = log.details.message;
+                } else if (log.details && typeof log.details === "object") {
+                    // Extract meaningful text from object values instead of JSON
+                    const vals = Object.entries(log.details)
+                        .filter(
+                            ([k, v]) =>
+                                v !== null && v !== undefined && k !== "id",
+                        )
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(", ");
+                    details = vals || "—";
+                } else {
+                    details = "—";
+                }
                 const entityType = log.entity_type || "SISTEMA";
                 const action = log.action || "Desconocida";
                 const entityId = log.entity_id || "";
@@ -121,6 +146,19 @@
             })
             .filter(Boolean);
     });
+
+    let totalPages = $derived(
+        Math.max(1, Math.ceil(derivedHistoryLogs.length / PAGE_SIZE)),
+    );
+
+    let paginatedLogs = $derived.by(() => {
+        const start = (currentPage - 1) * PAGE_SIZE;
+        return derivedHistoryLogs.slice(start, start + PAGE_SIZE);
+    });
+
+    function goToPage(page: number) {
+        currentPage = Math.max(1, Math.min(page, totalPages));
+    }
 
     import {
         ACTION_NAMES as actionNames,
@@ -206,7 +244,7 @@
 
     <Card class="overflow-hidden">
         <DataTable
-            data={derivedHistoryLogs}
+            data={paginatedLogs}
             columns={[
                 { key: "timestamp", label: "Fecha / Hora", render: renderDate },
                 {
@@ -219,4 +257,54 @@
             ]}
         />
     </Card>
+
+    <!-- Pagination Controls -->
+    {#if totalPages > 1}
+        <div class="flex items-center justify-between px-2">
+            <p class="text-xs text-slate-500">
+                Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(
+                    currentPage * PAGE_SIZE,
+                    derivedHistoryLogs.length,
+                )} de {derivedHistoryLogs.length} registros
+            </p>
+            <div class="flex items-center gap-2">
+                <Button
+                    variant="outline"
+                    onclick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                    class="flex items-center gap-1 text-xs px-3 py-1.5"
+                >
+                    <ChevronLeft size={14} />
+                    Anterior
+                </Button>
+                <div class="flex items-center gap-1">
+                    {#each Array.from({ length: totalPages }, (_, i) => i + 1) as page}
+                        {#if page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)}
+                            <button
+                                type="button"
+                                class="w-8 h-8 rounded-lg text-xs font-bold transition-colors {page ===
+                                currentPage
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-slate-600 hover:bg-slate-100'}"
+                                onclick={() => goToPage(page)}
+                            >
+                                {page}
+                            </button>
+                        {:else if page === currentPage - 2 || page === currentPage + 2}
+                            <span class="text-slate-400 text-xs px-1">…</span>
+                        {/if}
+                    {/each}
+                </div>
+                <Button
+                    variant="outline"
+                    onclick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                    class="flex items-center gap-1 text-xs px-3 py-1.5"
+                >
+                    Siguiente
+                    <ChevronRight size={14} />
+                </Button>
+            </div>
+        </div>
+    {/if}
 </div>

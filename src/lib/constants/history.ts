@@ -17,6 +17,13 @@ export const ACTION_NAMES: Record<string, string> = {
     REPLACE_CARD: "Reposición de Tarjeta",
     TICKET: "Ticket de Sistema",
     CREATE_TICKET: "Creación de Ticket",
+    COMPLETE_TICKET: "Ticket Completado",
+    APPLY_MODIFICATION: "Modificación Aprobada",
+    REJECT_MODIFICATION: "Modificación Rechazada",
+    UPDATE_ROLE: "Cambio de Rol",
+    CREATE_CATALOG: "Catálogo Creado",
+    UPDATE_CATALOG: "Catálogo Actualizado",
+    DELETE_CATALOG: "Catálogo Eliminado",
 };
 
 export const ACTION_COLORS: Record<string, string> = {
@@ -38,6 +45,13 @@ export const ACTION_COLORS: Record<string, string> = {
     DELETE_RESPONSIVA: "rose",
     TICKET: "sky",
     CREATE_TICKET: "sky",
+    COMPLETE_TICKET: "emerald",
+    APPLY_MODIFICATION: "emerald",
+    REJECT_MODIFICATION: "rose",
+    UPDATE_ROLE: "blue",
+    CREATE_CATALOG: "emerald",
+    UPDATE_CATALOG: "blue",
+    DELETE_CATALOG: "rose",
 };
 
 export function translateDetails(text: string) {
@@ -52,5 +66,7 @@ export function translateDetails(text: string) {
         .replace(/\bdone\b/gi, "listo")
         .replace(/\bsigned\b/gi, "firmado/a")
         .replace(/\bunsigned\b/gi, "sin firmar")
-        .replace(/\bavailable\b/gi, "disponible");
+        .replace(/\bavailable\b/gi, "disponible")
+        .replace(/\bnull\b/gi, "N/A");
 }
+
