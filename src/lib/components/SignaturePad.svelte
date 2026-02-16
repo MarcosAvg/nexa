@@ -99,14 +99,14 @@
     }
 </script>
 
-<div class="space-y-4 w-full flex-1 flex flex-col">
-    <div class="text-center flex-1 flex flex-col">
+<div class="space-y-4 w-full">
+    <div class="text-center">
         <p class="text-sm font-medium text-slate-600 mb-2">
             Firma aquí (usa tu mouse o dedo)
         </p>
         <canvas
             bind:this={canvas}
-            class="w-full flex-1 min-h-[250px] sm:min-h-0 sm:h-48 border-2 border-dashed border-slate-300 rounded-xl bg-slate-100 cursor-crosshair touch-none shadow-inner"
+            class="w-full h-64 sm:h-48 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 cursor-crosshair touch-none shadow-inner"
             onmousedown={startDrawing}
             onmousemove={draw}
             onmouseup={stopDrawing}
@@ -117,22 +117,16 @@
         ></canvas>
     </div>
 
-    <div class="flex flex-col xs:flex-row justify-between gap-3 mt-auto">
-        <Button
-            variant="ghost"
-            onclick={onCancel}
-            class="w-full xs:w-auto order-3 xs:order-1"
+    <div class="flex flex-col-reverse sm:flex-row justify-between gap-3">
+        <Button variant="ghost" onclick={onCancel} class="w-full sm:w-auto"
+            >Cancelar</Button
         >
-            Cancelar
-        </Button>
-        <div
-            class="flex flex-col xs:flex-row gap-2 w-full xs:w-auto order-1 xs:order-2"
-        >
+        <div class="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
             <Button
                 variant="outline"
                 onclick={clear}
                 disabled={!hasSignature}
-                class="w-full xs:w-auto"
+                class="w-full sm:w-auto"
             >
                 <Trash2 size={18} class="mr-2" />
                 Limpiar
@@ -141,11 +135,11 @@
                 variant="primary"
                 onclick={handleSave}
                 disabled={!hasSignature}
-                class="w-full xs:w-auto"
                 {loading}
+                class="w-full sm:w-auto"
             >
                 <Check size={18} class="mr-2" />
-                Confirmar
+                Confirmar Firma
             </Button>
         </div>
     </div>

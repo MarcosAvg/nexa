@@ -13,7 +13,7 @@
             fecha: string; // Formatted date string
         } | null;
         id?: string;
-        mode?: "hidden" | "preview";
+        mode?: "hidden" | "preview" | "text";
         signature?: string; // Base64 signature
         legalSnapshot?: string; // Snapshot from DB
         cardType?: "KONE" | "P2000";
@@ -39,8 +39,10 @@
     {id}
     class="pdf-container {mode === 'hidden'
         ? 'hidden-off-screen'
-        : 'preview-mode'}"
-    style="--bg-url: url('{bgImg}')"
+        : mode === 'text'
+          ? 'text-mode'
+          : 'preview-mode'}"
+    style={mode !== "text" ? `--bg-url: url('${bgImg}')` : ""}
 >
     {#if data}
         <div class="page">
@@ -222,4 +224,62 @@
 
     /* Helper class to hide from screen but allow generation */
     /* Note: We actually position it off-screen above, so this might be redundant or for specific controls */
+
+    /* TEXT MODE STYLES */
+    :global(.text-mode) {
+        position: relative !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
+        padding: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    :global(.text-mode) .page {
+        padding: 1.5rem !important;
+        min-height: auto !important;
+    }
+
+    :global(.text-mode) .page-background {
+        display: none !important;
+    }
+
+    :global(.text-mode) .header {
+        margin-bottom: 1rem !important;
+    }
+
+    :global(.text-mode) .date-line {
+        margin-top: 0 !important;
+        font-size: 0.85rem !important;
+        color: #64748b;
+    }
+
+    :global(.text-mode) .title {
+        font-size: 1.1rem !important;
+        margin-bottom: 1rem !important;
+        line-height: 1.3;
+        color: #0f172a;
+    }
+
+    :global(.text-mode) .content {
+        font-size: 0.95rem !important;
+        line-height: 1.6 !important;
+        color: #334155;
+    }
+
+    :global(.text-mode) .content p {
+        margin-bottom: 1rem !important;
+    }
+
+    :global(.text-mode) .signatures {
+        margin-top: 2rem !important;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    :global(.text-mode) .signature-box {
+        width: 100% !important;
+        max-width: 300px;
+    }
 </style>

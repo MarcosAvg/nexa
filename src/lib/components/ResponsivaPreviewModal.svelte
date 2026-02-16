@@ -1,22 +1,22 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import Modal from "./Modal.svelte";
     import Button from "./Button.svelte";
     import ResponsivaTemplate from "./ResponsivaTemplate.svelte";
-    import SignaturePad from "./SignaturePad.svelte";
+    import SignatureModal from "./modals/SignatureModal.svelte";
     import { generateResponsivaPdf } from "../utils/pdfGenerator";
     import {
         FileSignature,
         Download,
         X,
-        CheckCircle2,
         ShieldCheck,
         ShieldAlert,
         Mail,
-        Save,
+        FileText,
+        FileType,
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
     import { responsivaService } from "../services/responsiva";
-    import { cardService } from "../services/cards";
     import { supabase } from "../supabase";
     import { generateLegalHash } from "../utils/crypto";
     import { RESPONSIVA_LEGAL_TEXTS } from "../constants/legal";
@@ -44,11 +44,12 @@
 
     let isSigning = $state(false);
     let isDownloading = $state(false);
-    let showSignaturePad = $state(false);
+    let showSignatureModal = $state(false);
     let signatureBase64 = $state("");
     let verificationStatus = $state<"loading" | "valid" | "invalid" | "none">(
         "none",
     );
+    let isTextMode = $state(false);
 
     // Email capture state
     let showEmailPrompt = $state(false);
@@ -70,6 +71,11 @@
                 verifyIntegrity();
             } else {
                 verificationStatus = "none";
+            }
+
+            // Auto-enable text mode on small screens
+            if (window.innerWidth < 480) {
+                isTextMode = true;
             }
         }
     });
@@ -146,7 +152,7 @@
     }
 
     async function handleSign() {
-        showSignaturePad = true;
+        showSignatureModal = true;
     }
 
     async function handleSaveSignature(signature: string) {
@@ -192,7 +198,7 @@
 
             // 4. Update local state to show signature in preview
             signatureBase64 = signature;
-            showSignaturePad = false;
+            showSignatureModal = false;
 
             toast.success("Responsiva firmada y sellada digitalmente");
         } catch (error: any) {
@@ -338,45 +344,24 @@ Control de Accesos - Nexa`;
         showEmailPrompt = false;
     }
 
-    let isFullscreen = $state(false);
-
-    function toggleFullscreen() {
-        isFullscreen = !isFullscreen;
-    }
-
     function reset() {
-        showSignaturePad = false;
+        showSignatureModal = false;
         signatureBase64 = "";
-        isFullscreen = false;
         onClose();
     }
 </script>
 
 <Modal
     bind:isOpen
-    title={isFullscreen ? "" : "Previsualización de Responsiva"}
-    size={isFullscreen ? "full" : "xl"}
+    title="Previsualización de Responsiva"
+    size="xl"
     onclose={reset}
-    showClose={!isFullscreen}
 >
-    <!-- Fullscreen Overlay or Standard View -->
+    <!-- Standard View -->
     <div
-        class="bg-slate-100 rounded-lg overflow-x-hidden overflow-y-auto flex flex-col items-center relative transition-all duration-300
-               {isFullscreen
-            ? 'fixed inset-0 z-[60] bg-slate-900 p-0 rounded-none'
-            : 'p-2 sm:p-4 max-h-[70vh]'}"
+        class="bg-slate-100 rounded-lg overflow-x-hidden overflow-y-auto flex flex-col items-center p-2 sm:p-4 max-h-[70vh]"
     >
-        {#if isFullscreen}
-            <button
-                class="fixed top-4 right-4 z-[70] p-3 rounded-full bg-black/50 text-white backdrop-blur-md border border-white/20 active:scale-95"
-                onclick={toggleFullscreen}
-                aria-label="Cerrar pantalla completa"
-            >
-                <X size={24} />
-            </button>
-        {/if}
-
-        {#if !isFullscreen && showEmailPrompt}
+        {#if showEmailPrompt}
             <div
                 class="mb-4 w-full max-w-[215.9mm] p-6 rounded-2xl bg-white border border-blue-100 shadow-sm animate-in fade-in slide-in-from-top-4 duration-300"
             >
@@ -435,7 +420,22 @@ Control de Accesos - Nexa`;
             </div>
         {/if}
 
-        {#if !isFullscreen && verificationStatus !== "none" && !showSignaturePad}
+        <div class="w-full flex justify-end mb-2 max-w-[215.9mm]">
+            <Button
+                variant="outline"
+                size="sm"
+                onclick={() => (isTextMode = !isTextMode)}
+                class="text-xs gap-2"
+            >
+                {#if isTextMode}
+                    <FileType size={16} /> Ver PDF Original
+                {:else}
+                    <FileText size={16} /> Ver Modo Lectura
+                {/if}
+            </Button>
+        </div>
+
+        {#if verificationStatus !== "none" && !showSignatureModal}
             <div
                 class="mb-4 w-full max-w-[215.9mm] flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border gap-3 {verificationStatus ===
                 'valid'
@@ -486,61 +486,31 @@ Control de Accesos - Nexa`;
             </div>
         {/if}
 
-        {#if showSignaturePad}
+        <!-- Responsive PDF container with scaling -->
+        <div class="pdf-preview-wrapper relative">
             <div
-                class="bg-white p-4 sm:p-8 rounded-2xl shadow-xl w-full max-w-2xl min-h-[50vh] flex flex-col"
+                class={isTextMode
+                    ? ""
+                    : "pdf-scaler transition-transform duration-300 origin-top"}
             >
-                <SignaturePad
-                    onSave={handleSaveSignature}
-                    onCancel={() => (showSignaturePad = false)}
-                    loading={isSigning}
-                />
-            </div>
-        {:else}
-            <!-- Responsive PDF container with scaling -->
-            <div
-                class="pdf-preview-wrapper relative {isFullscreen
-                    ? 'scale-100 h-auto py-8'
-                    : ''}"
-            >
-                <button
-                    type="button"
-                    class="pdf-scaler transition-transform duration-300 origin-top cursor-zoom-in group"
-                    onclick={toggleFullscreen}
+                <div
+                    class="shadow-2xl bg-white"
+                    id="responsiva-preview-content"
                 >
-                    {#if !isFullscreen}
-                        <div
-                            class="absolute inset-x-0 -top-8 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            <span
-                                class="bg-slate-900 text-white text-[10px] font-bold uppercase px-2 py-1 rounded"
-                                >Ver pantalla completa</span
-                            >
-                        </div>
-                    {/if}
-                    <div
-                        class="shadow-2xl bg-white"
-                        id="responsiva-preview-content"
-                    >
-                        <ResponsivaTemplate
-                            {data}
-                            mode="preview"
-                            signature={signatureBase64}
-                            legalSnapshot={data.legal_snapshot}
-                            cardType={card?.type}
-                        />
-                    </div>
-                </button>
+                    <ResponsivaTemplate
+                        {data}
+                        mode={isTextMode ? "text" : "preview"}
+                        signature={signatureBase64}
+                        legalSnapshot={data.legal_snapshot}
+                        cardType={card?.type}
+                    />
+                </div>
             </div>
-        {/if}
+        </div>
     </div>
 
     {#snippet footer()}
-        <div
-            class="flex flex-col sm:flex-row gap-3 w-full sm:justify-between {isFullscreen
-                ? 'hidden'
-                : ''}"
-        >
+        <div class="flex flex-col sm:flex-row gap-3 w-full sm:justify-between">
             <div class="order-2 sm:order-1">
                 <Button
                     variant="ghost"
@@ -553,56 +523,55 @@ Control de Accesos - Nexa`;
                 </Button>
             </div>
 
-            {#if !showSignaturePad}
-                <div
-                    class="grid grid-cols-2 sm:flex sm:flex-row gap-2 order-1 sm:order-2"
-                >
-                    {#if signatureBase64}
-                        <Button
-                            variant="outline"
-                            onclick={handleSendEmail}
-                            class="w-full sm:w-auto"
-                            disabled={isSigning || isDownloading}
-                        >
-                            <Mail
-                                size={18}
-                                class="hidden sm:inline-block mr-2"
-                            />
-                            Email
-                        </Button>
-                    {/if}
-
+            <div
+                class="grid grid-cols-2 sm:flex sm:flex-row gap-2 order-1 sm:order-2"
+            >
+                {#if signatureBase64}
                     <Button
-                        variant={signatureBase64 ? "primary" : "outline"}
-                        onclick={handleDownload}
+                        variant="outline"
+                        onclick={handleSendEmail}
                         class="w-full sm:w-auto"
-                        loading={isDownloading}
-                        disabled={isSigning}
+                        disabled={isSigning || isDownloading}
                     >
-                        <Download
-                            size={18}
-                            class="hidden sm:inline-block mr-2"
-                        />
-                        {signatureBase64 ? "Final" : "Borrador"}
+                        <Mail size={18} class="hidden sm:inline-block mr-2" />
+                        Email
                     </Button>
+                {/if}
 
-                    {#if !signatureBase64 && card?.responsiva_status !== "signed"}
-                        <Button
-                            variant="primary"
-                            onclick={handleSign}
-                            class="col-span-2 sm:w-auto"
-                            loading={isSigning}
-                            disabled={isDownloading}
-                        >
-                            <FileSignature size={18} class="mr-2" />
-                            Firmar
-                        </Button>
-                    {/if}
-                </div>
-            {/if}
+                <Button
+                    variant={signatureBase64 ? "primary" : "outline"}
+                    onclick={handleDownload}
+                    class="w-full sm:w-auto"
+                    loading={isDownloading}
+                    disabled={isSigning}
+                >
+                    <Download size={18} class="hidden sm:inline-block mr-2" />
+                    {signatureBase64 ? "Final" : "Borrador"}
+                </Button>
+
+                {#if !signatureBase64 && card?.responsiva_status !== "signed"}
+                    <Button
+                        variant="primary"
+                        onclick={handleSign}
+                        class="col-span-2 sm:w-auto"
+                        loading={isSigning}
+                        disabled={isDownloading}
+                    >
+                        <FileSignature size={18} class="mr-2" />
+                        Firmar
+                    </Button>
+                {/if}
+            </div>
         </div>
     {/snippet}
 </Modal>
+
+<SignatureModal
+    bind:isOpen={showSignatureModal}
+    onSave={handleSaveSignature}
+    onClose={() => (showSignatureModal = false)}
+    loading={isSigning}
+/>
 
 <style>
     /* Responsive PDF scaling */
@@ -619,30 +588,25 @@ Control de Accesos - Nexa`;
 
     /* Scaling logic for mobile devices */
     @media (max-width: 850px) {
-        .pdf-preview-wrapper:not(.scale-100) {
+        .pdf-preview-wrapper {
             /* Height must be adjusted manually since transform doesn't affect document flow */
             /* Letter height (1056px approx) * scale factor */
-            height: calc(1056px * (100vw - 40px) / 816px);
+            height: calc(1056px * (100vw - 32px) / 816px);
             min-height: 400px;
         }
-        .pdf-scaler:not(.scale-100) {
-            /* 100vw minus modal padding (approx 40px) divided by original PDF width (215.9mm = 816px at 96dpi) */
-            transform: scale(calc((100vw - 40px) / 816));
-        }
-    }
-
-    @media (max-width: 640px) {
-        .pdf-preview-wrapper:not(.scale-100) {
-            height: calc(1056px * (100vw - 32px) / 816px);
-        }
-        .pdf-scaler:not(.scale-100) {
+        .pdf-scaler {
+            /* 100vw minus modal padding (approx 32px) divided by original PDF width (215.9mm = 816px at 96dpi) */
             transform: scale(calc((100vw - 32px) / 816));
         }
     }
 
-    .pdf-preview-wrapper.scale-100 {
-        background: #111;
-        overflow: auto;
+    @media (max-width: 640px) {
+        .pdf-preview-wrapper {
+            height: calc(1056px * (100vw - 24px) / 816px);
+        }
+        .pdf-scaler {
+            transform: scale(calc((100vw - 24px) / 816));
+        }
     }
 
     :global(.preview-mode) {
