@@ -1,18 +1,48 @@
 <script lang="ts">
-    import { appState } from "../state.svelte";
+    import { personnelState, userState, uiState } from "../stores";
     import SectionHeader from "../components/SectionHeader.svelte";
     import FilterGroup from "../components/FilterGroup.svelte";
     import Button from "../components/Button.svelte";
     import Card from "../components/Card.svelte";
     import DataTable from "../components/DataTable.svelte";
     import Badge from "../components/Badge.svelte";
-    import { Search, User, Lock, Trash2, RefreshCw, Ban } from "lucide-svelte";
+    import {
+        Search,
+        User,
+        Lock,
+        Trash2,
+        RefreshCw,
+        Ban,
+        Plus,
+        FileSpreadsheet,
+    } from "lucide-svelte";
+    import AddCardModal from "../components/modals/AddCardModal.svelte";
+    import { cardService } from "../services/cards";
+    import { toast } from "svelte-sonner";
+    import { personnelService } from "../services/personnel";
+    import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
 
-    let { personnel, extraCards } = $derived(appState);
+    let personnel = $derived(personnelState.personnel);
+    let extraCards = $derived(personnelState.extraCards);
 
     // Filters
     let cardStatusFilter = $state("Todas");
+    let cardTypeFilter = $state("Todos");
     let cardSearch = $state("");
+
+    // Modal State
+    let isModalOpen = $state(false);
+    let editingCard = $state<any>(null);
+    let replacingCard = $state<any>(null);
+
+    let confirmModal = $state({
+        isOpen: false,
+        title: "",
+        description: "",
+        variant: "danger" as "danger" | "warning" | "info",
+        confirmText: "Confirmar",
+        onConfirm: async () => {},
+    });
 
     // Computed Cards Data
     let allCards = $derived.by(() => {
@@ -38,6 +68,13 @@
 
     let filteredCards = $derived.by(() => {
         let result = allCards;
+
+        // Type Filter
+        if (cardTypeFilter !== "Todos") {
+            result = result.filter((c) => c.type === cardTypeFilter);
+        }
+
+        // Status Filter
         if (cardStatusFilter !== "Todas") {
             const statusMap: Record<string, string> = {
                 Activa: "active",
@@ -48,6 +85,8 @@
                 (c) => c.status === statusMap[cardStatusFilter],
             );
         }
+
+        // Search Filter
         if (cardSearch.trim() !== "") {
             const search = cardSearch.toLowerCase();
             result = result.filter(
@@ -60,23 +99,112 @@
     });
 
     // Props
-    let {
-        onOpenAddCard,
-        onBlockCard,
-        onDeleteCard,
-        onViewPerson,
-        onUnassignCard,
-        onReplaceCard,
-        currentUser,
-    } = $props<{
-        onOpenAddCard: () => void;
-        onBlockCard: (card: any) => void;
-        onDeleteCard: (card: any) => void;
-        onViewPerson: (card: any) => void;
-        onUnassignCard: (card: any) => void;
-        onReplaceCard: (card: any) => void;
-        currentUser?: any;
-    }>();
+    // Phase 2 Refactor: Use appState and stores instead of props
+
+    let currentUser = $derived.by(() => {
+        if (!userState.profile) return null;
+        return {
+            name: userState.profile.full_name || "Usuario",
+            email: userState.profile.email,
+            avatar: userState.profile.avatar_url,
+            role: userState.profile.role,
+        };
+    });
+
+    // Handlers
+    function onOpenAddCard() {
+        editingCard = null;
+        isModalOpen = true;
+    }
+
+    async function refreshData() {
+        const [updatedPeople, updatedCards] = await Promise.all([
+            personnelService.fetchAll(),
+            cardService.fetchExtra(),
+        ]);
+        personnelState.setPersonnel(updatedPeople);
+        personnelState.setCards(updatedCards);
+    }
+
+    async function onBlockCard(card: any) {
+        const isReactivation =
+            card.status === "blocked" || card.status === "inactive";
+        confirmModal = {
+            isOpen: true,
+            title: isReactivation
+                ? "¿Reactivar tarjeta?"
+                : "¿Bloquear tarjeta?",
+            description: isReactivation
+                ? "La tarjeta volverá a estar disponible o activa según su asignación."
+                : "Se denegará el acceso a esta tarjeta hasta que sea desbloqueada.",
+            variant: isReactivation ? "info" : "warning",
+            confirmText: isReactivation ? "Reactivar" : "Bloquear",
+            onConfirm: async () => {
+                const newStatus = isReactivation ? "active" : "blocked";
+                await cardService.updateStatus(card.id, newStatus);
+                toast.success(
+                    newStatus === "blocked"
+                        ? "Tarjeta Bloqueada"
+                        : "Tarjeta Reactivada",
+                );
+                await refreshData();
+            },
+        };
+    }
+
+    async function onUnassignCard(card: any) {
+        confirmModal = {
+            isOpen: true,
+            title: "¿Desvincular tarjeta?",
+            description:
+                "La tarjeta quedará disponible en inventario y dejará de pertenecer a esta persona.",
+            variant: "warning",
+            confirmText: "Desvincular",
+            onConfirm: async () => {
+                await cardService.unassign(card.id);
+                toast.success("Tarjeta desvinculada");
+                await refreshData();
+            },
+        };
+    }
+
+    async function onDeleteCard(card: any) {
+        const isInactive = card.status === "inactive";
+        confirmModal = {
+            isOpen: true,
+            title: isInactive
+                ? "¿Eliminar permanentemente?"
+                : "¿Inactivar tarjeta?",
+            description: isInactive
+                ? "Esta acción no se puede deshacer. Se borrará todo registro de la tarjeta."
+                : "La tarjeta quedará en estado de BAJA y no podrá ser utilizada.",
+            variant: "danger",
+            confirmText: isInactive
+                ? "Eliminar Definitivamente"
+                : "SÍ, Inactivar",
+            onConfirm: async () => {
+                if (isInactive) {
+                    await cardService.delete(card.id);
+                    toast.success("Tarjeta eliminada permanentemente");
+                } else {
+                    await cardService.updateStatus(card.id, "inactive");
+                    toast.success("Tarjeta inactivada");
+                }
+                await refreshData();
+            },
+        };
+    }
+
+    function onViewPerson(card: any) {
+        if (!card.personId) return;
+        personnelState.selectPerson(card.personId);
+        uiState.setActivePage("Directorio de Personal");
+    }
+
+    function onReplaceCard(card: any) {
+        replacingCard = card;
+        isModalOpen = true;
+    }
 
     // Snippets
     function getStatusVariant(status: string) {
@@ -136,7 +264,12 @@
     <SectionHeader title="Gestión de tarjetas">
         {#snippet filters()}
             <FilterGroup
-                label="Filtros"
+                label="Tipo"
+                options={["Todos", "KONE", "P2000"]}
+                bind:value={cardTypeFilter}
+            />
+            <FilterGroup
+                label="Estado"
                 options={["Todas", "Activa", "Bloqueada", "Baja"]}
                 bind:value={cardStatusFilter}
             />
@@ -163,7 +296,8 @@
 
         {#snippet actions()}
             <Button
-                variant="outline"
+                variant="soft-emerald"
+                class="flex items-center gap-2.5 h-10 px-6"
                 onclick={() => {
                     import("../utils/xlsxExport").then((m) => {
                         m.exportCardsToExcel(filteredCards, {
@@ -175,12 +309,22 @@
                     });
                 }}
             >
+                <FileSpreadsheet
+                    size={18}
+                    strokeWidth={2.5}
+                    class="text-emerald-600/80"
+                />
                 Exportar Excel
             </Button>
             {#if currentUser?.role !== "viewer"}
-                <Button variant="primary" onclick={onOpenAddCard}
-                    >Nueva Tarjeta</Button
+                <Button
+                    variant="primary"
+                    class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
+                    onclick={onOpenAddCard}
                 >
+                    <Plus size={18} strokeWidth={3} />
+                    Nueva Tarjeta
+                </Button>
             {/if}
         {/snippet}
     </SectionHeader>
@@ -281,3 +425,44 @@
         </DataTable>
     </Card>
 </div>
+
+<AddCardModal
+    bind:isOpen={isModalOpen}
+    mode={replacingCard ? "assign" : "inventory"}
+    {replacingCard}
+    onSave={async (card, replacementOptions) => {
+        try {
+            await cardService.save(
+                {
+                    ...card,
+                    person_id: replacingCard?.personId,
+                },
+                replacementOptions,
+            );
+            toast.success(
+                replacingCard
+                    ? "Tarjeta reemplazada exitosamente"
+                    : "Tarjeta creada en inventario",
+            );
+            await refreshData();
+            isModalOpen = false;
+        } catch (e) {
+            console.error(e);
+            throw e;
+        }
+    }}
+    onclose={() => {
+        replacingCard = null;
+        isModalOpen = false;
+    }}
+/>
+
+<ConfirmationModal
+    bind:isOpen={confirmModal.isOpen}
+    title={confirmModal.title}
+    description={confirmModal.description}
+    variant={confirmModal.variant}
+    confirmText={confirmModal.confirmText}
+    onConfirm={confirmModal.onConfirm}
+    onCancel={() => (confirmModal.isOpen = false)}
+/>

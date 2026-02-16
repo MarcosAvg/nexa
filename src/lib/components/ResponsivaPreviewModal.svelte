@@ -16,8 +16,11 @@
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
     import { responsivaService } from "../services/responsiva";
-    import { cardService } from "../services/data";
+    import { cardService } from "../services/cards";
     import { supabase } from "../supabase";
+    import { generateLegalHash } from "../utils/crypto";
+    import { RESPONSIVA_LEGAL_TEXTS } from "../constants/legal";
+    import bgImage from "../../assets/responsiva_bg.png";
 
     type Props = {
         isOpen: boolean;
@@ -25,7 +28,7 @@
         person?: any;
         card: any;
         signature?: string;
-        onSign: (card: any) => Promise<void>;
+        onSign: (card: any, signature?: string) => Promise<void>;
         onClose: () => void;
     };
 
@@ -55,10 +58,15 @@
 
     $effect(() => {
         if (isOpen) {
-            signatureBase64 = signature;
+            // Only synchronize from prop if the prop is NOT empty
+            // This allows viewing an existing signature without overwriting
+            // a fresh one generated locally during the current session
+            if (signature) {
+                signatureBase64 = signature;
+            }
             showEmailPrompt = false;
             tempEmail = person?.email || "";
-            if (signature && data.legal_hash) {
+            if (signatureBase64 && data.legal_hash) {
                 verifyIntegrity();
             } else {
                 verificationStatus = "none";
@@ -86,8 +94,6 @@
             verificationStatus = "none";
         }
     }
-
-    import bgImage from "../../assets/responsiva_bg.png";
 
     async function getBase64Image(url: string): Promise<string> {
         const response = await fetch(url);
@@ -143,9 +149,6 @@
         showSignaturePad = true;
     }
 
-    import { generateLegalHash } from "../utils/crypto";
-    import { RESPONSIVA_LEGAL_TEXTS } from "../constants/legal";
-
     async function handleSaveSignature(signature: string) {
         if (!card || !person || !data) {
             toast.error("Error: Información incompleta para firmar");
@@ -153,7 +156,6 @@
         }
         isSigning = true;
         try {
-            // 1. Generate Legal Hash (Security Seal) with processed text
             const typeKey =
                 card?.type?.toUpperCase() === "P2000" ? "P2000" : "KONE";
             const textToUse = RESPONSIVA_LEGAL_TEXTS[typeKey];
@@ -186,16 +188,21 @@
             });
 
             // 3. Update card status
-            await onSign(card);
+            await onSign(card, signature);
 
             // 4. Update local state to show signature in preview
             signatureBase64 = signature;
             showSignaturePad = false;
 
             toast.success("Responsiva firmada y sellada digitalmente");
-        } catch (error) {
-            console.error(error);
-            toast.error("Error al guardar responsiva");
+        } catch (error: any) {
+            console.error(
+                "[ResponsivaPreviewModal] Error in signature flow:",
+                error,
+            );
+            toast.error(
+                `Error al guardar responsiva: ${error.message || "Error desconocido"}`,
+            );
         } finally {
             isSigning = false;
         }
@@ -462,6 +469,7 @@ Control de Accesos - Nexa`;
                 <SignaturePad
                     onSave={handleSaveSignature}
                     onCancel={() => (showSignaturePad = false)}
+                    loading={isSigning}
                 />
             </div>
         {:else}

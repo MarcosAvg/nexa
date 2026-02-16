@@ -4,7 +4,7 @@ import { saveAs } from 'file-saver';
 export interface ExportPersonnelData {
     first_name: string;
     last_name: string;
-    employeeNo: string;
+    employee_no: string;
     building: string;
     dependency: string;
     area: string;
@@ -19,8 +19,10 @@ export interface ExportPersonnelData {
         entry: string;
         exit: string;
     } | null;
-    email?: string;
+    email?: string | null;
     cards?: { type: string; folio: string }[];
+    // Allow any other props from Person to avoid strict casting errors during development
+    [key: string]: any;
 }
 
 export interface ExportOptions {
@@ -71,14 +73,14 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         }
 
         if (activeFilters.length > 0) {
-            filterDescription = `  |  Filtros: ${activeFilters.join(' - ')}`;
+            filterDescription = `      -  Filtros: ${activeFilters.join(' - ')}`;
         }
     }
 
     worksheet.columns = [
         { key: 'last_name', width: 25 },
         { key: 'first_name', width: 25 },
-        { key: 'employeeNo', width: 15 },
+        { key: 'employee_no', width: 15 },
         { key: 'building', width: 22 },
         { key: 'dependency', width: 28 },
         { key: 'area', width: 22 },
@@ -99,7 +101,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
     // Row 1: Header + Logo
     worksheet.mergeCells('A1:R1');
     const titleCell = worksheet.getCell('A1');
-    titleCell.value = `         DIRECTORIO MAESTRO DE PERSONAL - NEXA${filterDescription}`;
+    titleCell.value = `       DIRECTORIO DE PERSONAL - NEXA${filterDescription}`;
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     worksheet.getRow(1).height = 40;
@@ -194,7 +196,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         const rowData = {
             last_name: person.last_name || '-',
             first_name: person.first_name || '-',
-            employeeNo: person.employeeNo || '-',
+            employee_no: person.employee_no || '-',
             building: person.building || '-',
             dependency: person.dependency || '-',
             area: person.area || '-',
@@ -290,29 +292,34 @@ export async function exportCardsToExcel(data: any[], options?: ExportOptions) {
         amber: { head: 'FFFEF3C7', sub: 'FF92400E', fill: 'FFFEFCE8' },
         sky: { head: 'FFE0F2FE', sub: 'FF075985', fill: 'FFF0F9FF' },
         status: { head: 'FFEDE9FE', sub: 'FF5B21B6', fill: 'FFFAF5FF' },
+        emerald: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
+        rose: { head: 'FFFEE2E2', sub: 'FF991B1B', fill: 'FFFFF1F2' },
+        violet: { head: 'FFEDE9FE', sub: 'FF5B21B6', fill: 'FFFAF5FF' },
+        slate: { head: 'FFF1F5F9', sub: 'FF334155', fill: 'FFF8FAFC' }
     };
 
     let filterDescription = '';
     if (options?.filters?.search) {
-        filterDescription = `  |  Búsqueda: "${options.filters.search}"`;
+        filterDescription = `      -  Búsqueda: "${options.filters.search}"`;
     }
     if (options?.filters?.status && options.filters.status !== 'Todas') {
         filterDescription += `  |  Estado: ${options.filters.status}`;
     }
 
     worksheet.columns = [
-        { key: 'type', width: 12 },
-        { key: 'folio', width: 20 },
-        { key: 'personName', width: 30 },
-        { key: 'statusLabel', width: 15 },
-        { key: 'responsivaText', width: 22 },
+        { key: 'type', width: 14 },
+        { key: 'folio', width: 22 },
+        { key: 'personName', width: 35 },
+        { key: 'statusLabel', width: 18 },
         { key: 'programmingText', width: 22 },
+        { key: 'responsivaText', width: 22 },
     ];
 
+    // Row 1: Header + Logo
     worksheet.mergeCells('A1:F1');
     const titleCell = worksheet.getCell('A1');
-    titleCell.value = `         INVENTARIO DE TARJETAS Y ACCESOS - NEXA${filterDescription}`;
-    titleCell.font = { name: 'Arial', bold: true, size: 14, color: { argb: COLORS.title } };
+    titleCell.value = `       INVENTARIO DE TARJETAS Y ACCESOS - NEXA${filterDescription}`;
+    titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     worksheet.getRow(1).height = 40;
 
@@ -331,71 +338,120 @@ export async function exportCardsToExcel(data: any[], options?: ExportOptions) {
         console.warn('Logo load failed');
     }
 
-    // Sub-Headers (No Row 2 gap)
-    const headerRow = worksheet.getRow(2);
-    headerRow.height = 25;
-    const headerLabels = ['TIPO', 'FOLIO / NO. TARJETA', 'ASIGNADA A', 'ESTADO', 'RESPONSIVA', 'PROGRAMACIÓN'];
+    // Row 2: Meta
+    worksheet.mergeCells('A2:F2');
+    const metaCell = worksheet.getCell('A2');
+    const dateStr = new Date().toLocaleDateString('es-MX', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    metaCell.value = `Reporte generado: ${dateStr}  |  Registros: ${data.length}`;
+    metaCell.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
+    metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    worksheet.getRow(2).height = 20;
+
+    // Row 3: Super-Headers
+    const groups = [
+        { label: 'IDENTIFICACIÓN', range: 'A3:B3', colors: COLORS.amber },
+        { label: 'USUARIO ASIGNADO', range: 'C3:C3', colors: COLORS.personal },
+        { label: 'ESTADO ACTUAL', range: 'D3:D3', colors: COLORS.status },
+        { label: 'MOVIMIENTOS / CONTROL', range: 'E3:F3', colors: COLORS.violet }
+    ];
+
+    groups.forEach(group => {
+        worksheet.mergeCells(group.range);
+        const cell = worksheet.getCell(group.range.split(':')[0]);
+        cell.value = group.label;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.head } };
+        cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: group.colors.sub } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+            top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            right: { style: 'medium', color: { argb: COLORS.separator } }
+        };
+    });
+
+    // Row 4: Sub-Headers
+    const headerRow = worksheet.getRow(4);
+    headerRow.height = 30;
+    const headerLabels = ['TIPO', 'FOLIO / NO. TARJETA', 'ASIGNADA A', 'ESTADO', 'PROGRAMACIÓN', 'RESPONSIVA'];
 
     headerLabels.forEach((label, i) => {
         const cell = headerRow.getCell(i + 1);
         cell.value = label;
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.title } };
-        cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        const group = groups.find(g => {
+            const col = String.fromCharCode(65 + i);
+            const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
+            return col >= (start || 'A') && col <= (end || start || 'A');
+        }) || groups[0];
+
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
+        cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+        const isGroupEnd = [2, 3, 4, 6].includes(i + 1);
         cell.border = {
             bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
-            right: { style: (i === 1 || i === 3) ? 'medium' : 'thin', color: { argb: 'FFFFFFFF' } }
+            right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFFFFFFF' } }
         };
     });
 
-    worksheet.autoFilter = 'A2:F2';
+    worksheet.autoFilter = 'A4:F4';
 
     data.forEach((card) => {
         const rowData = {
             type: card.type,
             folio: card.folio,
             personName: card.personName || 'Sin asignar',
-            statusLabel: card.status === 'active' ? 'Activa' : (card.status === 'blocked' ? 'Bloqueada' : 'Disponible'),
-            responsivaText: card.responsiva_status === 'signed' ? 'Firmada' : (card.personId ? 'PENDIENTE' : 'N/A'),
-            programmingText: card.programming_status === 'done' ? 'Programada' : (card.personId ? 'PENDIENTE' : 'N/A')
+            statusLabel: card.status === 'active' ? 'Activa' : (card.status === 'blocked' ? 'Bloqueada' : (card.status === 'inactive' ? 'Baja' : 'Disponible')),
+            programmingText: card.programming_status === 'done' ? 'Programada' : (card.person_id ? 'PENDIENTE' : 'N/A'),
+            responsivaText: card.responsiva_status === 'signed' ? 'Firmada' : (card.person_id ? 'PENDIENTE' : 'N/A')
         };
 
         const row = worksheet.addRow(rowData);
-        row.height = 22;
+        row.height = 24;
 
         row.eachCell((cell, colNumber) => {
+            const colLetter = String.fromCharCode(64 + colNumber);
+            const group = groups.find(g => {
+                const parts = g.range.replace(/[0-9]/g, '').split(':');
+                return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
+            }) || groups[0];
+
             cell.font = { name: 'Arial', size: 9 };
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
+
+            const isGroupEnd = [2, 3, 4, 6].includes(colNumber);
             cell.border = {
                 bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-                right: { style: (colNumber === 2 || colNumber === 4) ? 'medium' : 'thin', color: { argb: 'FFCBD5E1' } }
+                right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFCBD5E1' } }
             };
 
-            // Empty highlights
-            if (cell.value === 'PENDIENTE') {
-                cell.value = '[SIN DATO]';
-                cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, italic: true };
+            // HIGHLIGHTS & STATUS BADGES
+            if (cell.value === 'PENDIENTE' || cell.value === 'N/A' || !cell.value || cell.value === '[SIN DATO]' || cell.value === 'Sin asignar') {
+                const label = cell.value === 'Sin asignar' ? 'SIN ASIGNAR' : (cell.value === 'PENDIENTE' ? '[PENDIENTE]' : (cell.value === 'N/A' ? 'N/A' : '[SIN DATO]'));
+                cell.value = label;
+                cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, italic: true, bold: true };
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+            } else if (cell.value === 'Programada' || cell.value === 'Firmada') {
+                const isProg = cell.value === 'Programada';
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isProg ? COLORS.violet.head : COLORS.emerald.head } };
+                cell.font = { ...cell.font, color: { argb: isProg ? COLORS.violet.sub : COLORS.emerald.sub }, bold: true };
+            } else if (colNumber === 4) { // Status column badge system
+                let statusColors = COLORS.slate; // Default for 'Baja'
+                if (cell.value === 'Activa') statusColors = COLORS.emerald;
+                else if (cell.value === 'Bloqueada') statusColors = COLORS.rose;
+                else if (cell.value === 'Disponible') statusColors = COLORS.sky;
+
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: statusColors.head } };
+                cell.font = { ...cell.font, color: { argb: statusColors.sub }, bold: true };
             }
         });
-
-        // Status Colors
-        const statusCell = row.getCell('statusLabel');
-        if (card.status === 'active') {
-            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
-            statusCell.font = { color: { argb: 'FF166534' }, bold: true, name: 'Arial', size: 9 };
-        } else if (card.status === 'blocked') {
-            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
-            statusCell.font = { color: { argb: 'FF991B1B' }, bold: true, name: 'Arial', size: 9 };
-        }
-
-        // Type Colors
-        const typeCell = row.getCell('type');
-        typeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: card.type === 'KONE' ? COLORS.sky.head : COLORS.amber.head } };
-        typeCell.font = { color: { argb: card.type === 'KONE' ? COLORS.sky.sub : COLORS.amber.sub }, bold: true, name: 'Arial', size: 9 };
     });
 
-    worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 2 }];
+    worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
     const finalFileName = `Tarjetas_Nexa_${new Date().toISOString().split('T')[0]}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), finalFileName);
@@ -407,12 +463,15 @@ export async function exportHistoryToExcel(data: any[], options?: ExportOptions)
 
     const COLORS = {
         title: 'FF1E293B',
-        personal: { head: 'FFDBEAFE', sub: 'FF1E40AF' },
-        amber: { head: 'FFFEF3C7', sub: 'FF92400E' },
-        sky: { head: 'FFE0F2FE', sub: 'FF075985' },
-        emerald: { head: 'FFD1FAE5', sub: 'FF065F46' },
-        rose: { head: 'FFFEE2E2', sub: 'FF991B1B' },
-        violet: { head: 'FFEDE9FE', sub: 'FF5B21B6' }
+        meta: 'FF64748B',
+        separator: 'FF94A3B8',
+        personal: { head: 'FFDBEAFE', sub: 'FF1E40AF', fill: 'FFEFF6FF' },
+        amber: { head: 'FFFEF3C7', sub: 'FF92400E', fill: 'FFFEFCE8' },
+        sky: { head: 'FFE0F2FE', sub: 'FF075985', fill: 'FFF0F9FF' },
+        emerald: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
+        rose: { head: 'FFFEE2E2', sub: 'FF991B1B', fill: 'FFFFF1F2' },
+        violet: { head: 'FFEDE9FE', sub: 'FF5B21B6', fill: 'FFFAF5FF' },
+        slate: { head: 'FFF1F5F9', sub: 'FF334155', fill: 'FFF8FAFC' }
     };
 
     const actionNames: Record<string, string> = {
@@ -422,6 +481,8 @@ export async function exportHistoryToExcel(data: any[], options?: ExportOptions)
         UPDATE_STATUS: "Cambio de Estado", UNASSIGN: "Desvinculación", UPDATE_PROGRAMMING: "Programación de Acceso",
         UPDATE_RESPONSIVA: "Estatus de Responsiva", REPLACE_CARD: "Reposición de Tarjeta", TICKET: "Ticket de Sistema",
         CREATE_TICKET: "Creación de Ticket", SIGN_RESPONSIVA: "Firma de Responsiva", DELETE_RESPONSIVA: "Eliminación de Responsiva",
+        COMPLETE_TICKET: "Ticket Completado", APPLY_MODIFICATION: "Modificación Aprobada", REJECT_MODIFICATION: "Modificación Rechazada",
+        REPLACE_OLD: "Baja por Reposición", DELETE_TICKET_CASCADE: "Eliminación en Cascada"
     };
 
     function translateText(text: string) {
@@ -436,20 +497,25 @@ export async function exportHistoryToExcel(data: any[], options?: ExportOptions)
             .replace(/\bdone\b/gi, "listo")
             .replace(/\bsigned\b/gi, "firmado/a")
             .replace(/\bunsigned\b/gi, "sin firmar")
-            .replace(/\bavailable\b/gi, "disponible");
+            .replace(/\bavailable\b/gi, "disponible")
+            .replace(/\burgente\b/gi, "URGENTE")
+            .replace(/\balta\b/gi, "ALTA")
+            .replace(/\bmedia\b/gi, "MEDIA")
+            .replace(/\bbaja\b/gi, "BAJA");
     }
 
     worksheet.columns = [
-        { key: 'date', width: 22 },
-        { key: 'entity', width: 45 }, // Slightly wider for full names
-        { key: 'actionLabel', width: 25 },
-        { key: 'description', width: 55 },
+        { key: 'date', width: 24 },
+        { key: 'entity', width: 45 },
+        { key: 'actionLabel', width: 28 },
+        { key: 'description', width: 65 },
     ];
 
+    // Row 1: Header + Logo
     worksheet.mergeCells('A1:D1');
     const titleCell = worksheet.getCell('A1');
-    titleCell.value = `         HISTORIAL DE AUDITORÍA Y ACCIONES - NEXA`;
-    titleCell.font = { name: 'Arial', bold: true, size: 14, color: { argb: COLORS.title } };
+    titleCell.value = `       HISTORIAL DE AUDITORÍA Y ACCIONES - NEXA`;
+    titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     worksheet.getRow(1).height = 40;
 
@@ -468,29 +534,68 @@ export async function exportHistoryToExcel(data: any[], options?: ExportOptions)
         console.warn('Logo load failed');
     }
 
-    const headerRow = worksheet.getRow(2);
-    headerRow.height = 25;
-    const headerLabels = ['FECHA / HORA', 'ENTIDAD AFECTADA', 'ACCIÓN', 'DESCRIPCIÓN'];
+    // Row 2: Meta
+    worksheet.mergeCells('A2:D2');
+    const metaCell = worksheet.getCell('A2');
+    const dateStr = new Date().toLocaleDateString('es-MX', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    metaCell.value = `Reporte generado: ${dateStr}  |  Registros: ${data.length}`;
+    metaCell.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
+    metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    worksheet.getRow(2).height = 20;
+
+    // Row 3: Super-Headers
+    const groups = [
+        { label: 'TEMPORALIDAD', range: 'A3:A3', colors: COLORS.slate },
+        { label: 'AUDITORÍA', range: 'B3:B3', colors: COLORS.personal },
+        { label: 'MOVIMIENTO', range: 'C3:C3', colors: COLORS.amber },
+        { label: 'DETALLES DE LA ACCIÓN', range: 'D3:D3', colors: COLORS.violet }
+    ];
+
+    groups.forEach(group => {
+        worksheet.mergeCells(group.range);
+        const cell = worksheet.getCell(group.range.split(':')[0]);
+        cell.value = group.label;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.head } };
+        cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: group.colors.sub } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+            top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            right: { style: 'medium', color: { argb: COLORS.separator } }
+        };
+    });
+
+    // Row 4: Sub-Headers
+    const headerRow = worksheet.getRow(4);
+    headerRow.height = 30;
+    const headerLabels = ['FECHA / HORA', 'ENTIDAD AFECTADA', 'ACCIÓN REALIZADA', 'DESCRIPCIÓN'];
     headerLabels.forEach((label, i) => {
         const cell = headerRow.getCell(i + 1);
         cell.value = label;
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.title } };
-        cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        const group = groups.find(g => {
+            const col = String.fromCharCode(65 + i);
+            const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
+            return col >= (start || 'A') && col <= (end || start || 'A');
+        }) || groups[0];
+
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
+        cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+            bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
+            right: { style: 'medium', color: { argb: COLORS.separator } }
+        };
     });
 
-    worksheet.autoFilter = 'A2:D2';
+    worksheet.autoFilter = 'A4:D4';
 
     data.forEach((log) => {
         const message = log.details?.message || (typeof log.details === 'string' ? log.details : JSON.stringify(log.details));
-        let cleanMessage = message.replace(/\sID:?\s?[a-f0-9-]{8,}/gi, '').replace(/\s(de|ID)\s?[a-f0-9-]{8,}/gi, '');
+        let cleanMessage = (message || '').replace(/\sID:?\s?[a-f0-9-]{8,}/gi, '').replace(/\s(de|ID)\s?[a-f0-9-]{8,}/gi, '');
         cleanMessage = translateText(cleanMessage);
-
-        // Resolve entity string (since we are receiving data that might already have resolved entity in some cases, 
-        // but the view sends the raw or almost raw data. We'll handle it here if view gives us it or we derive.)
-        // Looking at HistoryView, it uses resolveEntity(log.entity_type, log.entity_id)
-        // We'll assume the caller might have already resolved it or we'll just use what's there.
-        // Actually, let's assume the view sends row.resolvedEntity derived field.
 
         const rowData = {
             date: new Date(log.timestamp).toLocaleString('es-MX'),
@@ -502,31 +607,49 @@ export async function exportHistoryToExcel(data: any[], options?: ExportOptions)
         const row = worksheet.addRow(rowData);
         row.height = 24;
 
-        // Apply Row Background Color based on Action (Subtle)
-        let rowFillColor = 'FFFFFFFF'; // Default white
-        const action = log.action;
-        if (['CREATE', 'ACTIVATE'].includes(action)) rowFillColor = COLORS.emerald.head;
-        else if (['DELETE', 'BLOCK', 'DEACTIVATE', 'UNASSIGN', 'UNASSIGN_CARD', 'DELETE_RESPONSIVA'].includes(action)) rowFillColor = COLORS.rose.head;
-        else if (['UPDATE', 'UPDATE_STATUS', 'UPSERT'].includes(action)) rowFillColor = COLORS.personal.head;
-        else if (['ASSIGN_CARD', 'UPDATE_PROGRAMMING', 'UPDATE_RESPONSIVA', 'REPLACE_CARD', 'SIGN_RESPONSIVA'].includes(action)) rowFillColor = COLORS.violet.head;
-        else if (['TICKET', 'CREATE_TICKET'].includes(action)) rowFillColor = COLORS.sky.head;
+        row.eachCell((cell, colNumber) => {
+            const colLetter = String.fromCharCode(64 + colNumber);
+            const group = groups.find(g => {
+                const parts = g.range.replace(/[0-9]/g, '').split(':');
+                return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
+            }) || groups[0];
 
-        row.eachCell((cell) => {
             cell.font = { name: 'Arial', size: 9 };
             cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-            cell.border = { bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } } };
-            // Apply fill if not white
-            if (rowFillColor !== 'FFFFFFFF') {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFillColor } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
+
+            cell.border = {
+                bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                right: { style: 'medium', color: { argb: COLORS.separator } }
+            };
+
+            // ACTION COLUMN OVERRIDE (Subtle Badge Style)
+            if (colNumber === 3) { // actionLabel
+                let bgColor = COLORS.personal.head;
+                let textColor = COLORS.personal.sub;
+                const action = log.action;
+
+                if (['CREATE', 'ACTIVATE', 'APPLY_MODIFICATION'].includes(action)) {
+                    bgColor = COLORS.emerald.head;
+                    textColor = COLORS.emerald.sub;
+                } else if (['DELETE', 'BLOCK', 'DEACTIVATE', 'UNASSIGN', 'UNASSIGN_CARD', 'DELETE_RESPONSIVA', 'REPLACE_OLD', 'DELETE_TICKET_CASCADE', 'REJECT_MODIFICATION'].includes(action)) {
+                    bgColor = COLORS.rose.head;
+                    textColor = COLORS.rose.sub;
+                } else if (['ASSIGN_CARD', 'REPLACE_CARD', 'SIGN_RESPONSIVA', 'COMPLETE_TICKET', 'TICKET', 'CREATE_TICKET'].includes(action)) {
+                    bgColor = COLORS.violet.head;
+                    textColor = COLORS.violet.sub;
+                }
+
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+                cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: textColor } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             }
         });
 
         row.getCell('date').alignment = { horizontal: 'center', vertical: 'middle' };
-        row.getCell('actionLabel').alignment = { horizontal: 'center', vertical: 'middle' };
-        row.getCell('actionLabel').font = { ...row.getCell('actionLabel').font, bold: true };
     });
 
-    worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 2 }];
+    worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
     const finalFileName = `Historial_Nexa_${new Date().toISOString().split('T')[0]}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), finalFileName);

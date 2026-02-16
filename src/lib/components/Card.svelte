@@ -10,7 +10,7 @@
     let { class: className = "", children, ...rest }: Props = $props();
 
     const baseStyles =
-        "rounded-xl border border-slate-200 bg-white text-slate-950 shadow-sm transition-shadow hover:shadow-md";
+        "rounded-2xl border border-slate-200/50 bg-white/90 backdrop-blur-sm text-slate-950 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300/50";
 
     let computedClass = $derived(`${baseStyles} ${className}`);
 </script>

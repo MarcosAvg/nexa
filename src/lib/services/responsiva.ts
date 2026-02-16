@@ -30,7 +30,7 @@ export const responsivaService = {
 
         if (error) throw error;
 
-        await HistoryService.log("PERSON", payload.person_id, "SIGN_RESPONSIVA", {
+        await HistoryService.log("PERSONNEL", payload.person_id, "SIGN_RESPONSIVA", {
             message: `Responsiva firmada para tarjeta ${payload.folio}`,
             responsiva_id: data.id
         });
@@ -46,7 +46,7 @@ export const responsivaService = {
 
         if (error) throw error;
 
-        await HistoryService.log("PERSON", personId, "DELETE_RESPONSIVA", {
+        await HistoryService.log("PERSONNEL", personId, "DELETE_RESPONSIVA", {
             message: `Responsiva eliminada`
         });
     }

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { supabase } from "../supabase";
+    import { toast } from "svelte-sonner";
     import {
         personnelService,
         catalogService,
@@ -17,31 +17,37 @@
         Edit2,
         Shield,
     } from "lucide-svelte";
-    import Card from "./Card.svelte";
-    import Button from "./Button.svelte";
-    import Badge from "./Badge.svelte";
-    import DataTable from "./DataTable.svelte";
-    import Modal from "./Modal.svelte";
-    import Input from "./Input.svelte";
-    import Select from "./Select.svelte";
+    import Card from "../components/Card.svelte";
+    import Button from "../components/Button.svelte";
+    import Badge from "../components/Badge.svelte";
+    import DataTable from "../components/DataTable.svelte";
+    import Modal from "../components/Modal.svelte";
+    import Input from "../components/Input.svelte";
+    import Select from "../components/Select.svelte";
 
-    type Props = {
-        currentUser: any;
-    };
-
-    let { currentUser }: Props = $props();
+    import { catalogState, userState } from "../stores"; // Import stores
+    // Remove currentUser prop
 
     let activeTab = $state<"catalogos" | "usuarios">("catalogos");
     let activeCatalog = $state<
         "edificios" | "dependencias" | "accesos" | "dias"
     >("edificios");
 
-    // --- Supabase Data ---
-    let buildings = $state<any[]>([]);
-    let dependencies = $state<any[]>([]);
-    let specialAccesses = $state<any[]>([]);
-    let schedules = $state<any[]>([]);
-    let users = $state<any[]>([]);
+    // --- Global State ---
+    let buildings = $derived(catalogState.buildings);
+    let dependencies = $derived(catalogState.dependencies);
+    let specialAccesses = $derived(catalogState.specialAccesses);
+    let schedules = $derived(catalogState.schedules);
+    let users = $state<any[]>([]); // Users still local as they are specific to this admin view
+
+    let currentUser = $derived.by(() => {
+        if (!userState.profile) return { role: "viewer" }; // Fallback
+        return userState.profile;
+    });
+
+    let canEdit = $derived(
+        currentUser.role === "admin" || currentUser.role === "operator",
+    );
 
     onMount(async () => {
         await fetchAll();
@@ -59,22 +65,22 @@
 
     async function fetchBuildings() {
         const data = await catalogService.fetchBuildings();
-        buildings = data;
+        catalogState.setBuildings(data);
     }
 
     async function fetchDependencies() {
         const data = await catalogService.fetchDependencies();
-        dependencies = data;
+        catalogState.setDependencies(data);
     }
 
     async function fetchAccesses() {
         const data = await catalogService.fetchAccesses();
-        specialAccesses = data;
+        catalogState.setSpecialAccesses(data);
     }
 
     async function fetchSchedules() {
         const data = await catalogService.fetchSchedules();
-        schedules = data;
+        catalogState.setSchedules(data);
     }
 
     async function fetchUsers() {
@@ -127,26 +133,32 @@
     }
 
     async function saveBuilding() {
+        if (!buildingName.trim()) {
+            toast.error("El nombre del edificio es requerido");
+            return;
+        }
         const floors = buildingFloors
             .split(",")
             .map((f) => f.trim())
             .filter((f) => f);
-
-        const payload = { name: buildingName, floors };
-
-        if (editingId) {
-            const { error } = await supabase
-                .from("buildings")
-                .update(payload)
-                .eq("id", editingId);
-            if (!error) await fetchBuildings();
-        } else {
-            const { error } = await supabase
-                .from("buildings")
-                .insert([payload]);
-            if (!error) await fetchBuildings();
+        if (floors.length === 0) {
+            toast.error("Debes agregar al menos un piso");
+            return;
         }
-        isBuildingModalOpen = false;
+
+        try {
+            await catalogService.saveBuilding(editingId, {
+                name: buildingName,
+                floors,
+            });
+            await fetchBuildings();
+            isBuildingModalOpen = false;
+            toast.success(
+                editingId ? "Edificio actualizado" : "Edificio creado",
+            );
+        } catch {
+            toast.error("Error al guardar el edificio");
+        }
     }
 
     function openDependencyModal(dep?: any) {
@@ -161,20 +173,22 @@
     }
 
     async function saveDependency() {
-        const payload = { name: dependencyName };
-        if (editingId) {
-            const { error } = await supabase
-                .from("dependencies")
-                .update(payload)
-                .eq("id", editingId);
-            if (!error) await fetchDependencies();
-        } else {
-            const { error } = await supabase
-                .from("dependencies")
-                .insert([payload]);
-            if (!error) await fetchDependencies();
+        if (!dependencyName.trim()) {
+            toast.error("El nombre de la dependencia es requerido");
+            return;
         }
-        isDependencyModalOpen = false;
+        try {
+            await catalogService.saveDependency(editingId, {
+                name: dependencyName,
+            });
+            await fetchDependencies();
+            isDependencyModalOpen = false;
+            toast.success(
+                editingId ? "Dependencia actualizada" : "Dependencia creada",
+            );
+        } catch {
+            toast.error("Error al guardar la dependencia");
+        }
     }
 
     function openAccessModal(access?: any) {
@@ -189,20 +203,18 @@
     }
 
     async function saveAccess() {
-        const payload = { name: accessName };
-        if (editingId) {
-            const { error } = await supabase
-                .from("special_accesses")
-                .update(payload)
-                .eq("id", editingId);
-            if (!error) await fetchAccesses();
-        } else {
-            const { error } = await supabase
-                .from("special_accesses")
-                .insert([payload]);
-            if (!error) await fetchAccesses();
+        if (!accessName.trim()) {
+            toast.error("El nombre del acceso es requerido");
+            return;
         }
-        isAccessModalOpen = false;
+        try {
+            await catalogService.saveAccess(editingId, { name: accessName });
+            await fetchAccesses();
+            isAccessModalOpen = false;
+            toast.success(editingId ? "Acceso actualizado" : "Acceso creado");
+        } catch {
+            toast.error("Error al guardar el acceso");
+        }
     }
 
     function openScheduleModal(schedule?: any) {
@@ -227,24 +239,25 @@
     }
 
     async function saveSchedule() {
-        const payload = {
-            name: scheduleName,
-            days: scheduleDays,
-        };
-
-        if (editingId) {
-            const { error } = await supabase
-                .from("schedules")
-                .update(payload)
-                .eq("id", editingId);
-            if (!error) await fetchSchedules();
-        } else {
-            const { error } = await supabase
-                .from("schedules")
-                .insert([payload]);
-            if (!error) await fetchSchedules();
+        if (!scheduleName.trim()) {
+            toast.error("El nombre del horario es requerido");
+            return;
         }
-        isScheduleModalOpen = false;
+        if (scheduleDays.length === 0) {
+            toast.error("Debes seleccionar al menos un día");
+            return;
+        }
+        try {
+            await catalogService.saveSchedule(editingId, {
+                name: scheduleName,
+                days: scheduleDays,
+            });
+            await fetchSchedules();
+            isScheduleModalOpen = false;
+            toast.success(editingId ? "Horario actualizado" : "Horario creado");
+        } catch {
+            toast.error("Error al guardar el horario");
+        }
     }
 
     function openUserModal(user?: any) {
@@ -263,14 +276,13 @@
     }
 
     async function saveUser() {
-        if (!editingId) return; // Only editing roles is allowed for now
+        if (!editingId) return;
 
         try {
-            // Update role via service
             await profileService.updateRole(editingId.toString(), userRole);
 
-            // Also update full name if changed
-            const { error: nameError } = await supabase
+            const { supabase: sb } = await import("../supabase");
+            const { error: nameError } = await sb
                 .from("profiles")
                 .update({ full_name: userName })
                 .eq("id", editingId);
@@ -279,8 +291,10 @@
 
             await fetchUsers();
             isUserModalOpen = false;
+            toast.success("Permisos actualizados correctamente");
         } catch (e) {
             console.error("Error saving user profile", e);
+            toast.error("Error al actualizar permisos");
         }
     }
 
@@ -298,22 +312,26 @@
     async function confirmDelete() {
         if (!deleteTarget || deleteConfirmation !== deleteTarget.name) return;
 
-        let table = "";
-        if (deleteTarget.type === "building") table = "buildings";
-        else if (deleteTarget.type === "dependency") table = "dependencies";
-        else if (deleteTarget.type === "access") table = "special_accesses";
-        else if (deleteTarget.type === "schedule") table = "schedules";
-        else if (deleteTarget.type === "user") table = "profiles";
+        const tableMap: Record<string, string> = {
+            building: "buildings",
+            dependency: "dependencies",
+            access: "special_accesses",
+            schedule: "schedules",
+        };
 
-        if (table) {
-            const { error } = await supabase
-                .from(table)
-                .delete()
-                .eq("id", deleteTarget.id);
+        const table = tableMap[deleteTarget.type];
+        if (!table) return;
 
-            if (!error) {
-                await fetchAll();
-            }
+        try {
+            await catalogService.deleteCatalogItem(
+                table,
+                deleteTarget.id,
+                deleteTarget.name,
+            );
+            await fetchAll();
+            toast.success(`"${deleteTarget.name}" eliminado correctamente`);
+        } catch {
+            toast.error("Error al eliminar el elemento");
         }
 
         isDeleteModalOpen = false;
@@ -323,32 +341,52 @@
 
 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
     <!-- Sidebar Navigation -->
-    <Card class="lg:col-span-1 p-0 overflow-hidden h-fit">
-        <div class="p-4 border-b border-slate-100">
-            <h3 class="font-bold text-slate-800">Configuración</h3>
-            <p class="text-xs text-slate-500">Administración del sistema</p>
+    <Card
+        class="lg:col-span-1 p-0 overflow-hidden h-fit bg-white/50 backdrop-blur-md border border-slate-200/50 rounded-[22px] shadow-sm"
+    >
+        <div class="p-6 border-b border-slate-100/60">
+            <h3
+                class="font-extrabold text-slate-900 tracking-tight uppercase text-xs tracking-[0.1em]"
+            >
+                Administración
+            </h3>
+            <p class="text-[11px] font-bold text-slate-400 mt-1">
+                Configura el ecosistema Nexa
+            </p>
         </div>
-        <nav class="flex flex-col p-2 gap-1">
+        <nav class="flex flex-col p-3 gap-1.5">
             <button
-                class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left {activeTab ===
+                class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 text-left active:scale-[0.98] {activeTab ===
                 'catalogos'
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-slate-600 hover:bg-slate-50'}"
+                    ? 'bg-slate-900 text-white shadow-lg shadow-blue-500/5'
+                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'}"
                 onclick={() => (activeTab = "catalogos")}
             >
-                <Building2 size={18} />
+                <div
+                    class={activeTab === "catalogos"
+                        ? "text-white"
+                        : "text-slate-400"}
+                >
+                    <Building2 size={18} strokeWidth={2.5} />
+                </div>
                 Catálogos
             </button>
 
             {#if currentUser.role === "admin"}
                 <button
-                    class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left {activeTab ===
+                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 text-left active:scale-[0.98] {activeTab ===
                     'usuarios'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-slate-600 hover:bg-slate-50'}"
+                        ? 'bg-slate-900 text-white shadow-lg shadow-blue-500/5'
+                        : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'}"
                     onclick={() => (activeTab = "usuarios")}
                 >
-                    <Users size={18} />
+                    <div
+                        class={activeTab === "usuarios"
+                            ? "text-white"
+                            : "text-slate-400"}
+                    >
+                        <Users size={18} strokeWidth={2.5} />
+                    </div>
                     Usuarios
                 </button>
             {/if}
@@ -360,122 +398,197 @@
         {#if activeTab === "catalogos"}
             <!-- Sub-tabs for Catalogos -->
             <div
-                class="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200"
+                class="flex items-center gap-3 overflow-x-auto pb-4 scrollbar-none"
             >
-                {#each [{ id: "edificios", label: "Edificios", icon: Building2 }, { id: "dependencias", label: "Dependencias", icon: Briefcase }, { id: "accesos", label: "Accesos Especiales", icon: Key }, { id: "dias", label: "Días Laborales", icon: Calendar }] as item}
+                {#each [{ id: "edificios", label: "Edificios", icon: Building2 }, { id: "dependencias", label: "Dependencias", icon: Briefcase }, { id: "accesos", label: "Accesos", icon: Key }, { id: "dias", label: "Horarios", icon: Calendar }] as item}
                     {@const Icon = item.icon}
                     <button
-                        class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors {activeCatalog ===
+                        class="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[13px] font-extrabold whitespace-nowrap transition-all duration-300 active:scale-95 {activeCatalog ===
                         item.id
-                            ? 'bg-slate-900 text-white shadow-sm'
-                            : 'text-slate-600 hover:bg-slate-100'}"
+                            ? 'bg-white text-slate-900 shadow-md ring-1 ring-slate-200'
+                            : 'bg-slate-100/50 text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
                         onclick={() => (activeCatalog = item.id as any)}
                     >
-                        <Icon size={16} />
+                        <Icon size={16} strokeWidth={2.5} />
                         {item.label}
                     </button>
                 {/each}
             </div>
 
             <!-- Catalog Content -->
-            <Card class="p-6 min-h-[400px]">
+            <Card
+                class="p-8 min-h-[400px] bg-white/60 backdrop-blur-md rounded-[22px] border border-slate-200/50 shadow-sm relative overflow-hidden"
+            >
                 {#if activeCatalog === "edificios"}
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold text-slate-800">
-                            Edificios y Pisos
-                        </h3>
-                        <Button size="sm" onclick={() => openBuildingModal()}>
-                            <Plus size={16} class="mr-2" /> Nuevo Edificio
-                        </Button>
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h3
+                                class="text-xl font-black text-slate-900 tracking-tight"
+                            >
+                                Edificios y Pisos
+                            </h3>
+                            <p
+                                class="text-sm font-medium text-slate-500 mt-0.5"
+                            >
+                                Gestión de infraestructura física
+                            </p>
+                        </div>
+                        {#if canEdit}
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10"
+                                onclick={() => openBuildingModal()}
+                            >
+                                <Plus size={18} strokeWidth={3} class="mr-2" /> Nuevo
+                                Edificio
+                            </Button>
+                        {/if}
                     </div>
 
-                    <div class="space-y-4">
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-2 gap-6">
                         {#each buildings as building}
                             <div
-                                class="p-4 border border-slate-200 rounded-xl bg-slate-50/50"
+                                class="group p-6 border border-slate-200/50 rounded-[24px] bg-white/40 hover:bg-white transition-all duration-500 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden"
                             >
                                 <div
-                                    class="flex justify-between items-start mb-3"
+                                    class="flex justify-between items-start mb-5 relative z-10"
                                 >
                                     <div>
-                                        <h4 class="font-bold text-slate-900">
+                                        <h4
+                                            class="font-extrabold text-slate-900 text-[16px] tracking-tight group-hover:text-blue-600 transition-colors"
+                                        >
                                             {building.name}
                                         </h4>
-                                        <p class="text-xs text-slate-500">
+                                        <p
+                                            class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-1.5 flex items-center gap-2"
+                                        >
+                                            <span
+                                                class="w-1.5 h-1.5 rounded-full bg-blue-500/40"
+                                            ></span>
                                             {building.floors.length} pisos configurados
                                         </p>
                                     </div>
-                                    <div class="flex gap-1">
-                                        <button
-                                            class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                            onclick={() =>
-                                                openBuildingModal(building)}
-                                        >
-                                            <Edit2 size={16} />
-                                        </button>
-                                        <button
-                                            class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                            onclick={() =>
-                                                openDeleteModal(
-                                                    building,
-                                                    "building",
-                                                )}
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
+                                    {#if canEdit}
+                                        <div class="flex gap-1.5">
+                                            <button
+                                                class="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50/80 rounded-xl transition-all active:scale-95"
+                                                onclick={() =>
+                                                    openBuildingModal(building)}
+                                            >
+                                                <Edit2
+                                                    size={16}
+                                                    strokeWidth={2.5}
+                                                />
+                                            </button>
+                                            <button
+                                                class="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50/80 rounded-xl transition-all active:scale-95"
+                                                onclick={() =>
+                                                    openDeleteModal(
+                                                        building,
+                                                        "building",
+                                                    )}
+                                            >
+                                                <Trash2
+                                                    size={16}
+                                                    strokeWidth={2.5}
+                                                />
+                                            </button>
+                                        </div>
+                                    {/if}
                                 </div>
-                                <div class="flex flex-wrap gap-2">
+                                <div class="flex flex-wrap gap-2 relative z-10">
                                     {#each building.floors as floor}
                                         <span
-                                            class="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-medium text-slate-600"
+                                            class="px-3.5 py-1.5 bg-white border border-slate-100 rounded-xl text-xs font-bold text-slate-600 shadow-sm group-hover:border-blue-100 transition-colors"
                                         >
                                             {floor}
                                         </span>
                                     {/each}
                                 </div>
+                                <div
+                                    class="absolute -right-6 -bottom-6 text-slate-400/5 group-hover:text-blue-500/8 rotate-12 transition-all duration-700 pointer-events-none"
+                                >
+                                    <Building2 size={100} />
+                                </div>
                             </div>
                         {/each}
                     </div>
                 {:else if activeCatalog === "dependencias"}
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold text-slate-800">
-                            Dependencias
-                        </h3>
-                        <Button size="sm" onclick={() => openDependencyModal()}>
-                            <Plus size={16} class="mr-2" /> Nueva Dependencia
-                        </Button>
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h3
+                                class="text-xl font-black text-slate-900 tracking-tight"
+                            >
+                                Dependencias
+                            </h3>
+                            <p
+                                class="text-sm font-medium text-slate-500 mt-0.5"
+                            >
+                                Áreas y departamentos registrados
+                            </p>
+                        </div>
+                        {#if canEdit}
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10"
+                                onclick={() => openDependencyModal()}
+                            >
+                                <Plus size={18} strokeWidth={3} class="mr-2" /> Nueva
+                                Dependencia
+                            </Button>
+                        {/if}
                     </div>
                     <DataTable
                         data={dependencies}
                         columns={[{ key: "name", label: "Nombre" }]}
                     >
                         {#snippet actions(row: any)}
-                            <div class="flex justify-end gap-1">
-                                <button
-                                    class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    onclick={() => openDependencyModal(row)}
-                                >
-                                    <Edit2 size={16} />
-                                </button>
-                                <button
-                                    class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                    onclick={() =>
-                                        openDeleteModal(row, "dependency")}
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
+                            {#if canEdit}
+                                <div class="flex justify-end gap-1">
+                                    <button
+                                        class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        onclick={() => openDependencyModal(row)}
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button
+                                        class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                        onclick={() =>
+                                            openDeleteModal(row, "dependency")}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            {/if}
                         {/snippet}
                     </DataTable>
                 {:else if activeCatalog === "accesos"}
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold text-slate-800">
-                            Accesos Especiales
-                        </h3>
-                        <Button size="sm" onclick={() => openAccessModal()}>
-                            <Plus size={16} class="mr-2" /> Nuevo Acceso
-                        </Button>
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h3
+                                class="text-xl font-black text-slate-900 tracking-tight"
+                            >
+                                Accesos Especiales
+                            </h3>
+                            <p
+                                class="text-sm font-medium text-slate-500 mt-0.5"
+                            >
+                                Zonas restringidas o críticas
+                            </p>
+                        </div>
+                        {#if canEdit}
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10"
+                                onclick={() => openAccessModal()}
+                            >
+                                <Plus size={18} strokeWidth={3} class="mr-2" /> Nuevo
+                                Acceso
+                            </Button>
+                        {/if}
                     </div>
 
                     {#snippet renderAccessName(row: any)}
@@ -502,31 +615,50 @@
                         ]}
                     >
                         {#snippet actions(row: any)}
-                            <div class="flex justify-end gap-1">
-                                <button
-                                    class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    onclick={() => openAccessModal(row)}
-                                >
-                                    <Edit2 size={16} />
-                                </button>
-                                <button
-                                    class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                    onclick={() =>
-                                        openDeleteModal(row, "access")}
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
+                            {#if canEdit}
+                                <div class="flex justify-end gap-1">
+                                    <button
+                                        class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        onclick={() => openAccessModal(row)}
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button
+                                        class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                        onclick={() =>
+                                            openDeleteModal(row, "access")}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            {/if}
                         {/snippet}
                     </DataTable>
                 {:else if activeCatalog === "dias"}
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold text-slate-800">
-                            Catálogo de Horarios
-                        </h3>
-                        <Button size="sm" onclick={() => openScheduleModal()}>
-                            <Plus size={16} class="mr-2" /> Nuevo Horario
-                        </Button>
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h3
+                                class="text-xl font-black text-slate-900 tracking-tight"
+                            >
+                                Horarios
+                            </h3>
+                            <p
+                                class="text-sm font-medium text-slate-500 mt-0.5"
+                            >
+                                Configuración de jornadas
+                            </p>
+                        </div>
+                        {#if canEdit}
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10"
+                                onclick={() => openScheduleModal()}
+                            >
+                                <Plus size={18} strokeWidth={3} class="mr-2" /> Nuevo
+                                Horario
+                            </Button>
+                        {/if}
                     </div>
 
                     {#snippet renderDays(row: any)}
@@ -549,37 +681,43 @@
                         ]}
                     >
                         {#snippet actions(row: any)}
-                            <div class="flex justify-end gap-1">
-                                <button
-                                    class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    onclick={() => openScheduleModal(row)}
-                                >
-                                    <Edit2 size={16} />
-                                </button>
-                                <button
-                                    class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                    onclick={() =>
-                                        openDeleteModal(row, "schedule")}
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
+                            {#if canEdit}
+                                <div class="flex justify-end gap-1">
+                                    <button
+                                        class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        onclick={() => openScheduleModal(row)}
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button
+                                        class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                        onclick={() =>
+                                            openDeleteModal(row, "schedule")}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            {/if}
                         {/snippet}
                     </DataTable>
                 {/if}
             </Card>
         {:else if activeTab === "usuarios" && currentUser.role === "admin"}
-            <Card class="p-0 overflow-hidden">
+            <Card
+                class="p-0 overflow-hidden bg-white/60 backdrop-blur-md rounded-[22px] border border-slate-200/50 shadow-sm h-fit"
+            >
                 <div
-                    class="p-6 border-b border-slate-200 flex justify-between items-center"
+                    class="p-8 border-b border-slate-100/60 flex justify-between items-center"
                 >
                     <div>
-                        <h3 class="text-lg font-bold text-slate-800">
+                        <h3
+                            class="text-xl font-black text-slate-900 tracking-tight"
+                        >
                             Gestión de Permisos
                         </h3>
-                        <p class="text-sm text-slate-500">
+                        <p class="text-sm font-medium text-slate-500 mt-0.5">
                             Configura los niveles de acceso de los usuarios
-                            registrados
+                            registrado
                         </p>
                     </div>
                 </div>
@@ -615,34 +753,35 @@
                     {/if}
                 {/snippet}
 
-                <DataTable
-                    data={users}
-                    columns={[
-                        {
-                            key: "full_name",
-                            label: "Usuario",
-                            render: renderUserName,
-                        },
-                        {
-                            key: "role",
-                            label: "Rol de Acceso",
-                            render: renderUserRole,
-                        },
-                        { key: "created_at", label: "Registro" },
-                    ]}
-                >
-                    {#snippet actions(row: any)}
-                        <div class="flex justify-end gap-1">
-                            <button
-                                class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="Cambiar Permisos"
-                                onclick={() => openUserModal(row)}
-                            >
-                                <Shield size={16} />
-                            </button>
-                        </div>
-                    {/snippet}
-                </DataTable>
+                <div class="p-4">
+                    <DataTable
+                        data={users}
+                        columns={[
+                            {
+                                key: "full_name",
+                                label: "Usuario",
+                                render: renderUserName,
+                            },
+                            {
+                                key: "role",
+                                label: "Rol de Acceso",
+                                render: renderUserRole,
+                            },
+                        ]}
+                    >
+                        {#snippet actions(row: any)}
+                            <div class="flex justify-end gap-1">
+                                <button
+                                    class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Cambiar Permisos"
+                                    onclick={() => openUserModal(row)}
+                                >
+                                    <Shield size={16} />
+                                </button>
+                            </div>
+                        {/snippet}
+                    </DataTable>
+                </div>
             </Card>
         {/if}
     </div>

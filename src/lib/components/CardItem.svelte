@@ -9,6 +9,7 @@
         status?: "active" | "blocked";
         responsiva_status?: string;
         programming_status?: string;
+        isHighlighted?: boolean;
         onGenerateResponsiva?: () => void;
         onBlock?: () => void;
         onUnassign?: () => void;
@@ -21,6 +22,7 @@
         status = "active",
         responsiva_status,
         programming_status,
+        isHighlighted = false,
         onGenerateResponsiva,
         onBlock,
         onUnassign,
@@ -29,7 +31,9 @@
 </script>
 
 <div
-    class="p-4 rounded-xl border border-slate-200 bg-white shadow-sm space-y-4"
+    class="p-4 rounded-xl border bg-white shadow-sm space-y-4 transition-all duration-300 {isHighlighted
+        ? 'border-violet-500 ring-2 ring-violet-500/20'
+        : 'border-slate-200'}"
 >
     <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-3 flex-wrap">
