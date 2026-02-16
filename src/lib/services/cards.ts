@@ -1,7 +1,7 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import type { Card } from "../types";
-import { handleError } from "../utils/error";
+import { handleError, withTimeout } from "../utils/error";
 
 export const cardService = {
     async fetchExtra(): Promise<Card[]> {
@@ -55,7 +55,7 @@ export const cardService = {
                     const newStatus = replacementOptions.oldCardStatus; // 'blocked' or 'available'
 
                     // 2. Update Old Card Status
-                    const { error: updateError } = await supabase
+                    const { error: updateError } = await withTimeout(supabase
                         .from("cards")
                         .update({
                             status: newStatus,
@@ -63,7 +63,7 @@ export const cardService = {
                             programming_status: null,
                             responsiva_status: null,
                         })
-                        .eq("id", oldCard.id);
+                        .eq("id", oldCard.id));
 
                     if (updateError) throw updateError;
 
@@ -90,20 +90,20 @@ export const cardService = {
             let cardId = data.id;
 
             if (cardId) {
-                const { error } = await supabase
+                const { error } = await withTimeout(supabase
                     .from("cards")
                     .update(payload)
-                    .eq("id", cardId);
+                    .eq("id", cardId));
                 if (error) throw error;
                 await HistoryService.log("CARD", cardId, "UPDATE", {
                     message: `Tarjeta ${payload.folio} actualizada`,
                 });
             } else {
-                const { data: newCard, error } = await supabase
+                const { data: newCard, error } = await withTimeout(supabase
                     .from("cards")
                     .insert([payload])
                     .select()
-                    .single();
+                    .single());
                 if (error) throw error;
                 cardId = newCard.id;
                 await HistoryService.log("CARD", cardId, "CREATE", {

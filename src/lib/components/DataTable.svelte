@@ -11,6 +11,8 @@
         class?: string;
         hideOnMobile?: boolean;
         sortable?: boolean;
+        width?: string;
+        maxWidth?: string;
     };
 
     type Props = {
@@ -72,8 +74,10 @@
 <div
     class="hidden md:block overflow-hidden rounded-2xl border border-slate-200/50 shadow-sm bg-white/80 backdrop-blur-sm"
 >
-    <div class="overflow-x-auto custom-scrollbar">
-        <table class="w-full text-left text-sm text-slate-600 border-collapse">
+    <div class="w-full overflow-x-auto custom-scrollbar">
+        <table
+            class="w-full min-w-[1024px] table-fixed text-left text-sm text-slate-600 border-collapse"
+        >
             <thead
                 class="bg-slate-50/40 text-[11px] uppercase tracking-[0.15em] text-slate-500 font-bold border-b border-slate-200/50"
             >
@@ -85,6 +89,8 @@
                                 ''} {column.sortable !== false
                                 ? 'cursor-pointer hover:bg-slate-100/30 transition-all duration-300 group select-none'
                                 : ''}"
+                            style:width={column.width}
+                            style:max-width={column.maxWidth}
                             onclick={() =>
                                 column.sortable !== false &&
                                 toggleSort(column.key)}
@@ -124,7 +130,7 @@
                     {#if actions}
                         <th
                             scope="col"
-                            class="px-5 py-4 lg:px-6 lg:py-5 text-right font-bold"
+                            class="w-[140px] px-5 py-4 lg:px-6 lg:py-5 text-right font-bold"
                             >Acciones</th
                         >
                     {/if}
@@ -137,19 +143,23 @@
                     >
                         {#each columns as column}
                             <td
-                                class="px-5 py-4 lg:px-6 lg:py-4.5 lg:whitespace-nowrap text-[13.5px] font-medium text-slate-700/90 transition-colors group-hover:text-slate-900 {column.class ||
+                                class="px-5 py-4 lg:px-6 lg:py-4.5 text-[13.5px] font-medium text-slate-700/90 transition-colors group-hover:text-slate-900 truncate {column.class ||
                                     ''}"
+                                style:width={column.width}
+                                style:max-width={column.maxWidth}
                             >
-                                {#if column.render}
-                                    {@render column.render(row)}
-                                {:else}
-                                    {row[column.key]}
-                                {/if}
+                                <div class="truncate">
+                                    {#if column.render}
+                                        {@render column.render(row)}
+                                    {:else}
+                                        {row[column.key]}
+                                    {/if}
+                                </div>
                             </td>
                         {/each}
                         {#if actions}
                             <td
-                                class="px-5 py-4 lg:px-6 lg:py-4.5 whitespace-nowrap text-right"
+                                class="px-5 py-4 lg:px-6 lg:py-4.5 whitespace-nowrap text-right w-[140px]"
                             >
                                 <div
                                     class="flex justify-end opacity-60 group-hover:opacity-100 transition-opacity duration-300"

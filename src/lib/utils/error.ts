@@ -37,6 +37,30 @@ export function handleError(error: any, context: string = "An error occurred") {
         }
     }
 
+    if (error?.isTimeout) {
+        message = "La solicitud tardó demasiado. Por favor, verifique su conexión e intente nuevamente.";
+    }
+
     toast.error(message);
     return null;
+}
+
+export async function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number = 15000): Promise<T> {
+    let timeoutHandle: ReturnType<typeof setTimeout>;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+            const error: any = new Error("Request timed out");
+            error.isTimeout = true;
+            reject(error);
+        }, timeoutMs);
+    });
+
+    return Promise.race([
+        Promise.resolve(promise).then((result) => {
+            clearTimeout(timeoutHandle);
+            return result;
+        }),
+        timeoutPromise
+    ]);
 }

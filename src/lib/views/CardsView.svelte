@@ -246,7 +246,11 @@
     <div class="flex items-center gap-2">
         <span class="font-medium text-slate-700">{row.folio}</span>
         {#if row.personId}
-            {#if row.responsiva_status !== "signed"}
+            {#if row.responsiva_status === "legacy"}
+                <Badge variant="slate" class="text-[8px] px-1 py-0 h-4"
+                    >LEGACY</Badge
+                >
+            {:else if row.responsiva_status !== "signed"}
                 <Badge variant="rose" class="text-[8px] px-1 py-0 h-4"
                     >SIN RESPONSIVA</Badge
                 >
@@ -333,18 +337,30 @@
         <DataTable
             data={filteredCards}
             columns={[
-                { key: "type", label: "Tipo", render: renderCardType },
+                {
+                    key: "type",
+                    label: "Tipo",
+                    render: renderCardType,
+                    width: "80px",
+                },
                 {
                     key: "folio",
                     label: "Folio / No. Tarjeta",
                     render: renderCardFolio,
+                    width: "150px",
                 },
                 {
                     key: "personName",
                     label: "Asignada a",
                     render: renderCardPerson,
+                    width: "35%",
                 },
-                { key: "status", label: "Estado", render: renderCardStatus },
+                {
+                    key: "status",
+                    label: "Estado",
+                    render: renderCardStatus,
+                    width: "100px",
+                },
             ]}
         >
             {#snippet actions(row: any)}

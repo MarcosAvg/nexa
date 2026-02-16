@@ -270,22 +270,34 @@
         <DataTable
             data={filteredPersonnel}
             columns={[
-                { key: "name", label: "Nombre completo", render: renderName },
-                { key: "employee_no", label: "No. Empleado" },
-                { key: "area", label: "Área" },
-                { key: "position", label: "Puesto" },
+                {
+                    key: "name",
+                    label: "Nombre completo",
+                    render: renderName,
+                    width: "250px",
+                },
+                { key: "employee_no", label: "No. Empleado", width: "120px" },
+                { key: "area", label: "Área", width: "150px" },
+                { key: "position", label: "Puesto", width: "150px" },
                 {
                     key: "dependency",
                     label: "Dependencia / Edificio",
                     render: renderDependency,
+                    width: "200px",
                 },
                 {
                     key: "cards",
                     label: "Tarjetas",
                     render: renderCards,
                     sortable: false,
+                    width: "120px",
                 },
-                { key: "status", label: "Estado", render: renderStatus },
+                {
+                    key: "status",
+                    label: "Estado",
+                    render: renderStatus,
+                    width: "150px",
+                },
             ]}
             mobileCard={mobilePersonnelCard}
         >

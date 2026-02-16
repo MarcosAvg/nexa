@@ -83,15 +83,21 @@
 
     $effect(() => {
         if (isOpen) {
+            // Safety check: Ensure personnel data is loaded for search
+            if (personnelState.personnel.length === 0) {
+                personnelService.fetchAll().then((data) => {
+                    personnelState.setPersonnel(data);
+                });
+            }
+
             if (editingTicket) {
-                // Edit Implementation (Basic mapping)
+                // ... existing edit logic
                 formData.type = editingTicket.type;
                 formData.title = editingTicket.title;
                 formData.description = editingTicket.description;
                 formData.priority = editingTicket.priority;
-                // TODO: Map payload fields back if editing is fully supported
             } else {
-                // Reset
+                // ... existing reset logic
                 formData = {
                     createdBy: currentUser?.id || "",
                     type: "Reporte de Fallo",
@@ -128,12 +134,15 @@
         }
 
         const all = personnelState.personnel;
+
         searchResults = all
             .filter(
                 (p) =>
-                    p.name.toLowerCase().includes(term) ||
-                    p.employee_no.toLowerCase().includes(term) ||
-                    p.cards.some((c) => c.folio.toLowerCase().includes(term)),
+                    (p.name || "").toLowerCase().includes(term) ||
+                    (p.employee_no || "").toLowerCase().includes(term) ||
+                    (p.cards || []).some((c) =>
+                        (c.folio || "").toLowerCase().includes(term),
+                    ),
             )
             .slice(0, 5);
 

@@ -761,11 +761,13 @@
                                 key: "full_name",
                                 label: "Usuario",
                                 render: renderUserName,
+                                width: "60%",
                             },
                             {
                                 key: "role",
                                 label: "Rol de Acceso",
                                 render: renderUserRole,
+                                width: "40%",
                             },
                         ]}
                     >

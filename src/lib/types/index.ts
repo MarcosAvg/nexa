@@ -33,7 +33,7 @@ export interface Card {
     status: 'active' | 'available' | 'blocked' | 'inactive';
     person_id: string | null;
     programming_status: 'pending' | 'done' | null;
-    responsiva_status: 'unsigned' | 'signed' | null;
+    responsiva_status: 'unsigned' | 'signed' | 'legacy' | null;
     // Optional computed properties often found in UI usage
     personName?: string;
     personStatus?: string;

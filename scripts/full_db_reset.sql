@@ -92,7 +92,7 @@ CREATE TABLE cards (
     folio text not null,
     type text not null, -- 'P2000' or 'KONE'
     status text default 'available', -- 'available', 'active', 'blocked'
-    responsiva_status text default 'unsigned', -- 'unsigned', 'signed'
+    responsiva_status text default 'unsigned', -- 'unsigned', 'signed', 'legacy'
     programming_status text default 'pending', -- 'pending', 'done'
     person_id uuid references personnel(id) on delete set null,
     updated_at timestamp with time zone default now(),

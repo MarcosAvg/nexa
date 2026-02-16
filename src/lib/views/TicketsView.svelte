@@ -14,6 +14,7 @@
     import TicketModal from "../components/modals/TicketModal.svelte";
     import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
     import ModificationCompareModal from "../components/modals/ModificationCompareModal.svelte";
+    import ManualTicketDetailsModal from "../components/modals/ManualTicketDetailsModal.svelte";
     import { Search, Plus } from "lucide-svelte";
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
@@ -30,6 +31,10 @@
     // Modal State
     let isModalOpen = $state(false);
     let editingTicket = $state<any>(null);
+
+    // Manual Details State
+    let isManualDetailsOpen = $state(false);
+    let manualTicket = $state<any>(null);
 
     // Confirmation States
     let isConfirm1Open = $state(false);
@@ -92,7 +97,14 @@
         return ["Todos", ...Array.from(types)].sort();
     });
 
+    import { onMount } from "svelte";
+
+    // ... imports
+
+    // ... existing code ...
+
     async function refreshData() {
+        // ... existing refresh logic
         const [tickets, personnel, extraCards] = await Promise.all([
             ticketService.fetchAll(),
             personnelService.fetchAll(),
@@ -103,6 +115,10 @@
         personnelState.setCards(extraCards);
     }
 
+    onMount(() => {
+        refreshData();
+    });
+
     // Handlers
     function onManageTicket(ticket: any) {
         if (ticket.type === "Modificación de datos") {
@@ -110,13 +126,15 @@
             isCompareOpen = true;
             return;
         }
-        editingTicket = ticket;
-        isModalOpen = true;
+
+        // Open Manual Details for review
+        manualTicket = ticket;
+        isManualDetailsOpen = true;
     }
 
     function onOpenAddTicket() {
         editingTicket = null;
-        isModalOpen = true;
+        isModalOpen = true; // Still use TicketModal for creating new tickets
     }
 
     function onStartCompletion(ticket: any) {
@@ -135,6 +153,10 @@
             isCompareOpen = true;
             return;
         }
+
+        // For other types, we can use the manual modal flow or quick complete
+        // defaulting to manual modal for consistent "review" experience if clicked via banner
+        // But onStartCompletion is triggered by the "check" button on banner
 
         ticketToComplete = ticket;
         isConfirm1Open = true;
@@ -248,6 +270,12 @@
 </div>
 
 <TicketModal bind:isOpen={isModalOpen} {editingTicket} />
+
+<ManualTicketDetailsModal
+    bind:isOpen={isManualDetailsOpen}
+    ticket={manualTicket}
+    onComplete={refreshData}
+/>
 
 <ConfirmationModal
     bind:isOpen={isConfirm1Open}

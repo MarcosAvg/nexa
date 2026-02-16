@@ -1,6 +1,6 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
-import { handleError } from "../utils/error";
+import { handleError, withTimeout } from "../utils/error";
 import type { Person, Card } from "../types";
 
 export const personnelService = {
@@ -22,7 +22,7 @@ export const personnelService = {
                         displayStatus = "Inactivo/a";
                     } else {
                         const readyCards = activeCards.filter(
-                            (c: any) => c.programming_status === "done" && c.responsiva_status === "signed"
+                            (c: any) => c.programming_status === "done" && (c.responsiva_status === "signed" || c.responsiva_status === "legacy")
                         );
                         if (readyCards.length === activeCards.length) {
                             displayStatus = "Activo/a";
@@ -94,11 +94,11 @@ export const personnelService = {
             let personId = data.id;
 
             if (personId) {
-                const { error } = await supabase.from("personnel").update(payload).eq("id", personId);
+                const { error } = await withTimeout(supabase.from("personnel").update(payload).eq("id", personId));
                 if (error) throw error;
                 await HistoryService.log("PERSONNEL", personId, "UPDATE", { message: `Actualización de ${payload.first_name}` });
             } else {
-                const { data: newPerson, error } = await supabase.from("personnel").insert([payload]).select().single();
+                const { data: newPerson, error } = await withTimeout(supabase.from("personnel").insert([payload]).select().single());
                 if (error) throw error;
                 personId = newPerson.id;
                 await HistoryService.log("PERSONNEL", personId, "CREATE", { message: `Registro de ${payload.first_name}` });
@@ -124,17 +124,17 @@ export const personnelService = {
     async updateStatus(id: string, status: string) {
         try {
             // Update Person
-            const { error } = await supabase.from("personnel").update({ status }).eq("id", id);
+            const { error } = await withTimeout(supabase.from("personnel").update({ status }).eq("id", id));
             if (error) throw error;
 
             // Cascade to Cards
             // If the person is blocked/inactive, cards should reflect that.
             // If reactivated, cards should become active (since they are assigned).
             const cardStatus = status;
-            const { error: cardError } = await supabase
+            const { error: cardError } = await withTimeout(supabase
                 .from("cards")
                 .update({ status: cardStatus })
-                .eq("person_id", id);
+                .eq("person_id", id));
 
             if (cardError) throw cardError;
 

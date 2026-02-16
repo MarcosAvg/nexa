@@ -237,13 +237,24 @@
         <DataTable
             data={paginatedLogs}
             columns={[
-                { key: "timestamp", label: "Fecha / Hora", render: renderDate },
+                {
+                    key: "timestamp",
+                    label: "Fecha / Hora",
+                    render: renderDate,
+                    width: "160px",
+                },
                 {
                     key: "entity",
                     label: "Entidad Afectada",
                     render: renderEntity,
+                    width: "250px",
                 },
-                { key: "action", label: "Acción", render: renderHistoryAction },
+                {
+                    key: "action",
+                    label: "Acción",
+                    render: renderHistoryAction,
+                    width: "140px",
+                },
                 { key: "details", label: "Descripción", render: renderDetails },
             ]}
         />

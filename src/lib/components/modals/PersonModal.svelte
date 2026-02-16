@@ -421,11 +421,13 @@
                         label="Pisos Asignados P2000 (Puertas)"
                         options={availableFloors}
                         bind:value={pisosP2000}
+                        showSelectAll={true}
                     />
                     <ToggleGroup
                         label="Pisos Asignados KONE (Elevadores)"
                         options={availableFloors}
                         bind:value={pisosKone}
+                        showSelectAll={true}
                     />
                 </div>
             {/if}

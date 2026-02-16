@@ -345,13 +345,14 @@
                 <DataTable
                     data={pendingItems.slice(0, 5)}
                     columns={[
-                        { key: "personName", label: "Persona" },
-                        { key: "type", label: "Tipo" },
-                        { key: "priority", label: "Prioridad" },
+                        { key: "personName", label: "Persona", width: "40%" },
+                        { key: "type", label: "Tipo", width: "20%" },
+                        { key: "priority", label: "Prioridad", width: "20%" },
                         {
                             key: "status",
                             label: "Estado",
                             render: renderStatus,
+                            width: "20%",
                         },
                     ]}
                 />
