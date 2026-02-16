@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import { handleError } from "../utils/error";
 
 export const HistoryService = {
     /**
@@ -16,9 +17,31 @@ export const HistoryService = {
             // defined in schema as nullable, so yes.
         }
 
+        let entityName: string | null = null;
+        const idStr = entityId ? String(entityId) : null;
+
+        // Proactively capture entity name/folio
+        try {
+            if (idStr) {
+                if (entityType === "CARD") {
+                    const { data } = await supabase.from("cards").select("folio, type").eq("id", idStr).single();
+                    if (data) entityName = `Tarjeta: ${data.folio} (${data.type})`;
+                } else if (entityType === "PERSONNEL" || entityType === "PERSON") {
+                    const { data } = await supabase.from("personnel").select("first_name, last_name").eq("id", idStr).single();
+                    if (data) entityName = `${data.first_name} ${data.last_name}`;
+                } else if (entityType === "TICKET") {
+                    const { data } = await supabase.from("tickets").select("id, title").eq("id", idStr).single();
+                    if (data) entityName = `Ticket #${data.id}: ${data.title}`;
+                }
+            }
+        } catch (e) {
+            console.warn("HistoryService: Could not capture entity snapshot name", e);
+        }
+
         const payload = {
             entity_type: entityType,
-            entity_id: entityId ? String(entityId) : null,
+            entity_id: idStr,
+            entity_name: entityName,
             action,
             details: typeof details === 'string' ? { message: details } : details,
             // performed_by is handled by RLS 'default: auth.uid()' usually? 
@@ -52,28 +75,65 @@ export const HistoryService = {
     },
 
     async fetchAll() {
-        const { data, error } = await supabase
-            .from("history_logs")
-            .select("*")
-            // We can't join easily with polymorphic foreign keys in basic Supabase select unless we join ALL tables separateley.
-            // For now, we will fetch the raw logs. The UI will have to resolve names if needed, 
-            // OR we can do a more complex query? 
-            // Given the constraints, let's fetch raw logs first.
-            .order("timestamp", { ascending: false });
+        try {
+            const { data, error } = await supabase
+                .from("history_logs")
+                .select("*")
+                .order("timestamp", { ascending: false });
 
-        if (error) throw error;
-        return data || [];
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            handleError(error, "Fetch History");
+            return [];
+        }
+    },
+
+    async fetchMore(offset: number, limit: number = 200) {
+        try {
+            const { data, error } = await supabase
+                .from("history_logs")
+                .select("*")
+                .order("timestamp", { ascending: false })
+                .range(offset, offset + limit - 1);
+
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            handleError(error, "Fetch More History");
+            return [];
+        }
+    },
+
+    async deleteByEntity(entityType: string, entityId: string) {
+        try {
+            const { error } = await supabase
+                .from("history_logs")
+                .delete()
+                .eq("entity_type", entityType)
+                .eq("entity_id", entityId);
+
+            if (error) throw error;
+        } catch (error) {
+            handleError(error, "Delete History By Entity");
+            throw error;
+        }
     },
 
     async fetchByEntity(entityType: string, entityId: string) {
-        const { data, error } = await supabase
-            .from("history_logs")
-            .select("*")
-            .eq("entity_type", entityType)
-            .eq("entity_id", entityId)
-            .order("timestamp", { ascending: false });
+        try {
+            const { data, error } = await supabase
+                .from("history_logs")
+                .select("*")
+                .eq("entity_type", entityType)
+                .eq("entity_id", entityId)
+                .order("timestamp", { ascending: false });
 
-        if (error) throw error;
-        return data || [];
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error("Fetch History By Entity Error", error);
+            return [];
+        }
     }
 };

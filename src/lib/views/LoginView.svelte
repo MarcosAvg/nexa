@@ -1,8 +1,8 @@
 <script lang="ts">
     import { supabase } from "../supabase";
-    import Button from "./Button.svelte";
-    import Input from "./Input.svelte";
-    import Card from "./Card.svelte";
+    import Button from "../components/Button.svelte";
+    import Input from "../components/Input.svelte";
+    import Card from "../components/Card.svelte";
     import {
         LogIn,
         UserPlus,

@@ -6,9 +6,10 @@
     type Props = {
         onSave: (signatureBase64: string) => void;
         onCancel: () => void;
+        loading?: boolean;
     };
 
-    let { onSave, onCancel }: Props = $props();
+    let { onSave, onCancel, loading = false }: Props = $props();
 
     let canvas = $state<HTMLCanvasElement | null>(null);
     let ctx = $state<CanvasRenderingContext2D | null>(null);
@@ -127,6 +128,7 @@
                 variant="primary"
                 onclick={handleSave}
                 disabled={!hasSignature}
+                {loading}
             >
                 <Check size={18} class="mr-2" />
                 Confirmar Firma

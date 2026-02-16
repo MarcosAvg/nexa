@@ -70,48 +70,51 @@
 
 <!-- Desktop Table View (hidden on small screens) -->
 <div
-    class="hidden md:block overflow-hidden rounded-xl border border-slate-200/60 shadow-sm bg-white"
+    class="hidden md:block overflow-hidden rounded-2xl border border-slate-200/50 shadow-sm bg-white/80 backdrop-blur-sm"
 >
-    <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm text-slate-500">
+    <div class="overflow-x-auto custom-scrollbar">
+        <table class="w-full text-left text-sm text-slate-600 border-collapse">
             <thead
-                class="bg-slate-50/50 text-xs uppercase tracking-wider text-slate-500 font-semibold border-b border-slate-200/60"
+                class="bg-slate-50/40 text-[11px] uppercase tracking-[0.15em] text-slate-500 font-bold border-b border-slate-200/50"
             >
                 <tr>
                     {#each columns as column}
                         <th
                             scope="col"
-                            class="px-4 py-3 lg:px-6 lg:py-4 {column.class ||
+                            class="px-5 py-4 lg:px-6 lg:py-5 {column.class ||
                                 ''} {column.sortable !== false
-                                ? 'cursor-pointer hover:bg-slate-100/50 transition-all duration-200 group select-none'
+                                ? 'cursor-pointer hover:bg-slate-100/30 transition-all duration-300 group select-none'
                                 : ''}"
                             onclick={() =>
                                 column.sortable !== false &&
                                 toggleSort(column.key)}
                         >
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2.5">
                                 {column.label}
                                 {#if column.sortable !== false}
                                     <div
-                                        class="flex-shrink-0 transition-colors {sortKey ===
+                                        class="flex-shrink-0 transition-all duration-300 {sortKey ===
                                         column.key
-                                            ? 'text-slate-900'
-                                            : 'text-slate-300 group-hover:text-slate-400'}"
+                                            ? 'text-blue-500 scale-110'
+                                            : 'text-slate-300 group-hover:text-slate-400 group-hover:scale-105'}"
                                     >
                                         {#if sortKey === column.key}
                                             {#if sortDirection === "asc"}
                                                 <ChevronUp
-                                                    size={14}
-                                                    strokeWidth={3}
+                                                    size={15}
+                                                    strokeWidth={2.5}
                                                 />
                                             {:else}
                                                 <ChevronDown
-                                                    size={14}
-                                                    strokeWidth={3}
+                                                    size={15}
+                                                    strokeWidth={2.5}
                                                 />
                                             {/if}
                                         {:else}
-                                            <ChevronsUpDown size={14} />
+                                            <ChevronsUpDown
+                                                size={14}
+                                                strokeWidth={2}
+                                            />
                                         {/if}
                                     </div>
                                 {/if}
@@ -121,18 +124,20 @@
                     {#if actions}
                         <th
                             scope="col"
-                            class="px-4 py-3 lg:px-6 lg:py-4 text-right"
+                            class="px-5 py-4 lg:px-6 lg:py-5 text-right font-bold"
                             >Acciones</th
                         >
                     {/if}
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-slate-100/60">
                 {#each sortedData as row (row.id || Math.random())}
-                    <tr class="transition-colors hover:bg-slate-50/80">
+                    <tr
+                        class="group transition-all duration-300 hover:bg-blue-50/30"
+                    >
                         {#each columns as column}
                             <td
-                                class="px-4 py-3 lg:px-6 lg:py-4 lg:whitespace-nowrap text-slate-700 {column.class ||
+                                class="px-5 py-4 lg:px-6 lg:py-4.5 lg:whitespace-nowrap text-[13.5px] font-medium text-slate-700/90 transition-colors group-hover:text-slate-900 {column.class ||
                                     ''}"
                             >
                                 {#if column.render}
@@ -144,9 +149,13 @@
                         {/each}
                         {#if actions}
                             <td
-                                class="px-4 py-3 lg:px-6 lg:py-4 whitespace-nowrap text-right"
+                                class="px-5 py-4 lg:px-6 lg:py-4.5 whitespace-nowrap text-right"
                             >
-                                {@render actions(row)}
+                                <div
+                                    class="flex justify-end opacity-60 group-hover:opacity-100 transition-opacity duration-300"
+                                >
+                                    {@render actions(row)}
+                                </div>
                             </td>
                         {/if}
                     </tr>
@@ -164,33 +173,61 @@
         {:else}
             <!-- Fallback generic card -->
             <article
-                class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3"
+                class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5 space-y-4 relative overflow-hidden active:scale-[0.98] transition-all duration-200"
             >
                 <div class="flex items-start justify-between gap-3">
-                    <div class="font-bold text-slate-900">
+                    <div
+                        class="font-bold text-slate-900 text-[15px] tracking-tight"
+                    >
                         {row[columns[0]?.key]}
                     </div>
                     {#if actions}
-                        {@render actions(row)}
-                    {/if}
-                </div>
-                {#each columns.slice(1) as column}
-                    {#if !column.hideOnMobile}
-                        <div
-                            class="flex items-center justify-between gap-2 text-sm"
-                        >
-                            <span class="text-slate-400">{column.label}</span>
-                            <span class="text-slate-700">
-                                {#if column.render}
-                                    {@render column.render(row)}
-                                {:else}
-                                    {row[column.key]}
-                                {/if}
-                            </span>
+                        <div class="opacity-80">
+                            {@render actions(row)}
                         </div>
                     {/if}
-                {/each}
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 pt-1">
+                    {#each columns.slice(1) as column}
+                        {#if !column.hideOnMobile}
+                            <div
+                                class="flex items-center justify-between gap-4 py-1.5 border-b border-slate-50 last:border-0"
+                            >
+                                <span
+                                    class="text-[11px] font-bold uppercase tracking-wider text-slate-400"
+                                    >{column.label}</span
+                                >
+                                <span
+                                    class="text-[13px] font-semibold text-slate-700"
+                                >
+                                    {#if column.render}
+                                        {@render column.render(row)}
+                                    {:else}
+                                        {row[column.key]}
+                                    {/if}
+                                </span>
+                            </div>
+                        {/if}
+                    {/each}
+                </div>
             </article>
         {/if}
     {/each}
 </div>
+
+<style>
+    .custom-scrollbar::-webkit-scrollbar {
+        height: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #e2e8f0;
+        border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #cbd5e1;
+    }
+</style>
