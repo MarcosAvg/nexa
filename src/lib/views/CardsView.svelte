@@ -33,6 +33,7 @@
     // Modal State
     let isModalOpen = $state(false);
     let editingCard = $state<any>(null);
+    let replacingCard = $state<any>(null);
 
     let confirmModal = $state({
         isOpen: false,
@@ -178,10 +179,13 @@
                 ? "Esta acción no se puede deshacer. Se borrará todo registro de la tarjeta."
                 : "La tarjeta quedará en estado de BAJA y no podrá ser utilizada.",
             variant: "danger",
-            confirmText: isInactive ? "Eliminar" : "SÍ, Inactivar",
+            confirmText: isInactive
+                ? "Eliminar Definitivamente"
+                : "SÍ, Inactivar",
             onConfirm: async () => {
                 if (isInactive) {
-                    toast.error("Eliminación permanente no implementada aún.");
+                    await cardService.delete(card.id);
+                    toast.success("Tarjeta eliminada permanentemente");
                 } else {
                     await cardService.updateStatus(card.id, "inactive");
                     toast.success("Tarjeta inactivada");
@@ -198,7 +202,8 @@
     }
 
     function onReplaceCard(card: any) {
-        toast.info("Función de reemplazo no disponible aún");
+        replacingCard = card;
+        isModalOpen = true;
     }
 
     // Snippets
@@ -423,17 +428,32 @@
 
 <AddCardModal
     bind:isOpen={isModalOpen}
-    mode="inventory"
-    onSave={async (card) => {
+    mode={replacingCard ? "assign" : "inventory"}
+    {replacingCard}
+    onSave={async (card, replacementOptions) => {
         try {
-            await cardService.save(card);
-            toast.success("Tarjeta creada en inventario");
+            await cardService.save(
+                {
+                    ...card,
+                    person_id: replacingCard?.personId,
+                },
+                replacementOptions,
+            );
+            toast.success(
+                replacingCard
+                    ? "Tarjeta reemplazada exitosamente"
+                    : "Tarjeta creada en inventario",
+            );
             await refreshData();
             isModalOpen = false;
         } catch (e) {
             console.error(e);
             throw e;
         }
+    }}
+    onclose={() => {
+        replacingCard = null;
+        isModalOpen = false;
     }}
 />
 

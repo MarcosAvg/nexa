@@ -22,7 +22,7 @@ export const cardService = {
         }
     },
 
-    async save(data: any) {
+    async save(data: any, replacementOptions?: { oldCardStatus: string }) {
         try {
             // Check if this is a new assignment
             let isNewAssignment = false;
@@ -40,12 +40,50 @@ export const cardService = {
                 isNewAssignment = true;
             }
 
+            // Handle Replacement Logic BEFORE creating/updating the new card
+            if (replacementOptions && data.person_id) {
+                // 1. Find the currently assigned card of the same type
+                const { data: currentCards } = await supabase
+                    .from("cards")
+                    .select("id, folio")
+                    .eq("person_id", data.person_id)
+                    .eq("type", data.type) // Ensure same type
+                    .neq("status", "inactive"); // Active cards only
+
+                if (currentCards && currentCards.length > 0) {
+                    const oldCard = currentCards[0];
+                    const newStatus = replacementOptions.oldCardStatus; // 'blocked' or 'available'
+
+                    // 2. Update Old Card Status
+                    const { error: updateError } = await supabase
+                        .from("cards")
+                        .update({
+                            status: newStatus,
+                            person_id: null, // Unassign
+                            programming_status: null,
+                            responsiva_status: null,
+                        })
+                        .eq("id", oldCard.id);
+
+                    if (updateError) throw updateError;
+
+                    // 3. Log History for Old Card
+                    await HistoryService.log("CARD", oldCard.id, "REPLACE_OLD", {
+                        message: `Tarjeta ${oldCard.folio} reemplazada. Nuevo estado: ${newStatus === "blocked" ? "Baja Definitiva" : "Disponible"
+                            }`,
+                        related_person_id: data.person_id,
+                    });
+                }
+            }
+
             const payload = {
                 folio: data.folio,
                 type: data.type,
                 status: data.status || (data.person_id ? "active" : "available"),
                 person_id: data.person_id || null,
-                programming_status: isNewAssignment ? "pending" : (data.programming_status || null),
+                programming_status: isNewAssignment
+                    ? "pending"
+                    : data.programming_status || null,
                 responsiva_status: data.responsiva_status || null,
             };
 
@@ -77,13 +115,27 @@ export const cardService = {
             if (isNewAssignment) {
                 const { ticketService } = await import("./tickets");
                 await ticketService.create({
-                    type: "Programación",
-                    description: `Programar acceso para tarjeta folio ${payload.folio}`,
-                    priority: "alta",
+                    type: replacementOptions ? "Reposición" : "Programación", // Distinct type for replacement
+                    description: replacementOptions
+                        ? `Reponer tarjeta ${payload.type} (Folio anterior dado de baja/liberado). Nuevo folio: ${payload.folio}`
+                        : `Programar acceso para tarjeta ${payload.type} folio ${payload.folio}`,
+                    priority: replacementOptions ? "urgente" : "alta",
                     person_id: data.person_id,
                     card_id: cardId,
-                    title: `Programación: ${payload.folio}`
+                    title: replacementOptions
+                        ? `Reposición: ${payload.folio}`
+                        : `Programación: ${payload.folio}`,
                 });
+
+                // Log history for new card to link it to the person explicitly
+                if (data.person_id) {
+                    await HistoryService.log("PERSON", data.person_id, replacementOptions ? "REPLACE_CARD" : "ASSIGN_CARD", {
+                        message: replacementOptions
+                            ? `Tarjeta ${payload.folio} (${payload.type}) asignada por Reposición`
+                            : `Tarjeta ${payload.folio} (${payload.type}) asignada`,
+                        related_card_id: cardId,
+                    });
+                }
             }
         } catch (error) {
             handleError(error, "Save Card");
@@ -104,7 +156,7 @@ export const cardService = {
             if (status === "done") {
                 const { data: card } = await supabase
                     .from("cards")
-                    .select("folio, responsiva_status, person_id")
+                    .select("folio, responsiva_status, person_id, type")
                     .eq("id", cardId)
                     .single();
 
@@ -112,7 +164,7 @@ export const cardService = {
                     const { ticketService } = await import("./tickets");
                     await ticketService.create({
                         type: "Firma Responsiva",
-                        description: `Firma de responsiva para tarjeta folio ${card.folio}`,
+                        description: `Firma de responsiva para tarjeta ${card.type || ''} folio ${card.folio}`,
                         priority: "media",
                         person_id: card.person_id,
                         card_id: cardId,
@@ -216,11 +268,18 @@ export const cardService = {
 
     async delete(id: string) {
         try {
+            // Log deletion BEFORE removing data so proactive snapshotting can capture the name
+            await HistoryService.log("CARD", id, "DELETE", { message: `Tarjeta eliminada permanentemente` });
+
+            // Associated tickets are transient and can be deleted. 
+            // History remains readable because HistoryService captures names PROACTIVELY.
+            const { ticketService } = await import("./tickets");
+            await ticketService.deleteByCard(id);
+
+            // Delete the card
             const { error } = await supabase.from("cards").delete().eq("id", id);
             if (error) throw error;
-            await HistoryService.log("CARD", id, "DELETE", {
-                message: "Tarjeta eliminada permanentemente",
-            });
+
         } catch (error) {
             handleError(error, "Delete Card");
             throw error;

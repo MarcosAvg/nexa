@@ -6,7 +6,12 @@
     import Badge from "../components/Badge.svelte";
     import Button from "../components/Button.svelte";
     import HistoryFilters from "../components/HistoryFilters.svelte";
-    import { ChevronLeft, ChevronRight, FileSpreadsheet } from "lucide-svelte";
+    import {
+        ChevronLeft,
+        ChevronRight,
+        FileSpreadsheet,
+        RotateCw,
+    } from "lucide-svelte";
 
     const PAGE_SIZE = 50;
 
@@ -28,46 +33,6 @@
 
     // Get data from Stores
     let filteredHistoryLogs = $derived(historyState.filteredHistoryLogs);
-    let personnel = $derived(personnelState.personnel);
-    let extraCards = $derived(personnelState.extraCards);
-    let pendingItems = $derived(ticketState.pendingItems);
-
-    // Helper to resolve entity name based on type and ID
-    function resolveEntity(type: string, id: string) {
-        if (!type || !id) return "-";
-        type = type.toUpperCase();
-
-        if (type === "SISTEMA" || type === "SYSTEM") return "Sistema";
-
-        if (type === "PERSONNEL" || type === "PERSON") {
-            const p = (personnel || []).find((p: any) => p.id == id);
-            return p
-                ? `${p.first_name} ${p.last_name} (${p.dependency})`
-                : `Personal (${id})`;
-        }
-
-        if (type === "CARD") {
-            // Check extra cards first
-            let c = (extraCards || []).find((c: any) => c.id == id);
-            if (c) return `Tarjeta: ${c.folio} (${c.type})`;
-
-            // Check assigned cards
-            for (const p of personnel || []) {
-                if (p.cards) {
-                    c = p.cards.find((card: any) => card.id == id);
-                    if (c) return `Tarjeta: ${c.folio} (${c.type})`;
-                }
-            }
-            return `Tarjeta (${id})`;
-        }
-
-        if (type === "TICKET") {
-            const t = (pendingItems || []).find((item: any) => item.id == id);
-            return t ? `Ticket #${id}: ${t.title}` : `Ticket #${id}`;
-        }
-
-        return `${type} (${id})`;
-    }
 
     let derivedHistoryLogs = $derived.by(() => {
         if (!filteredHistoryLogs) return [];
@@ -83,7 +48,10 @@
                     const vals = Object.entries(log.details)
                         .filter(
                             ([k, v]) =>
-                                v !== null && v !== undefined && k !== "id",
+                                v !== null &&
+                                v !== undefined &&
+                                k !== "id" &&
+                                k !== "snapshot",
                         )
                         .map(([k, v]) => `${k}: ${v}`)
                         .join(", ");
@@ -94,8 +62,8 @@
                 const entityType = log.entity_type || "SISTEMA";
                 const action = log.action || "Desconocida";
                 const entityId = log.entity_id || "";
-
-                const resolvedName = resolveEntity(entityType, entityId);
+                const entityName =
+                    log.entity_name || `${entityType} (${entityId})`;
 
                 const searchStr = (
                     details +
@@ -104,7 +72,7 @@
                     " " +
                     action +
                     " " +
-                    resolvedName
+                    entityName
                 ).toLowerCase();
 
                 const actionLabel = actionNames[action] || action;
@@ -125,7 +93,7 @@
                             entityType === "PERSON")) ||
                     // Specific card type search in the resolved name
                     (entityType === "CARD" &&
-                        resolvedName
+                        entityName
                             .toLowerCase()
                             .includes(historyFilterCardType.toLowerCase()));
 
@@ -140,7 +108,7 @@
                         .includes(historyFilterAction.toLowerCase());
 
                 if (matchPerson && matchType && matchFolio && matchAction) {
-                    return { ...log, resolvedName };
+                    return { ...log, resolvedName: entityName };
                 }
                 return null;
             })
@@ -177,7 +145,9 @@
                   : row.entity_type}</span
         >
         <span class="text-xs text-slate-600 font-bold leading-tight mt-0.5">
-            {row.resolvedName || resolveEntity(row.entity_type, row.entity_id)}
+            {row.resolvedName ||
+                row.entity_name ||
+                `${row.entity_type} (${row.entity_id})`}
         </span>
     </div>
 {/snippet}
@@ -229,6 +199,21 @@
         {/snippet}
 
         {#snippet actions()}
+            <Button
+                variant="outline"
+                class="flex items-center gap-2.5 h-10 px-4 group"
+                disabled={historyState.isLoading}
+                onclick={() => historyState.refresh()}
+            >
+                <RotateCw
+                    size={16}
+                    class="text-slate-500 transition-transform duration-700 {historyState.isLoading
+                        ? 'animate-spin'
+                        : 'group-hover:rotate-180'}"
+                />
+                <span class="text-slate-600">Actualizar</span>
+            </Button>
+
             <Button
                 variant="soft-emerald"
                 class="flex items-center gap-2.5 h-10 px-6"

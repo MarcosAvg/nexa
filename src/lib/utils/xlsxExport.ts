@@ -73,7 +73,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         }
 
         if (activeFilters.length > 0) {
-            filterDescription = `  |  Filtros: ${activeFilters.join(' - ')}`;
+            filterDescription = `      -  Filtros: ${activeFilters.join(' - ')}`;
         }
     }
 
@@ -101,7 +101,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
     // Row 1: Header + Logo
     worksheet.mergeCells('A1:R1');
     const titleCell = worksheet.getCell('A1');
-    titleCell.value = `         DIRECTORIO MAESTRO DE PERSONAL - NEXA${filterDescription}`;
+    titleCell.value = `       DIRECTORIO DE PERSONAL - NEXA${filterDescription}`;
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     worksheet.getRow(1).height = 40;

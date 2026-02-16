@@ -134,6 +134,16 @@
         return modifiedData?.exit_time || modifiedData?.horaSalida || "—";
     }
 
+    // Special Access Comparison State
+    let currentAccesses = $derived(currentPerson?.specialAccesses || []);
+    let modifiedAccesses = $derived(modifiedData?.specialAccesses || []);
+    let accessChanges = $derived(
+        getFloorChanges(currentAccesses, modifiedAccesses),
+    );
+    let hasAccessChanges = $derived(
+        accessChanges.added.length > 0 || accessChanges.removed.length > 0,
+    );
+
     async function handleConfirm() {
         if (isSubmitting || !ticket || !currentPerson) return;
         isSubmitting = true;
@@ -447,6 +457,85 @@
                 {/if}
             {/if}
 
+            <!-- Special Accesses Comparison -->
+
+            {#if hasAccessChanges}
+                <div class="space-y-2">
+                    <p
+                        class="text-xs font-bold text-slate-500 uppercase tracking-widest px-1"
+                    >
+                        Accesos Especiales
+                    </p>
+
+                    <div
+                        class="grid grid-cols-[1fr_auto_1fr] gap-4 items-start"
+                    >
+                        <!-- Current Accesses -->
+                        <div
+                            class="p-3 rounded-lg border border-slate-300 bg-slate-50"
+                        >
+                            <div class="flex flex-wrap gap-1.5">
+                                {#each currentAccesses as access}
+                                    {#if accessChanges.removed.includes(access)}
+                                        <Badge variant="rose">
+                                            <span
+                                                class="flex items-center gap-0.5"
+                                            >
+                                                <Minus size={10} />
+                                                <span>{access}</span>
+                                            </span>
+                                        </Badge>
+                                    {:else}
+                                        <Badge variant="slate">{access}</Badge>
+                                    {/if}
+                                {/each}
+                                {#if currentAccesses.length === 0}
+                                    <span class="text-xs text-slate-400"
+                                        >Sin accesos</span
+                                    >
+                                {/if}
+                            </div>
+                        </div>
+
+                        <!-- Arrow -->
+                        <div class="flex items-center justify-center pt-3">
+                            <div
+                                class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"
+                            >
+                                <ArrowRight size={14} class="text-amber-600" />
+                            </div>
+                        </div>
+
+                        <!-- Modified Accesses -->
+                        <div
+                            class="p-3 rounded-lg border border-amber-300 bg-amber-50 ring-1 ring-amber-200"
+                        >
+                            <div class="flex flex-wrap gap-1.5">
+                                {#each modifiedAccesses as access}
+                                    {#if accessChanges.added.includes(access)}
+                                        <Badge variant="emerald">
+                                            <span
+                                                class="flex items-center gap-0.5"
+                                            >
+                                                <Plus size={10} />
+                                                {access}
+                                            </span>
+                                        </Badge>
+                                    {:else}
+                                        <Badge variant="slate">{access}</Badge>
+                                    {/if}
+                                {/each}
+                                {#if modifiedAccesses.length === 0}
+                                    <span class="text-xs text-slate-400"
+                                        >Sin accesos</span
+                                    >
+                                {/if}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {/if}
+
             <!-- Floor Arrays Comparison -->
             {#each [{ label: "Pisos P2000", currentKey: "floors_p2000", modifiedKey: "pisosP2000", fallbackKey: "floors_p2000" }, { label: "Pisos Kone", currentKey: "floors_kone", modifiedKey: "pisosKone", fallbackKey: "floors_kone" }] as floorField}
                 {@const currentFloors = getCurrentFloors(floorField.currentKey)}
@@ -484,9 +573,7 @@
                                                     class="flex items-center gap-0.5"
                                                 >
                                                     <Minus size={10} />
-                                                    <span class="line-through"
-                                                        >{floor}</span
-                                                    >
+                                                    <span>{floor}</span>
                                                 </span>
                                             </Badge>
                                         {:else}

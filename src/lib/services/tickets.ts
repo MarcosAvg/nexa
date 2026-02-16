@@ -56,20 +56,14 @@ export const ticketService = {
 
     async delete(id: number, reason?: string) {
         try {
-            // Fetch ticket info before deleting for history
-            const { data: ticket } = await supabase
-                .from("tickets")
-                .select("title, type")
-                .eq("id", id)
-                .single();
+            // Log deletion/completion BEFORE removing data
+            await HistoryService.log("TICKET", id, "COMPLETE_TICKET", {
+                message: reason || `Ticket completado/eliminado`
+            });
 
             const { error } = await supabase.from("tickets").delete().eq("id", id);
             if (error) throw error;
             ticketState.removeTicket(id);
-
-            await HistoryService.log("TICKET", id, "COMPLETE_TICKET", {
-                message: reason || `Ticket completado: ${ticket?.title || `#${id}`}`,
-            });
         } catch (error) {
             handleError(error, "Delete Ticket");
             throw error;
@@ -78,6 +72,22 @@ export const ticketService = {
 
     async deleteByCard(cardId: string, types?: string[]) {
         try {
+            // 0. Fetch tickets to log deletion
+            let fetchQuery = supabase.from("tickets")
+                .select("id, title")
+                .eq("card_id", cardId);
+            if (types && types.length > 0) fetchQuery = fetchQuery.in("type", types);
+
+            const { data: tickets } = await fetchQuery;
+
+            if (tickets) {
+                for (const t of tickets) {
+                    await HistoryService.log("TICKET", t.id, "DELETE_TICKET_CASCADE", {
+                        message: `Ticket #${t.id} eliminado por baja de tarjeta`
+                    });
+                }
+            }
+
             let query = supabase.from("tickets").delete().eq("card_id", cardId);
             if (types && types.length > 0) {
                 query = query.in("type", types);
@@ -93,6 +103,19 @@ export const ticketService = {
 
     async deleteByPerson(personId: string) {
         try {
+            // 0. Fetch tickets to log deletion
+            const { data: tickets } = await supabase.from("tickets")
+                .select("id, title")
+                .eq("person_id", personId);
+
+            if (tickets) {
+                for (const t of tickets) {
+                    await HistoryService.log("TICKET", t.id, "DELETE_TICKET_CASCADE", {
+                        message: `Ticket #${t.id} eliminado por baja de personal`
+                    });
+                }
+            }
+
             // We delete all tickets linked to this person ID
             const { error } = await supabase.from("tickets").delete().eq("person_id", personId);
             if (error) throw error;

@@ -17,6 +17,7 @@
 
     // Local state for Global Overlays (actions triggered from here)
     let isCardModalOpen = $state(false);
+    let replacingCard = $state<any>(null);
 
     let confirmModal = $state({
         isOpen: false,
@@ -126,18 +127,26 @@
         };
     };
 
+    const onCardReplace = (c: any) => {
+        replacingCard = c;
+        isCardModalOpen = true;
+    };
+
     // Card Save Handler (from AddCardModal inside Details Panel context)
-    const handleCardSave = async (cardData: {
-        type: string;
-        folio: string;
-    }) => {
+    const handleCardSave = async (
+        cardData: { type: string; folio: string },
+        replacementOptions?: { oldCardStatus: string },
+    ) => {
         if (!selectedPersonId) return;
+
         await personnelActions.handleCardSave(
             cardData,
             selectedPersonId,
             refreshData,
+            replacementOptions,
         );
         isCardModalOpen = false;
+        replacingCard = null; // Reset
     };
 
     function onEdit(person: any) {
@@ -154,9 +163,13 @@
     {onDeactivate}
     {onReactivate}
     {onDeletePermanent}
-    onCardAdd={() => (isCardModalOpen = true)}
+    onCardAdd={() => {
+        replacingCard = null;
+        isCardModalOpen = true;
+    }}
     {onCardBlock}
     {onCardUnassign}
+    {onCardReplace}
     onRefresh={refreshData}
     onclose={() => personnelState.setDetailsOpen(false)}
 />
@@ -172,7 +185,12 @@
 <AddCardModal
     bind:isOpen={isCardModalOpen}
     mode="assign"
+    {replacingCard}
     onSave={handleCardSave}
+    onclose={() => {
+        replacingCard = null;
+        isCardModalOpen = false;
+    }}
 />
 
 <!-- Generic Confirmation Modal -->

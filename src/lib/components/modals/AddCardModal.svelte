@@ -10,20 +10,26 @@
         CheckCircle2,
         PlusCircle,
         Ban,
+        ArrowRight,
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
 
     type Props = {
         isOpen: boolean;
         mode?: "assign" | "inventory";
-        availableCards?: any[]; // Legacy prop, we'll use personnelState but keep for compat
-        onSave?: (card: { type: string; folio: string }) => void;
+        availableCards?: any[]; // Legacy prop
+        replacingCard?: { type: string; folio: string; id: string } | null;
+        onSave?: (
+            card: { type: string; folio: string },
+            replacementOptions?: { oldCardStatus: string },
+        ) => void;
         onclose?: () => void;
     };
 
     let {
         isOpen = $bindable(),
         mode = "assign",
+        replacingCard = null,
         onSave,
         onclose,
     }: Props = $props();
@@ -35,6 +41,14 @@
     let searchQuery = $state("");
     let isSubmitting = $state(false);
     let confirmCreate = $state(false);
+    let oldCardStatus = $state("blocked"); // blocked | available
+
+    // Sync card type when replacing
+    $effect(() => {
+        if (replacingCard) {
+            cardType = replacingCard.type as "P2000" | "KONE";
+        }
+    });
 
     // List of cards in inventory filtered by type
     let filteredInventory = $derived.by(() => {
@@ -139,7 +153,12 @@
                 savePayload.id = status.card.id;
             }
 
-            await onSave?.(savePayload);
+            // Pass replacement options if replacing
+            if (replacingCard) {
+                await onSave?.(savePayload, { oldCardStatus });
+            } else {
+                await onSave?.(savePayload);
+            }
 
             if (mode === "inventory") {
                 toast.success("Tarjeta Registrada", {
@@ -148,6 +167,10 @@
             } else if (status.type === "new") {
                 toast.success("Nueva Tarjeta Registrada", {
                     description: `Se ha creado y asignado el folio ${searchQuery} (${cardType}).`,
+                });
+            } else if (replacingCard) {
+                toast.success("Reposición Exitosa", {
+                    description: `Se reemplazó la tarjeta ${replacingCard.folio} por ${searchQuery}.`,
                 });
             } else {
                 toast.success("Tarjeta Asignada", {
@@ -171,14 +194,43 @@
 
 <Modal
     bind:isOpen
-    title={mode === "inventory" ? "Nueva Tarjeta" : "Asignar Tarjeta"}
-    description={mode === "inventory"
-        ? "Registre un nuevo folio en el inventario del sistema."
-        : "Ingrese el folio para buscarlo en inventario o registrar uno nuevo."}
+    title={replacingCard
+        ? "Reponer Tarjeta"
+        : mode === "inventory"
+          ? "Nueva Tarjeta"
+          : "Asignar Tarjeta"}
+    description={replacingCard
+        ? `Sustitución de tarjeta ${replacingCard.type} - ${replacingCard.folio}`
+        : mode === "inventory"
+          ? "Registre un nuevo folio en el inventario del sistema."
+          : "Ingrese el folio para buscarlo en inventario o registrar uno nuevo."}
     size="md"
     onclose={resetAndClose}
 >
     <div class="space-y-6">
+        {#if replacingCard}
+            <div
+                class="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800"
+            >
+                <div
+                    class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0"
+                >
+                    <CreditCard size={16} />
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p
+                        class="text-xs font-bold uppercase tracking-wider opacity-70"
+                    >
+                        Reponiendo
+                    </p>
+                    <p class="font-bold truncate">
+                        {replacingCard.type} · {replacingCard.folio}
+                    </p>
+                </div>
+                <ArrowRight size={16} class="opacity-50" />
+            </div>
+        {/if}
+
         <!-- Type Selection with NEXA Colors -->
         <div class="space-y-2">
             <span
@@ -188,12 +240,16 @@
             <div class="grid grid-cols-2 gap-2">
                 <button
                     type="button"
+                    disabled={!!replacingCard}
                     class="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all {cardType ===
                     'P2000'
                         ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-sm'
-                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'}"
+                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'} {replacingCard &&
+                    cardType !== 'P2000'
+                        ? 'opacity-50 cursor-not-allowed'
+                        : ''}"
                     onclick={() => {
-                        cardType = "P2000";
+                        if (!replacingCard) cardType = "P2000";
                     }}
                 >
                     <span class="text-sm font-bold">P2000</span>
@@ -211,12 +267,16 @@
 
                 <button
                     type="button"
+                    disabled={!!replacingCard}
                     class="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all {cardType ===
                     'KONE'
                         ? 'border-sky-500 bg-sky-50 text-sky-900 shadow-sm'
-                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'}"
+                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'} {replacingCard &&
+                    cardType !== 'KONE'
+                        ? 'opacity-50 cursor-not-allowed'
+                        : ''}"
                     onclick={() => {
-                        cardType = "KONE";
+                        if (!replacingCard) cardType = "KONE";
                     }}
                 >
                     <span class="text-sm font-bold">KONE</span>
@@ -231,6 +291,60 @@
                 </button>
             </div>
         </div>
+
+        <!-- Old Card Status Selector (Only when replacing) -->
+        {#if replacingCard}
+            <div class="space-y-2 animate-in fade-in slide-in-from-top-2">
+                <span
+                    class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
+                >
+                    Estado de Tarjeta Anterior
+                </span>
+                <div class="grid grid-cols-2 gap-2">
+                    <button
+                        type="button"
+                        class="relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all {oldCardStatus ===
+                        'blocked'
+                            ? 'border-rose-500 bg-rose-50 text-rose-900 shadow-sm'
+                            : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'}"
+                        onclick={() => (oldCardStatus = "blocked")}
+                    >
+                        <span class="text-xs font-bold">Baja Definitiva</span>
+                        <span class="text-[9px] opacity-70"
+                            >Bloquear (Robo/Extravío)</span
+                        >
+                        {#if oldCardStatus === "blocked"}
+                            <div
+                                class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5"
+                            >
+                                <CheckCircle2 size={12} />
+                            </div>
+                        {/if}
+                    </button>
+
+                    <button
+                        type="button"
+                        class="relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all {oldCardStatus ===
+                        'available'
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm'
+                            : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'}"
+                        onclick={() => (oldCardStatus = "available")}
+                    >
+                        <span class="text-xs font-bold">Disponible</span>
+                        <span class="text-[9px] opacity-70"
+                            >Regresar a Inventario</span
+                        >
+                        {#if oldCardStatus === "available"}
+                            <div
+                                class="absolute -top-2 -right-2 bg-emerald-500 text-white rounded-full p-0.5"
+                            >
+                                <CheckCircle2 size={12} />
+                            </div>
+                        {/if}
+                    </button>
+                </div>
+            </div>
+        {/if}
 
         <!-- Smart Search Input -->
         <div class="space-y-3">
@@ -433,6 +547,8 @@
                 Restringida
             {:else if searchStatus?.type === "available" && mode === "inventory"}
                 Existente
+            {:else if replacingCard}
+                Reponer
             {:else}
                 Asignar
             {/if}

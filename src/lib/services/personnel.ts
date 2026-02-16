@@ -153,9 +153,12 @@ export const personnelService = {
 
     async delete(id: string) {
         try {
+            // Log deletion BEFORE removing data so proactive snapshotting can capture the name
+            await HistoryService.log("PERSONNEL", id, "DELETE", { message: `Registro eliminado permanentemente` });
+
+            // Delete the person
             const { error } = await supabase.from("personnel").delete().eq("id", id);
             if (error) throw error;
-            await HistoryService.log("PERSONNEL", id, "DELETE", { message: `Registro eliminado permanentemente` });
         } catch (error) {
             handleError(error, "Delete Personnel");
             throw error;

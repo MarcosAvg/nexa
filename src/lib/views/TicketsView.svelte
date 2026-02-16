@@ -40,8 +40,11 @@
     let isCompareOpen = $state(false);
     let compareTicket = $state<any>(null);
 
+    let personnel = $derived(personnelState.personnel);
+
     let filteredTickets = $derived.by(() => {
         let items = pendingItems.filter((ticket) => {
+            // ... (filters remain the same)
             // 1. Type Filter
             const matchType =
                 typeFilter === "Todos" || ticket.type === typeFilter;
@@ -51,15 +54,17 @@
                 priorityFilter === "Todas" ||
                 ticket.priority.toLowerCase() === priorityFilter.toLowerCase();
 
+            // Helper for search
+            const person = personnel.find((p) => p.id == ticket.person_id);
+            const pName = person?.name || "Desconocido";
+
             // 3. Search Filter
             const searchLower = searchQuery.toLowerCase();
             const matchSearch =
                 searchQuery === "" ||
                 ticket.title.toLowerCase().includes(searchLower) ||
                 ticket.description.toLowerCase().includes(searchLower) ||
-                (ticket.personName || "Desconocido")
-                    .toLowerCase()
-                    .includes(searchLower) ||
+                pName.toLowerCase().includes(searchLower) ||
                 (ticket.cardFolio || "").toLowerCase().includes(searchLower);
 
             return matchType && matchPriority && matchSearch;
@@ -73,10 +78,13 @@
             );
         });
 
-        return items.map((t) => ({
-            ...t,
-            personName: t.personName || "Desconocido",
-        }));
+        return items.map((t) => {
+            const person = personnel.find((p) => p.id == t.person_id);
+            return {
+                ...t,
+                personName: person?.name || "Desconocido",
+            };
+        });
     });
 
     let availableTypes = $derived.by(() => {

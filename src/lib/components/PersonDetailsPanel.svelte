@@ -402,13 +402,13 @@
                     <div class="flex justify-between items-center">
                         <span class="text-xs text-slate-500">Estado</span>
                         <Badge
-                            variant={person.status === "active" ||
-                            person.status === "Activo/a"
+                            variant={person.status === "Activo/a"
                                 ? "emerald"
-                                : person.status === "blocked" ||
-                                    person.status === "Bloqueado/a"
-                                  ? "rose"
-                                  : "slate"}
+                                : person.status === "Parcial"
+                                  ? "amber"
+                                  : person.status === "Bloqueado/a"
+                                    ? "rose"
+                                    : "slate"}
                         >
                             {person.status}
                         </Badge>
@@ -496,9 +496,9 @@
                     </h3>
                     {#if person.status !== "Baja" && person.status_raw !== "inactive"}
                         <Button
-                            variant="ghost"
+                            variant="soft-blue"
                             size="sm"
-                            class="h-7 px-2 text-blue-600"
+                            class="h-7 px-3"
                             onclick={() => onCardAdd?.(person)}
                         >
                             Asignar Tarjeta

@@ -54,13 +54,14 @@ export const personnelActions = {
     async handleCardSave(
         cardData: { type: string; folio: string },
         personId: string,
-        onSuccess?: () => Promise<void>
+        onSuccess?: () => Promise<void>,
+        replacementOptions?: { oldCardStatus: string }
     ) {
         try {
             await cardService.save({
                 ...cardData,
                 person_id: personId,
-            });
+            }, replacementOptions);
             await onSuccess?.();
         } catch (e) {
             console.error(e);

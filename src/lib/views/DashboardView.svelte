@@ -16,15 +16,24 @@
         Lock,
         Users,
         Activity,
-        Plus,
         FileText,
     } from "lucide-svelte";
 
     // Re-derive from stores for reactivity
-    let pendingItems = $derived(ticketState.pendingItems);
+    let rawPendingItems = $derived(ticketState.pendingItems);
     let personnel = $derived(personnelState.personnel);
     let extraCards = $derived(personnelState.extraCards);
     let filteredHistoryLogs = $derived(historyState.filteredHistoryLogs);
+
+    let pendingItems = $derived(
+        rawPendingItems.map((t) => {
+            const person = personnel.find((p) => p.id == t.person_id);
+            return {
+                ...t,
+                personName: person?.name || "Desconocido",
+            };
+        }),
+    );
 
     // Props
     // Props - Removed most props as we use stores
@@ -48,18 +57,6 @@
     // Or simpler: I will simply not error out, but actions won't work until I move modals.
     // To make it fully functional, I'll define local handlers that log "Not implemented yet - Waiting for Phase 4".
 
-    function onOpenAddPerson() {
-        uiState.setActivePage("Personal");
-        // In a future enhancement, we could pass a query param or state to auto-open the modal
-        // For now, navigation is sufficient as per plan.
-    }
-    function onOpenAddTicket() {
-        uiState.setActivePage("Tickets");
-    }
-    function onOpenAddCard() {
-        uiState.setActivePage("Tarjetas");
-    }
-
     // Metrics
     let activePersonnelCount = $derived(
         personnel.filter(
@@ -70,8 +67,14 @@
         ).length,
     );
 
-    let availableCardsCount = $derived(
-        extraCards.filter((c) => c.status === "available").length,
+    let koneStock = $derived(
+        extraCards.filter((c) => c.status === "available" && c.type === "KONE")
+            .length,
+    );
+
+    let p2000Stock = $derived(
+        extraCards.filter((c) => c.status === "available" && c.type === "P2000")
+            .length,
     );
 
     let pendingSignaturesCount = $derived(
@@ -162,45 +165,10 @@
                 Resumen operativo y accesos rápidos.
             </p>
         </div>
-        <div class="flex flex-wrap gap-3">
-            {#if currentUser?.role !== "viewer"}
-                <Button
-                    variant="soft-slate"
-                    class="gap-2.5 px-5 h-11"
-                    onclick={onOpenAddPerson}
-                >
-                    <Users size={18} strokeWidth={2.5} class="text-slate-500" />
-                    <span class="hidden lg:inline text-slate-700"
-                        >Registrar</span
-                    > <span class="text-slate-700">Personal</span>
-                </Button>
-                <Button
-                    variant="soft-blue"
-                    class="gap-2.5 px-5 h-11"
-                    onclick={onOpenAddCard}
-                >
-                    <CreditCard
-                        size={18}
-                        strokeWidth={2.5}
-                        class="text-blue-600/70"
-                    />
-                    <span class="hidden lg:inline text-slate-700">Nueva</span>
-                    <span class="text-slate-700">Tarjeta</span>
-                </Button>
-            {/if}
-            <Button
-                variant="primary"
-                class="gap-2.5 px-6 h-11 shadow-lg shadow-blue-500/20"
-                onclick={onOpenAddTicket}
-            >
-                <Plus size={18} strokeWidth={3} />
-                <span>Crear Ticket</span>
-            </Button>
-        </div>
     </div>
 
     <!-- Metrics Grid -->
-    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         <Card
             class="p-7 relative overflow-hidden group hover:shadow-xl hover:-translate-y-1 bg-white/50 backdrop-blur-md border border-slate-200/50"
         >
@@ -301,17 +269,46 @@
                     <div
                         class="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.15em] mb-1"
                     >
-                        Stock Tarjetas
+                        Stock KONE
                     </div>
                     <div
                         class="text-3xl font-black text-slate-900 tabular-nums"
                     >
-                        {availableCardsCount}
+                        {koneStock}
                     </div>
                 </div>
             </div>
             <div
                 class="absolute -right-6 -bottom-6 text-blue-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+            >
+                <CreditCard size={120} />
+            </div>
+        </Card>
+
+        <Card
+            class="p-7 relative overflow-hidden group hover:shadow-xl hover:-translate-y-1 bg-white/50 backdrop-blur-md border border-slate-200/50"
+        >
+            <div class="flex items-center gap-5">
+                <div
+                    class="p-4 bg-amber-50 text-amber-600 rounded-2xl group-hover:scale-110 group-hover:bg-amber-100 transition-all duration-300"
+                >
+                    <CreditCard size={28} strokeWidth={2} />
+                </div>
+                <div>
+                    <div
+                        class="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.15em] mb-1"
+                    >
+                        Stock P2000
+                    </div>
+                    <div
+                        class="text-3xl font-black text-slate-900 tabular-nums"
+                    >
+                        {p2000Stock}
+                    </div>
+                </div>
+            </div>
+            <div
+                class="absolute -right-6 -bottom-6 text-amber-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
             >
                 <CreditCard size={120} />
             </div>

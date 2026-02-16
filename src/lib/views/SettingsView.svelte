@@ -358,7 +358,7 @@
             <button
                 class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 text-left active:scale-[0.98] {activeTab ===
                 'catalogos'
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                    ? 'bg-slate-900 text-white shadow-lg shadow-blue-500/5'
                     : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'}"
                 onclick={() => (activeTab = "catalogos")}
             >
@@ -376,7 +376,7 @@
                 <button
                     class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 text-left active:scale-[0.98] {activeTab ===
                     'usuarios'
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                        ? 'bg-slate-900 text-white shadow-lg shadow-blue-500/5'
                         : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'}"
                     onclick={() => (activeTab = "usuarios")}
                 >
@@ -405,7 +405,7 @@
                     <button
                         class="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[13px] font-extrabold whitespace-nowrap transition-all duration-300 active:scale-95 {activeCatalog ===
                         item.id
-                            ? 'bg-white text-blue-600 shadow-md ring-1 ring-blue-500/10'
+                            ? 'bg-white text-slate-900 shadow-md ring-1 ring-slate-200'
                             : 'bg-slate-100/50 text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
                         onclick={() => (activeCatalog = item.id as any)}
                     >
@@ -753,34 +753,35 @@
                     {/if}
                 {/snippet}
 
-                <DataTable
-                    data={users}
-                    columns={[
-                        {
-                            key: "full_name",
-                            label: "Usuario",
-                            render: renderUserName,
-                        },
-                        {
-                            key: "role",
-                            label: "Rol de Acceso",
-                            render: renderUserRole,
-                        },
-                        { key: "created_at", label: "Registro" },
-                    ]}
-                >
-                    {#snippet actions(row: any)}
-                        <div class="flex justify-end gap-1">
-                            <button
-                                class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="Cambiar Permisos"
-                                onclick={() => openUserModal(row)}
-                            >
-                                <Shield size={16} />
-                            </button>
-                        </div>
-                    {/snippet}
-                </DataTable>
+                <div class="p-4">
+                    <DataTable
+                        data={users}
+                        columns={[
+                            {
+                                key: "full_name",
+                                label: "Usuario",
+                                render: renderUserName,
+                            },
+                            {
+                                key: "role",
+                                label: "Rol de Acceso",
+                                render: renderUserRole,
+                            },
+                        ]}
+                    >
+                        {#snippet actions(row: any)}
+                            <div class="flex justify-end gap-1">
+                                <button
+                                    class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Cambiar Permisos"
+                                    onclick={() => openUserModal(row)}
+                                >
+                                    <Shield size={16} />
+                                </button>
+                            </div>
+                        {/snippet}
+                    </DataTable>
+                </div>
             </Card>
         {/if}
     </div>
