@@ -44,13 +44,20 @@
         transition:fade={{ duration: 200 }}
     ></button>
 
-    <!-- Side Panel -->
+    <!-- Side Panel / Bottom Sheet -->
     <div
-        class="fixed top-0 bottom-0 right-0 z-50 w-full max-w-lg flex flex-col bg-white shadow-[-8px_0_30px_-10px_rgba(0,0,0,0.15)] border-l border-slate-200"
+        class="fixed z-50 flex flex-col bg-white shadow-2xl transition-all duration-300
+               bottom-0 left-0 right-0 w-full h-[85vh] rounded-t-[32px] border-t border-slate-200
+               sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:w-full sm:max-w-lg sm:h-full sm:rounded-none sm:border-l"
         role="dialog"
         aria-modal="true"
         aria-labelledby="sidepanel-title"
-        transition:fly={{ x: 400, duration: 300, easing: cubicOut }}
+        transition:fly={{
+            y: window.innerWidth < 640 ? 600 : 0,
+            x: window.innerWidth >= 640 ? 400 : 0,
+            duration: 400,
+            easing: cubicOut,
+        }}
     >
         <!-- Header -->
         <header

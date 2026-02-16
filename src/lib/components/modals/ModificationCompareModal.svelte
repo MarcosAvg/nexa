@@ -255,7 +255,9 @@
             </div>
 
             <!-- Column Headers -->
-            <div class="grid grid-cols-[1fr_auto_1fr] gap-4 items-center">
+            <div
+                class="hidden sm:grid grid-cols-[1fr_auto_1fr] gap-4 items-center"
+            >
                 <div class="text-center">
                     <p
                         class="text-xs font-bold text-slate-500 uppercase tracking-widest"
@@ -274,7 +276,7 @@
             </div>
 
             <!-- Text Fields Comparison -->
-            <div class="space-y-2">
+            <div class="space-y-4 sm:space-y-2">
                 {#each fieldDefs as field}
                     {@const currentVal = getValue(
                         currentPerson,
@@ -288,7 +290,7 @@
                     {@const changed = isChanged(currentVal, modifiedVal)}
 
                     <div
-                        class="grid grid-cols-[1fr_auto_1fr] gap-4 items-center"
+                        class="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] gap-2 sm:gap-4 items-stretch sm:items-center"
                     >
                         <!-- Current Value -->
                         <div
@@ -299,16 +301,20 @@
                             <p
                                 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"
                             >
-                                {field.label}
+                                {field.label} (Actual)
                             </p>
-                            <p class="text-sm text-slate-700">{currentVal}</p>
+                            <p class="text-sm text-slate-700 break-words">
+                                {currentVal}
+                            </p>
                         </div>
 
-                        <!-- Arrow -->
-                        <div class="flex items-center justify-center">
+                        <!-- Arrow/Indicator -->
+                        <div
+                            class="flex items-center justify-center py-1 sm:py-0"
+                        >
                             {#if changed}
                                 <div
-                                    class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"
+                                    class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center rotate-90 sm:rotate-0"
                                 >
                                     <ArrowRight
                                         size={14}
@@ -317,7 +323,7 @@
                                 </div>
                             {:else}
                                 <div
-                                    class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center"
+                                    class="hidden sm:flex w-6 h-6 rounded-full bg-slate-100 items-center justify-center"
                                 >
                                     <span class="text-slate-300 text-xs">=</span
                                     >
@@ -336,10 +342,10 @@
                                     ? 'text-amber-600'
                                     : 'text-slate-400'} uppercase tracking-wider mb-1"
                             >
-                                {field.label}
+                                {field.label} (Propuesto)
                             </p>
                             <p
-                                class="text-sm {changed
+                                class="text-sm break-words {changed
                                     ? 'text-amber-900 font-semibold'
                                     : 'text-slate-700'}"
                             >

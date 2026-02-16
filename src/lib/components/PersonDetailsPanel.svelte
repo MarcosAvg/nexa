@@ -426,25 +426,25 @@
                     </h3>
                 </div>
                 <div
-                    class="flex items-center gap-2 p-1 rounded-xl bg-slate-50 border border-slate-100"
+                    class="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-100"
                 >
                     {#if person.status_raw === "inactive" || person.status === "Baja"}
                         <button
                             type="button"
-                            class="flex-1 flex flex-col items-center gap-1 p-2 rounded-lg text-emerald-600 hover:bg-white hover:shadow-sm"
+                            class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-emerald-600 hover:bg-white hover:shadow-sm transition-all active:scale-95"
                             onclick={() => onReactivate?.(person)}
                         >
-                            <Lock size={18} />
+                            <Lock size={20} />
                             <span class="text-[10px] font-bold uppercase"
                                 >Reactivar</span
                             >
                         </button>
                         <button
                             type="button"
-                            class="flex-1 flex flex-col items-center gap-1 p-2 rounded-lg text-rose-600 hover:bg-white hover:shadow-sm"
+                            class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-rose-600 hover:bg-white hover:shadow-sm transition-all active:scale-95"
                             onclick={() => onDeletePermanent?.(person)}
                         >
-                            <Trash2 size={18} />
+                            <Trash2 size={20} />
                             <span class="text-[10px] font-bold uppercase"
                                 >Eliminar</span
                             >
@@ -452,20 +452,20 @@
                     {:else}
                         <button
                             type="button"
-                            class="flex-1 flex flex-col items-center gap-1 p-2 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-white"
+                            class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-white transition-all active:scale-95"
                             onclick={() => onEdit?.(person)}
                         >
-                            <Edit size={18} />
+                            <Edit size={20} />
                             <span class="text-[10px] font-bold uppercase"
                                 >Editar</span
                             >
                         </button>
                         <button
                             type="button"
-                            class="flex-1 flex flex-col items-center gap-1 p-2 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-white"
+                            class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-white transition-all active:scale-95"
                             onclick={() => onBlock?.(person)}
                         >
-                            <Lock size={18} />
+                            <Lock size={20} />
                             <span class="text-[10px] font-bold uppercase"
                                 >{person.status_raw === "blocked"
                                     ? "Activar"
@@ -474,10 +474,10 @@
                         </button>
                         <button
                             type="button"
-                            class="flex-1 flex flex-col items-center gap-1 p-2 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-white"
+                            class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-white transition-all active:scale-95"
                             onclick={() => onDeactivate?.(person)}
                         >
-                            <UserX size={18} />
+                            <UserX size={20} />
                             <span class="text-[10px] font-bold uppercase"
                                 >Baja</span
                             >

@@ -171,45 +171,100 @@
         {#if mobileCard}
             {@render mobileCard(row)}
         {:else}
-            <!-- Fallback generic card -->
+            {@const [isExpanded, setExpanded] = (() => {
+                let expanded = $state(false);
+                return [expanded, (val: boolean) => (expanded = val)];
+            })()}
+            <!-- Card component with internal state logic simplified -->
             <article
-                class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5 space-y-4 relative overflow-hidden active:scale-[0.98] transition-all duration-200"
+                class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5 space-y-4 relative overflow-hidden transition-all duration-200"
             >
+                <!-- Card Header -->
                 <div class="flex items-start justify-between gap-3">
-                    <div
-                        class="font-bold text-slate-900 text-[15px] tracking-tight"
-                    >
-                        {row[columns[0]?.key]}
+                    <div class="flex flex-col">
+                        <span
+                            class="text-[10px] font-bold uppercase text-slate-400 tracking-wider"
+                            >{columns[0]?.label}</span
+                        >
+                        <div
+                            class="font-bold text-slate-900 text-[16px] tracking-tight"
+                        >
+                            {row[columns[0]?.key]}
+                        </div>
                     </div>
                     {#if actions}
-                        <div class="opacity-80">
+                        <div class="flex items-center gap-2">
                             {@render actions(row)}
                         </div>
                     {/if}
                 </div>
 
-                <div class="grid grid-cols-1 gap-3 pt-1">
-                    {#each columns.slice(1) as column}
-                        {#if !column.hideOnMobile}
-                            <div
-                                class="flex items-center justify-between gap-4 py-1.5 border-b border-slate-50 last:border-0"
+                <!-- Card Content (Expandable) -->
+                <div class="grid grid-cols-1 gap-1 pt-1">
+                    <!-- Always visible fields (next 1 or 2) -->
+                    {#each columns.slice(1, 3) as column}
+                        <div
+                            class="flex items-center justify-between gap-4 py-1.5 border-b border-slate-50 last:border-0"
+                        >
+                            <span
+                                class="text-[11px] font-bold uppercase tracking-wider text-slate-400"
+                                >{column.label}</span
                             >
-                                <span
-                                    class="text-[11px] font-bold uppercase tracking-wider text-slate-400"
-                                    >{column.label}</span
-                                >
-                                <span
-                                    class="text-[13px] font-semibold text-slate-700"
-                                >
-                                    {#if column.render}
-                                        {@render column.render(row)}
-                                    {:else}
-                                        {row[column.key]}
-                                    {/if}
-                                </span>
-                            </div>
-                        {/if}
+                            <span
+                                class="text-[13px] font-semibold text-slate-700"
+                            >
+                                {#if column.render}
+                                    {@render column.render(row)}
+                                {:else}
+                                    {row[column.key]}
+                                {/if}
+                            </span>
+                        </div>
                     {/each}
+
+                    <!-- Expandable fields -->
+                    <div
+                        class="content-wrapper overflow-hidden transition-all duration-300"
+                        style="max-height: {row._expanded
+                            ? '500px'
+                            : '0px'}; opacity: {row._expanded
+                            ? '1'
+                            : '0'}; visibility: {row._expanded
+                            ? 'visible'
+                            : 'hidden'}"
+                    >
+                        {#each columns.slice(3) as column}
+                            {#if !column.hideOnMobile}
+                                <div
+                                    class="flex items-center justify-between gap-4 py-2 border-b border-slate-50 last:border-0"
+                                >
+                                    <span
+                                        class="text-[11px] font-bold uppercase tracking-wider text-slate-400"
+                                        >{column.label}</span
+                                    >
+                                    <span
+                                        class="text-[13px] font-semibold text-slate-700"
+                                    >
+                                        {#if column.render}
+                                            {@render column.render(row)}
+                                        {:else}
+                                            {row[column.key]}
+                                        {/if}
+                                    </span>
+                                </div>
+                            {/if}
+                        {/each}
+                    </div>
+
+                    <!-- Expand Toggle -->
+                    {#if columns.length > 3}
+                        <button
+                            class="w-full pt-3 text-[11px] font-bold text-blue-600 uppercase tracking-widest hover:text-blue-700 flex items-center justify-center gap-1"
+                            onclick={() => (row._expanded = !row._expanded)}
+                        >
+                            {row._expanded ? "Ver menos" : "Ver más detalles"}
+                        </button>
+                    {/if}
                 </div>
             </article>
         {/if}

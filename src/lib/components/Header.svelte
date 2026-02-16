@@ -12,7 +12,7 @@
 </script>
 
 <header
-    class="sticky top-0 z-40 flex h-20 items-center justify-between border-b border-slate-200/40 bg-white/40 px-8 backdrop-blur-xl transition-all"
+    class="sticky top-0 z-40 flex h-14 lg:h-20 items-center justify-between border-b border-slate-200/40 bg-white/40 px-4 lg:px-8 backdrop-blur-xl transition-all duration-300"
 >
     <div class="flex items-center gap-4">
         <!-- Mobile toggle button -->
