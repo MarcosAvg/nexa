@@ -6,7 +6,7 @@
     import Badge from "../components/Badge.svelte";
     import Button from "../components/Button.svelte";
     import HistoryFilters from "../components/HistoryFilters.svelte";
-    import { ChevronLeft, ChevronRight } from "lucide-svelte";
+    import { ChevronLeft, ChevronRight, FileSpreadsheet } from "lucide-svelte";
 
     const PAGE_SIZE = 50;
 
@@ -230,13 +230,19 @@
 
         {#snippet actions()}
             <Button
-                variant="outline"
+                variant="soft-emerald"
+                class="flex items-center gap-2.5 h-10 px-6"
                 onclick={() => {
                     import("../utils/xlsxExport").then((m) => {
                         m.exportHistoryToExcel(derivedHistoryLogs);
                     });
                 }}
             >
+                <FileSpreadsheet
+                    size={18}
+                    strokeWidth={2.5}
+                    class="text-emerald-600/80"
+                />
                 Exportar Excel
             </Button>
         {/snippet}

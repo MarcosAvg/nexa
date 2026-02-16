@@ -66,11 +66,12 @@
     };
 
     const iconStyles: Record<string, string> = {
-        Programación: "bg-blue-50 text-blue-600",
-        "Firma Responsiva": "bg-violet-50 text-violet-600",
-        Cobro: "bg-emerald-50 text-emerald-600",
-        Bloqueo: "bg-rose-50 text-rose-600",
-        Otro: "bg-slate-100 text-slate-600",
+        Programación: "bg-blue-50/50 text-blue-600 border-blue-100/50",
+        "Firma Responsiva":
+            "bg-indigo-50/50 text-indigo-600 border-indigo-100/50",
+        Cobro: "bg-emerald-50/50 text-emerald-600 border-emerald-100/50",
+        Bloqueo: "bg-rose-50/50 text-rose-600 border-rose-100/50",
+        Otro: "bg-slate-50/50 text-slate-600 border-slate-100/50",
     };
 
     function formatDate(dateStr?: string) {
@@ -90,15 +91,15 @@
 >
     <!-- Accent Line (optional, but adds a nice touch without being too much) -->
     <div
-        class="absolute inset-y-0 left-0 w-1 rounded-l-xl {ticket.type ===
+        class="absolute inset-y-0 left-0 w-1.5 rounded-l-xl {ticket.type ===
         'Programación'
-            ? 'bg-blue-500'
+            ? 'bg-blue-600'
             : ticket.type === 'Firma Responsiva'
-              ? 'bg-violet-500'
+              ? 'bg-indigo-600'
               : ticket.type === 'Cobro'
-                ? 'bg-emerald-500'
+                ? 'bg-emerald-600'
                 : ticket.type === 'Bloqueo'
-                  ? 'bg-rose-500'
+                  ? 'bg-rose-600'
                   : 'bg-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity"
     ></div>
 
@@ -106,9 +107,9 @@
         <!-- Icon Section -->
         <div class="flex items-center gap-3.5 min-w-[160px]">
             <div
-                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-100 {iconStyles[
+                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border {iconStyles[
                     ticket.type
-                ] || iconStyles['Otro']}"
+                ] || iconStyles['Otro']} shadow-sm"
             >
                 {#if iconMap[ticket.type]}
                     {@const Icon = iconMap[ticket.type]}
@@ -191,23 +192,26 @@
 
             {#if ticket.type === "Programación" || ticket.type === "Firma Responsiva"}
                 <Button
-                    variant="primary"
-                    class="h-8.5 px-3.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 border-none"
+                    variant="soft-emerald"
+                    size="sm"
+                    class="h-9 px-4 rounded-xl active:scale-95"
                     onclick={() => onComplete?.(ticket)}
                 >
-                    <CheckCircle2 size={14} class="mr-1.5" />
+                    <CheckCircle2 size={15} strokeWidth={2.5} class="mr-2" />
                     Completar
                 </Button>
             {:else}
                 <Button
-                    variant="secondary"
-                    class="h-8.5 px-3.5 rounded-lg text-xs font-bold border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+                    variant="soft-slate"
+                    size="sm"
+                    class="h-9 px-4 rounded-xl active:scale-95"
                     onclick={() => onManage?.(ticket)}
                 >
                     Gestionar
                     <ArrowRight
-                        size={14}
-                        class="ml-1.5 text-slate-400 group-hover:translate-x-0.5 transition-transform"
+                        size={15}
+                        strokeWidth={2.5}
+                        class="ml-2 text-slate-400 group-hover:translate-x-0.5 transition-transform"
                     />
                 </Button>
             {/if}

@@ -6,7 +6,16 @@
     import Card from "../components/Card.svelte";
     import DataTable from "../components/DataTable.svelte";
     import Badge from "../components/Badge.svelte";
-    import { Search, User, Lock, Trash2, RefreshCw, Ban } from "lucide-svelte";
+    import {
+        Search,
+        User,
+        Lock,
+        Trash2,
+        RefreshCw,
+        Ban,
+        Plus,
+        FileSpreadsheet,
+    } from "lucide-svelte";
     import AddCardModal from "../components/modals/AddCardModal.svelte";
     import { cardService } from "../services/cards";
     import { toast } from "svelte-sonner";
@@ -282,7 +291,8 @@
 
         {#snippet actions()}
             <Button
-                variant="outline"
+                variant="soft-emerald"
+                class="flex items-center gap-2.5 h-10 px-6"
                 onclick={() => {
                     import("../utils/xlsxExport").then((m) => {
                         m.exportCardsToExcel(filteredCards, {
@@ -294,12 +304,22 @@
                     });
                 }}
             >
+                <FileSpreadsheet
+                    size={18}
+                    strokeWidth={2.5}
+                    class="text-emerald-600/80"
+                />
                 Exportar Excel
             </Button>
             {#if currentUser?.role !== "viewer"}
-                <Button variant="primary" onclick={onOpenAddCard}
-                    >Nueva Tarjeta</Button
+                <Button
+                    variant="primary"
+                    class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
+                    onclick={onOpenAddCard}
                 >
+                    <Plus size={18} strokeWidth={3} />
+                    Nueva Tarjeta
+                </Button>
             {/if}
         {/snippet}
     </SectionHeader>

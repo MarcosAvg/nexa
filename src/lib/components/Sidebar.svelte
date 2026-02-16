@@ -15,23 +15,31 @@
 </script>
 
 <aside
-    class="fixed inset-y-0 left-0 z-50 flex h-full w-66 flex-col bg-slate-950 text-slate-300 transition-transform duration-300 ease-in-out lg:translate-x-0 {uiState.isSidebarOpen
+    class="fixed inset-y-0 left-0 z-50 flex h-full w-72 flex-col bg-slate-950 text-slate-300 transition-transform duration-300 ease-in-out lg:translate-x-0 {uiState.isSidebarOpen
         ? 'translate-x-0'
-        : '-translate-x-full'} border-r border-slate-800/40 shadow-2xl"
+        : '-translate-x-full'} border-r border-white/5 shadow-[20px_0_50px_rgba(0,0,0,0.3)]"
 >
+    <!-- Background Decor -->
+    <div
+        class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.08),transparent_50%)] pointer-events-none"
+    ></div>
+
     <!-- Header/Logo Area -->
-    <div class="flex h-20 items-center flex-shrink-0 px-7 mb-2">
-        <Logo showText={true} class="text-white scale-110 origin-left" />
+    <div class="flex h-24 items-center flex-shrink-0 px-8 mb-4 relative">
+        <Logo showText={true} class="scale-110 origin-left" />
     </div>
 
     <!-- Navigation -->
-    <nav class="flex-1 overflow-y-auto px-4 py-2 space-y-1.5 custom-scrollbar">
-        <div class="px-3 mb-4">
+    <nav
+        class="flex-1 overflow-y-auto px-5 py-2 space-y-2 custom-scrollbar relative"
+    >
+        <div class="px-4 mb-5 flex items-center gap-3">
             <p
-                class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500/80"
+                class="text-[10px] font-extrabold uppercase tracking-[0.25em] text-slate-500/70"
             >
                 Menú Principal
             </p>
+            <div class="h-px flex-1 bg-slate-800/40"></div>
         </div>
 
         {#each items as item}
@@ -40,42 +48,53 @@
                 use:link
                 use:active={{
                     className:
-                        "bg-blue-600/10 text-blue-400 ring-1 ring-blue-500/20 active-nav-item",
+                        "bg-white/[0.03] text-white ring-1 ring-white/10 active-nav-item shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]",
                 }}
-                class="group relative flex items-center gap-3.5 rounded-xl px-4 py-3 text-[13.5px] font-medium transition-all duration-300 text-slate-400/90 hover:bg-slate-900/60 hover:text-white"
+                class="group relative flex items-center gap-4 rounded-2xl px-5 py-3.5 text-[13.5px] font-extrabold transition-all duration-300 text-slate-400 hover:bg-white/[0.02] hover:text-white tracking-tight"
                 onclick={() => {
                     if (window.innerWidth < 1024) {
                         uiState.toggleSidebar();
                     }
                 }}
             >
-                <!-- Active Accent (Left) -->
+                <!-- Active Accent Glow (Left) -->
                 <div
-                    class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-500 rounded-r-full transition-all duration-300 scale-y-0 group-[.active-nav-item]:scale-y-100 opacity-0 group-[.active-nav-item]:opacity-100 shadow-[0_0_12px_rgba(59,130,246,0.5)]"
+                    class="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-7 bg-blue-500 rounded-r-full transition-all duration-500 scale-y-0 group-[.active-nav-item]:scale-y-100 opacity-0 group-[.active-nav-item]:opacity-100 shadow-[0_0_20px_rgba(59,130,246,0.8)]"
                 ></div>
 
                 {#if item.icon}
                     <div
-                        class="text-slate-500 group-hover:text-white group-[.active-nav-item]:text-blue-400 transition-colors duration-300"
+                        class="text-slate-500 group-hover:text-slate-200 group-[.active-nav-item]:text-blue-400 transition-all duration-300 group-[.active-nav-item]:scale-110"
                     >
-                        <item.icon size={19} strokeWidth={2.2} />
+                        <item.icon size={20} strokeWidth={2.4} />
                     </div>
                 {/if}
-                <span class="relative">
+                <span
+                    class="relative group-[.active-nav-item]:translate-x-0.5 transition-transform duration-300"
+                >
                     {item.label}
                 </span>
+
+                <!-- Active Indicator Dot (Right) -->
+                <div
+                    class="ml-auto opacity-0 group-[.active-nav-item]:opacity-100 transition-opacity"
+                >
+                    <div
+                        class="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"
+                    ></div>
+                </div>
             </a>
         {/each}
     </nav>
 
     <!-- Footer / User Profile -->
     {#if user}
-        <div class="mt-auto p-4">
+        <div class="mt-auto p-5 relative border-t border-white/5">
             <div
-                class="flex items-center gap-3.5 rounded-2xl bg-slate-900/30 p-4 border border-slate-800/40 backdrop-blur-sm shadow-inner group transition-all duration-300 hover:border-slate-700/60"
+                class="flex items-center gap-3.5 rounded-[22px] bg-gradient-to-b from-slate-900/50 to-slate-950/50 p-4 border border-white/5 backdrop-blur-md shadow-2xl group transition-all duration-300 hover:border-blue-500/30 hover:shadow-blue-500/5"
             >
                 <div
-                    class="h-10 w-10 flex-shrink-0 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-white font-bold overflow-hidden border-2 border-slate-800 ring-1 ring-white/5 shadow-lg group-hover:ring-blue-500/30 transition-all duration-300"
+                    class="h-11 w-11 flex-shrink-0 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-extrabold overflow-hidden border-2 border-slate-800 ring-2 ring-white/5 shadow-xl group-hover:scale-105 transition-all duration-300"
                 >
                     {#if user.avatar}
                         <img
@@ -84,7 +103,7 @@
                             class="h-full w-full object-cover"
                         />
                     {:else}
-                        <span class="text-sm tracking-tight"
+                        <span class="text-sm tracking-tighter"
                             >{user.name.charAt(0).toUpperCase()}</span
                         >
                     {/if}
@@ -92,11 +111,11 @@
 
                 <div class="flex flex-col min-w-0 flex-1">
                     <span
-                        class="truncate text-[13px] font-bold text-slate-100 tracking-tight"
+                        class="truncate text-[13.5px] font-extrabold text-white tracking-tight"
                         >{user.name}</span
                     >
                     <span
-                        class="truncate text-[11px] font-medium text-slate-500"
+                        class="truncate text-[11px] font-bold text-slate-500 tracking-tight"
                         >{user.email}</span
                     >
                 </div>
@@ -104,21 +123,22 @@
                 {#if onLogout}
                     <button
                         onclick={onLogout}
-                        class="p-2.5 text-slate-500 hover:text-white hover:bg-rose-500/10 hover:border hover:border-rose-500/20 rounded-xl transition-all duration-300 group/logout"
+                        class="p-2.5 text-slate-500 hover:text-white hover:bg-rose-500/20 rounded-xl transition-all duration-300 group/logout border border-transparent hover:border-rose-500/30"
                         title="Cerrar sesión"
                     >
                         <LogOut
-                            size={18}
-                            class="group-hover/logout:scale-110 transition-transform"
+                            size={19}
+                            strokeWidth={2.5}
+                            class="group-hover/logout:scale-110 group-hover/logout:rotate-12 transition-all"
                         />
                     </button>
                 {/if}
             </div>
 
             <p
-                class="text-[10px] text-center text-slate-600 mt-4 px-2 tracking-wide font-medium"
+                class="text-[10px] text-center text-slate-600 mt-5 px-2 tracking-[0.1em] font-extrabold uppercase opacity-60"
             >
-                Nexa Access Control &copy; 2024
+                Nexa Access &copy; 2024
             </p>
         </div>
     {/if}

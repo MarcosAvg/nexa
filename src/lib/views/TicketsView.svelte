@@ -212,9 +212,9 @@
             <Button
                 variant="primary"
                 onclick={onOpenAddTicket}
-                class="flex items-center gap-2"
+                class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
             >
-                <Plus size={18} />
+                <Plus size={18} strokeWidth={3} />
                 Nuevo Ticket
             </Button>
         {/snippet}

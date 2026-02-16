@@ -12,7 +12,7 @@
     import Card from "../components/Card.svelte";
     import DataTable from "../components/DataTable.svelte";
     import Badge from "../components/Badge.svelte";
-    import { Search, FileDown } from "lucide-svelte";
+    import { Search, FileSpreadsheet, Plus } from "lucide-svelte";
     import { personnelService } from "../services/personnel";
     import { cardService } from "../services/cards";
     import { exportPersonnelToExcel } from "../utils/xlsxExport";
@@ -186,10 +186,13 @@
             class="px-4 py-3 bg-slate-50/50 border-t border-slate-100 flex justify-end"
         >
             <Button
-                variant="secondary"
+                variant="soft-blue"
                 size="sm"
-                onclick={() => onOpenDetails(row)}>Ver Detalles</Button
+                class="h-9 px-4 rounded-xl"
+                onclick={() => onOpenDetails(row)}
             >
+                Ver detalles
+            </Button>
         </div>
     </article>
 {/snippet}
@@ -238,18 +241,27 @@
 
         {#snippet actions()}
             <Button
-                variant="secondary"
+                variant="soft-emerald"
                 onclick={handleExportExcel}
-                class="flex items-center gap-2"
+                class="flex items-center gap-2.5"
                 disabled={filteredPersonnel.length === 0}
             >
-                <FileDown size={18} />
+                <FileSpreadsheet
+                    size={18}
+                    strokeWidth={2.5}
+                    class="text-emerald-600/80"
+                />
                 Exportar Excel
             </Button>
             {#if currentUser?.role !== "viewer"}
-                <Button variant="primary" onclick={onOpenAddModal}
-                    >Nueva Alta</Button
+                <Button
+                    variant="primary"
+                    class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
+                    onclick={onOpenAddModal}
                 >
+                    <Plus size={18} strokeWidth={3} class="mr-2" />
+                    Nueva Alta
+                </Button>
             {/if}
         {/snippet}
     </SectionHeader>
@@ -279,10 +291,13 @@
         >
             {#snippet actions(row: any)}
                 <Button
-                    variant="secondary"
+                    variant="soft-blue"
                     size="sm"
-                    onclick={() => onOpenDetails(row)}>Ver Detalles</Button
+                    class="h-9 px-4 rounded-xl"
+                    onclick={() => onOpenDetails(row)}
                 >
+                    Ver detalles
+                </Button>
             {/snippet}
         </DataTable>
     </Card>

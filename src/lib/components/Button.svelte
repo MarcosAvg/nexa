@@ -11,7 +11,10 @@
             | "outline"
             | "danger"
             | "amber"
-            | "sky";
+            | "sky"
+            | "soft-blue"
+            | "soft-emerald"
+            | "soft-slate";
         size?: "default" | "sm" | "lg";
         class?: string;
         children?: Snippet;
@@ -31,27 +34,33 @@
     }: Props = $props();
 
     const baseStyles =
-        "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:pointer-events-none disabled:opacity-50 cursor-pointer shadow-sm border";
+        "inline-flex items-center justify-center rounded-2xl text-[13px] font-extrabold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer shadow-sm active:scale-[0.96] select-none tracking-tight";
 
     const variants = {
         primary:
-            "bg-slate-900 text-slate-50 border-slate-900 hover:bg-slate-900/90",
+            "bg-slate-900 text-white hover:bg-slate-950 shadow-md shadow-blue-500/5 border border-slate-700/50 hover:border-blue-500/50 active:shadow-blue-500/10",
         secondary:
-            "bg-white text-slate-900 border-slate-200 hover:bg-slate-100/80",
+            "bg-white text-slate-700 border border-slate-200/60 hover:bg-slate-50 hover:text-slate-900 backdrop-blur-sm shadow-sm hover:shadow-md",
         success:
-            "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-600/90",
-        ghost: "border-transparent shadow-none hover:bg-slate-100 hover:text-slate-900",
+            "bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-500/10 border border-emerald-500/40",
+        ghost: "text-slate-500 hover:bg-slate-100/60 hover:text-slate-900 shadow-none border-transparent",
         outline:
-            "bg-transparent text-slate-700 border-slate-300 hover:bg-slate-50 hover:border-slate-400",
-        danger: "bg-rose-600 text-white border-rose-600 hover:bg-rose-700",
-        amber: "bg-amber-500 text-white border-amber-500 hover:bg-amber-600 shadow-amber-200",
-        sky: "bg-sky-500 text-white border-sky-500 hover:bg-sky-600 shadow-sky-200",
+            "bg-transparent text-slate-700 border border-slate-300/60 hover:bg-slate-50/50 hover:border-slate-400 hover:text-slate-900",
+        danger: "bg-rose-600 text-white hover:bg-rose-700 shadow-md shadow-rose-500/10 border border-rose-500/40",
+        amber: "bg-amber-500 text-white hover:bg-amber-600 shadow-md shadow-amber-500/10 border border-amber-400/40",
+        sky: "bg-sky-500 text-white hover:bg-sky-600 shadow-md shadow-sky-500/10 border border-sky-400/40",
+        "soft-blue":
+            "bg-blue-50/70 text-blue-700 border border-blue-100/60 hover:bg-blue-100 hover:text-blue-800 shadow-none",
+        "soft-emerald":
+            "bg-emerald-50/70 text-emerald-700 border border-emerald-100/60 hover:bg-emerald-100 hover:text-emerald-800 shadow-none",
+        "soft-slate":
+            "bg-slate-50/70 text-slate-600 border border-slate-100/60 hover:bg-slate-100 hover:text-slate-900 shadow-none",
     };
 
     const sizes = {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
+        default: "h-11 px-6",
+        sm: "h-9 px-4 text-xs",
+        lg: "h-14 px-10 text-base",
     };
 
     // Derived class using simple string concatenation for now as we don't have clsx/tailwind-merge yet

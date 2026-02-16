@@ -341,32 +341,52 @@
 
 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
     <!-- Sidebar Navigation -->
-    <Card class="lg:col-span-1 p-0 overflow-hidden h-fit">
-        <div class="p-4 border-b border-slate-100">
-            <h3 class="font-bold text-slate-800">Configuración</h3>
-            <p class="text-xs text-slate-500">Administración del sistema</p>
+    <Card
+        class="lg:col-span-1 p-0 overflow-hidden h-fit bg-white/50 backdrop-blur-md border border-slate-200/50 rounded-[22px] shadow-sm"
+    >
+        <div class="p-6 border-b border-slate-100/60">
+            <h3
+                class="font-extrabold text-slate-900 tracking-tight uppercase text-xs tracking-[0.1em]"
+            >
+                Administración
+            </h3>
+            <p class="text-[11px] font-bold text-slate-400 mt-1">
+                Configura el ecosistema Nexa
+            </p>
         </div>
-        <nav class="flex flex-col p-2 gap-1">
+        <nav class="flex flex-col p-3 gap-1.5">
             <button
-                class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left {activeTab ===
+                class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 text-left active:scale-[0.98] {activeTab ===
                 'catalogos'
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-slate-600 hover:bg-slate-50'}"
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'}"
                 onclick={() => (activeTab = "catalogos")}
             >
-                <Building2 size={18} />
+                <div
+                    class={activeTab === "catalogos"
+                        ? "text-white"
+                        : "text-slate-400"}
+                >
+                    <Building2 size={18} strokeWidth={2.5} />
+                </div>
                 Catálogos
             </button>
 
             {#if currentUser.role === "admin"}
                 <button
-                    class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left {activeTab ===
+                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 text-left active:scale-[0.98] {activeTab ===
                     'usuarios'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-slate-600 hover:bg-slate-50'}"
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                        : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'}"
                     onclick={() => (activeTab = "usuarios")}
                 >
-                    <Users size={18} />
+                    <div
+                        class={activeTab === "usuarios"
+                            ? "text-white"
+                            : "text-slate-400"}
+                    >
+                        <Users size={18} strokeWidth={2.5} />
+                    </div>
                     Usuarios
                 </button>
             {/if}
@@ -378,101 +398,145 @@
         {#if activeTab === "catalogos"}
             <!-- Sub-tabs for Catalogos -->
             <div
-                class="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200"
+                class="flex items-center gap-3 overflow-x-auto pb-4 scrollbar-none"
             >
-                {#each [{ id: "edificios", label: "Edificios", icon: Building2 }, { id: "dependencias", label: "Dependencias", icon: Briefcase }, { id: "accesos", label: "Accesos Especiales", icon: Key }, { id: "dias", label: "Días Laborales", icon: Calendar }] as item}
+                {#each [{ id: "edificios", label: "Edificios", icon: Building2 }, { id: "dependencias", label: "Dependencias", icon: Briefcase }, { id: "accesos", label: "Accesos", icon: Key }, { id: "dias", label: "Horarios", icon: Calendar }] as item}
                     {@const Icon = item.icon}
                     <button
-                        class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors {activeCatalog ===
+                        class="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[13px] font-extrabold whitespace-nowrap transition-all duration-300 active:scale-95 {activeCatalog ===
                         item.id
-                            ? 'bg-slate-900 text-white shadow-sm'
-                            : 'text-slate-600 hover:bg-slate-100'}"
+                            ? 'bg-white text-blue-600 shadow-md ring-1 ring-blue-500/10'
+                            : 'bg-slate-100/50 text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
                         onclick={() => (activeCatalog = item.id as any)}
                     >
-                        <Icon size={16} />
+                        <Icon size={16} strokeWidth={2.5} />
                         {item.label}
                     </button>
                 {/each}
             </div>
 
             <!-- Catalog Content -->
-            <Card class="p-6 min-h-[400px]">
+            <Card
+                class="p-8 min-h-[400px] bg-white/60 backdrop-blur-md rounded-[22px] border border-slate-200/50 shadow-sm relative overflow-hidden"
+            >
                 {#if activeCatalog === "edificios"}
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold text-slate-800">
-                            Edificios y Pisos
-                        </h3>
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h3
+                                class="text-xl font-black text-slate-900 tracking-tight"
+                            >
+                                Edificios y Pisos
+                            </h3>
+                            <p
+                                class="text-sm font-medium text-slate-500 mt-0.5"
+                            >
+                                Gestión de infraestructura física
+                            </p>
+                        </div>
                         {#if canEdit}
                             <Button
+                                variant="primary"
                                 size="sm"
+                                class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10"
                                 onclick={() => openBuildingModal()}
                             >
-                                <Plus size={16} class="mr-2" /> Nuevo Edificio
+                                <Plus size={18} strokeWidth={3} class="mr-2" /> Nuevo
+                                Edificio
                             </Button>
                         {/if}
                     </div>
 
-                    <div class="space-y-4">
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-2 gap-6">
                         {#each buildings as building}
                             <div
-                                class="p-4 border border-slate-200 rounded-xl bg-slate-50/50"
+                                class="group p-6 border border-slate-200/50 rounded-[24px] bg-white/40 hover:bg-white transition-all duration-500 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden"
                             >
                                 <div
-                                    class="flex justify-between items-start mb-3"
+                                    class="flex justify-between items-start mb-5 relative z-10"
                                 >
                                     <div>
-                                        <h4 class="font-bold text-slate-900">
+                                        <h4
+                                            class="font-extrabold text-slate-900 text-[16px] tracking-tight group-hover:text-blue-600 transition-colors"
+                                        >
                                             {building.name}
                                         </h4>
-                                        <p class="text-xs text-slate-500">
+                                        <p
+                                            class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-1.5 flex items-center gap-2"
+                                        >
+                                            <span
+                                                class="w-1.5 h-1.5 rounded-full bg-blue-500/40"
+                                            ></span>
                                             {building.floors.length} pisos configurados
                                         </p>
                                     </div>
                                     {#if canEdit}
-                                        <div class="flex gap-1">
+                                        <div class="flex gap-1.5">
                                             <button
-                                                class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                class="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50/80 rounded-xl transition-all active:scale-95"
                                                 onclick={() =>
                                                     openBuildingModal(building)}
                                             >
-                                                <Edit2 size={16} />
+                                                <Edit2
+                                                    size={16}
+                                                    strokeWidth={2.5}
+                                                />
                                             </button>
                                             <button
-                                                class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                class="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50/80 rounded-xl transition-all active:scale-95"
                                                 onclick={() =>
                                                     openDeleteModal(
                                                         building,
                                                         "building",
                                                     )}
                                             >
-                                                <Trash2 size={16} />
+                                                <Trash2
+                                                    size={16}
+                                                    strokeWidth={2.5}
+                                                />
                                             </button>
                                         </div>
                                     {/if}
                                 </div>
-                                <div class="flex flex-wrap gap-2">
+                                <div class="flex flex-wrap gap-2 relative z-10">
                                     {#each building.floors as floor}
                                         <span
-                                            class="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-medium text-slate-600"
+                                            class="px-3.5 py-1.5 bg-white border border-slate-100 rounded-xl text-xs font-bold text-slate-600 shadow-sm group-hover:border-blue-100 transition-colors"
                                         >
                                             {floor}
                                         </span>
                                     {/each}
                                 </div>
+                                <div
+                                    class="absolute -right-6 -bottom-6 text-slate-400/5 group-hover:text-blue-500/8 rotate-12 transition-all duration-700 pointer-events-none"
+                                >
+                                    <Building2 size={100} />
+                                </div>
                             </div>
                         {/each}
                     </div>
                 {:else if activeCatalog === "dependencias"}
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold text-slate-800">
-                            Dependencias
-                        </h3>
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h3
+                                class="text-xl font-black text-slate-900 tracking-tight"
+                            >
+                                Dependencias
+                            </h3>
+                            <p
+                                class="text-sm font-medium text-slate-500 mt-0.5"
+                            >
+                                Áreas y departamentos registrados
+                            </p>
+                        </div>
                         {#if canEdit}
                             <Button
+                                variant="primary"
                                 size="sm"
+                                class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10"
                                 onclick={() => openDependencyModal()}
                             >
-                                <Plus size={16} class="mr-2" /> Nueva Dependencia
+                                <Plus size={18} strokeWidth={3} class="mr-2" /> Nueva
+                                Dependencia
                             </Button>
                         {/if}
                     </div>
@@ -501,13 +565,28 @@
                         {/snippet}
                     </DataTable>
                 {:else if activeCatalog === "accesos"}
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold text-slate-800">
-                            Accesos Especiales
-                        </h3>
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h3
+                                class="text-xl font-black text-slate-900 tracking-tight"
+                            >
+                                Accesos Especiales
+                            </h3>
+                            <p
+                                class="text-sm font-medium text-slate-500 mt-0.5"
+                            >
+                                Zonas restringidas o críticas
+                            </p>
+                        </div>
                         {#if canEdit}
-                            <Button size="sm" onclick={() => openAccessModal()}>
-                                <Plus size={16} class="mr-2" /> Nuevo Acceso
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10"
+                                onclick={() => openAccessModal()}
+                            >
+                                <Plus size={18} strokeWidth={3} class="mr-2" /> Nuevo
+                                Acceso
                             </Button>
                         {/if}
                     </div>
@@ -556,16 +635,28 @@
                         {/snippet}
                     </DataTable>
                 {:else if activeCatalog === "dias"}
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold text-slate-800">
-                            Catálogo de Horarios
-                        </h3>
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h3
+                                class="text-xl font-black text-slate-900 tracking-tight"
+                            >
+                                Horarios
+                            </h3>
+                            <p
+                                class="text-sm font-medium text-slate-500 mt-0.5"
+                            >
+                                Configuración de jornadas
+                            </p>
+                        </div>
                         {#if canEdit}
                             <Button
+                                variant="primary"
                                 size="sm"
+                                class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10"
                                 onclick={() => openScheduleModal()}
                             >
-                                <Plus size={16} class="mr-2" /> Nuevo Horario
+                                <Plus size={18} strokeWidth={3} class="mr-2" /> Nuevo
+                                Horario
                             </Button>
                         {/if}
                     </div>
@@ -612,17 +703,21 @@
                 {/if}
             </Card>
         {:else if activeTab === "usuarios" && currentUser.role === "admin"}
-            <Card class="p-0 overflow-hidden">
+            <Card
+                class="p-0 overflow-hidden bg-white/60 backdrop-blur-md rounded-[22px] border border-slate-200/50 shadow-sm h-fit"
+            >
                 <div
-                    class="p-6 border-b border-slate-200 flex justify-between items-center"
+                    class="p-8 border-b border-slate-100/60 flex justify-between items-center"
                 >
                     <div>
-                        <h3 class="text-lg font-bold text-slate-800">
+                        <h3
+                            class="text-xl font-black text-slate-900 tracking-tight"
+                        >
                             Gestión de Permisos
                         </h3>
-                        <p class="text-sm text-slate-500">
+                        <p class="text-sm font-medium text-slate-500 mt-0.5">
                             Configura los niveles de acceso de los usuarios
-                            registrados
+                            registrado
                         </p>
                     </div>
                 </div>

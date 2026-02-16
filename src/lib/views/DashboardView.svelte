@@ -154,38 +154,47 @@
     <div
         class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
     >
-        <div>
-            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">
+        <div class="flex flex-col gap-1.5">
+            <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">
                 Panel de Control
             </h1>
-            <p class="text-slate-500">Resumen operativo y accesos rápidos.</p>
+            <p class="text-[15px] font-medium text-slate-500">
+                Resumen operativo y accesos rápidos.
+            </p>
         </div>
-        <div class="flex gap-3">
+        <div class="flex flex-wrap gap-3">
             {#if currentUser?.role !== "viewer"}
                 <Button
-                    variant="outline"
-                    class="gap-2 bg-white"
+                    variant="soft-slate"
+                    class="gap-2.5 px-5 h-11"
                     onclick={onOpenAddPerson}
                 >
-                    <Users size={16} />
-                    <span class="hidden lg:inline">Registrar</span> Personal
+                    <Users size={18} strokeWidth={2.5} class="text-slate-500" />
+                    <span class="hidden lg:inline text-slate-700"
+                        >Registrar</span
+                    > <span class="text-slate-700">Personal</span>
                 </Button>
                 <Button
-                    variant="outline"
-                    class="gap-2 bg-white"
+                    variant="soft-blue"
+                    class="gap-2.5 px-5 h-11"
                     onclick={onOpenAddCard}
                 >
-                    <CreditCard size={16} />
-                    <span class="hidden lg:inline">Nueva</span> Tarjeta
+                    <CreditCard
+                        size={18}
+                        strokeWidth={2.5}
+                        class="text-blue-600/70"
+                    />
+                    <span class="hidden lg:inline text-slate-700">Nueva</span>
+                    <span class="text-slate-700">Tarjeta</span>
                 </Button>
             {/if}
             <Button
                 variant="primary"
-                class="gap-2 shadow-lg shadow-emerald-200"
+                class="gap-2.5 px-6 h-11 shadow-lg shadow-blue-500/20"
                 onclick={onOpenAddTicket}
             >
-                <Plus size={16} />
-                Crear Ticket
+                <Plus size={18} strokeWidth={3} />
+                <span>Crear Ticket</span>
             </Button>
         </div>
     </div>
@@ -193,96 +202,118 @@
     <!-- Metrics Grid -->
     <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card
-            class="p-6 relative overflow-hidden group hover:shadow-md transition-all"
+            class="p-7 relative overflow-hidden group hover:shadow-xl hover:-translate-y-1 bg-white/50 backdrop-blur-md border border-slate-200/50"
         >
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-5">
                 <div
-                    class="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-110 transition-transform"
+                    class="p-4 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:scale-110 group-hover:bg-emerald-100 transition-all duration-300"
                 >
-                    <Users size={24} />
+                    <Users size={28} strokeWidth={2} />
                 </div>
                 <div>
                     <div
-                        class="text-sm font-bold text-slate-500 uppercase tracking-wide"
+                        class="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.15em] mb-1"
                     >
                         Personal Activo
                     </div>
-                    <div class="text-3xl font-bold text-slate-900 mt-1">
+                    <div
+                        class="text-3xl font-black text-slate-900 tabular-nums"
+                    >
                         {activePersonnelCount}
                     </div>
                 </div>
             </div>
+            <div
+                class="absolute -right-6 -bottom-6 text-emerald-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+            >
+                <Users size={120} />
+            </div>
         </Card>
 
         <Card
-            class="p-6 relative overflow-hidden group hover:shadow-md transition-all"
+            class="p-7 relative overflow-hidden group hover:shadow-xl hover:-translate-y-1 bg-white/50 backdrop-blur-md border border-slate-200/50"
         >
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-5">
                 <div
-                    class="p-3 bg-violet-50 text-violet-600 rounded-xl group-hover:scale-110 transition-transform"
+                    class="p-4 bg-violet-50 text-violet-600 rounded-2xl group-hover:scale-110 group-hover:bg-violet-100 transition-all duration-300"
                 >
-                    <FileSignature size={24} />
+                    <FileSignature size={28} strokeWidth={2} />
                 </div>
                 <div>
                     <div
-                        class="text-sm font-bold text-slate-500 uppercase tracking-wide"
+                        class="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.15em] mb-1"
                     >
                         Firmas Pendientes
                     </div>
-                    <div class="text-3xl font-bold text-slate-900 mt-1">
+                    <div
+                        class="text-3xl font-black text-slate-900 tabular-nums"
+                    >
                         {pendingSignaturesCount}
                     </div>
                 </div>
             </div>
-        </Card>
-
-        <Card
-            class="p-6 relative overflow-hidden group hover:shadow-md transition-all"
-        >
-            <div class="flex items-center gap-4">
-                <div
-                    class="p-3 bg-amber-50 text-amber-600 rounded-xl group-hover:scale-110 transition-transform"
-                >
-                    <FileText size={24} />
-                </div>
-                <div>
-                    <div
-                        class="text-sm font-bold text-slate-500 uppercase tracking-wide"
-                    >
-                        Total Tickets
-                    </div>
-                    <div class="text-3xl font-bold text-slate-900 mt-1">
-                        {pendingItems.length}
-                    </div>
-                </div>
+            <div
+                class="absolute -right-6 -bottom-6 text-violet-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+            >
+                <FileSignature size={120} />
             </div>
         </Card>
 
         <Card
-            class="p-6 relative overflow-hidden group hover:shadow-md transition-all"
+            class="p-7 relative overflow-hidden group hover:shadow-xl hover:-translate-y-1 bg-white/50 backdrop-blur-md border border-slate-200/50"
         >
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-5">
                 <div
-                    class="p-3 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform"
+                    class="p-4 bg-amber-50 text-amber-600 rounded-2xl group-hover:scale-110 group-hover:bg-amber-100 transition-all duration-300"
                 >
-                    <CreditCard size={24} />
+                    <FileText size={28} strokeWidth={2} />
                 </div>
                 <div>
                     <div
-                        class="text-sm font-bold text-slate-500 uppercase tracking-wide"
+                        class="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.15em] mb-1"
+                    >
+                        Total Tickets
+                    </div>
+                    <div
+                        class="text-3xl font-black text-slate-900 tabular-nums"
+                    >
+                        {pendingItems.length}
+                    </div>
+                </div>
+            </div>
+            <div
+                class="absolute -right-6 -bottom-6 text-amber-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+            >
+                <FileText size={120} />
+            </div>
+        </Card>
+
+        <Card
+            class="p-7 relative overflow-hidden group hover:shadow-xl hover:-translate-y-1 bg-white/50 backdrop-blur-md border border-slate-200/50"
+        >
+            <div class="flex items-center gap-5">
+                <div
+                    class="p-4 bg-blue-50 text-blue-600 rounded-2xl group-hover:scale-110 group-hover:bg-blue-100 transition-all duration-300"
+                >
+                    <CreditCard size={28} strokeWidth={2} />
+                </div>
+                <div>
+                    <div
+                        class="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.15em] mb-1"
                     >
                         Stock Tarjetas
                     </div>
-                    <div class="text-3xl font-bold text-slate-900 mt-1">
+                    <div
+                        class="text-3xl font-black text-slate-900 tabular-nums"
+                    >
                         {availableCardsCount}
                     </div>
                 </div>
             </div>
             <div
-                class="mt-4 flex items-center gap-2 text-xs font-medium text-slate-400"
+                class="absolute -right-6 -bottom-6 text-blue-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
             >
-                <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Dispositivos
-                disponibles
+                <CreditCard size={120} />
             </div>
         </Card>
     </div>
@@ -290,16 +321,30 @@
     <!-- Main Content Grid -->
     <div class="grid lg:grid-cols-3 gap-8">
         <!-- Recent Tickets (2/3 width) -->
-        <div class="lg:col-span-2 space-y-4">
-            <div class="flex items-center justify-between">
+        <div class="lg:col-span-2 space-y-5">
+            <div class="flex items-center justify-between px-1">
                 <h2
-                    class="text-lg font-bold text-slate-900 flex items-center gap-2"
+                    class="text-[15px] font-extrabold text-slate-900 flex items-center gap-2.5 uppercase tracking-wider"
                 >
-                    <FileText size={20} class="text-slate-400" />
+                    <FileText
+                        size={18}
+                        strokeWidth={2.5}
+                        class="text-blue-500"
+                    />
                     Tickets Recientes
                 </h2>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    class="text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50/50 rounded-xl px-4"
+                    onclick={() => uiState.setActivePage("Pendientes")}
+                >
+                    Ver todos
+                </Button>
             </div>
-            <Card class="overflow-hidden border border-slate-200 shadow-sm">
+            <Card
+                class="overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-[22px]"
+            >
                 <DataTable
                     data={pendingItems.slice(0, 5)}
                     columns={[
@@ -317,28 +362,44 @@
         </div>
 
         <!-- Recent Activity Feed (1/3 width) -->
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
+        <div class="space-y-5">
+            <div class="flex items-center justify-between px-1">
                 <h2
-                    class="text-lg font-bold text-slate-900 flex items-center gap-2"
+                    class="text-[15px] font-extrabold text-slate-900 flex items-center gap-2.5 uppercase tracking-wider"
                 >
-                    <Activity size={20} class="text-slate-400" />
-                    Actividad Reciente
+                    <Activity
+                        size={18}
+                        strokeWidth={2.5}
+                        class="text-blue-500"
+                    />
+                    Actividad
                 </h2>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    class="text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-100/50 rounded-xl px-4"
+                    onclick={() => uiState.setActivePage("Historial")}
+                >
+                    Historial
+                </Button>
             </div>
-            <Card class="p-0 overflow-hidden border border-slate-200 shadow-sm">
-                <div class="divide-y divide-slate-100">
+            <Card
+                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-[22px]"
+            >
+                <div class="divide-y divide-slate-100/60 font-medium">
                     {#each recentActivity as log}
-                        <div class="p-4 hover:bg-slate-50 transition-colors">
-                            <div class="flex items-start justify-between mb-1">
+                        <div
+                            class="p-5 hover:bg-blue-50/30 transition-all duration-300 group"
+                        >
+                            <div class="flex items-start justify-between mb-2">
                                 <Badge
                                     variant={log.actionColor}
-                                    class="text-[10px] px-1.5 py-0.5"
+                                    class="text-[10px] font-extrabold px-2 py-0.5 tracking-wider uppercase opacity-80 group-hover:opacity-100"
                                 >
                                     {log.actionLabel}
                                 </Badge>
                                 <span
-                                    class="text-[10px] text-slate-400 font-medium whitespace-nowrap"
+                                    class="text-[10px] text-slate-400 font-bold whitespace-nowrap bg-slate-100/50 px-2 py-0.5 rounded-md"
                                 >
                                     {new Date(log.timestamp).toLocaleTimeString(
                                         [],
@@ -347,14 +408,18 @@
                                 </span>
                             </div>
                             <p
-                                class="text-sm text-slate-700 font-medium line-clamp-2 mb-1"
+                                class="text-[13px] text-slate-700 leading-relaxed line-clamp-2 mb-2 group-hover:text-slate-900 transition-colors"
                             >
                                 {log.formattedDetails}
                             </p>
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs text-slate-500">
-                                    Por: <span
-                                        class="font-medium text-slate-700"
+                            <div
+                                class="flex items-center justify-between border-t border-slate-100/40 pt-2"
+                            >
+                                <span
+                                    class="text-[11px] text-slate-400 flex items-center gap-1.5"
+                                >
+                                    Por <span
+                                        class="font-extrabold text-slate-600 group-hover:text-blue-600"
                                         >{log.user || "Sistema"}</span
                                     >
                                 </span>
