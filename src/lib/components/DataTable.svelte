@@ -20,9 +20,15 @@
         columns: Column[];
         actions?: TopSnippet;
         mobileCard?: TopSnippet;
+        actionsWidth?: string;
     };
-
-    let { data, columns, actions, mobileCard }: Props = $props();
+    let {
+        data,
+        columns,
+        actions,
+        mobileCard,
+        actionsWidth = "140px",
+    }: Props = $props();
 
     // Sort state
     let sortKey = $state<string | null>(null);
@@ -70,9 +76,9 @@
     }
 </script>
 
-<!-- Desktop Table View (hidden on small screens) -->
+<!-- Desktop Table View (hidden on small/medium screens) -->
 <div
-    class="hidden md:block overflow-hidden rounded-2xl border border-slate-200/50 shadow-sm bg-white/80 backdrop-blur-sm"
+    class="hidden lg:block overflow-hidden rounded-2xl border border-slate-200/50 shadow-sm bg-white/80 backdrop-blur-sm"
 >
     <div class="w-full overflow-x-auto custom-scrollbar">
         <table
@@ -130,8 +136,8 @@
                     {#if actions}
                         <th
                             scope="col"
-                            class="w-[140px] px-5 py-4 lg:px-6 lg:py-5 text-right font-bold"
-                            >Acciones</th
+                            class="px-5 py-4 lg:px-6 lg:py-5 text-right font-bold"
+                            style:width={actionsWidth}>Acciones</th
                         >
                     {/if}
                 </tr>
@@ -143,12 +149,18 @@
                     >
                         {#each columns as column}
                             <td
-                                class="px-5 py-4 lg:px-6 lg:py-4.5 text-[13.5px] font-medium text-slate-700/90 transition-colors group-hover:text-slate-900 truncate {column.class ||
-                                    ''}"
+                                class="px-5 py-4 lg:px-6 lg:py-4.5 text-[13.5px] font-medium text-slate-700/90 transition-colors group-hover:text-slate-900 {column.width ||
+                                column.maxWidth
+                                    ? 'truncate'
+                                    : ''} {column.class || ''}"
                                 style:width={column.width}
                                 style:max-width={column.maxWidth}
                             >
-                                <div class="truncate">
+                                <div
+                                    class={column.width || column.maxWidth
+                                        ? "truncate"
+                                        : ""}
+                                >
                                     {#if column.render}
                                         {@render column.render(row)}
                                     {:else}
@@ -159,7 +171,8 @@
                         {/each}
                         {#if actions}
                             <td
-                                class="px-5 py-4 lg:px-6 lg:py-4.5 whitespace-nowrap text-right w-[140px]"
+                                class="px-5 py-4 lg:px-6 lg:py-4.5 whitespace-nowrap text-right"
+                                style:width={actionsWidth}
                             >
                                 <div
                                     class="flex justify-end opacity-60 group-hover:opacity-100 transition-opacity duration-300"
@@ -175,8 +188,8 @@
     </div>
 </div>
 
-<!-- Mobile Card View (visible only on small screens) -->
-<div class="md:hidden space-y-4">
+<!-- Mobile/Tablet Card View (visible on small/medium screens) -->
+<div class="lg:hidden space-y-4">
     {#each sortedData as row (row.id || Math.random())}
         {#if mobileCard}
             {@render mobileCard(row)}

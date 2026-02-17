@@ -255,7 +255,12 @@
                     render: renderHistoryAction,
                     width: "140px",
                 },
-                { key: "details", label: "Descripción", render: renderDetails },
+                {
+                    key: "details",
+                    label: "Descripción",
+                    render: renderDetails,
+                    width: "350px",
+                },
             ]}
         />
     </Card>

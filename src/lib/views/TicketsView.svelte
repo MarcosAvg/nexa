@@ -85,9 +85,10 @@
 
         return items.map((t) => {
             const person = personnel.find((p) => p.id == t.person_id);
+            const externalName = t.payload?.relatedPerson?.name;
             return {
                 ...t,
-                personName: person?.name || "Desconocido",
+                personName: person?.name || externalName || "Desconocido",
             };
         });
     });

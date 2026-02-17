@@ -341,25 +341,21 @@
                     key: "type",
                     label: "Tipo",
                     render: renderCardType,
-                    width: "80px",
                 },
                 {
                     key: "folio",
                     label: "Folio / No. Tarjeta",
                     render: renderCardFolio,
-                    width: "150px",
                 },
                 {
                     key: "personName",
                     label: "Asignada a",
                     render: renderCardPerson,
-                    width: "35%",
                 },
                 {
                     key: "status",
                     label: "Estado",
                     render: renderCardStatus,
-                    width: "100px",
                 },
             ]}
         >

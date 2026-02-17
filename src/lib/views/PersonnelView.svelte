@@ -269,34 +269,35 @@
     <Card class="overflow-hidden">
         <DataTable
             data={filteredPersonnel}
+            actionsWidth="130px"
             columns={[
                 {
                     key: "name",
                     label: "Nombre completo",
                     render: renderName,
-                    width: "250px",
+                    width: "220px",
                 },
-                { key: "employee_no", label: "No. Empleado", width: "120px" },
-                { key: "area", label: "Área", width: "150px" },
-                { key: "position", label: "Puesto", width: "150px" },
+                { key: "employee_no", label: "No. Empleado", width: "100px" },
+                { key: "area", label: "Área", width: "120px" },
+                { key: "position", label: "Puesto", width: "120px" },
                 {
                     key: "dependency",
                     label: "Dependencia / Edificio",
                     render: renderDependency,
-                    width: "200px",
+                    width: "250px",
                 },
                 {
                     key: "cards",
                     label: "Tarjetas",
                     render: renderCards,
                     sortable: false,
-                    width: "120px",
+                    width: "140px",
                 },
                 {
                     key: "status",
                     label: "Estado",
                     render: renderStatus,
-                    width: "150px",
+                    width: "120px",
                 },
             ]}
             mobileCard={mobilePersonnelCard}

@@ -40,9 +40,19 @@
             : null,
     );
 
-    let displayPersonName = $derived(
-        ticket?.personName || ticket?.payload?.relatedPerson?.name || "",
-    );
+    let displayPersonName = $derived.by(() => {
+        if (ticket?.person_id) {
+            const person = personnelState.personnel.find(
+                (p) => p.id === ticket.person_id,
+            );
+            if (person) return person.name;
+        }
+        return (
+            ticket?.payload?.relatedPerson?.name ||
+            ticket?.personName ||
+            "Desconocido"
+        );
+    });
 
     onMount(async () => {
         users = await profileService.fetchAll();
@@ -248,11 +258,34 @@
                                 <div class="text-sm font-bold text-slate-700">
                                     {displayPersonName}
                                 </div>
-                                {#if relatedPerson?.dependency}
+                                {#if ticket?.person_id && relatedPerson?.dependency}
                                     <div
                                         class="text-[10px] text-slate-500 font-medium mt-0.5"
                                     >
                                         {relatedPerson.dependency}
+                                    </div>
+                                {:else if !ticket?.person_id && ticket?.payload?.relatedPerson}
+                                    <div
+                                        class="text-[10px] text-slate-500 font-medium mt-0.5 space-x-2"
+                                    >
+                                        {#if ticket.payload.relatedPerson.employee_no}
+                                            <span
+                                                ><span class="opacity-50"
+                                                    >No.</span
+                                                >
+                                                {ticket.payload.relatedPerson
+                                                    .employee_no}</span
+                                            >
+                                        {/if}
+                                        {#if ticket.payload.relatedPerson.employee_no && ticket.payload.relatedPerson.dependency}
+                                            <span class="opacity-50">|</span>
+                                        {/if}
+                                        {#if ticket.payload.relatedPerson.dependency}
+                                            <span
+                                                >{ticket.payload.relatedPerson
+                                                    .dependency}</span
+                                            >
+                                        {/if}
                                     </div>
                                 {/if}
                             </div>

@@ -53,6 +53,8 @@
         relatedPersonId: "",
         personNotListed: false,
         notListedPersonName: "",
+        notListedPersonEmployeeNo: "",
+        notListedPersonDependency: "",
     });
 
     // Validations & Search
@@ -114,6 +116,8 @@
                     relatedPersonId: "",
                     personNotListed: false,
                     notListedPersonName: "",
+                    notListedPersonEmployeeNo: "",
+                    notListedPersonDependency: "",
                 };
                 searchTerm = "";
                 selectedPerson = null;
@@ -187,7 +191,12 @@
                 assignedTo: formData.assignedTo,
                 requestor: formData.requestor,
                 relatedPerson: formData.personNotListed
-                    ? { name: formData.notListedPersonName, type: "external" }
+                    ? {
+                          name: formData.notListedPersonName,
+                          employee_no: formData.notListedPersonEmployeeNo,
+                          dependency: formData.notListedPersonDependency,
+                          type: "external",
+                      }
                     : {
                           id: formData.relatedPersonId,
                           name: selectedPerson?.name,
@@ -345,11 +354,45 @@
                     </div>
                 </div>
             {:else if formData.personNotListed}
-                <div class="space-y-2">
-                    <Input
-                        placeholder="Nombre de la persona..."
-                        bind:value={formData.notListedPersonName}
-                    />
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <label
+                            class="text-xs font-bold text-slate-600 block pl-1"
+                            >Nombre Completo</label
+                        >
+                        <Input
+                            placeholder="Nombre de la persona..."
+                            bind:value={formData.notListedPersonName}
+                        />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label
+                                class="text-xs font-bold text-slate-600 block pl-1"
+                                >No. Empleado</label
+                            >
+                            <Input
+                                placeholder="Ej: 12345"
+                                bind:value={formData.notListedPersonEmployeeNo}
+                            />
+                        </div>
+                        <div class="space-y-2">
+                            <label
+                                class="text-xs font-bold text-slate-600 block pl-1"
+                                >Dependencia</label
+                            >
+                            <Select
+                                bind:value={formData.notListedPersonDependency}
+                            >
+                                <option value="">Seleccione...</option>
+                                {#each dependencies as d}
+                                    <option value={d.name}>{d.name}</option>
+                                {/each}
+                            </Select>
+                        </div>
+                    </div>
+
                     <p class="text-xs text-amber-600 bg-amber-50 p-2 rounded">
                         Persona externa o no registrada en el sistema.
                     </p>
