@@ -12,120 +12,36 @@
         FileSpreadsheet,
         RotateCw,
     } from "lucide-svelte";
+    import { toast } from "svelte-sonner";
+    import { HistoryService } from "../services/history";
 
     const PAGE_SIZE = 50;
 
-    // State
-    let historyFilterPerson = $state("");
-    let historyFilterCardType = $state("Todos");
-    let historyFilterFolio = $state("");
-    let historyFilterAction = $state("Todas");
-    let currentPage = $state(1);
-
     // Reset page when filters change
     $effect(() => {
-        historyFilterPerson;
-        historyFilterCardType;
-        historyFilterFolio;
-        historyFilterAction;
-        currentPage = 1;
+        // Track dependencies
+        historyState.filters.person;
+        historyState.filters.cardType;
+        historyState.filters.folio;
+        historyState.filters.action;
+
+        // Debounce refresh for text inputs if needed, but for now direct refresh
+        // To avoid rapid firing on typing, we might want a debounced input in valid components
+        // But HistoryFilters might be using oninput.
+        // Let's rely on standard refresh.
+        historyState.refresh(1);
     });
 
-    // Get data from Stores
-    let filteredHistoryLogs = $derived(historyState.filteredHistoryLogs);
+    // Get data directly from Store (already paginated by server)
+    let historyLogs = $derived(historyState.historyLogs);
+    let totalRecords = $derived(historyState.totalRecords);
+    let currentPage = $derived(historyState.currentPage);
+    let pageSize = $derived(historyState.pageSize);
 
-    let derivedHistoryLogs = $derived.by(() => {
-        if (!filteredHistoryLogs) return [];
-        return filteredHistoryLogs
-            .map((log: any) => {
-                let details = "";
-                if (typeof log.details === "string") {
-                    details = log.details;
-                } else if (log.details?.message) {
-                    details = log.details.message;
-                } else if (log.details && typeof log.details === "object") {
-                    // Extract meaningful text from object values instead of JSON
-                    const vals = Object.entries(log.details)
-                        .filter(
-                            ([k, v]) =>
-                                v !== null &&
-                                v !== undefined &&
-                                k !== "id" &&
-                                k !== "snapshot",
-                        )
-                        .map(([k, v]) => `${k}: ${v}`)
-                        .join(", ");
-                    details = vals || "—";
-                } else {
-                    details = "—";
-                }
-                const entityType = log.entity_type || "SISTEMA";
-                const action = log.action || "Desconocida";
-                const entityId = log.entity_id || "";
-                const entityName =
-                    log.entity_name || `${entityType} (${entityId})`;
-
-                const searchStr = (
-                    details +
-                    " " +
-                    entityType +
-                    " " +
-                    action +
-                    " " +
-                    entityName
-                ).toLowerCase();
-
-                const actionLabel = actionNames[action] || action;
-
-                const matchPerson =
-                    historyFilterPerson === "" ||
-                    searchStr.includes(historyFilterPerson.toLowerCase());
-
-                const matchType =
-                    historyFilterCardType === "Todos" ||
-                    (historyFilterCardType === "Sistema" &&
-                        (entityType === "SYSTEM" ||
-                            entityType === "SISTEMA")) ||
-                    (historyFilterCardType === "Tarjeta" &&
-                        entityType === "CARD") ||
-                    (historyFilterCardType === "Personal" &&
-                        (entityType === "PERSONNEL" ||
-                            entityType === "PERSON")) ||
-                    // Specific card type search in the resolved name
-                    (entityType === "CARD" &&
-                        entityName
-                            .toLowerCase()
-                            .includes(historyFilterCardType.toLowerCase()));
-
-                const matchFolio =
-                    historyFilterFolio === "" ||
-                    searchStr.includes(historyFilterFolio.toLowerCase());
-
-                const matchAction =
-                    historyFilterAction === "Todas" ||
-                    actionLabel
-                        .toLowerCase()
-                        .includes(historyFilterAction.toLowerCase());
-
-                if (matchPerson && matchType && matchFolio && matchAction) {
-                    return { ...log, resolvedName: entityName };
-                }
-                return null;
-            })
-            .filter(Boolean);
-    });
-
-    let totalPages = $derived(
-        Math.max(1, Math.ceil(derivedHistoryLogs.length / PAGE_SIZE)),
-    );
-
-    let paginatedLogs = $derived.by(() => {
-        const start = (currentPage - 1) * PAGE_SIZE;
-        return derivedHistoryLogs.slice(start, start + PAGE_SIZE);
-    });
+    let totalPages = $derived(Math.max(1, Math.ceil(totalRecords / pageSize)));
 
     function goToPage(page: number) {
-        currentPage = Math.max(1, Math.min(page, totalPages));
+        historyState.goToPage(page);
     }
 
     import {
@@ -191,10 +107,10 @@
     <SectionHeader title="Historial de acciones">
         {#snippet filters()}
             <HistoryFilters
-                bind:personName={historyFilterPerson}
-                bind:cardType={historyFilterCardType}
-                bind:cardFolio={historyFilterFolio}
-                bind:action={historyFilterAction}
+                bind:personName={historyState.filters.person}
+                bind:cardType={historyState.filters.cardType}
+                bind:cardFolio={historyState.filters.folio}
+                bind:action={historyState.filters.action}
             />
         {/snippet}
 
@@ -203,7 +119,7 @@
                 variant="outline"
                 class="flex items-center gap-2.5 h-10 px-4 group"
                 disabled={historyState.isLoading}
-                onclick={() => historyState.refresh()}
+                onclick={() => historyState.refresh(1)}
             >
                 <RotateCw
                     size={16}
@@ -217,10 +133,23 @@
             <Button
                 variant="soft-emerald"
                 class="flex items-center gap-2.5 h-10 px-6"
-                onclick={() => {
-                    import("../utils/xlsxExport").then((m) => {
-                        m.exportHistoryToExcel(derivedHistoryLogs);
-                    });
+                onclick={async () => {
+                    const loadingToast = toast.loading(
+                        "Preparando exportación...",
+                    );
+                    try {
+                        const data = await HistoryService.fetchForExport(
+                            historyState.filters,
+                        );
+                        const m = await import("../utils/xlsxExport");
+                        m.exportHistoryToExcel(data);
+                        toast.success("Exportación completada", {
+                            id: loadingToast,
+                        });
+                    } catch (e) {
+                        console.error(e);
+                        toast.error("Error al exportar", { id: loadingToast });
+                    }
                 }}
             >
                 <FileSpreadsheet
@@ -235,7 +164,7 @@
 
     <Card class="overflow-hidden">
         <DataTable
-            data={paginatedLogs}
+            data={historyLogs}
             columns={[
                 {
                     key: "timestamp",
@@ -266,18 +195,18 @@
     </Card>
 
     <!-- Pagination Controls -->
-    {#if totalPages > 1}
+    {#if totalRecords > 0}
         <div class="flex items-center justify-between px-2">
             <p class="text-xs text-slate-500">
-                Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(
-                    currentPage * PAGE_SIZE,
-                    derivedHistoryLogs.length,
-                )} de {derivedHistoryLogs.length} registros
+                Mostrando {(currentPage - 1) * pageSize + 1}–{Math.min(
+                    currentPage * pageSize,
+                    totalRecords,
+                )} de {totalRecords} registros
             </p>
             <div class="flex items-center gap-2">
                 <Button
                     variant="outline"
-                    onclick={() => goToPage(currentPage - 1)}
+                    onclick={() => historyState.prevPage()}
                     disabled={currentPage <= 1}
                     class="flex items-center gap-1 text-xs px-3 py-1.5"
                 >
@@ -304,7 +233,7 @@
                 </div>
                 <Button
                     variant="outline"
-                    onclick={() => goToPage(currentPage + 1)}
+                    onclick={() => historyState.nextPage()}
                     disabled={currentPage >= totalPages}
                     class="flex items-center gap-1 text-xs px-3 py-1.5"
                 >

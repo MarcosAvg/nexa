@@ -30,13 +30,18 @@ export interface Card {
     id: string;
     folio: string;
     type: string;
-    status: 'active' | 'available' | 'blocked' | 'inactive';
+    status: string;
     person_id: string | null;
-    programming_status: 'pending' | 'done' | null;
-    responsiva_status: 'unsigned' | 'signed' | 'legacy' | null;
-    // Optional computed properties often found in UI usage
+    programming_status: string | null;
+    responsiva_status: string | null;
+    // Computed/Joined properties
     personName?: string;
     personStatus?: string;
+    personnel?: {
+        first_name: string;
+        last_name: string;
+        status?: string;
+    };
 }
 
 export interface Ticket {
@@ -54,6 +59,11 @@ export interface Ticket {
     personName?: string;
     cardType?: string;
     cardFolio?: string;
+    personnel?: {
+        first_name: string;
+        last_name: string;
+        status?: string;
+    };
 }
 
 export interface UserProfile {

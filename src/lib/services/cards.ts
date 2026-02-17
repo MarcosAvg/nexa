@@ -4,6 +4,139 @@ import type { Card } from "../types";
 import { handleError, withTimeout } from "../utils/error";
 
 export const cardService = {
+    async fetchAll(
+        page: number = 1,
+        limit: number = 50,
+        search: string = "",
+        typeFilter: string = "Todos",
+        statusFilter: string = "Todas"
+    ): Promise<{ data: Card[]; count: number }> {
+        try {
+            const from = (page - 1) * limit;
+            const to = from + limit - 1;
+
+            let query = supabase
+                .from("cards")
+                .select("*, personnel(first_name, last_name, status)", { count: "exact" });
+
+            if (search) {
+                const searchTerm = `%${search}%`;
+
+                // 1. Find matching people IDs first
+                const { data: people } = await supabase
+                    .from("personnel")
+                    .select("id")
+                    .or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm}`);
+
+                const personIds = people?.map(p => p.id) || [];
+
+                // 2. Build Query: Folio match OR Person match
+                if (personIds.length > 0) {
+                    query = query.or(`folio.ilike.${searchTerm},person_id.in.(${personIds.join(',')})`);
+                } else {
+                    query = query.ilike("folio", searchTerm);
+                }
+            }
+
+            if (typeFilter !== "Todos") {
+                query = query.eq("type", typeFilter);
+            }
+
+            if (statusFilter !== "Todas") {
+                const statusMap: Record<string, string> = {
+                    "Activa": "active",
+                    "Bloqueada": "blocked",
+                    "Baja": "inactive",
+                    "Disponible": "available"
+                };
+                if (statusMap[statusFilter]) {
+                    query = query.eq("status", statusMap[statusFilter]);
+                }
+            }
+
+            const { data, count, error } = await query
+                .order("folio", { ascending: true })
+                .range(from, to);
+
+            if (error) throw error;
+
+            const mappedData = (data || []).map((c) => ({
+                ...c,
+                personName: c.personnel
+                    ? `${c.personnel.first_name} ${c.personnel.last_name}`
+                    : "Sin asignar",
+                personStatus: c.personnel?.status
+            }));
+
+            return { data: mappedData, count: count || 0 };
+        } catch (error) {
+            handleError(error, "Fetch All Cards");
+            return { data: [], count: 0 };
+        }
+    },
+
+    async fetchForExport(
+        search: string = "",
+        typeFilter: string = "Todos",
+        statusFilter: string = "Todas"
+    ): Promise<Card[]> {
+        try {
+            let query = supabase
+                .from("cards")
+                .select("*, personnel(first_name, last_name, status)");
+
+            if (search) {
+                const searchTerm = `%${search}%`;
+
+                // 1. Find matching people IDs first
+                const { data: people } = await supabase
+                    .from("personnel")
+                    .select("id")
+                    .or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm}`);
+
+                const personIds = people?.map(p => p.id) || [];
+
+                // 2. Build Query: Folio match OR Person match
+                if (personIds.length > 0) {
+                    query = query.or(`folio.ilike.${searchTerm},person_id.in.(${personIds.join(',')})`);
+                } else {
+                    query = query.ilike("folio", searchTerm);
+                }
+            }
+
+            if (typeFilter !== "Todos") {
+                query = query.eq("type", typeFilter);
+            }
+
+            if (statusFilter !== "Todas") {
+                const statusMap: Record<string, string> = {
+                    "Activa": "active",
+                    "Bloqueada": "blocked",
+                    "Baja": "inactive",
+                    "Disponible": "available"
+                };
+                if (statusMap[statusFilter]) {
+                    query = query.eq("status", statusMap[statusFilter]);
+                }
+            }
+
+            const { data, error } = await query.order("folio", { ascending: true });
+
+            if (error) throw error;
+
+            return (data || []).map((c) => ({
+                ...c,
+                personName: c.personnel
+                    ? `${c.personnel.first_name} ${c.personnel.last_name}`
+                    : "Sin asignar",
+                personStatus: c.personnel?.status
+            }));
+        } catch (error) {
+            handleError(error, "Fetch Cards for Export");
+            return [];
+        }
+    },
+
     async fetchExtra(): Promise<Card[]> {
         try {
             const { data, error } = await supabase

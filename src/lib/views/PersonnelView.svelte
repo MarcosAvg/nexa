@@ -18,6 +18,8 @@
     import { exportPersonnelToExcel } from "../utils/xlsxExport";
     import { toast } from "svelte-sonner";
 
+    import { onMount } from "svelte";
+
     let personnel = $derived(personnelState.personnel);
     let dependencies = $derived(catalogState.dependencies);
     let buildings = $derived(catalogState.buildings);
@@ -36,28 +38,83 @@
         personnel.find((p) => p.id === selectedPersonId) || null,
     );
 
-    let filteredPersonnel = $derived.by(() => {
-        return personnel.filter((person) => {
-            const matchStatus =
-                statusFilter === "Todos" ||
-                (statusFilter === "Activo/a" && person.status === "Activo/a") ||
-                (statusFilter === "Parcial" && person.status === "Parcial") ||
-                (statusFilter === "Inactivo/a" &&
-                    person.status === "Inactivo/a") ||
-                (statusFilter === "Bloqueado/a" &&
-                    person.status === "Bloqueado/a") ||
-                (statusFilter === "Baja" && person.status === "Baja");
-
-            const matchDependency =
-                dependencyFilter === "" ||
-                person.dependency === dependencyFilter;
-            const matchSearch =
-                personSearch === "" ||
-                person.name.toLowerCase().includes(personSearch.toLowerCase());
-
-            return matchStatus && matchDependency && matchSearch;
-        });
+    onMount(() => {
+        personnelState.refresh();
     });
+
+    // Filter Logic
+    function handleFilterChange() {
+        const depId =
+            dependencies.find((d) => d.name === dependencyFilter)?.id || "";
+        personnelState.filter(statusFilter, depId);
+    }
+
+    // React to filter changes
+    $effect(() => {
+        // We need to trigger this when statusFilter or dependencyFilter changes.
+        // However, we want to avoid double-triggering on mount.
+        // Let's use specific handlers or just call it here (with simple debounce if needed, but effect is okay for select inputs).
+        // Actually, we can just bind inputs to state proxy or call function on change.
+        // Since we are using bind:value on components, we need to inspect if they support onchange.
+        // For now, let's use an effect that watches these values.
+        const depId =
+            dependencies.find((d) => d.name === dependencyFilter)?.id || "";
+        // Only trigger if values are different from state (to avoid loops if state updates filters)
+        if (
+            statusFilter !== personnelState.statusFilter ||
+            depId !== personnelState.dependencyId
+        ) {
+            personnelState.filter(statusFilter, depId);
+        }
+    });
+
+    // Search Logic (Debounced)
+    let searchTimeout: any;
+    function onSearch(e: Event) {
+        const value = (e.target as HTMLInputElement).value;
+        personSearch = value;
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            personnelState.search(value);
+        }, 300);
+    }
+
+    /* Pagination Helpers */
+    let currentPage = $derived(personnelState.currentPage);
+    let pageSize = $derived(personnelState.pageSize);
+    let totalRecords = $derived(personnelState.totalRecords);
+    let totalPages = $derived(Math.ceil(totalRecords / pageSize));
+
+    function getPageRange(curr: number, total: number): (number | "...")[] {
+        const delta = 2; // Number of pages valid before and after current page
+        const range: number[] = [];
+        const rangeWithDots: (number | "...")[] = [];
+
+        for (let i = 1; i <= total; i++) {
+            if (
+                i === 1 ||
+                i === total ||
+                (i >= curr - delta && i <= curr + delta)
+            ) {
+                range.push(i);
+            }
+        }
+
+        let l: number | null = null;
+        for (const i of range) {
+            if (l) {
+                if (i - l === 2) {
+                    rangeWithDots.push(l + 1);
+                } else if (i - l !== 1) {
+                    rangeWithDots.push("...");
+                }
+            }
+            rangeWithDots.push(i);
+            l = i;
+        }
+
+        return rangeWithDots;
+    }
 
     let currentUser = $derived.by(() => {
         if (!userState.profile) return null;
@@ -81,14 +138,29 @@
         personnelState.openEditModal(person);
     }
 
-    function handleExportExcel() {
-        exportPersonnelToExcel(filteredPersonnel as any[], {
-            filters: {
-                status: statusFilter,
-                dependency: dependencyFilter,
-                search: personSearch,
-            },
-        });
+    async function handleExportExcel() {
+        const loadingToast = toast.loading("Preparando exportación...");
+        try {
+            const depId =
+                dependencies.find((d) => d.name === dependencyFilter)?.id || "";
+            const data = await personnelService.fetchForExport(
+                personSearch,
+                statusFilter,
+                depId,
+            );
+
+            exportPersonnelToExcel(data as any[], {
+                filters: {
+                    status: statusFilter,
+                    dependency: dependencyFilter,
+                    search: personSearch,
+                },
+            });
+            toast.success("Exportación completada", { id: loadingToast });
+        } catch (error) {
+            console.error("Export Error:", error);
+            toast.error("Error al exportar los datos", { id: loadingToast });
+        }
     }
 
     function getStatusVariant(status: string) {
@@ -98,15 +170,6 @@
         if (status === "Bloqueado/a") return "rose";
         if (status === "Baja") return "slate";
         return "slate";
-    }
-
-    async function refreshData() {
-        const [updatedPeople, updatedCards] = await Promise.all([
-            personnelService.fetchAll(),
-            cardService.fetchExtra(),
-        ]);
-        personnelState.setPersonnel(updatedPeople);
-        personnelState.setCards(updatedCards);
     }
 </script>
 
@@ -226,8 +289,9 @@
                 <div class="relative">
                     <input
                         type="text"
-                        placeholder="Nombre..."
-                        bind:value={personSearch}
+                        placeholder="Nombre, No. Empleado..."
+                        value={personSearch}
+                        oninput={onSearch}
                         class="h-9 pl-9 pr-4 rounded-lg border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:bg-white focus:border-slate-900 transition-all outline-none"
                     />
                     <div
@@ -244,7 +308,7 @@
                 variant="soft-emerald"
                 onclick={handleExportExcel}
                 class="flex items-center gap-2.5"
-                disabled={filteredPersonnel.length === 0}
+                disabled={personnel.length === 0}
             >
                 <FileSpreadsheet
                     size={18}
@@ -268,7 +332,7 @@
 
     <Card class="overflow-hidden">
         <DataTable
-            data={filteredPersonnel}
+            data={personnel}
             actionsWidth="130px"
             columns={[
                 {
@@ -314,4 +378,63 @@
             {/snippet}
         </DataTable>
     </Card>
+
+    <!-- Pagination Controls -->
+    {#if totalRecords > 0}
+        <div
+            class="flex flex-col sm:flex-row justify-between items-center gap-4 py-4"
+        >
+            <div class="text-sm text-slate-500">
+                Mostrando <span class="font-medium text-slate-900"
+                    >{(currentPage - 1) * pageSize + 1}</span
+                >
+                a
+                <span class="font-medium text-slate-900"
+                    >{Math.min(currentPage * pageSize, totalRecords)}</span
+                >
+                de
+                <span class="font-medium text-slate-900">{totalRecords}</span>
+                registros
+            </div>
+
+            <div class="flex items-center gap-2">
+                <Button
+                    variant="soft-blue"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onclick={() => personnelState.prevPage()}
+                >
+                    Anterior
+                </Button>
+
+                <div class="flex items-center gap-1">
+                    {#each getPageRange(currentPage, totalPages) as page}
+                        {#if page === "..."}
+                            <span class="px-2 text-slate-400">...</span>
+                        {:else}
+                            <button
+                                class="w-8 h-8 rounded-lg text-sm font-medium transition-colors {currentPage ===
+                                page
+                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                                    : 'text-slate-600 hover:bg-slate-100'}"
+                                onclick={() =>
+                                    personnelState.goToPage(page as number)}
+                            >
+                                {page}
+                            </button>
+                        {/if}
+                    {/each}
+                </div>
+
+                <Button
+                    variant="soft-blue"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onclick={() => personnelState.nextPage()}
+                >
+                    Siguiente
+                </Button>
+            </div>
+        </div>
+    {/if}
 </div>

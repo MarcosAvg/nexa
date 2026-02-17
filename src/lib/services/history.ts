@@ -74,17 +74,91 @@ export const HistoryService = {
         }
     },
 
-    async fetchAll() {
+    async fetchAll(
+        page: number = 1,
+        limit: number = 50,
+        filters: {
+            person?: string;
+            cardType?: string;
+            folio?: string;
+            action?: string;
+        } = {}
+    ) {
         try {
-            const { data, error } = await supabase
+            const from = (page - 1) * limit;
+            const to = from + limit - 1;
+
+            let query = supabase
                 .from("history_logs")
-                .select("*")
+                .select("*", { count: "exact" });
+
+            // Apply Filters
+            if (filters.person) {
+                // Search in entity_name (snapshot) primarily
+                query = query.ilike("entity_name", `%${filters.person}%`);
+            }
+
+            if (filters.cardType && filters.cardType !== "Todos") {
+                query = query.ilike("entity_name", `%${filters.cardType}%`);
+            }
+
+            if (filters.folio) {
+                query = query.ilike("entity_name", `%${filters.folio}%`);
+            }
+
+            if (filters.action && filters.action !== "Todas") {
+                query = query.eq("action", filters.action);
+            }
+
+            const { data, count, error } = await query
+                .order("timestamp", { ascending: false })
+                .range(from, to);
+
+            if (error) throw error;
+            return { data: data || [], count: count || 0 };
+        } catch (error) {
+            handleError(error, "Fetch History");
+            return { data: [], count: 0 };
+        }
+    },
+
+    async fetchForExport(
+        filters: {
+            person?: string;
+            cardType?: string;
+            folio?: string;
+            action?: string;
+        } = {}
+    ) {
+        try {
+            let query = supabase
+                .from("history_logs")
+                .select("*");
+
+            // Apply Filters
+            if (filters.person) {
+                query = query.ilike("entity_name", `%${filters.person}%`);
+            }
+
+            if (filters.cardType && filters.cardType !== "Todos") {
+                query = query.ilike("entity_name", `%${filters.cardType}%`);
+            }
+
+            if (filters.folio) {
+                query = query.ilike("entity_name", `%${filters.folio}%`);
+            }
+
+            if (filters.action && filters.action !== "Todas") {
+                query = query.eq("action", filters.action);
+            }
+
+            const { data, error } = await query
                 .order("timestamp", { ascending: false });
 
             if (error) throw error;
             return data || [];
         } catch (error) {
-            handleError(error, "Fetch History");
+            handleError(error, "Fetch History for Export");
             return [];
         }
     },

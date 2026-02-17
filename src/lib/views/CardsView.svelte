@@ -1,5 +1,6 @@
 <script lang="ts">
     import { personnelState, userState, uiState } from "../stores";
+    import { onMount } from "svelte";
     import SectionHeader from "../components/SectionHeader.svelte";
     import FilterGroup from "../components/FilterGroup.svelte";
     import Button from "../components/Button.svelte";
@@ -44,59 +45,14 @@
         onConfirm: async () => {},
     });
 
-    // Computed Cards Data
-    let allCards = $derived.by(() => {
-        const cards: any[] = [];
-        personnel.forEach((person) => {
-            if (person.cards) {
-                person.cards.forEach((card: any) => {
-                    cards.push({
-                        ...card,
-                        id: card.id,
-                        personId: person.id,
-                        personName: person.name,
-                        personStatus: person.status,
-                    });
-                });
-            }
-        });
-        cards.push(
-            ...extraCards.map((c) => ({ ...c, personName: "Sin asignar" })),
-        );
-        return cards;
-    });
+    // State for cards (Decoupled from Personnel Store)
+    let cards = $state<any[]>([]);
 
-    let filteredCards = $derived.by(() => {
-        let result = allCards;
-
-        // Type Filter
-        if (cardTypeFilter !== "Todos") {
-            result = result.filter((c) => c.type === cardTypeFilter);
-        }
-
-        // Status Filter
-        if (cardStatusFilter !== "Todas") {
-            const statusMap: Record<string, string> = {
-                Activa: "active",
-                Bloqueada: "blocked",
-                Baja: "inactive",
-            };
-            result = result.filter(
-                (c) => c.status === statusMap[cardStatusFilter],
-            );
-        }
-
-        // Search Filter
-        if (cardSearch.trim() !== "") {
-            const search = cardSearch.toLowerCase();
-            result = result.filter(
-                (c) =>
-                    c.folio.toLowerCase().includes(search) ||
-                    c.personName.toLowerCase().includes(search),
-            );
-        }
-        return result;
-    });
+    let currentPage = $state(1);
+    let pageSize = $state(50);
+    let totalRecords = $state(0);
+    let totalPages = $derived(Math.ceil(totalRecords / pageSize));
+    let isLoading = $state(false);
 
     // Props
     // Phase 2 Refactor: Use appState and stores instead of props
@@ -117,14 +73,42 @@
         isModalOpen = true;
     }
 
-    async function refreshData() {
-        const [updatedPeople, updatedCards] = await Promise.all([
-            personnelService.fetchAll(),
-            cardService.fetchExtra(),
-        ]);
-        personnelState.setPersonnel(updatedPeople);
-        personnelState.setCards(updatedCards);
+    async function refreshData(page: number = 1) {
+        isLoading = true;
+        currentPage = page;
+        try {
+            const result = await cardService.fetchAll(
+                currentPage,
+                pageSize,
+                cardSearch,
+                cardTypeFilter,
+                cardStatusFilter,
+            );
+            cards = result.data;
+            totalRecords = result.count;
+        } finally {
+            isLoading = false;
+        }
     }
+
+    // Debounced Search
+    let searchTimeout: any;
+    function onSearch(e: Event) {
+        const value = (e.target as HTMLInputElement).value;
+        cardSearch = value;
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            refreshData(1);
+        }, 300);
+    }
+
+    function onFilterChange() {
+        refreshData(1);
+    }
+
+    onMount(() => {
+        refreshData();
+    });
 
     async function onBlockCard(card: any) {
         const isReactivation =
@@ -220,6 +204,37 @@
         if (status === "inactive") return "Baja";
         return "Disponible";
     }
+
+    function getPageRange(curr: number, total: number): (number | "...")[] {
+        const delta = 2; // Number of pages valid before and after current page
+        const range: number[] = [];
+        const rangeWithDots: (number | "...")[] = [];
+
+        for (let i = 1; i <= total; i++) {
+            if (
+                i === 1 ||
+                i === total ||
+                (i >= curr - delta && i <= curr + delta)
+            ) {
+                range.push(i);
+            }
+        }
+
+        let l: number | null = null;
+        for (const i of range) {
+            if (l) {
+                if (i - l === 2) {
+                    rangeWithDots.push(l + 1);
+                } else if (i - l !== 1) {
+                    rangeWithDots.push("...");
+                }
+            }
+            rangeWithDots.push(i);
+            l = i;
+        }
+
+        return rangeWithDots;
+    }
 </script>
 
 {#snippet renderCardType(row: any)}
@@ -271,11 +286,13 @@
                 label="Tipo"
                 options={["Todos", "KONE", "P2000"]}
                 bind:value={cardTypeFilter}
+                onchange={() => onFilterChange()}
             />
             <FilterGroup
                 label="Estado"
                 options={["Todas", "Activa", "Bloqueada", "Baja"]}
                 bind:value={cardStatusFilter}
+                onchange={() => onFilterChange()}
             />
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span
@@ -285,8 +302,9 @@
                 <div class="relative">
                     <input
                         type="text"
-                        placeholder="Folio o Persona..."
-                        bind:value={cardSearch}
+                        placeholder="Folio..."
+                        value={cardSearch}
+                        oninput={onSearch}
                         class="h-9 pl-9 pr-4 rounded-lg border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:bg-white focus:border-slate-900 transition-all outline-none"
                     />
                     <div
@@ -302,15 +320,30 @@
             <Button
                 variant="soft-emerald"
                 class="flex items-center gap-2.5 h-10 px-6"
-                onclick={() => {
-                    import("../utils/xlsxExport").then((m) => {
-                        m.exportCardsToExcel(filteredCards, {
+                onclick={async () => {
+                    const loadingToast = toast.loading(
+                        "Preparando exportación...",
+                    );
+                    try {
+                        const data = await cardService.fetchForExport(
+                            cardSearch,
+                            cardTypeFilter,
+                            cardStatusFilter,
+                        );
+                        const m = await import("../utils/xlsxExport");
+                        m.exportCardsToExcel(data, {
                             filters: {
                                 status: cardStatusFilter,
                                 search: cardSearch,
                             },
                         });
-                    });
+                        toast.success("Exportación completada", {
+                            id: loadingToast,
+                        });
+                    } catch (e) {
+                        console.error(e);
+                        toast.error("Error al exportar", { id: loadingToast });
+                    }
                 }}
             >
                 <FileSpreadsheet
@@ -335,7 +368,7 @@
 
     <Card class="overflow-hidden">
         <DataTable
-            data={filteredCards}
+            data={cards}
             columns={[
                 {
                     key: "type",
@@ -436,6 +469,64 @@
             {/snippet}
         </DataTable>
     </Card>
+
+    <!-- Pagination Controls -->
+    {#if totalRecords > 0}
+        <div
+            class="flex flex-col sm:flex-row justify-between items-center gap-4 py-4"
+        >
+            <div class="text-sm text-slate-500">
+                Mostrando <span class="font-medium text-slate-900"
+                    >{(currentPage - 1) * pageSize + 1}</span
+                >
+                a
+                <span class="font-medium text-slate-900"
+                    >{Math.min(currentPage * pageSize, totalRecords)}</span
+                >
+                de
+                <span class="font-medium text-slate-900">{totalRecords}</span>
+                registros
+            </div>
+
+            <div class="flex items-center gap-2">
+                <Button
+                    variant="soft-blue"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onclick={() => refreshData(currentPage - 1)}
+                >
+                    Anterior
+                </Button>
+
+                <div class="flex items-center gap-1">
+                    {#each getPageRange(currentPage, totalPages) as page}
+                        {#if page === "..."}
+                            <span class="px-2 text-slate-400">...</span>
+                        {:else}
+                            <button
+                                class="w-8 h-8 rounded-lg text-sm font-medium transition-colors {currentPage ===
+                                page
+                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                                    : 'text-slate-600 hover:bg-slate-100'}"
+                                onclick={() => refreshData(page as number)}
+                            >
+                                {page}
+                            </button>
+                        {/if}
+                    {/each}
+                </div>
+
+                <Button
+                    variant="soft-blue"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onclick={() => refreshData(currentPage + 1)}
+                >
+                    Siguiente
+                </Button>
+            </div>
+        </div>
+    {/if}
 </div>
 
 <AddCardModal

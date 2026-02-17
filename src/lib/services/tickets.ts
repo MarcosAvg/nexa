@@ -9,7 +9,7 @@ export const ticketService = {
         try {
             const { data, error } = await supabase
                 .from("tickets")
-                .select("*")
+                .select("*, personnel(first_name, last_name)")
                 .order('created_at', { ascending: false });
 
             if (error) throw error;

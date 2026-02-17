@@ -16,7 +16,7 @@
     import { personnelState, uiState } from "../../stores";
 
     import { onMount } from "svelte";
-    import { profileService } from "../../services"; // Corrected import path
+    import { personnelService, profileService } from "../../services";
 
     let {
         isOpen = $bindable(false),
@@ -32,13 +32,44 @@
 
     let isSubmitting = $state(false);
     let users = $state<any[]>([]);
+    let fetchedPerson = $state<any>(null);
+    let isLoadingPerson = $state(false);
 
     // Derived person for dependency info
-    let relatedPerson = $derived(
-        ticket?.person_id
-            ? personnelState.personnel.find((p) => p.id === ticket.person_id)
-            : null,
-    );
+    let relatedPerson = $derived.by(() => {
+        if (!ticket?.person_id) return null;
+        return (
+            personnelState.personnel.find((p) => p.id === ticket.person_id) ||
+            fetchedPerson ||
+            null
+        );
+    });
+
+    $effect(() => {
+        if (isOpen && ticket?.person_id) {
+            const inStore = personnelState.personnel.find(
+                (p) => p.id === ticket.person_id,
+            );
+            if (
+                !inStore &&
+                !isLoadingPerson &&
+                (!fetchedPerson || fetchedPerson.id !== ticket.person_id)
+            ) {
+                isLoadingPerson = true;
+                personnelService
+                    .fetchById(ticket.person_id)
+                    .then((p) => {
+                        if (p) fetchedPerson = p;
+                    })
+                    .catch((e) => {
+                        console.error("Error fetching person:", e);
+                    })
+                    .finally(() => {
+                        isLoadingPerson = false;
+                    });
+            }
+        }
+    });
 
     let displayPersonName = $derived.by(() => {
         if (ticket?.person_id) {

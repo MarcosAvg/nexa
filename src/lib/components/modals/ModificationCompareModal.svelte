@@ -9,7 +9,7 @@
     import { cardService } from "../../services/cards";
     import { toast } from "svelte-sonner";
     import { ArrowRight, Plus, Minus, User } from "lucide-svelte";
-    import type { Ticket } from "../../types";
+    import type { Ticket, Person } from "../../types";
 
     let {
         isOpen = $bindable(false),
@@ -22,14 +22,45 @@
     } = $props();
 
     let isSubmitting = $state(false);
+    let fetchedPerson = $state<Person | null>(null);
+    let isLoadingPerson = $state(false);
 
-    // Get person data from store (current DB state)
+    // Get person data from store (current DB state) or fetch it
     let currentPerson = $derived.by(() => {
         if (!ticket?.person_id) return null;
+        // Prioritize store data for consistency, fallback to fetched data
         return (
             personnelState.personnel.find((p) => p.id === ticket.person_id) ||
+            fetchedPerson ||
             null
         );
+    });
+
+    $effect(() => {
+        if (isOpen && ticket?.person_id) {
+            const inStore = personnelState.personnel.find(
+                (p) => p.id === ticket.person_id,
+            );
+            if (
+                !inStore &&
+                !isLoadingPerson &&
+                (!fetchedPerson || fetchedPerson.id !== ticket.person_id)
+            ) {
+                isLoadingPerson = true;
+                personnelService
+                    .fetchById(ticket.person_id)
+                    .then((p) => {
+                        if (p) fetchedPerson = p;
+                    })
+                    .catch((e) => {
+                        console.error("Error fetching person:", e);
+                        toast.error("Error al cargar datos de personal");
+                    })
+                    .finally(() => {
+                        isLoadingPerson = false;
+                    });
+            }
+        }
     });
 
     // Get modified data from ticket payload
@@ -640,6 +671,13 @@
                     </div>
                 {/if}
             {/each}
+        </div>
+    {:else if isLoadingPerson}
+        <div
+            class="p-8 text-center text-slate-500 flex flex-col items-center gap-2"
+        >
+            <span class="loading loading-spinner text-emerald-500"></span>
+            <span>Cargando datos de la persona...</span>
         </div>
     {:else}
         <div class="p-8 text-center text-slate-500">

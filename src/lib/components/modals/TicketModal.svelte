@@ -87,8 +87,8 @@
         if (isOpen) {
             // Safety check: Ensure personnel data is loaded for search
             if (personnelState.personnel.length === 0) {
-                personnelService.fetchAll().then((data) => {
-                    personnelState.setPersonnel(data);
+                personnelService.fetchAll().then((res) => {
+                    personnelState.setPersonnel(res.data, res.count);
                 });
             }
 

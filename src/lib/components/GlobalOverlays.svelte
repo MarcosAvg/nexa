@@ -34,14 +34,14 @@
             personnelService.fetchAll(),
             cardService.fetchExtra(),
         ]);
-        personnelState.setPersonnel(updatedPeople);
+        personnelState.setPersonnel(updatedPeople.data, updatedPeople.count);
         personnelState.setCards(updatedCards);
 
         // Update selected person reference if open
         if (selectedPersonId) {
             // No need to manually update selectedPerson as it is a derived value from the store
             // But we might need to handle edge case if person was deleted
-            if (!updatedPeople.find((p) => p.id === selectedPersonId)) {
+            if (!updatedPeople.data.find((p) => p.id === selectedPersonId)) {
                 personnelState.setDetailsOpen(false);
             }
         }

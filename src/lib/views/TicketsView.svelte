@@ -60,8 +60,12 @@
                 ticket.priority.toLowerCase() === priorityFilter.toLowerCase();
 
             // Helper for search
-            const person = personnel.find((p) => p.id == ticket.person_id);
-            const pName = person?.name || "Desconocido";
+            let pName = "Desconocido";
+            if (ticket.personnel) {
+                pName = `${ticket.personnel.first_name} ${ticket.personnel.last_name}`;
+            } else if (ticket.payload?.relatedPerson?.name) {
+                pName = ticket.payload.relatedPerson.name;
+            }
 
             // 3. Search Filter
             const searchLower = searchQuery.toLowerCase();
@@ -84,11 +88,18 @@
         });
 
         return items.map((t) => {
-            const person = personnel.find((p) => p.id == t.person_id);
-            const externalName = t.payload?.relatedPerson?.name;
+            let personName = "Desconocido";
+
+            // Use joined data if available
+            if (t.personnel) {
+                personName = `${t.personnel.first_name} ${t.personnel.last_name}`;
+            } else if (t.payload?.relatedPerson?.name) {
+                personName = t.payload.relatedPerson.name;
+            }
+
             return {
                 ...t,
-                personName: person?.name || externalName || "Desconocido",
+                personName,
             };
         });
     });
@@ -112,7 +123,7 @@
             cardService.fetchExtra(),
         ]);
         ticketState.setTickets(tickets);
-        personnelState.setPersonnel(personnel);
+        personnelState.setPersonnel(personnel.data, personnel.count);
         personnelState.setCards(extraCards);
     }
 

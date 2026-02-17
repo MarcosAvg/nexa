@@ -4,15 +4,44 @@ import { handleError, withTimeout } from "../utils/error";
 import type { Person, Card } from "../types";
 
 export const personnelService = {
-    async fetchAll(): Promise<Person[]> {
+    async fetchAll(page: number = 1, limit: number = 50, search: string = "", statusFilter: string = "Todos", dependencyId: string = ""): Promise<{ data: Person[], count: number }> {
         try {
-            const { data, error } = await supabase
+            const from = (page - 1) * limit;
+            const to = from + limit - 1;
+
+            let query = supabase
                 .from("personnel")
-                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)", { count: "exact" });
+
+            if (search) {
+                const searchTerm = `%${search}%`;
+                query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},employee_no.ilike.${searchTerm}`);
+            }
+
+            if (statusFilter !== "Todos") {
+                const statusMap: Record<string, string> = {
+                    "Activo/a": "active",
+                    "Parcial": "partial",
+                    "Inactivo/a": "inactive",
+                    "Bloqueado/a": "blocked",
+                    "Baja": "deleted"
+                };
+                if (statusMap[statusFilter]) {
+                    query = query.eq("status", statusMap[statusFilter]);
+                }
+            }
+
+            if (dependencyId) {
+                query = query.eq("dependency_id", dependencyId);
+            }
+
+            const { data, count, error } = await query
+                .order("first_name", { ascending: true })
+                .range(from, to);
 
             if (error) throw error;
 
-            return (data || []).map(p => {
+            const mappedData = (data || []).map(p => {
                 const activeCards = (p.cards || []).filter((c: any) => c.status === "active");
                 const hasActiveCards = activeCards.length > 0;
                 let displayStatus = "Baja";
@@ -64,13 +93,169 @@ export const personnelService = {
                     specialAccesses: p.special_accesses || []
                 } as Person;
             });
+
+            return { data: mappedData, count: count || 0 };
         } catch (error) {
             handleError(error, "Fetch Personnel");
+            return { data: [], count: 0 };
+        }
+    },
+
+    async fetchForExport(search: string = "", statusFilter: string = "Todos", dependencyId: string = ""): Promise<Person[]> {
+        try {
+            let query = supabase
+                .from("personnel")
+                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+
+            if (search) {
+                const searchTerm = `%${search}%`;
+                query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},employee_no.ilike.${searchTerm}`);
+            }
+
+            if (statusFilter !== "Todos") {
+                const statusMap: Record<string, string> = {
+                    "Activo/a": "active",
+                    "Parcial": "partial",
+                    "Inactivo/a": "inactive",
+                    "Bloqueado/a": "blocked",
+                    "Baja": "deleted"
+                };
+                if (statusMap[statusFilter]) {
+                    query = query.eq("status", statusMap[statusFilter]);
+                }
+            }
+
+            if (dependencyId) {
+                query = query.eq("dependency_id", dependencyId);
+            }
+
+            const { data, error } = await query.order("first_name", { ascending: true });
+
+            if (error) throw error;
+
+            return (data || []).map(p => {
+                const activeCards = (p.cards || []).filter((c: any) => c.status === "active");
+                const hasActiveCards = activeCards.length > 0;
+                let displayStatus = "Baja";
+
+                if (p.status === "active") {
+                    if (!hasActiveCards) {
+                        displayStatus = "Inactivo/a";
+                    } else {
+                        const readyCards = activeCards.filter(
+                            (c: any) => c.programming_status === "done" && (c.responsiva_status === "signed" || c.responsiva_status === "legacy")
+                        );
+                        if (readyCards.length === activeCards.length) {
+                            displayStatus = "Activo/a";
+                        } else if (readyCards.length > 0) {
+                            displayStatus = "Parcial";
+                        } else {
+                            displayStatus = "Inactivo/a";
+                        }
+                    }
+                } else if (p.status === "blocked") {
+                    displayStatus = "Bloqueado/a";
+                }
+
+                return {
+                    id: p.id,
+                    first_name: p.first_name,
+                    last_name: p.last_name,
+                    name: `${p.first_name} ${p.last_name}`,
+                    employee_no: p.employee_no,
+                    email: p.email,
+                    area: p.area,
+                    position: p.position,
+                    floor: p.floor,
+                    building: p.buildings?.name || "N/A",
+                    dependency: p.dependencies?.name || "N/A",
+                    schedule: p.schedules ? {
+                        days: p.schedules.name,
+                        entry: p.entry_time || p.schedules.default_entry || "09:00",
+                        exit: p.exit_time || p.schedules.default_exit || "18:00"
+                    } : null,
+                    status_raw: p.status,
+                    status: displayStatus,
+                    cards: p.cards || [],
+                    floors_p2000: p.floors_p2000 || [],
+                    floors_kone: p.floors_kone || [],
+                    specialAccesses: p.special_accesses || []
+                } as Person;
+            });
+        } catch (error) {
+            handleError(error, "Fetch Personnel for Export");
             return [];
         }
     },
 
-    async save(data: any) { // Keeping 'any' for input data to be flexible with form binding, but logic inside is safer
+    async fetchById(id: string): Promise<Person | null> {
+        try {
+            const { data, error } = await supabase
+                .from("personnel")
+                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)")
+                .eq("id", id)
+                .single();
+
+            if (error) throw error;
+            if (!data) return null;
+
+            // Map single person (reuse logic if possible, but distinct here for simplicity)
+            const p = data;
+            const activeCards = (p.cards || []).filter((c: any) => c.status === "active");
+            const hasActiveCards = activeCards.length > 0;
+            let displayStatus = "Baja";
+
+            if (p.status === "active") {
+                if (!hasActiveCards) {
+                    displayStatus = "Inactivo/a";
+                } else {
+                    const readyCards = activeCards.filter(
+                        (c: any) => c.programming_status === "done" && (c.responsiva_status === "signed" || c.responsiva_status === "legacy")
+                    );
+                    if (readyCards.length === activeCards.length) {
+                        displayStatus = "Activo/a";
+                    } else if (readyCards.length > 0) {
+                        displayStatus = "Parcial";
+                    } else {
+                        displayStatus = "Inactivo/a";
+                    }
+                }
+            } else if (p.status === "blocked") {
+                displayStatus = "Bloqueado/a";
+            }
+
+            return {
+                id: p.id,
+                first_name: p.first_name,
+                last_name: p.last_name,
+                name: `${p.first_name} ${p.last_name}`,
+                employee_no: p.employee_no,
+                email: p.email,
+                area: p.area,
+                position: p.position,
+                floor: p.floor,
+                building: p.buildings?.name || "N/A",
+                dependency: p.dependencies?.name || "N/A",
+                schedule: p.schedules ? {
+                    days: p.schedules.name,
+                    entry: p.entry_time || p.schedules.default_entry || "09:00",
+                    exit: p.exit_time || p.schedules.default_exit || "18:00"
+                } : null,
+                status_raw: p.status,
+                status: displayStatus,
+                cards: p.cards || [],
+                floors_p2000: p.floors_p2000 || [],
+                floors_kone: p.floors_kone || [],
+                specialAccesses: p.special_accesses || []
+            } as Person;
+        } catch (error) {
+            handleError(error, "Fetch Person By ID");
+            return null;
+        }
+    },
+
+
+    async save(data: any) {
         try {
             const payload = {
                 first_name: data.first_name || data.nombres,
@@ -128,8 +313,6 @@ export const personnelService = {
             if (error) throw error;
 
             // Cascade to Cards
-            // If the person is blocked/inactive, cards should reflect that.
-            // If reactivated, cards should become active (since they are assigned).
             const cardStatus = status;
             const { error: cardError } = await withTimeout(supabase
                 .from("cards")
@@ -153,7 +336,7 @@ export const personnelService = {
 
     async delete(id: string) {
         try {
-            // Log deletion BEFORE removing data so proactive snapshotting can capture the name
+            // Log deletion BEFORE removing data
             await HistoryService.log("PERSONNEL", id, "DELETE", { message: `Registro eliminado permanentemente` });
 
             // Delete the person
@@ -166,7 +349,6 @@ export const personnelService = {
     }
 };
 
-// Keeping other services here for now, but they should ideally be moved or typed too
 export const catalogService = {
     // --- Fetch ---
     async fetchDependencies() {

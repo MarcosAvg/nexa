@@ -209,7 +209,7 @@
             } else {
                 await personnelService.save(data);
                 const updated = await personnelService.fetchAll();
-                personnelState.setPersonnel(updated);
+                personnelState.setPersonnel(updated.data, updated.count);
                 toast.success("Personal Registrado");
             }
 
