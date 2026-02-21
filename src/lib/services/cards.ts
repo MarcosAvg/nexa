@@ -62,6 +62,7 @@ export const cardService = {
 
             const mappedData = (data || []).map((c) => ({
                 ...c,
+                personId: c.person_id,
                 personName: c.personnel
                     ? `${c.personnel.first_name} ${c.personnel.last_name}`
                     : "Sin asignar",
@@ -126,6 +127,7 @@ export const cardService = {
 
             return (data || []).map((c) => ({
                 ...c,
+                personId: c.person_id,
                 personName: c.personnel
                     ? `${c.personnel.first_name} ${c.personnel.last_name}`
                     : "Sin asignar",

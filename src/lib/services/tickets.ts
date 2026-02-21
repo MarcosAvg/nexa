@@ -15,6 +15,8 @@ export const ticketService = {
             if (error) throw error;
             return (data || []).map(t => ({
                 ...t,
+                personId: t.person_id,
+                cardId: t.card_id,
             } as Ticket));
         } catch (error) {
             handleError(error, "Fetch Tickets");

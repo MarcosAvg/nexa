@@ -1,8 +1,11 @@
 <script lang="ts" module>
     export function getStatusVariant(priority: string) {
-        if (priority === "Alta") return "rose";
-        if (priority === "Media") return "amber";
-        return "blue";
+        const p = priority?.toLowerCase();
+        if (p === "urgente") return "rose";
+        if (p === "alta") return "rose";
+        if (p === "media") return "amber";
+        if (p === "baja") return "blue";
+        return "slate";
     }
 </script>
 
@@ -49,12 +52,6 @@
         Cobro: Wallet,
         Bloqueo: Lock,
         Otro: Briefcase,
-    };
-
-    const priorityColor = {
-        Alta: "rose",
-        Media: "amber",
-        Baja: "blue",
     };
 
     const typeStyles: Record<string, string> = {

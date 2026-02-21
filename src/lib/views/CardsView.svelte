@@ -247,7 +247,22 @@
     {#if row.personName === "Sin asignar"}
         <span class="text-slate-400 italic text-sm">{row.personName}</span>
     {:else}
-        <div class="font-medium text-slate-900">{row.personName}</div>
+        <button
+            type="button"
+            class="group/name flex items-center gap-2 text-left outline-none"
+            onclick={() => onViewPerson(row)}
+        >
+            <div
+                class="font-medium text-slate-900 group-hover/name:text-blue-600 group-hover/name:underline underline-offset-4 decoration-blue-300 decoration-2 transition-all"
+            >
+                {row.personName}
+            </div>
+            <div
+                class="opacity-0 group-hover/name:opacity-100 -translate-x-2 group-hover/name:translate-x-0 transition-all text-blue-500"
+            >
+                <User size={12} />
+            </div>
+        </button>
     {/if}
 {/snippet}
 

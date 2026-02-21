@@ -32,6 +32,7 @@ export interface Card {
     type: string;
     status: string;
     person_id: string | null;
+    personId?: string | null; // Alias for UI consistency
     programming_status: string | null;
     responsiva_status: string | null;
     // Computed/Joined properties
@@ -53,7 +54,9 @@ export interface Ticket {
     status: "Pendiente" | "En Proceso" | "Completado" | "pending" | "completed";
     created_at: string;
     person_id: string | null;
+    personId?: string | null; // Alias for UI consistency
     card_id: string | null;
+    cardId?: string | null; // Alias for UI consistency
     payload: any;
     // Computed/Joined properties
     personName?: string;
