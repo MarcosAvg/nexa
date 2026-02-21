@@ -209,7 +209,10 @@
                 personnelService.fetchAll(),
                 cardService.fetchExtra(),
             ]);
-            personnelState.setPersonnel(updatedPersonnel);
+            personnelState.setPersonnel(
+                updatedPersonnel.data,
+                updatedPersonnel.count,
+            );
             personnelState.setCards(updatedCards);
 
             toast.success("Cambios aplicados", {
@@ -266,7 +269,28 @@
         "Comparación de datos actuales vs. propuestos"}
     size="xl"
 >
-    {#if currentPerson && modifiedData}
+    {#if isLoadingPerson}
+        <div
+            class="p-12 text-center text-slate-500 flex flex-col items-center justify-center gap-4 min-h-[300px]"
+        >
+            <div class="relative w-12 h-12">
+                <div
+                    class="absolute inset-0 border-4 border-slate-100 rounded-full"
+                ></div>
+                <div
+                    class="absolute inset-0 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"
+                ></div>
+            </div>
+            <div class="space-y-1">
+                <p class="text-sm font-bold text-slate-700">
+                    Cargando datos de personal
+                </p>
+                <p class="text-xs text-slate-400">
+                    Obteniendo información para la comparación...
+                </p>
+            </div>
+        </div>
+    {:else if currentPerson && modifiedData}
         <div class="space-y-6">
             <!-- Person Header -->
             <div

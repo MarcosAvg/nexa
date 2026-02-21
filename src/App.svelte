@@ -65,7 +65,7 @@
         HistoryService.fetchAll(),
       ]);
 
-      personnelState.setPersonnel(_p);
+      personnelState.setPersonnel(_p.data, _p.count);
       personnelState.setCards(_c);
       ticketState.setTickets(_t);
 
@@ -74,7 +74,7 @@
       catalogState.setSpecialAccesses(_a);
       catalogState.setSchedules(_s);
 
-      historyState.setHistory(_h);
+      historyState.setHistory(_h.data, _h.count);
     } catch (err) {
       console.error("Error general en onMount:", err);
     }
