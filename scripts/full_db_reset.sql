@@ -231,25 +231,26 @@ CREATE POLICY "Admins delete special" ON special_accesses FOR DELETE USING (EXIS
 -- Signed Responsivas
 CREATE POLICY "Responsivas viewable" ON signed_responsivas FOR SELECT USING ((SELECT auth.role()) = 'authenticated');
 CREATE POLICY "Admins/Operators insert responsivas" ON signed_responsivas FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'operator')));
-CREATE POLICY "Admins/Operators delete responsivas" ON signed_responsivas FOR DELETE USING (EXISTS (SELECT 1 FROM profiles WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'operator')));
+-- 6. PERFORMANCE INDEXES
 
--- 6. SEED DATA
--- Catálogos
-INSERT INTO buildings (name, floors) VALUES 
-('Torre Administrativa', '{"S1","S2","PB","P1","P2","P3","P4","P5"}'),
-('Palacio de Gobierno', '{"PB","P1","P2"}');
+-- PERSONNEL (Personal)
+CREATE INDEX IF NOT EXISTS idx_personnel_name ON personnel (first_name, last_name); 
+CREATE INDEX IF NOT EXISTS idx_personnel_employee_no ON personnel (employee_no);
+CREATE INDEX IF NOT EXISTS idx_personnel_status ON personnel (status);
+CREATE INDEX IF NOT EXISTS idx_personnel_dependency ON personnel (dependency_id);
+CREATE INDEX IF NOT EXISTS idx_personnel_building ON personnel (building_id);
 
-INSERT INTO dependencies (name) VALUES 
-('Secretaría de Finanzas'), 
-('Secretaría de Educación'), 
-('Dirección de Tecnologías');
+-- HISTORY_LOGS (Historial)
+CREATE INDEX IF NOT EXISTS idx_history_timestamp ON history_logs (timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_history_entity ON history_logs (entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_history_action ON history_logs (action);
 
-INSERT INTO special_accesses (name) VALUES 
-('Comedores'), 
-('Estacionamiento VIP'), 
-('Archivo General');
+-- CARDS (Tarjetas)
+CREATE INDEX IF NOT EXISTS idx_cards_folio ON cards (folio);
+CREATE INDEX IF NOT EXISTS idx_cards_person_id ON cards (person_id);
+CREATE INDEX IF NOT EXISTS idx_cards_status ON cards (status);
 
-INSERT INTO schedules (name, days, default_entry, default_exit) VALUES 
-('Administrativo', '{"Lunes","Martes","Miércoles","Jueves","Viernes"}', '08:00:00', '16:00:00'),
-('Seguridad 24/7', '{"Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"}', '00:00:00', '23:59:59');
-
+-- TICKETS
+CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets (status);
+CREATE INDEX IF NOT EXISTS idx_tickets_person_id ON tickets (person_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_assigned_to ON tickets ((payload->>'assignedTo'));
