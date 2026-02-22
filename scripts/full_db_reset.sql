@@ -70,6 +70,8 @@ CREATE TABLE personnel (
     first_name text not null,
     last_name text not null,
     employee_no text unique not null,
+    email text,
+
     area text,
     position text,
     dependency_id bigint references dependencies(id),

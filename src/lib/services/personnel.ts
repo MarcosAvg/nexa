@@ -3,6 +3,54 @@ import { HistoryService } from "./history";
 import { handleError, withTimeout } from "../utils/error";
 import type { Person, Card } from "../types";
 
+const mapPersonRecord = (p: any): Person => {
+    const activeCards = (p.cards || []).filter((c: any) => c.status === "active");
+    const readyCards = activeCards.filter(
+        (c: any) => c.programming_status === "done" && (c.responsiva_status === "signed" || c.responsiva_status === "legacy")
+    );
+
+    const readyTypes = new Set(readyCards.map((c: any) => c.type));
+
+    let displayStatus = "Baja";
+
+    if (p.status === "active") {
+        if (readyTypes.size >= 2) {
+            displayStatus = "Activo/a";
+        } else if (readyTypes.size === 1) {
+            displayStatus = "Parcial";
+        } else {
+            displayStatus = "Inactivo/a";
+        }
+    } else if (p.status === "blocked") {
+        displayStatus = "Bloqueado/a";
+    }
+
+    return {
+        id: p.id,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        name: `${p.first_name} ${p.last_name}`,
+        employee_no: p.employee_no,
+        email: p.email,
+        area: p.area,
+        position: p.position,
+        floor: p.floor,
+        building: p.buildings?.name || "N/A",
+        dependency: p.dependencies?.name || "N/A",
+        schedule: p.schedules ? {
+            days: p.schedules.name,
+            entry: p.entry_time || p.schedules.default_entry || "09:00",
+            exit: p.exit_time || p.schedules.default_exit || "18:00"
+        } : null,
+        status_raw: p.status,
+        status: displayStatus,
+        cards: p.cards || [],
+        floors_p2000: p.floors_p2000 || [],
+        floors_kone: p.floors_kone || [],
+        specialAccesses: p.special_accesses || []
+    } as Person;
+};
+
 export const personnelService = {
     async fetchAll(page: number = 1, limit: number = 50, search: string = "", statusFilter: string = "Todos", dependencyId: string = ""): Promise<{ data: Person[], count: number }> {
         try {
@@ -41,58 +89,7 @@ export const personnelService = {
 
             if (error) throw error;
 
-            const mappedData = (data || []).map(p => {
-                const activeCards = (p.cards || []).filter((c: any) => c.status === "active");
-                const hasActiveCards = activeCards.length > 0;
-                let displayStatus = "Baja";
-
-                if (p.status === "active") {
-                    if (!hasActiveCards) {
-                        displayStatus = "Inactivo/a";
-                    } else {
-                        const readyCards = activeCards.filter(
-                            (c: any) => c.programming_status === "done" && (c.responsiva_status === "signed" || c.responsiva_status === "legacy")
-                        );
-                        if (readyCards.length === activeCards.length) {
-                            displayStatus = "Activo/a";
-                        } else if (readyCards.length > 0) {
-                            displayStatus = "Parcial";
-                        } else {
-                            displayStatus = "Inactivo/a";
-                        }
-                    }
-                } else if (p.status === "blocked") {
-                    displayStatus = "Bloqueado/a";
-                }
-
-                return {
-                    id: p.id,
-                    first_name: p.first_name,
-                    last_name: p.last_name,
-                    name: `${p.first_name} ${p.last_name}`,
-                    employee_no: p.employee_no,
-                    email: p.email,
-                    area: p.area,
-                    position: p.position,
-                    floor: p.floor,
-                    // Map joined fields
-                    building: p.buildings?.name || "N/A",
-                    dependency: p.dependencies?.name || "N/A",
-                    schedule: p.schedules ? {
-                        days: p.schedules.name,
-                        entry: p.entry_time || p.schedules.default_entry || "09:00",
-                        exit: p.exit_time || p.schedules.default_exit || "18:00"
-                    } : null,
-                    // Raw and Computed Status
-                    status_raw: p.status,
-                    status: displayStatus,
-                    // Arrays
-                    cards: p.cards || [],
-                    floors_p2000: p.floors_p2000 || [],
-                    floors_kone: p.floors_kone || [],
-                    specialAccesses: p.special_accesses || []
-                } as Person;
-            });
+            const mappedData = (data || []).map(p => mapPersonRecord(p));
 
             return { data: mappedData, count: count || 0 };
         } catch (error) {
@@ -103,85 +100,56 @@ export const personnelService = {
 
     async fetchForExport(search: string = "", statusFilter: string = "Todos", dependencyId: string = ""): Promise<Person[]> {
         try {
-            let query = supabase
-                .from("personnel")
-                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+            const allData: Person[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
 
-            if (search) {
-                const searchTerm = `%${search}%`;
-                query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},employee_no.ilike.${searchTerm}`);
-            }
+            while (hasMore) {
+                let query = supabase
+                    .from("personnel")
+                    .select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
 
-            if (statusFilter !== "Todos") {
-                const statusMap: Record<string, string> = {
-                    "Activo/a": "active",
-                    "Parcial": "partial",
-                    "Inactivo/a": "inactive",
-                    "Bloqueado/a": "blocked",
-                    "Baja": "deleted"
-                };
-                if (statusMap[statusFilter]) {
-                    query = query.eq("status", statusMap[statusFilter]);
+                if (search) {
+                    const searchTerm = `%${search}%`;
+                    query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},employee_no.ilike.${searchTerm}`);
                 }
-            }
 
-            if (dependencyId) {
-                query = query.eq("dependency_id", dependencyId);
-            }
-
-            const { data, error } = await query.order("first_name", { ascending: true });
-
-            if (error) throw error;
-
-            return (data || []).map(p => {
-                const activeCards = (p.cards || []).filter((c: any) => c.status === "active");
-                const hasActiveCards = activeCards.length > 0;
-                let displayStatus = "Baja";
-
-                if (p.status === "active") {
-                    if (!hasActiveCards) {
-                        displayStatus = "Inactivo/a";
-                    } else {
-                        const readyCards = activeCards.filter(
-                            (c: any) => c.programming_status === "done" && (c.responsiva_status === "signed" || c.responsiva_status === "legacy")
-                        );
-                        if (readyCards.length === activeCards.length) {
-                            displayStatus = "Activo/a";
-                        } else if (readyCards.length > 0) {
-                            displayStatus = "Parcial";
-                        } else {
-                            displayStatus = "Inactivo/a";
-                        }
+                if (statusFilter !== "Todos") {
+                    const statusMap: Record<string, string> = {
+                        "Activo/a": "active",
+                        "Parcial": "partial",
+                        "Inactivo/a": "inactive",
+                        "Bloqueado/a": "blocked",
+                        "Baja": "deleted"
+                    };
+                    if (statusMap[statusFilter]) {
+                        query = query.eq("status", statusMap[statusFilter]);
                     }
-                } else if (p.status === "blocked") {
-                    displayStatus = "Bloqueado/a";
                 }
 
-                return {
-                    id: p.id,
-                    first_name: p.first_name,
-                    last_name: p.last_name,
-                    name: `${p.first_name} ${p.last_name}`,
-                    employee_no: p.employee_no,
-                    email: p.email,
-                    area: p.area,
-                    position: p.position,
-                    floor: p.floor,
-                    building: p.buildings?.name || "N/A",
-                    dependency: p.dependencies?.name || "N/A",
-                    schedule: p.schedules ? {
-                        days: p.schedules.name,
-                        entry: p.entry_time || p.schedules.default_entry || "09:00",
-                        exit: p.exit_time || p.schedules.default_exit || "18:00"
-                    } : null,
-                    status_raw: p.status,
-                    status: displayStatus,
-                    cards: p.cards || [],
-                    floors_p2000: p.floors_p2000 || [],
-                    floors_kone: p.floors_kone || [],
-                    specialAccesses: p.special_accesses || []
-                } as Person;
-            });
+                if (dependencyId) {
+                    query = query.eq("dependency_id", dependencyId);
+                }
+
+                const { data, error } = await query
+                    .order("first_name", { ascending: true })
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    allData.push(...data.map(p => mapPersonRecord(p)));
+                    page++;
+                    if (data.length < pageSize) {
+                        hasMore = false;
+                    }
+                } else {
+                    hasMore = false;
+                }
+            }
+
+            return allData;
         } catch (error) {
             handleError(error, "Fetch Personnel for Export");
             return [];
@@ -199,55 +167,7 @@ export const personnelService = {
             if (error) throw error;
             if (!data) return null;
 
-            // Map single person (reuse logic if possible, but distinct here for simplicity)
-            const p = data;
-            const activeCards = (p.cards || []).filter((c: any) => c.status === "active");
-            const hasActiveCards = activeCards.length > 0;
-            let displayStatus = "Baja";
-
-            if (p.status === "active") {
-                if (!hasActiveCards) {
-                    displayStatus = "Inactivo/a";
-                } else {
-                    const readyCards = activeCards.filter(
-                        (c: any) => c.programming_status === "done" && (c.responsiva_status === "signed" || c.responsiva_status === "legacy")
-                    );
-                    if (readyCards.length === activeCards.length) {
-                        displayStatus = "Activo/a";
-                    } else if (readyCards.length > 0) {
-                        displayStatus = "Parcial";
-                    } else {
-                        displayStatus = "Inactivo/a";
-                    }
-                }
-            } else if (p.status === "blocked") {
-                displayStatus = "Bloqueado/a";
-            }
-
-            return {
-                id: p.id,
-                first_name: p.first_name,
-                last_name: p.last_name,
-                name: `${p.first_name} ${p.last_name}`,
-                employee_no: p.employee_no,
-                email: p.email,
-                area: p.area,
-                position: p.position,
-                floor: p.floor,
-                building: p.buildings?.name || "N/A",
-                dependency: p.dependencies?.name || "N/A",
-                schedule: p.schedules ? {
-                    days: p.schedules.name,
-                    entry: p.entry_time || p.schedules.default_entry || "09:00",
-                    exit: p.exit_time || p.schedules.default_exit || "18:00"
-                } : null,
-                status_raw: p.status,
-                status: displayStatus,
-                cards: p.cards || [],
-                floors_p2000: p.floors_p2000 || [],
-                floors_kone: p.floors_kone || [],
-                specialAccesses: p.special_accesses || []
-            } as Person;
+            return mapPersonRecord(data);
         } catch (error) {
             handleError(error, "Fetch Person By ID");
             return null;
@@ -348,6 +268,7 @@ export const personnelService = {
         }
     }
 };
+
 
 export const catalogService = {
     // --- Fetch ---

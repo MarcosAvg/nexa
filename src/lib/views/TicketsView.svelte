@@ -104,10 +104,20 @@
         });
     });
 
-    let availableTypes = $derived.by(() => {
-        const types = new Set(pendingItems.map((t) => t.type));
-        return ["Todos", ...Array.from(types)].sort();
-    });
+    const ticketTypes = [
+        "Todos",
+        "Programación",
+        "Firma Responsiva",
+        "Modificación de datos",
+        "Solicitud de acceso",
+        "Reposición",
+        "Bloqueo de tarjeta",
+        "Baja de tarjeta",
+        "Bloqueo de persona",
+        "Baja de Persona",
+        "Reporte de Fallo",
+        "Otro",
+    ];
 
     import { onMount } from "svelte";
 
@@ -218,9 +228,9 @@
             >
                 <!-- Type Filters -->
                 <div class="w-full xl:w-auto">
-                    <FilterGroup
+                    <FilterSelect
                         label="Tipo"
-                        options={availableTypes}
+                        options={ticketTypes}
                         bind:value={typeFilter}
                     />
                 </div>

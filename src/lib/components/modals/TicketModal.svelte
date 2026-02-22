@@ -72,7 +72,7 @@
         "Baja de tarjeta",
         "Bloqueo de persona",
         "Baja de Persona",
-        "Reposicion",
+        "Reposición",
         "Reporte de Fallo",
         "Otro",
     ];

@@ -15,7 +15,7 @@
 </script>
 
 <div
-    class="bg-white/80 backdrop-blur-md p-5 lg:p-7 rounded-[22px] border border-slate-200/50 shadow-sm transition-all duration-300 hover:shadow-md"
+    class="relative z-30 bg-white/80 backdrop-blur-md p-5 lg:p-7 rounded-[22px] border border-slate-200/50 shadow-sm transition-all duration-300 hover:shadow-md"
 >
     <div class="flex flex-col gap-4 sm:gap-6">
         <!-- Title row with search and actions -->
@@ -65,7 +65,7 @@
             </div>
 
             <div
-                class="flex items-center gap-2 sm:gap-3 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0 no-scrollbar"
+                class="flex items-center gap-2 sm:gap-3 pb-1 sm:pb-0 no-scrollbar overflow-visible"
             >
                 {#if actions}
                     <div

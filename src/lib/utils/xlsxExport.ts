@@ -30,12 +30,12 @@ export interface ExportOptions {
         status?: string;
         dependency?: string;
         search?: string;
-    }
+    },
+    splitByDependency?: boolean;
 }
 
 export async function exportPersonnelToExcel(data: ExportPersonnelData[], options?: ExportOptions) {
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Directorio');
 
     // Helper Colors
     const COLORS = {
@@ -51,7 +51,210 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         emerald: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
     };
 
-    // Construct Dynamic Title and Filename
+    // Helper to add a sheet with data
+    const addDataSheet = async (sheetName: string, sheetData: ExportPersonnelData[], filterInfo: string) => {
+        // Excel sheet names limit: 31 chars, no special chars : \ / ? * [ ]
+        const safeName = sheetName.replace(/[:\\/?*[\]]/g, '').substring(0, 31) || 'Hoja';
+        const worksheet = workbook.addWorksheet(safeName);
+
+        worksheet.columns = [
+            { key: 'last_name', width: 25 },
+            { key: 'first_name', width: 25 },
+            { key: 'employee_no', width: 15 },
+            { key: 'building', width: 22 },
+            { key: 'dependency', width: 28 },
+            { key: 'area', width: 22 },
+            { key: 'position', width: 28 },
+            { key: 'floor', width: 12 },
+            { key: 'folioP2000', width: 20 },
+            { key: 'pisosP2000Text', width: 25 },
+            { key: 'folioKone', width: 22 },
+            { key: 'pisosKoneText', width: 25 },
+            { key: 'status', width: 15 },
+            { key: 'specialAccessesText', width: 28 },
+            { key: 'days', width: 22 },
+            { key: 'entry', width: 14 },
+            { key: 'exit', width: 14 },
+            { key: 'email', width: 35 },
+        ];
+
+        // Row 1: Header + Logo
+        worksheet.mergeCells('A1:R1');
+        const titleCell = worksheet.getCell('A1');
+        titleCell.value = `       DIRECTORIO DE PERSONAL - NEXA${filterInfo}`;
+        titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
+        titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
+        worksheet.getRow(1).height = 40;
+
+        try {
+            const response = await fetch('/favicon.svg');
+            if (response.ok) {
+                const blob = await response.blob();
+                const buffer = await blob.arrayBuffer();
+                const imageId = workbook.addImage({ buffer: buffer, extension: 'svg' as any });
+                worksheet.addImage(imageId, {
+                    tl: { col: 0.15, row: 0.2 },
+                    ext: { width: 32, height: 32 }
+                });
+            }
+        } catch (e) {
+            console.warn('Logo load failed');
+        }
+
+        // Row 2: Meta
+        worksheet.mergeCells('A2:R2');
+        const metaCell = worksheet.getCell('A2');
+        const dateStr = new Date().toLocaleDateString('es-MX', {
+            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+        metaCell.value = `Reporte generado: ${dateStr}  |  Registros en esta hoja: ${sheetData.length}`;
+        metaCell.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
+        metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
+        worksheet.getRow(2).height = 20;
+
+        // Row 3: Super-Headers
+        const groups = [
+            { label: 'DATOS PERSONALES', range: 'A3:C3', colors: COLORS.personal },
+            { label: 'UBICACIÓN Y PUESTO', range: 'D3:H3', colors: COLORS.location },
+            { label: 'ACCESO PUERTAS (P2000)', range: 'I3:J3', colors: COLORS.amber },
+            { label: 'ACCESO ELEVADORES (KONE)', range: 'K3:L3', colors: COLORS.sky },
+            { label: 'ESTADO', range: 'M3:M3', colors: COLORS.status },
+            { label: 'ADICIONALES', range: 'N3:N3', colors: COLORS.additional },
+            { label: 'JORNADA LABORAL', range: 'O3:Q3', colors: COLORS.emerald },
+            { label: 'CONTACTO', range: 'R3:R3', colors: COLORS.personal }
+        ];
+
+        groups.forEach(group => {
+            worksheet.mergeCells(group.range);
+            const cell = worksheet.getCell(group.range.split(':')[0]);
+            cell.value = group.label;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.head } };
+            cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: group.colors.sub } };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.border = {
+                top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                right: { style: 'medium', color: { argb: COLORS.separator } }
+            };
+        });
+
+        // Row 4: Sub-Headers
+        const headerRow = worksheet.getRow(4);
+        headerRow.height = 30;
+        const headerLabels = [
+            'APELLIDOS', 'NOMBRES', 'NO. EMPLEADO', 'EDIFICIO', 'DEPENDENCIA', 'EQUIPO', 'PUESTO', 'PISO BASE',
+            'FOLIO ACCESO', 'PISOS ASIGNADOS', 'FOLIO ACCESO', 'PISOS ASIGNADOS', 'ESTADO', 'ACCESOS ESPECIALES',
+            'DIAS LABORALES', 'ENTRADA', 'SALIDA', 'CORREO ELECTRÓNICO'
+        ];
+
+        headerLabels.forEach((label, i) => {
+            const cell = headerRow.getCell(i + 1);
+            cell.value = label;
+            const group = groups.find(g => {
+                const col = String.fromCharCode(65 + i);
+                const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
+                return col >= (start || 'A') && col <= (end || start || 'A');
+            }) || groups[0];
+
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
+            cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+            const isGroupEnd = [3, 8, 10, 12, 13, 14, 17, 18].includes(i + 1);
+            cell.border = {
+                bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
+                right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFFFFFFF' } }
+            };
+        });
+
+        // Data Rows
+        sheetData.forEach((person) => {
+            const folioP2000 = person.cards?.filter(c => c.type.toUpperCase() === 'P2000').map(c => c.folio).join(', ') || '-';
+            const folioKone = person.cards?.filter(c => c.type.toUpperCase() === 'KONE').map(c => c.folio).join(', ') || '-';
+
+            const rowData = {
+                last_name: person.last_name || '-',
+                first_name: person.first_name || '-',
+                employee_no: person.employee_no || '-',
+                building: person.building || '-',
+                dependency: person.dependency || '-',
+                area: person.area || '-',
+                position: person.position || '-',
+                floor: person.floor || '-',
+                folioP2000,
+                pisosP2000Text: person.floors_p2000?.join(', ') || '-',
+                folioKone,
+                pisosKoneText: person.floors_kone?.join(', ') || '-',
+                status: person.status || '-',
+                specialAccessesText: person.specialAccesses?.join(', ') || '-',
+                days: person.schedule?.days || '-',
+                entry: person.schedule?.entry || '-',
+                exit: person.schedule?.exit || '-',
+                email: person.email || '-'
+            };
+
+            const row = worksheet.addRow(rowData);
+            row.height = 24;
+
+            const isInactive = person.status === 'Baja' || person.status === 'Inactivo/a';
+
+            row.eachCell((cell, colNumber) => {
+                const colLetter = String.fromCharCode(64 + colNumber);
+                const group = groups.find(g => {
+                    const parts = g.range.replace(/[0-9]/g, '').split(':');
+                    return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
+                }) || groups[0];
+
+                cell.font = {
+                    name: 'Arial', size: 9,
+                    color: { argb: isInactive ? 'FF64748B' : 'FF111827' },
+                    italic: isInactive
+                };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+                if (isInactive) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+                } else {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
+                }
+
+                const isGroupEnd = [3, 8, 10, 12, 13, 14, 17, 18].includes(colNumber);
+                cell.border = {
+                    bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                    right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFCBD5E1' } }
+                };
+
+                if (cell.value === '-' || cell.value === 'N/A' || !cell.value) {
+                    cell.value = '[SIN DATO]';
+                    cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, italic: true };
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFFEE2E2' } // Light red background for missing data
+                    };
+                }
+            });
+
+            // Status Colors (Subtle: light background, dark text)
+            const statusCell = row.getCell('status');
+            if (person.status === 'Activo/a' && !isInactive) {
+                statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; // light-green-100
+                statusCell.font = { color: { argb: 'FF166534' }, bold: true, name: 'Arial', size: 9 };   // dark-green-800
+            } else if (person.status === 'Bloqueado/a') {
+                statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; // light-red-100
+                statusCell.font = { color: { argb: 'FF991B1B' }, bold: true, name: 'Arial', size: 9 };   // dark-red-800
+            } else if (isInactive) {
+                statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } }; // slate-100
+                statusCell.font = { color: { argb: 'FF475569' }, italic: true, name: 'Arial', size: 9 }; // slate-600
+            }
+        });
+
+        worksheet.autoFilter = 'A4:R4';
+        worksheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 4 }];
+    };
+
+    // Construct Dynamic Filter Description
     let filterDescription = '';
     let fileNameParts: string[] = ['Directorio'];
 
@@ -77,201 +280,25 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         }
     }
 
-    worksheet.columns = [
-        { key: 'last_name', width: 25 },
-        { key: 'first_name', width: 25 },
-        { key: 'employee_no', width: 15 },
-        { key: 'building', width: 22 },
-        { key: 'dependency', width: 28 },
-        { key: 'area', width: 22 },
-        { key: 'position', width: 28 },
-        { key: 'floor', width: 12 },
-        { key: 'folioP2000', width: 20 },
-        { key: 'pisosP2000Text', width: 25 },
-        { key: 'folioKone', width: 22 },
-        { key: 'pisosKoneText', width: 25 },
-        { key: 'status', width: 15 },
-        { key: 'specialAccessesText', width: 28 },
-        { key: 'days', width: 22 },
-        { key: 'entry', width: 14 },
-        { key: 'exit', width: 14 },
-        { key: 'email', width: 35 },
-    ];
-
-    // Row 1: Header + Logo
-    worksheet.mergeCells('A1:R1');
-    const titleCell = worksheet.getCell('A1');
-    titleCell.value = `       DIRECTORIO DE PERSONAL - NEXA${filterDescription}`;
-    titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
-    titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
-    worksheet.getRow(1).height = 40;
-
-    try {
-        const response = await fetch('/favicon.svg');
-        if (response.ok) {
-            const blob = await response.blob();
-            const buffer = await blob.arrayBuffer();
-            const imageId = workbook.addImage({ buffer: buffer, extension: 'svg' as any });
-            worksheet.addImage(imageId, {
-                tl: { col: 0.15, row: 0.2 },
-                ext: { width: 32, height: 32 }
-            });
-        }
-    } catch (e) {
-        console.warn('Logo load failed');
-    }
-
-    // Row 2: Meta
-    worksheet.mergeCells('A2:R2');
-    const metaCell = worksheet.getCell('A2');
-    const dateStr = new Date().toLocaleDateString('es-MX', {
-        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
-    metaCell.value = `Reporte generado: ${dateStr}  |  Registros: ${data.length}`;
-    metaCell.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
-    metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
-    worksheet.getRow(2).height = 20;
-
-    // Row 3: Super-Headers
-    const groups = [
-        { label: 'DATOS PERSONALES', range: 'A3:C3', colors: COLORS.personal },
-        { label: 'UBICACIÓN Y PUESTO', range: 'D3:H3', colors: COLORS.location },
-        { label: 'ACCESO PUERTAS (P2000)', range: 'I3:J3', colors: COLORS.amber },
-        { label: 'ACCESO ELEVADORES (KONE)', range: 'K3:L3', colors: COLORS.sky },
-        { label: 'ESTADO', range: 'M3:M3', colors: COLORS.status },
-        { label: 'ADICIONALES', range: 'N3:N3', colors: COLORS.additional },
-        { label: 'JORNADA LABORAL', range: 'O3:Q3', colors: COLORS.emerald },
-        { label: 'CONTACTO', range: 'R3:R3', colors: COLORS.personal }
-    ];
-
-    groups.forEach(group => {
-        worksheet.mergeCells(group.range);
-        const cell = worksheet.getCell(group.range.split(':')[0]);
-        cell.value = group.label;
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.head } };
-        cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: group.colors.sub } };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        cell.border = {
-            top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-            left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-            bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-            right: { style: 'medium', color: { argb: COLORS.separator } }
-        };
-    });
-
-    // Row 4: Sub-Headers
-    const headerRow = worksheet.getRow(4);
-    headerRow.height = 30;
-    const headerLabels = [
-        'APELLIDOS', 'NOMBRES', 'NO. EMPLEADO', 'EDIFICIO', 'DEPENDENCIA', 'EQUIPO', 'PUESTO', 'PISO BASE',
-        'FOLIO ACCESO', 'PISOS ASIGNADOS', 'FOLIO ACCESO', 'PISOS ASIGNADOS', 'ESTADO', 'ACCESOS ESPECIALES',
-        'DIAS LABORALES', 'ENTRADA', 'SALIDA', 'CORREO ELECTRÓNICO'
-    ];
-
-    headerLabels.forEach((label, i) => {
-        const cell = headerRow.getCell(i + 1);
-        cell.value = label;
-        const group = groups.find(g => {
-            const col = String.fromCharCode(65 + i);
-            const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
-            return col >= (start || 'A') && col <= (end || start || 'A');
-        }) || groups[0];
-
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
-        cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
-        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-
-        const isGroupEnd = [3, 8, 10, 12, 13, 14, 17, 18].includes(i + 1);
-        cell.border = {
-            bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
-            right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFFFFFFF' } }
-        };
-    });
-
-    // Data Rows
-    data.forEach((person, index) => {
-        const folioP2000 = person.cards?.filter(c => c.type.toUpperCase() === 'P2000').map(c => c.folio).join(', ') || '-';
-        const folioKone = person.cards?.filter(c => c.type.toUpperCase() === 'KONE').map(c => c.folio).join(', ') || '-';
-
-        const rowData = {
-            last_name: person.last_name || '-',
-            first_name: person.first_name || '-',
-            employee_no: person.employee_no || '-',
-            building: person.building || '-',
-            dependency: person.dependency || '-',
-            area: person.area || '-',
-            position: person.position || '-',
-            floor: person.floor || '-',
-            folioP2000,
-            pisosP2000Text: person.floors_p2000?.join(', ') || '-',
-            folioKone,
-            pisosKoneText: person.floors_kone?.join(', ') || '-',
-            status: person.status || '-',
-            specialAccessesText: person.specialAccesses?.join(', ') || '-',
-            days: person.schedule?.days || '-',
-            entry: person.schedule?.entry || '-',
-            exit: person.schedule?.exit || '-',
-            email: person.email || '-'
-        };
-
-        const row = worksheet.addRow(rowData);
-        row.height = 24;
-
-        const isInactive = person.status === 'Baja' || person.status === 'Inactivo/a';
-
-        row.eachCell((cell, colNumber) => {
-            const colLetter = String.fromCharCode(64 + colNumber);
-            const group = groups.find(g => {
-                const parts = g.range.replace(/[0-9]/g, '').split(':');
-                return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
-            }) || groups[0];
-
-            cell.font = {
-                name: 'Arial', size: 9,
-                color: { argb: isInactive ? 'FF64748B' : 'FF111827' },
-                italic: isInactive
-            };
-            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-
-            if (isInactive) {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-            } else {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
-            }
-
-            const isGroupEnd = [3, 8, 10, 12, 13, 14, 17, 18].includes(colNumber);
-            cell.border = {
-                bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-                right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFCBD5E1' } }
-            };
-
-            if (cell.value === '-' || cell.value === 'N/A' || !cell.value) {
-                cell.value = '[SIN DATO]';
-                cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, italic: true };
-                cell.fill = {
-                    type: 'pattern',
-                    pattern: 'solid',
-                    fgColor: { argb: 'FFFEE2E2' } // Light red background for missing data
-                };
-            }
+    if (options?.splitByDependency) {
+        // Group data by dependency
+        const groupedData: Record<string, ExportPersonnelData[]> = {};
+        data.forEach(person => {
+            const dep = person.dependency || 'Sin Dependencia';
+            if (!groupedData[dep]) groupedData[dep] = [];
+            groupedData[dep].push(person);
         });
 
-        // Status Colors (Subtle: light background, dark text)
-        const statusCell = row.getCell('status');
-        if (person.status === 'Activo/a' && !isInactive) {
-            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; // light-green-100
-            statusCell.font = { color: { argb: 'FF166534' }, bold: true, name: 'Arial', size: 9 };   // dark-green-800
-        } else if (person.status === 'Bloqueado/a') {
-            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; // light-red-100
-            statusCell.font = { color: { argb: 'FF991B1B' }, bold: true, name: 'Arial', size: 9 };   // dark-red-800
-        } else if (isInactive) {
-            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } }; // slate-100
-            statusCell.font = { color: { argb: 'FF475569' }, italic: true, name: 'Arial', size: 9 }; // slate-600
+        // Add a sheet for each dependency
+        const deps = Object.keys(groupedData).sort();
+        for (const dep of deps) {
+            await addDataSheet(dep, groupedData[dep], filterDescription);
         }
-    });
-
-    worksheet.autoFilter = 'A4:R4';
-    worksheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 4 }];
+        fileNameParts.push('Por_Dependencia');
+    } else {
+        // Just one sheet as before
+        await addDataSheet('Directorio', data, filterDescription);
+    }
 
     // Filename construction
     const finalFileName = `${fileNameParts.join('_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
