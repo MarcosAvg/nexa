@@ -56,6 +56,51 @@ export const ticketService = {
         }
     },
 
+    async createBatch(
+        tickets: { type: string; title: string; description: string; priority: string; payload: Record<string, string> }[]
+    ): Promise<{ created: number; errors: { index: number; message: string }[] }> {
+        const errors: { index: number; message: string }[] = [];
+        let created = 0;
+
+        const payloads = tickets.map(t => ({
+            type: t.type,
+            title: t.title,
+            description: t.description,
+            priority: t.priority.toLowerCase(),
+            status: 'pending',
+            person_id: null,
+            card_id: null,
+            payload: t.payload,
+        }));
+
+        try {
+            const { data: newTickets, error } = await supabase
+                .from('tickets')
+                .insert(payloads)
+                .select();
+
+            if (error) throw error;
+
+            created = newTickets?.length ?? 0;
+
+            // Single history log for the whole import
+            if (created > 0) {
+                await HistoryService.log('TICKET', newTickets![0].id, 'CREATE', {
+                    message: `Importación masiva: ${created} ticket(s) creados desde plantilla Excel`,
+                });
+            }
+
+            // Refresh store
+            const fresh = await ticketService.fetchAll();
+            ticketState.setTickets(fresh);
+        } catch (err: any) {
+            tickets.forEach((_, i) => errors.push({ index: i, message: err?.message ?? 'Error desconocido' }));
+        }
+
+        return { created, errors };
+    },
+
+
     async delete(id: number, reason?: string) {
         try {
             // Log deletion/completion BEFORE removing data

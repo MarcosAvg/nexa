@@ -15,11 +15,12 @@
     import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
     import ModificationCompareModal from "../components/modals/ModificationCompareModal.svelte";
     import ManualTicketDetailsModal from "../components/modals/ManualTicketDetailsModal.svelte";
-    import { Search, Plus } from "lucide-svelte";
+    import { Search, Plus, FileSpreadsheet } from "lucide-svelte";
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
     import { personnelService } from "../services/personnel";
     import { toast } from "svelte-sonner";
+    import ImportPreviewModal from "../components/modals/ImportPreviewModal.svelte";
 
     let pendingItems = $derived(ticketState.pendingItems);
 
@@ -35,6 +36,9 @@
     // Manual Details State
     let isManualDetailsOpen = $state(false);
     let manualTicket = $state<any>(null);
+
+    // Import modal
+    let isImportOpen = $state(false);
 
     // Confirmation States
     let isConfirm1Open = $state(false);
@@ -252,6 +256,14 @@
 
         {#snippet actions()}
             <Button
+                variant="outline"
+                onclick={() => (isImportOpen = true)}
+                class="flex items-center gap-2 h-10 px-4 border-slate-300"
+            >
+                <FileSpreadsheet size={16} />
+                Importar Plantilla
+            </Button>
+            <Button
                 variant="primary"
                 onclick={onOpenAddTicket}
                 class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
@@ -314,3 +326,5 @@
     ticket={compareTicket}
     onComplete={refreshData}
 />
+
+<ImportPreviewModal bind:isOpen={isImportOpen} onComplete={refreshData} />
