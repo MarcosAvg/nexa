@@ -124,6 +124,14 @@
         return currentVal !== modifiedVal && modifiedVal !== "—";
     }
 
+    function normalizeTime(time: string): string {
+        if (!time || time === "—") return "—";
+        // Si ya tiene el formato HH:MM:SS lo dejamos igual, si es HH:MM le agregamos :00
+        const parts = time.split(":");
+        if (parts.length === 2) return `${time}:00`;
+        return time;
+    }
+
     // Floor array comparison helpers
     function getFloorChanges(
         currentFloors: string[],
@@ -153,16 +161,19 @@
 
     // Schedule comparison
     function getCurrentScheduleEntry(): string {
-        return currentPerson?.schedule?.entry || "—";
+        return normalizeTime(currentPerson?.schedule?.entry || "—");
     }
     function getCurrentScheduleExit(): string {
-        return currentPerson?.schedule?.exit || "—";
+        return normalizeTime(currentPerson?.schedule?.exit || "—");
     }
     function getModifiedEntry(): string {
-        return modifiedData?.entry_time || modifiedData?.horaEntrada || "—";
+        const val =
+            modifiedData?.entry_time || modifiedData?.horaEntrada || "—";
+        return normalizeTime(String(val));
     }
     function getModifiedExit(): string {
-        return modifiedData?.exit_time || modifiedData?.horaSalida || "—";
+        const val = modifiedData?.exit_time || modifiedData?.horaSalida || "—";
+        return normalizeTime(String(val));
     }
 
     // Special Access Comparison State

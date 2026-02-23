@@ -654,31 +654,45 @@
                             <CreditCard size={16} />
                         </div>
                         <div class="flex-1 min-w-0">
-                            <p class="text-sm font-bold text-slate-800">
-                                {check.card.type} — {check.card.folio ?? "—"}
-                            </p>
-                            {#if check.warning}
-                                <p
-                                    class="text-xs text-amber-700 flex items-center gap-1 mt-0.5"
+                            <div class="flex items-center gap-2 mb-0.5">
+                                <span
+                                    class="text-[10px] font-black text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded tracking-wider"
+                                    >{check.card.type}</span
                                 >
-                                    <AlertTriangle size={11} />
-                                    {#if !check.card.id}
-                                        No hay tarjeta {check.card.type} activa asignada.
-                                    {:else}
-                                        Folio en plantilla (<strong
-                                            >{check.card.type === "P2000"
-                                                ? p.folio_p2000
-                                                : p.folio_kone}</strong
-                                        >) no coincide con la tarjeta asignada (<strong
-                                            >{check.card.folio}</strong
-                                        >). Verifique antes de continuar.
-                                    {/if}
-                                </p>
+                                <span
+                                    class="text-sm font-semibold text-slate-700 truncate"
+                                    >{check.card.folio ?? "—"}</span
+                                >
+                            </div>
+                            {#if check.warning}
+                                <div
+                                    class="text-xs text-amber-700 flex items-start gap-2 mt-1"
+                                >
+                                    <AlertTriangle
+                                        size={14}
+                                        class="shrink-0 mt-0.5"
+                                    />
+                                    <div class="leading-snug">
+                                        {#if !check.card.id}
+                                            No hay tarjeta {check.card.type} activa
+                                            asignada.
+                                        {:else}
+                                            Folio en plantilla (<strong
+                                                >{check.card.type === "P2000"
+                                                    ? p.folio_p2000
+                                                    : p.folio_kone}</strong
+                                            >) no coincide con la tarjeta
+                                            asignada (<strong
+                                                >{check.card.folio}</strong
+                                            >). Verifique antes de continuar.
+                                        {/if}
+                                    </div>
+                                </div>
                             {:else}
                                 <p
-                                    class="text-xs text-emerald-600 flex items-center gap-1"
+                                    class="text-xs text-emerald-600 flex items-center gap-1.5 mt-0.5 font-medium"
                                 >
-                                    <CheckCircle2 size={11} /> Folio coincide correctamente.
+                                    <CheckCircle2 size={13} /> Folio coincide correctamente.
                                 </p>
                             {/if}
                         </div>
