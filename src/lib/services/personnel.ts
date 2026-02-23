@@ -254,6 +254,55 @@ export const personnelService = {
         }
     },
 
+    /** Search personnel by apellidos and/or nombres (case-insensitive ilike).
+     * Returns all candidates ordered by last_name. Caller decides how to handle 0/1/many results. */
+    async searchByName(apellidos: string, nombres: string): Promise<Person[]> {
+        try {
+            let query = supabase
+                .from("personnel")
+                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+
+            if (apellidos) query = query.ilike("last_name", `%${apellidos.trim()}%`);
+            if (nombres) query = query.ilike("first_name", `%${nombres.trim()}%`);
+
+            const { data, error } = await query
+                .neq("status", "deleted")
+                .order("last_name", { ascending: true })
+                .limit(10);
+
+            if (error) throw error;
+
+            return (data || []).map((p: any) => ({
+                id: p.id,
+                first_name: p.first_name,
+                last_name: p.last_name,
+                name: `${p.first_name} ${p.last_name}`,
+                employee_no: p.employee_no,
+                email: p.email,
+                area: p.area,
+                position: p.position,
+                floor: p.floor,
+                building: p.buildings?.name || "N/A",
+                dependency: p.dependencies?.name || "N/A",
+                building_id: p.building_id,
+                dependency_id: p.dependency_id,
+                schedule: p.schedules ? {
+                    days: p.schedules.name,
+                    entry: p.entry_time || p.schedules.default_entry || "09:00",
+                    exit: p.exit_time || p.schedules.default_exit || "18:00"
+                } : null,
+                status_raw: p.status,
+                status: p.status,
+                cards: p.cards || [],
+                floors_p2000: p.floors_p2000 || [],
+                floors_kone: p.floors_kone || [],
+                specialAccesses: p.special_accesses || []
+            } as Person));
+        } catch (error) {
+            handleError(error, "Search Personnel by Name");
+            return [];
+        }
+    },
 
     async save(data: any) {
         try {

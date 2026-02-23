@@ -357,10 +357,12 @@
                 <div class="space-y-4">
                     <div class="space-y-2">
                         <label
+                            for="notListedPersonName"
                             class="text-xs font-bold text-slate-600 block pl-1"
                             >Nombre Completo</label
                         >
                         <Input
+                            id="notListedPersonName"
                             placeholder="Nombre de la persona..."
                             bind:value={formData.notListedPersonName}
                         />
@@ -369,20 +371,24 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-2">
                             <label
+                                for="notListedPersonEmployeeNo"
                                 class="text-xs font-bold text-slate-600 block pl-1"
                                 >No. Empleado</label
                             >
                             <Input
+                                id="notListedPersonEmployeeNo"
                                 placeholder="Ej: 12345"
                                 bind:value={formData.notListedPersonEmployeeNo}
                             />
                         </div>
                         <div class="space-y-2">
                             <label
+                                for="notListedPersonDependency"
                                 class="text-xs font-bold text-slate-600 block pl-1"
                                 >Dependencia</label
                             >
                             <Select
+                                id="notListedPersonDependency"
                                 bind:value={formData.notListedPersonDependency}
                             >
                                 <option value="">Seleccione...</option>

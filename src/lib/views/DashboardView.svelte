@@ -23,7 +23,7 @@
     let rawPendingItems = $derived(ticketState.pendingItems);
     let personnel = $derived(personnelState.personnel);
     let extraCards = $derived(personnelState.extraCards);
-    let filteredHistoryLogs = $derived(historyState.filteredHistoryLogs);
+    let filteredHistoryLogs = $derived(historyState.historyLogs);
 
     let pendingItems = $derived(
         rawPendingItems.map((t) => {
@@ -88,7 +88,7 @@
     } from "../constants/history";
 
     let recentActivity = $derived(
-        (filteredHistoryLogs || []).slice(0, 5).map((log) => {
+        (filteredHistoryLogs || []).slice(0, 5).map((log: any) => {
             const message =
                 log.details?.message ||
                 (typeof log.details === "string"

@@ -19,6 +19,8 @@
         mode?: "assign" | "inventory";
         availableCards?: any[]; // Legacy prop
         replacingCard?: { type: string; folio: string; id: string } | null;
+        /** If set, only these card types are selectable (e.g. ['P2000']) */
+        allowedCardTypes?: string[] | null;
         onSave?: (
             card: { type: string; folio: string },
             replacementOptions?: { oldCardStatus: string },
@@ -30,6 +32,7 @@
         isOpen = $bindable(),
         mode = "assign",
         replacingCard = null,
+        allowedCardTypes = null,
         onSave,
         onclose,
     }: Props = $props();
@@ -43,10 +46,12 @@
     let confirmCreate = $state(false);
     let oldCardStatus = $state("blocked"); // blocked | available
 
-    // Sync card type when replacing
+    // Sync card type when replacing or when allowedCardTypes restricts to one type
     $effect(() => {
         if (replacingCard) {
             cardType = replacingCard.type as "P2000" | "KONE";
+        } else if (allowedCardTypes?.length === 1) {
+            cardType = allowedCardTypes[0] as "P2000" | "KONE";
         }
     });
 

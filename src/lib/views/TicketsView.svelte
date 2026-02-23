@@ -21,6 +21,8 @@
     import { personnelService } from "../services/personnel";
     import { toast } from "svelte-sonner";
     import ImportPreviewModal from "../components/modals/ImportPreviewModal.svelte";
+    import ConfirmAltaModal from "../components/modals/ConfirmAltaModal.svelte";
+    import TicketImportedDetailsModal from "../components/modals/TicketImportedDetailsModal.svelte";
 
     let pendingItems = $derived(ticketState.pendingItems);
 
@@ -39,6 +41,12 @@
 
     // Import modal
     let isImportOpen = $state(false);
+
+    // Smart ticket modals (from plantilla import)
+    let isAltaOpen = $state(false);
+    let altaTicket = $state<any>(null);
+    let isImportedOpen = $state(false);
+    let importedTicket = $state<any>(null);
 
     // Confirmation States
     let isConfirm1Open = $state(false);
@@ -136,14 +144,35 @@
     });
 
     // Handlers
+    const IMPORTED_TYPES = new Set([
+        "Alta de Persona",
+        "Modificación",
+        "Baja de Persona",
+        "Reposición",
+        "Reporte de Falla",
+    ]);
+
     function onManageTicket(ticket: any) {
+        // Route imported ticket types to dedicated modals
+        if (ticket.type === "Alta de Persona") {
+            altaTicket = ticket;
+            isAltaOpen = true;
+            return;
+        }
+        if (
+            IMPORTED_TYPES.has(ticket.type) &&
+            ticket.type !== "Alta de Persona"
+        ) {
+            importedTicket = ticket;
+            isImportedOpen = true;
+            return;
+        }
         if (ticket.type === "Modificación de datos") {
             compareTicket = ticket;
             isCompareOpen = true;
             return;
         }
-
-        // Open Manual Details for review
+        // Default: manual details
         manualTicket = ticket;
         isManualDetailsOpen = true;
     }
@@ -328,3 +357,15 @@
 />
 
 <ImportPreviewModal bind:isOpen={isImportOpen} onComplete={refreshData} />
+
+<ConfirmAltaModal
+    bind:isOpen={isAltaOpen}
+    ticket={altaTicket}
+    onComplete={refreshData}
+/>
+
+<TicketImportedDetailsModal
+    bind:isOpen={isImportedOpen}
+    ticket={importedTicket}
+    onComplete={refreshData}
+/>

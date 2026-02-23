@@ -14,13 +14,42 @@
     import { toast } from "svelte-sonner";
     import type { Person } from "../../types";
 
+    import { type Snippet } from "svelte";
+
     let {
         isOpen = $bindable(false),
         editingPerson = null,
+        prefill = null,
+        allowedCardTypes = null,
+        headerContent,
+        leftFooterContent,
+        oncomplete,
         onclose,
     }: {
         isOpen: boolean;
         editingPerson?: Person | null;
+        /** Pre-fill form fields for a NEW person (no id) from an imported ticket */
+        prefill?: {
+            nombres?: string;
+            apellidos?: string;
+            noEmpleado?: string;
+            dependencia?: string;
+            edificio?: string;
+            pisoBase?: string;
+            area?: string;
+            puesto?: string;
+            horario?: string;
+            horaEntrada?: string;
+            horaSalida?: string;
+            correo?: string;
+            pisosP2000?: string[];
+            pisosKone?: string[];
+        } | null;
+        /** If set, only these card types can be added ('P2000', 'KONE') */
+        allowedCardTypes?: string[] | null;
+        headerContent?: Snippet;
+        leftFooterContent?: Snippet;
+        oncomplete?: () => void;
         onclose?: () => void;
     } = $props();
 
@@ -61,8 +90,8 @@
 
     // When building changes, reset floor selections
     $effect(() => {
-        if (edificio && !editingPerson) {
-            // Only reset if not loading initial data
+        if (edificio && !editingPerson && !prefill) {
+            // Only reset if not loading initial data (editing or prefilling)
             pisoBase = "";
             pisosP2000 = [];
             pisosKone = [];
@@ -123,7 +152,42 @@
                 tarjetasAsignadas = [...(editingPerson.cards || [])];
                 lastLoadedPersonId = editingPerson.id;
             });
-        } else if (isOpen && !editingPerson && lastLoadedPersonId !== "new") {
+        } else if (
+            isOpen &&
+            !editingPerson &&
+            prefill &&
+            lastLoadedPersonId !== "__prefill__"
+        ) {
+            // Pre-fill for a NEW person from an imported ticket
+            untrack(() => {
+                const cat = catalogState;
+                nombres = prefill.nombres ?? "";
+                apellidos = prefill.apellidos ?? "";
+                noEmpleado = prefill.noEmpleado ?? "";
+                dependency = prefill.dependencia ?? "";
+                edificio = prefill.edificio ?? "";
+                pisoBase = prefill.pisoBase ?? "";
+                areaEquipo = prefill.area ?? "";
+                puestoFuncion = prefill.puesto ?? "";
+                lastAutoAddedBase = pisoBase;
+
+                const schedObj = cat.schedules.find(
+                    (s) => s.name === prefill.horario,
+                );
+                diasHorario = schedObj ? prefill.horario! : "";
+                horaEntrada = prefill.horaEntrada ?? "08:00";
+                horaSalida = prefill.horaSalida ?? "17:00";
+                email = prefill.correo ?? "";
+                pisosP2000 = prefill.pisosP2000 ?? [];
+                pisosKone = prefill.pisosKone ?? [];
+                lastLoadedPersonId = "__prefill__";
+            });
+        } else if (
+            isOpen &&
+            !editingPerson &&
+            !prefill &&
+            lastLoadedPersonId !== "new"
+        ) {
             resetForm();
             lastLoadedPersonId = "new";
         } else if (!isOpen) {
@@ -213,6 +277,7 @@
                 toast.success("Personal Registrado");
             }
 
+            oncomplete?.();
             resetAndClose();
         } catch (e) {
             console.error(e);
@@ -270,6 +335,10 @@
             handleSave();
         }}
     >
+        {#if headerContent}
+            {@render headerContent()}
+        {/if}
+
         <!-- SECTION: Personal Info -->
         <fieldset
             class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
@@ -544,11 +613,30 @@
     </form>
 
     {#snippet footer()}
-        <Button variant="ghost" onclick={resetAndClose}>Cancelar</Button>
-        <Button variant="primary" onclick={handleSave} loading={isSubmitting}
-            >{editingPerson ? "Actualizar (Ticket)" : "Guardar Alta"}</Button
-        >
+        <div class="flex items-center justify-between w-full">
+            <div>
+                {#if leftFooterContent}
+                    {@render leftFooterContent()}
+                {/if}
+            </div>
+            <div class="flex items-center gap-2">
+                <Button variant="ghost" onclick={resetAndClose}>Cancelar</Button
+                >
+                <Button
+                    variant="primary"
+                    onclick={handleSave}
+                    loading={isSubmitting}
+                    >{editingPerson
+                        ? "Actualizar (Ticket)"
+                        : "Guardar Alta"}</Button
+                >
+            </div>
+        </div>
     {/snippet}
 </Modal>
 
-<AddCardModal bind:isOpen={isCardModalOpen} onSave={addCard} />
+<AddCardModal
+    bind:isOpen={isCardModalOpen}
+    onSave={addCard}
+    {allowedCardTypes}
+/>

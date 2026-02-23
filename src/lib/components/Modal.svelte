@@ -8,6 +8,7 @@
         description?: string;
         size?: "sm" | "md" | "lg" | "xl" | "full";
         showClose?: boolean;
+        zIndex?: string;
         children?: Snippet;
         footer?: Snippet;
         onclose?: () => void;
@@ -19,6 +20,7 @@
         description,
         size = "md",
         showClose = true,
+        zIndex = "z-50",
         children,
         footer,
         onclose,
@@ -48,14 +50,14 @@
     <!-- Backdrop -->
     <button
         type="button"
-        class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[6px] transition-all duration-300 cursor-default"
+        class="fixed inset-0 {zIndex} bg-slate-900/40 backdrop-blur-[6px] transition-all duration-300 cursor-default"
         onclick={close}
         aria-label="Cerrar"
     ></button>
 
     <!-- Modal Container -->
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center {size ===
+        class="fixed inset-0 {zIndex} flex items-center justify-center {size ===
         'full'
             ? 'p-0'
             : 'p-4'} pointer-events-none"

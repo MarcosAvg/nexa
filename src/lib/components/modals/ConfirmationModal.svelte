@@ -32,7 +32,7 @@
     }
 </script>
 
-<Modal bind:isOpen {title} size="sm" onclose={handleCancel}>
+<Modal bind:isOpen {title} size="sm" zIndex="z-[100]" onclose={handleCancel}>
     <div class="flex flex-col gap-4">
         <div class="flex items-start gap-4">
             <div
