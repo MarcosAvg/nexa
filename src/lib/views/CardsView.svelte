@@ -305,7 +305,7 @@
             />
             <FilterGroup
                 label="Estado"
-                options={["Todas", "Activa", "Bloqueada", "Baja"]}
+                options={["Todas", "Disponible", "Activa", "Bloqueada", "Baja"]}
                 bind:value={cardStatusFilter}
                 onchange={() => onFilterChange()}
             />

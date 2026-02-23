@@ -131,32 +131,51 @@ export const HistoryService = {
         } = {}
     ) {
         try {
-            let query = supabase
-                .from("history_logs")
-                .select("*");
+            const allData: any[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
 
-            // Apply Filters
-            if (filters.person) {
-                query = query.ilike("entity_name", `%${filters.person}%`);
+            while (hasMore) {
+                let query = supabase
+                    .from("history_logs")
+                    .select("*");
+
+                // Apply Filters
+                if (filters.person) {
+                    query = query.ilike("entity_name", `%${filters.person}%`);
+                }
+
+                if (filters.cardType && filters.cardType !== "Todos") {
+                    query = query.ilike("entity_name", `%${filters.cardType}%`);
+                }
+
+                if (filters.folio) {
+                    query = query.ilike("entity_name", `%${filters.folio}%`);
+                }
+
+                if (filters.action && filters.action !== "Todas") {
+                    query = query.eq("action", filters.action);
+                }
+
+                const { data, error } = await query
+                    .order("timestamp", { ascending: false })
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    allData.push(...data);
+                    page++;
+                    if (data.length < pageSize) {
+                        hasMore = false;
+                    }
+                } else {
+                    hasMore = false;
+                }
             }
 
-            if (filters.cardType && filters.cardType !== "Todos") {
-                query = query.ilike("entity_name", `%${filters.cardType}%`);
-            }
-
-            if (filters.folio) {
-                query = query.ilike("entity_name", `%${filters.folio}%`);
-            }
-
-            if (filters.action && filters.action !== "Todas") {
-                query = query.eq("action", filters.action);
-            }
-
-            const { data, error } = await query
-                .order("timestamp", { ascending: false });
-
-            if (error) throw error;
-            return data || [];
+            return allData;
         } catch (error) {
             handleError(error, "Fetch History for Export");
             return [];

@@ -12,7 +12,13 @@
     import Card from "../components/Card.svelte";
     import DataTable from "../components/DataTable.svelte";
     import Badge from "../components/Badge.svelte";
-    import { Search, FileSpreadsheet, Plus } from "lucide-svelte";
+    import {
+        Search,
+        FileSpreadsheet,
+        Plus,
+        ChevronDown,
+        FileStack,
+    } from "lucide-svelte";
     import { personnelService } from "../services/personnel";
     import { cardService } from "../services/cards";
     import { exportPersonnelToExcel } from "../utils/xlsxExport";
@@ -138,7 +144,10 @@
         personnelState.openEditModal(person);
     }
 
-    async function handleExportExcel() {
+    let showExportMenu = $state(false);
+
+    async function handleExportExcel(splitByDependency: boolean = false) {
+        showExportMenu = false;
         const loadingToast = toast.loading("Preparando exportación...");
         try {
             const depId =
@@ -155,6 +164,7 @@
                     dependency: dependencyFilter,
                     search: personSearch,
                 },
+                splitByDependency,
             });
             toast.success("Exportación completada", { id: loadingToast });
         } catch (error) {
@@ -304,19 +314,56 @@
         {/snippet}
 
         {#snippet actions()}
-            <Button
-                variant="soft-emerald"
-                onclick={handleExportExcel}
-                class="flex items-center gap-2.5"
-                disabled={personnel.length === 0}
-            >
-                <FileSpreadsheet
-                    size={18}
-                    strokeWidth={2.5}
-                    class="text-emerald-600/80"
-                />
-                Exportar Excel
-            </Button>
+            <div class="relative">
+                <Button
+                    variant="soft-emerald"
+                    onclick={() => (showExportMenu = !showExportMenu)}
+                    class="flex items-center gap-2.5 h-10 px-5"
+                    disabled={personnel.length === 0}
+                >
+                    <FileSpreadsheet
+                        size={18}
+                        strokeWidth={2.5}
+                        class="text-emerald-600/80"
+                    />
+                    Exportar Excel
+                    <ChevronDown
+                        size={14}
+                        class="ml-1 opacity-50 transition-transform {showExportMenu
+                            ? 'rotate-180'
+                            : ''}"
+                    />
+                </Button>
+
+                {#if showExportMenu}
+                    <div
+                        class="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 z-50 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300"
+                    >
+                        <button
+                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                            onclick={() => handleExportExcel(false)}
+                        >
+                            <span
+                                class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600"
+                            >
+                                <FileSpreadsheet size={16} />
+                            </span>
+                            Hoja Única
+                        </button>
+                        <button
+                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                            onclick={() => handleExportExcel(true)}
+                        >
+                            <span
+                                class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600"
+                            >
+                                <FileStack size={16} />
+                            </span>
+                            Separado por Dependencia
+                        </button>
+                    </div>
+                {/if}
+            </div>
             {#if currentUser?.role !== "viewer"}
                 <Button
                     variant="primary"
@@ -342,8 +389,6 @@
                     width: "220px",
                 },
                 { key: "employee_no", label: "No. Empleado", width: "100px" },
-                { key: "area", label: "Área", width: "120px" },
-                { key: "position", label: "Puesto", width: "120px" },
                 {
                     key: "dependency",
                     label: "Dependencia / Edificio",

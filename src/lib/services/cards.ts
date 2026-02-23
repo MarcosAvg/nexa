@@ -82,57 +82,77 @@ export const cardService = {
         statusFilter: string = "Todas"
     ): Promise<Card[]> {
         try {
-            let query = supabase
-                .from("cards")
-                .select("*, personnel(first_name, last_name, status)");
+            const allData: Card[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
 
+            // Pre-fetch person IDs if searching, to avoid doing it inside the loop
+            let personIds: string[] = [];
             if (search) {
                 const searchTerm = `%${search}%`;
-
-                // 1. Find matching people IDs first
                 const { data: people } = await supabase
                     .from("personnel")
                     .select("id")
                     .or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm}`);
+                personIds = people?.map(p => p.id) || [];
+            }
 
-                const personIds = people?.map(p => p.id) || [];
+            while (hasMore) {
+                let query = supabase
+                    .from("cards")
+                    .select("*, personnel(first_name, last_name, status)");
 
-                // 2. Build Query: Folio match OR Person match
-                if (personIds.length > 0) {
-                    query = query.or(`folio.ilike.${searchTerm},person_id.in.(${personIds.join(',')})`);
+                if (search) {
+                    const searchTerm = `%${search}%`;
+                    if (personIds.length > 0) {
+                        query = query.or(`folio.ilike.${searchTerm},person_id.in.(${personIds.join(',')})`);
+                    } else {
+                        query = query.ilike("folio", searchTerm);
+                    }
+                }
+
+                if (typeFilter !== "Todos") {
+                    query = query.eq("type", typeFilter);
+                }
+
+                if (statusFilter !== "Todas") {
+                    const statusMap: Record<string, string> = {
+                        "Activa": "active",
+                        "Bloqueada": "blocked",
+                        "Baja": "inactive",
+                        "Disponible": "available"
+                    };
+                    if (statusMap[statusFilter]) {
+                        query = query.eq("status", statusMap[statusFilter]);
+                    }
+                }
+
+                const { data, error } = await query
+                    .order("folio", { ascending: true })
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    allData.push(...data.map((c) => ({
+                        ...c,
+                        personId: c.person_id,
+                        personName: c.personnel
+                            ? `${c.personnel.first_name} ${c.personnel.last_name}`
+                            : "Sin asignar",
+                        personStatus: c.personnel?.status
+                    })));
+                    page++;
+                    if (data.length < pageSize) {
+                        hasMore = false;
+                    }
                 } else {
-                    query = query.ilike("folio", searchTerm);
+                    hasMore = false;
                 }
             }
 
-            if (typeFilter !== "Todos") {
-                query = query.eq("type", typeFilter);
-            }
-
-            if (statusFilter !== "Todas") {
-                const statusMap: Record<string, string> = {
-                    "Activa": "active",
-                    "Bloqueada": "blocked",
-                    "Baja": "inactive",
-                    "Disponible": "available"
-                };
-                if (statusMap[statusFilter]) {
-                    query = query.eq("status", statusMap[statusFilter]);
-                }
-            }
-
-            const { data, error } = await query.order("folio", { ascending: true });
-
-            if (error) throw error;
-
-            return (data || []).map((c) => ({
-                ...c,
-                personId: c.person_id,
-                personName: c.personnel
-                    ? `${c.personnel.first_name} ${c.personnel.last_name}`
-                    : "Sin asignar",
-                personStatus: c.personnel?.status
-            }));
+            return allData;
         } catch (error) {
             handleError(error, "Fetch Cards for Export");
             return [];
