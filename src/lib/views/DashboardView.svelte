@@ -18,6 +18,11 @@
         Activity,
         FileText,
     } from "lucide-svelte";
+    import { onMount } from "svelte";
+
+    onMount(() => {
+        personnelState.refreshDashboardStats();
+    });
 
     // Re-derive from stores for reactivity
     let rawPendingItems = $derived(ticketState.pendingItems);
@@ -59,23 +64,10 @@
 
     // Metrics
     let activePersonnelCount = $derived(
-        personnel.filter(
-            (p) =>
-                p.status === "active" ||
-                p.status === "Activo/a" ||
-                p.status === "Parcial",
-        ).length,
+        personnelState.dashboardStats.activePersonnel,
     );
-
-    let koneStock = $derived(
-        extraCards.filter((c) => c.status === "available" && c.type === "KONE")
-            .length,
-    );
-
-    let p2000Stock = $derived(
-        extraCards.filter((c) => c.status === "available" && c.type === "P2000")
-            .length,
-    );
+    let koneStock = $derived(personnelState.dashboardStats.koneStock);
+    let p2000Stock = $derived(personnelState.dashboardStats.p2000Stock);
 
     let pendingSignaturesCount = $derived(
         pendingItems.filter((t) => t.type === "Firma Responsiva").length,

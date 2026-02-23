@@ -315,8 +315,99 @@ export const personnelService = {
             handleError(error, "Delete Personnel");
             throw error;
         }
+    },
+
+    async fetchDashboardStats() {
+        try {
+            // 1. Get all unique person_id from cards that meet the 'ready' criteria
+            // We batch fetch because of the 1000 row limit of PostgREST
+            const readyPersonIds = new Set<string>();
+            let hasMoreCards = true;
+            let cardPage = 0;
+            const batchSize = 1000;
+
+            while (hasMoreCards) {
+                const { data: cardBatch, error: cError } = await supabase
+                    .from("cards")
+                    .select("person_id")
+                    .eq("status", "active")
+                    .eq("programming_status", "done")
+                    .in("responsiva_status", ["signed", "legacy"])
+                    .not("person_id", "is", null)
+                    .range(cardPage * batchSize, (cardPage + 1) * batchSize - 1);
+
+                if (cError) throw cError;
+                if (!cardBatch || cardBatch.length === 0) {
+                    hasMoreCards = false;
+                } else {
+                    cardBatch.forEach(c => readyPersonIds.add(c.person_id));
+                    if (cardBatch.length < batchSize) hasMoreCards = false;
+                    else cardPage++;
+                }
+            }
+
+            // 2. Get all personnel IDs where status is active
+            const activePersonnelIds = new Set<string>();
+            let hasMorePeople = true;
+            let peoplePage = 0;
+
+            while (hasMorePeople) {
+                const { data: peopleBatch, error: pError } = await supabase
+                    .from("personnel")
+                    .select("id")
+                    .eq("status", "active")
+                    .range(peoplePage * batchSize, (peoplePage + 1) * batchSize - 1);
+
+                if (pError) throw pError;
+                if (!peopleBatch || peopleBatch.length === 0) {
+                    hasMorePeople = false;
+                } else {
+                    peopleBatch.forEach(p => activePersonnelIds.add(p.id));
+                    if (peopleBatch.length < batchSize) hasMorePeople = false;
+                    else peoplePage++;
+                }
+            }
+
+            // 3. Intersection: People who are active AND have at least one ready card
+            let activePersonnelCount = 0;
+            for (const id of readyPersonIds) {
+                if (activePersonnelIds.has(id)) {
+                    activePersonnelCount++;
+                }
+            }
+
+            // 4. Card Stock Counts (head queries are NOT subject to the 1000 record delivery limit)
+            const { count: koneStock, error: kError } = await supabase
+                .from("cards")
+                .select("*", { count: "exact", head: true })
+                .is("person_id", null)
+                .eq("status", "available")
+                .eq("type", "KONE");
+
+            if (kError) throw kError;
+
+            const { count: p2000Stock, error: p2Error } = await supabase
+                .from("cards")
+                .select("*", { count: "exact", head: true })
+                .is("person_id", null)
+                .eq("status", "available")
+                .eq("type", "P2000");
+
+            if (p2Error) throw p2Error;
+
+            return {
+                activePersonnel: activePersonnelCount,
+                koneStock: koneStock || 0,
+                p2000Stock: p2000Stock || 0
+            };
+        } catch (error) {
+            handleError(error, "Fetch Dashboard Stats");
+            return { activePersonnel: 0, koneStock: 0, p2000Stock: 0 };
+        }
     }
+
 };
+
 
 
 export const catalogService = {

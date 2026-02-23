@@ -16,10 +16,25 @@ export class PersonnelState {
     statusFilter = $state("Todos");
     dependencyId = $state("");
     isLoading = $state(false);
+    dashboardStats = $state({
+        activePersonnel: 0,
+        koneStock: 0,
+        p2000Stock: 0
+    });
 
     setPersonnel(data: Person[], count: number) {
         this.personnel = data;
         this.totalRecords = count;
+    }
+
+    async refreshDashboardStats() {
+        try {
+            const { personnelService } = await import("../services/personnel");
+            const stats = await personnelService.fetchDashboardStats();
+            this.dashboardStats = stats;
+        } catch (error) {
+            console.error("Error refreshing dashboard stats:", error);
+        }
     }
 
     async refresh(page: number = 1, search: string = "", status: string = "Todos", depId: string = "") {
