@@ -16,6 +16,7 @@
         Trash2,
         Edit2,
         Shield,
+        FileDown,
     } from "lucide-svelte";
     import Card from "../components/Card.svelte";
     import Button from "../components/Button.svelte";
@@ -25,8 +26,8 @@
     import Input from "../components/Input.svelte";
     import Select from "../components/Select.svelte";
 
-    import { catalogState, userState } from "../stores"; // Import stores
-    // Remove currentUser prop
+    import { catalogState, userState } from "../stores";
+    import { generateRequestTemplate } from "../utils/xlsxTemplate";
 
     let activeTab = $state<"catalogos" | "usuarios">("catalogos");
     let activeCatalog = $state<
@@ -337,6 +338,28 @@
         isDeleteModalOpen = false;
         deleteTarget = null;
     }
+    let isGeneratingTemplate = $state(false);
+
+    async function handleGenerateTemplate() {
+        isGeneratingTemplate = true;
+        const loadingToast = toast.loading("Generando plantilla...");
+        try {
+            await generateRequestTemplate({
+                buildings: buildings as any[],
+                dependencies: dependencies as any[],
+                specialAccesses: specialAccesses as any[],
+                schedules: schedules as any[],
+            });
+            toast.success("Plantilla generada correctamente", {
+                id: loadingToast,
+            });
+        } catch (e) {
+            console.error(e);
+            toast.error("Error al generar la plantilla", { id: loadingToast });
+        } finally {
+            isGeneratingTemplate = false;
+        }
+    }
 </script>
 
 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -391,6 +414,29 @@
                 </button>
             {/if}
         </nav>
+
+        <!-- Tools section -->
+        <div class="p-4 border-t border-slate-100/60">
+            <p
+                class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-3"
+            >
+                Herramientas
+            </p>
+            <button
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                onclick={handleGenerateTemplate}
+                disabled={isGeneratingTemplate}
+            >
+                <FileDown
+                    size={18}
+                    strokeWidth={2.5}
+                    class="text-emerald-500"
+                />
+                {isGeneratingTemplate
+                    ? "Generando..."
+                    : "Plantilla de Solicitudes"}
+            </button>
+        </div>
     </Card>
 
     <!-- Content Area -->
