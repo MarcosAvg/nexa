@@ -27,6 +27,9 @@
 
   let loadingAuth = $state(true);
   let initError = $state(false);
+  // Flag to prevent double-fetch: onAuthStateChange fires SIGNED_IN right after
+  // getSession() on startup, which would run initData twice for the same user.
+  let appInitialized = $state(false);
 
   onMount(async () => {
     // Check initial session
@@ -41,21 +44,26 @@
     }
 
     loadingAuth = false;
+    appInitialized = true;
 
     // Listen for auth changes
     supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log("🔥 [DEBUG] Auth State Change:", event, newSession?.user?.id);
       if (newSession) {
-        // Prevent background token refreshes from trashing Svelte state if it's the same user
-        // and we already have a profile loaded
+        // Skip TOKEN_REFRESHED for the same user — prevents Svelte state thrashing / UI freeze
         if (
           event === "TOKEN_REFRESHED" &&
           userState.profile &&
           userState.profile.id === newSession.user.id
         ) {
-          console.log(
-            "🔥 [DEBUG] Token refreshed but user is the same, skipping initData to prevent UI freeze.",
-          );
+          return;
+        }
+
+        // Skip redundant SIGNED_IN that fires right after getSession() on startup
+        if (
+          event === "SIGNED_IN" &&
+          appInitialized &&
+          userState.profile?.id === newSession.user.id
+        ) {
           return;
         }
 

@@ -74,14 +74,20 @@
         }
     });
 
-    // Search Logic (Debounced)
-    let searchTimeout: any;
-    function onSearch(e: Event) {
+    // Search Logic (Debounced + stale-result-safe)
+    // We track the request ID so that if the user types faster than the API responds,
+    // only the latest in-flight request will update the store.
+    let searchTimeout: ReturnType<typeof setTimeout>;
+    let lastSearchId = 0;
+    async function onSearch(e: Event) {
         const value = (e.target as HTMLInputElement).value;
         personSearch = value;
         clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            personnelState.search(value);
+        const thisId = ++lastSearchId;
+        searchTimeout = setTimeout(async () => {
+            await personnelState.search(value);
+            // If another request was fired while this one was in flight, discard result
+            if (thisId !== lastSearchId) return;
         }, 300);
     }
 

@@ -1,6 +1,7 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import { handleError, withTimeout } from "../utils/error";
+import { catalogCache } from "../utils/catalogCache";
 import type { Person, Card } from "../types";
 
 const mapPersonRecord = (p: any): Person => {
@@ -433,12 +434,16 @@ export const personnelService = {
 
 
 export const catalogService = {
-    // --- Fetch ---
+    // --- Fetch (with localStorage 24h cache) ---
     async fetchDependencies(throwOnError: boolean = false) {
+        const cached = catalogCache.get<any[]>('dependencies');
+        if (cached) return cached;
         try {
             const { data, error } = await supabase.from("dependencies").select("*");
             if (error) throw error;
-            return data || [];
+            const result = data || [];
+            catalogCache.set('dependencies', result);
+            return result;
         } catch (error) {
             handleError(error, "Fetch Dependencies");
             if (throwOnError) throw error;
@@ -446,10 +451,14 @@ export const catalogService = {
         }
     },
     async fetchBuildings(throwOnError: boolean = false) {
+        const cached = catalogCache.get<any[]>('buildings');
+        if (cached) return cached;
         try {
             const { data, error } = await supabase.from("buildings").select("*");
             if (error) throw error;
-            return data || [];
+            const result = data || [];
+            catalogCache.set('buildings', result);
+            return result;
         } catch (error) {
             handleError(error, "Fetch Buildings");
             if (throwOnError) throw error;
@@ -457,10 +466,14 @@ export const catalogService = {
         }
     },
     async fetchAccesses(throwOnError: boolean = false) {
+        const cached = catalogCache.get<any[]>('special_accesses');
+        if (cached) return cached;
         try {
             const { data, error } = await supabase.from("special_accesses").select("*");
             if (error) throw error;
-            return data || [];
+            const result = data || [];
+            catalogCache.set('special_accesses', result);
+            return result;
         } catch (error) {
             handleError(error, "Fetch Accesses");
             if (throwOnError) throw error;
@@ -468,10 +481,14 @@ export const catalogService = {
         }
     },
     async fetchSchedules(throwOnError: boolean = false) {
+        const cached = catalogCache.get<any[]>('schedules');
+        if (cached) return cached;
         try {
             const { data, error } = await supabase.from("schedules").select("*");
             if (error) throw error;
-            return data || [];
+            const result = data || [];
+            catalogCache.set('schedules', result);
+            return result;
         } catch (error) {
             handleError(error, "Fetch Schedules");
             if (throwOnError) throw error;
@@ -479,7 +496,8 @@ export const catalogService = {
         }
     },
 
-    // --- Save (Create/Update) ---
+    // --- Save (Create/Update) --- 
+    // Invalidate the relevant cache key after any mutation so stale data is never served.
     async saveBuilding(id: number | null, payload: { name: string; floors: string[] }) {
         try {
             if (id) {
@@ -491,6 +509,7 @@ export const catalogService = {
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Edificio creado: ${payload.name}` });
             }
+            catalogCache.invalidate('buildings');
         } catch (error) {
             handleError(error, "Save Building");
             throw error;
@@ -508,6 +527,7 @@ export const catalogService = {
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Dependencia creada: ${payload.name}` });
             }
+            catalogCache.invalidate('dependencies');
         } catch (error) {
             handleError(error, "Save Dependency");
             throw error;
@@ -525,6 +545,7 @@ export const catalogService = {
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Acceso especial creado: ${payload.name}` });
             }
+            catalogCache.invalidate('special_accesses');
         } catch (error) {
             handleError(error, "Save Access");
             throw error;
@@ -542,6 +563,7 @@ export const catalogService = {
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Horario creado: ${payload.name}` });
             }
+            catalogCache.invalidate('schedules');
         } catch (error) {
             handleError(error, "Save Schedule");
             throw error;
@@ -554,6 +576,7 @@ export const catalogService = {
             const { error } = await supabase.from(table).delete().eq("id", id);
             if (error) throw error;
             await HistoryService.log("SYSTEM", id, "DELETE_CATALOG", { message: `Eliminado de ${table}: ${itemName}` });
+            catalogCache.invalidate(table);
         } catch (error) {
             handleError(error, "Delete Catalog Item");
             throw error;

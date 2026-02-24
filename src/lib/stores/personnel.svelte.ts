@@ -34,6 +34,19 @@ export class PersonnelState {
 
     async refreshDashboardStats() {
         try {
+            // Single RPC round-trip instead of 3 sequential paginated queries.
+            // Requires the 'get_dashboard_stats' function in Supabase SQL (see migration).
+            const { supabase } = await import("../supabase");
+            const { data, error } = await supabase.rpc('get_dashboard_stats');
+            if (error) throw error;
+            if (data) {
+                this.dashboardStats = data;
+                return;
+            }
+        } catch {
+            // Fallback: use the old multi-query implementation if the RPC is not yet deployed
+        }
+        try {
             const { personnelService } = await import("../services/personnel");
             const stats = await personnelService.fetchDashboardStats();
             this.dashboardStats = stats;

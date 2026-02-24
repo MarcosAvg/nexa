@@ -30,9 +30,12 @@
     let extraCards = $derived(personnelState.extraCards);
     let filteredHistoryLogs = $derived(historyState.historyLogs);
 
+    // O(1) map lookup instead of O(n) .find() per ticket — critical for large personnel lists
+    let personnelMap = $derived(new Map(personnel.map((p) => [p.id ?? "", p])));
+
     let pendingItems = $derived(
         rawPendingItems.map((t) => {
-            const person = personnel.find((p) => p.id == t.person_id);
+            const person = personnelMap.get(t.person_id ?? "");
             return {
                 ...t,
                 personName: person?.name || "Desconocido",
