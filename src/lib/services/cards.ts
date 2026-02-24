@@ -159,7 +159,7 @@ export const cardService = {
         }
     },
 
-    async fetchExtra(): Promise<Card[]> {
+    async fetchExtra(throwOnError: boolean = false): Promise<Card[]> {
         try {
             const { data, error } = await supabase
                 .from("cards")
@@ -173,6 +173,7 @@ export const cardService = {
             }));
         } catch (error) {
             handleError(error, "Fetch Extra Cards");
+            if (throwOnError) throw error;
             return [];
         }
     },

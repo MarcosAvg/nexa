@@ -82,7 +82,8 @@ export const HistoryService = {
             cardType?: string;
             folio?: string;
             action?: string;
-        } = {}
+        } = {},
+        throwOnError: boolean = false
     ) {
         try {
             const from = (page - 1) * limit;
@@ -118,6 +119,7 @@ export const HistoryService = {
             return { data: data || [], count: count || 0 };
         } catch (error) {
             handleError(error, "Fetch History");
+            if (throwOnError) throw error;
             return { data: [], count: 0 };
         }
     },

@@ -85,13 +85,6 @@
 
     $effect(() => {
         if (isOpen) {
-            // Safety check: Ensure personnel data is loaded for search
-            if (personnelState.personnel.length === 0) {
-                personnelService.fetchAll().then((res) => {
-                    personnelState.setPersonnel(res.data, res.count);
-                });
-            }
-
             if (editingTicket) {
                 // ... existing edit logic
                 formData.type = editingTicket.type;
@@ -137,16 +130,13 @@
             return;
         }
 
-        const all = personnelState.personnel;
+        const all = personnelState.personnelOptions;
 
         searchResults = all
             .filter(
                 (p) =>
                     (p.name || "").toLowerCase().includes(term) ||
-                    (p.employee_no || "").toLowerCase().includes(term) ||
-                    (p.cards || []).some((c) =>
-                        (c.folio || "").toLowerCase().includes(term),
-                    ),
+                    (p.employee_no || "").toLowerCase().includes(term),
             )
             .slice(0, 5);
 

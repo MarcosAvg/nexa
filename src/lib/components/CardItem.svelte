@@ -1,7 +1,13 @@
 <script lang="ts">
     import Badge from "./Badge.svelte";
     import Button from "./Button.svelte";
-    import { FileSignature, Lock, Ban, RefreshCw } from "lucide-svelte";
+    import {
+        FileSignature,
+        Lock,
+        Ban,
+        RefreshCw,
+        CheckCircle2,
+    } from "lucide-svelte";
 
     type Props = {
         type: "P2000" | "KONE";
@@ -14,6 +20,7 @@
         onBlock?: () => void;
         onUnassign?: () => void;
         onReplace?: () => void;
+        onProgram?: () => void;
     };
 
     let {
@@ -27,6 +34,7 @@
         onBlock,
         onUnassign,
         onReplace,
+        onProgram,
     }: Props = $props();
 </script>
 
@@ -90,6 +98,24 @@
                 >Responsiva</span
             >
         </button>
+
+        {#if programming_status !== "done"}
+            <!-- Programar: Blue -->
+            <button
+                type="button"
+                class="flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 group text-blue-600 hover:bg-blue-50"
+                onclick={onProgram}
+                title="Marcar tarjeta como programada físicamente"
+            >
+                <CheckCircle2
+                    size={16}
+                    class="group-hover:scale-110 transition-transform"
+                />
+                <span class="text-[10px] font-bold uppercase tracking-wider"
+                    >Programar</span
+                >
+            </button>
+        {/if}
 
         <div class="flex items-center gap-1">
             <!-- Bloquear: Amber -->

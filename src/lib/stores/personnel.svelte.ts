@@ -2,6 +2,7 @@ import type { Person, Card } from "../types";
 
 export class PersonnelState {
     personnel = $state<Person[]>([]);
+    personnelOptions = $state<{ id: string, name: string, employee_no: string }[]>([]);
     selectedPersonId = $state<string | null>(null);
     extraCards = $state<Card[]>([]);
     isDetailsOpen = $state(false);
@@ -25,6 +26,10 @@ export class PersonnelState {
     setPersonnel(data: Person[], count: number) {
         this.personnel = data;
         this.totalRecords = count;
+    }
+
+    setPersonnelOptions(data: { id: string, name: string, employee_no: string }[]) {
+        this.personnelOptions = data;
     }
 
     async refreshDashboardStats() {

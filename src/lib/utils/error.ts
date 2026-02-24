@@ -57,9 +57,8 @@ export async function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number 
     });
 
     return Promise.race([
-        Promise.resolve(promise).then((result) => {
+        Promise.resolve(promise).finally(() => {
             clearTimeout(timeoutHandle);
-            return result;
         }),
         timeoutPromise
     ]);

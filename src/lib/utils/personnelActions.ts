@@ -95,5 +95,34 @@ export const personnelActions = {
             console.error(e);
             toast.error("Error al desvincular tarjeta");
         }
+    },
+
+    async handleCardProgram(card: any, onSuccess?: () => Promise<void>) {
+        try {
+            await cardService.updateProgrammingStatus(card.id, "done");
+
+            // Look for any pending "Programación" ticket for this card and complete it
+            const { supabase: sb } = await import("../supabase");
+            const { data: tickets } = await sb
+                .from("tickets")
+                .select("id")
+                .eq("card_id", card.id)
+                .eq("type", "Programación")
+                .eq("status", "pending");
+
+            if (tickets && tickets.length > 0) {
+                const { ticketService } = await import("../services/tickets");
+                for (const t of tickets) {
+                    await ticketService.delete(t.id);
+                }
+                toast.success("Tarjeta programada y ticket completado");
+            } else {
+                toast.success("Tarjeta programada exitosamente");
+            }
+            await onSuccess?.();
+        } catch (e) {
+            console.error(e);
+            toast.error("Error al programar tarjeta");
+        }
     }
 };

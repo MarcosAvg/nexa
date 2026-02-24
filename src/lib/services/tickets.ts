@@ -5,7 +5,7 @@ import { handleError } from "../utils/error";
 import { ticketState } from "../stores";
 
 export const ticketService = {
-    async fetchAll(): Promise<Ticket[]> {
+    async fetchAll(throwOnError: boolean = false): Promise<Ticket[]> {
         try {
             const { data, error } = await supabase
                 .from("tickets")
@@ -20,6 +20,7 @@ export const ticketService = {
             } as Ticket));
         } catch (error) {
             handleError(error, "Fetch Tickets");
+            if (throwOnError) throw error;
             return [];
         }
     },

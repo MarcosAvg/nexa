@@ -98,6 +98,28 @@ export const personnelService = {
         }
     },
 
+    async fetchOptions(throwOnError: boolean = false): Promise<{ id: string, name: string, employee_no: string }[]> {
+        try {
+            const { data, error } = await supabase
+                .from("personnel")
+                .select("id, first_name, last_name, employee_no")
+                .neq("status", "deleted")
+                .order("first_name", { ascending: true });
+
+            if (error) throw error;
+
+            return (data || []).map(p => ({
+                id: p.id,
+                name: `${p.first_name} ${p.last_name}`,
+                employee_no: p.employee_no
+            }));
+        } catch (error) {
+            handleError(error, "Fetch Personnel Options");
+            if (throwOnError) throw error;
+            return [];
+        }
+    },
+
     async fetchForExport(search: string = "", statusFilter: string = "Todos", dependencyId: string = ""): Promise<Person[]> {
         try {
             const allData: Person[] = [];
@@ -412,43 +434,47 @@ export const personnelService = {
 
 export const catalogService = {
     // --- Fetch ---
-    async fetchDependencies() {
+    async fetchDependencies(throwOnError: boolean = false) {
         try {
             const { data, error } = await supabase.from("dependencies").select("*");
             if (error) throw error;
             return data || [];
         } catch (error) {
             handleError(error, "Fetch Dependencies");
+            if (throwOnError) throw error;
             return [];
         }
     },
-    async fetchBuildings() {
+    async fetchBuildings(throwOnError: boolean = false) {
         try {
             const { data, error } = await supabase.from("buildings").select("*");
             if (error) throw error;
             return data || [];
         } catch (error) {
             handleError(error, "Fetch Buildings");
+            if (throwOnError) throw error;
             return [];
         }
     },
-    async fetchAccesses() {
+    async fetchAccesses(throwOnError: boolean = false) {
         try {
             const { data, error } = await supabase.from("special_accesses").select("*");
             if (error) throw error;
             return data || [];
         } catch (error) {
             handleError(error, "Fetch Accesses");
+            if (throwOnError) throw error;
             return [];
         }
     },
-    async fetchSchedules() {
+    async fetchSchedules(throwOnError: boolean = false) {
         try {
             const { data, error } = await supabase.from("schedules").select("*");
             if (error) throw error;
             return data || [];
         } catch (error) {
             handleError(error, "Fetch Schedules");
+            if (throwOnError) throw error;
             return [];
         }
     },

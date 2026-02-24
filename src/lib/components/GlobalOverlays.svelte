@@ -11,9 +11,38 @@
     // Computed state from global store
     let isDetailsOpen = $derived(personnelState.isDetailsOpen);
     let selectedPersonId = $derived(personnelState.selectedPersonId);
-    let selectedPerson = $derived(
-        personnelState.personnel.find((p) => p.id === selectedPersonId) || null,
-    );
+
+    let fetchedPerson = $state<any>(null);
+
+    let selectedPerson = $derived.by(() => {
+        if (!selectedPersonId) return null;
+        const pInStore = personnelState.personnel.find(
+            (p) => p.id === selectedPersonId,
+        );
+        if (pInStore) return pInStore;
+        if (fetchedPerson && fetchedPerson.id === selectedPersonId)
+            return fetchedPerson;
+        return null;
+    });
+
+    $effect(() => {
+        if (isDetailsOpen && selectedPersonId) {
+            const pInStore = personnelState.personnel.find(
+                (p) => p.id === selectedPersonId,
+            );
+            if (
+                !pInStore &&
+                (!fetchedPerson || fetchedPerson.id !== selectedPersonId)
+            ) {
+                personnelService
+                    .fetchById(selectedPersonId)
+                    .then((p) => {
+                        if (p) fetchedPerson = p;
+                    })
+                    .catch(console.error);
+            }
+        }
+    });
 
     // Local state for Global Overlays (actions triggered from here)
     let isCardModalOpen = $state(false);
@@ -30,19 +59,25 @@
 
     // Refresh Data Helper
     async function refreshData() {
-        const [updatedPeople, updatedCards] = await Promise.all([
-            personnelService.fetchAll(),
-            cardService.fetchExtra(),
+        await Promise.all([
+            personnelState.refresh(
+                personnelState.currentPage,
+                personnelState.searchQuery,
+                personnelState.statusFilter,
+                personnelState.dependencyId,
+            ),
+            cardService
+                .fetchExtra()
+                .then((cards) => personnelState.setCards(cards)),
         ]);
-        personnelState.setPersonnel(updatedPeople.data, updatedPeople.count);
-        personnelState.setCards(updatedCards);
 
-        // Update selected person reference if open
         if (selectedPersonId) {
-            // No need to manually update selectedPerson as it is a derived value from the store
-            // But we might need to handle edge case if person was deleted
-            if (!updatedPeople.data.find((p) => p.id === selectedPersonId)) {
+            const stillExists =
+                await personnelService.fetchById(selectedPersonId);
+            if (!stillExists) {
                 personnelState.setDetailsOpen(false);
+            } else {
+                fetchedPerson = stillExists;
             }
         }
     }
@@ -132,6 +167,18 @@
         isCardModalOpen = true;
     };
 
+    const onCardProgram = (c: any) => {
+        confirmModal = {
+            isOpen: true,
+            title: "¿Confirmar Programación?",
+            description:
+                "Confirma que la tarjeta ha sido programada físicamente en el sistema externo. Esto también completará automáticamente cualquier ticket de programación pendiente asociado.",
+            variant: "info",
+            confirmText: "Completar Programación",
+            onConfirm: () => personnelActions.handleCardProgram(c, refreshData),
+        };
+    };
+
     // Card Save Handler (from AddCardModal inside Details Panel context)
     const handleCardSave = async (
         cardData: { type: string; folio: string },
@@ -170,6 +217,7 @@
     {onCardBlock}
     {onCardUnassign}
     {onCardReplace}
+    {onCardProgram}
     onRefresh={refreshData}
     onclose={() => personnelState.setDetailsOpen(false)}
 />

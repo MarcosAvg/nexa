@@ -52,7 +52,9 @@
     );
 
     onMount(async () => {
-        await fetchAll();
+        if (currentUser.role === "admin") {
+            await fetchUsers();
+        }
     });
 
     async function fetchAll() {

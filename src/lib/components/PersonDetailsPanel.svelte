@@ -40,6 +40,7 @@
         onReactivate?: (person: Person) => void;
         onDeletePermanent?: (person: Person) => void;
         onRefresh?: () => Promise<void>;
+        onCardProgram?: (card: any) => void;
     };
 
     let {
@@ -56,6 +57,7 @@
         onReactivate,
         onDeletePermanent,
         onRefresh,
+        onCardProgram,
     }: Props = $props();
 
     // Reset highlight when closing
@@ -521,6 +523,7 @@
                                 onBlock={() => onCardBlock?.(card)}
                                 onUnassign={() => onCardUnassign?.(card)}
                                 onReplace={() => onCardReplace?.(card)}
+                                onProgram={() => onCardProgram?.(card)}
                             />
                         {/each}
                     </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { AlertCircle, RefreshCcw } from "lucide-svelte";
   import { supabase, auth } from "./lib/supabase";
   import {
     uiState,
@@ -25,6 +26,7 @@
   import GlobalOverlays from "./lib/components/GlobalOverlays.svelte";
 
   let loadingAuth = $state(true);
+  let initError = $state(false);
 
   onMount(async () => {
     // Check initial session
@@ -45,27 +47,32 @@
       if (newSession) {
         const { data: profile } = await auth.getProfile(newSession.user.id);
         userState.setProfile(profile);
-        initData();
+        initData(true);
       } else {
         userState.clear();
       }
     });
   });
 
-  async function initData() {
+  async function initData(isBackground = false) {
     try {
-      const [_p, _c, _t, _d, _b, _a, _s, _h] = await Promise.all([
-        personnelService.fetchAll(),
-        cardService.fetchExtra(),
-        ticketService.fetchAll(),
-        catalogService.fetchDependencies(),
-        catalogService.fetchBuildings(),
-        catalogService.fetchAccesses(),
-        catalogService.fetchSchedules(),
-        HistoryService.fetchAll(),
+      if (!isBackground) {
+        loadingAuth = true;
+        initError = false;
+      }
+
+      const [_pOptions, _c, _t, _d, _b, _a, _s, _h] = await Promise.all([
+        personnelService.fetchOptions(true),
+        cardService.fetchExtra(true),
+        ticketService.fetchAll(true),
+        catalogService.fetchDependencies(true),
+        catalogService.fetchBuildings(true),
+        catalogService.fetchAccesses(true),
+        catalogService.fetchSchedules(true),
+        HistoryService.fetchAll(1, 50, {}, true),
       ]);
 
-      personnelState.setPersonnel(_p.data, _p.count);
+      personnelState.setPersonnelOptions(_pOptions);
       personnelState.setCards(_c);
       ticketState.setTickets(_t);
 
@@ -76,8 +83,19 @@
 
       historyState.setHistory(_h.data, _h.count);
     } catch (err) {
-      console.error("Error general en onMount:", err);
+      console.error("Error general en initData:", err);
+      if (!isBackground) {
+        initError = true;
+      }
+    } finally {
+      if (!isBackground) {
+        loadingAuth = false;
+      }
     }
+  }
+
+  function retryInit() {
+    initData(false);
   }
 </script>
 
@@ -90,6 +108,28 @@
         class="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin"
       ></div>
       <p class="text-slate-500 font-medium animate-pulse">Cargando Nexa...</p>
+    </div>
+  </div>
+{:else if initError}
+  <div class="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div class="flex flex-col items-center max-w-sm text-center">
+      <div
+        class="w-16 h-16 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-rose-200"
+      >
+        <AlertCircle size={32} />
+      </div>
+      <h2 class="text-xl font-bold text-slate-900 mb-2">Error de conexión</h2>
+      <p class="text-slate-500 mb-8 text-sm">
+        No pudimos cargar los datos iniciales de la aplicación. Por favor,
+        verifica tu conexión a internet e inténtalo de nuevo.
+      </p>
+      <button
+        class="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/10"
+        onclick={retryInit}
+      >
+        <RefreshCcw size={18} />
+        Reintentar conexión
+      </button>
     </div>
   </div>
 {:else if !userState.profile}

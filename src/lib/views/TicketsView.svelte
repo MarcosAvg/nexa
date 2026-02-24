@@ -49,8 +49,6 @@
     let importedTicket = $state<any>(null);
 
     // Confirmation States
-    let isConfirm1Open = $state(false);
-    let isConfirm2Open = $state(false);
     let ticketToComplete = $state<any>(null);
 
     // Modification Compare Modal
@@ -139,13 +137,11 @@
 
     async function refreshData() {
         // ... existing refresh logic
-        const [tickets, personnel, extraCards] = await Promise.all([
+        const [tickets, extraCards] = await Promise.all([
             ticketService.fetchAll(),
-            personnelService.fetchAll(),
             cardService.fetchExtra(),
         ]);
         ticketState.setTickets(tickets);
-        personnelState.setPersonnel(personnel.data, personnel.count);
         personnelState.setCards(extraCards);
     }
 
@@ -193,10 +189,13 @@
     }
 
     function onStartCompletion(ticket: any) {
-        if (ticket.type === "Firma Responsiva") {
+        if (
+            ticket.type === "Firma Responsiva" ||
+            ticket.type === "Programación"
+        ) {
             if (ticket.person_id) {
                 personnelState.selectPerson(ticket.person_id);
-                personnelState.highlightedCardId = ticket.card_id;
+                personnelState.highlightedCardId = ticket.card_id || null;
             } else {
                 toast.error("Este ticket no tiene una persona vinculada");
             }
@@ -214,31 +213,15 @@
         // But onStartCompletion is triggered by the "check" button on banner
 
         ticketToComplete = ticket;
-        isConfirm1Open = true;
-    }
-
-    function handleConfirm1() {
-        isConfirm1Open = false;
-        setTimeout(() => {
-            isConfirm2Open = true;
-        }, 300);
+        // Directly call handleFinalConfirm for simple tickets
+        handleFinalConfirm();
     }
 
     async function handleFinalConfirm() {
         if (!ticketToComplete) return;
 
         try {
-            // 1. Update card status if it's a programming ticket
-            if (
-                ticketToComplete.type === "Programación" &&
-                ticketToComplete.card_id
-            ) {
-                await cardService.updateProgrammingStatus(
-                    ticketToComplete.card_id,
-                    "done",
-                );
-            }
-            // 2. Delete ticket
+            // Delete ticket usually done here for simple tickets that don't have sidepanel logic
             await ticketService.delete(ticketToComplete.id);
 
             toast.success("Ticket completado");
@@ -248,7 +231,6 @@
             toast.error("Error al completar el ticket");
         } finally {
             ticketToComplete = null;
-            isConfirm2Open = false;
         }
     }
 </script>
@@ -338,26 +320,6 @@
     bind:isOpen={isManualDetailsOpen}
     ticket={manualTicket}
     onComplete={refreshData}
-/>
-
-<ConfirmationModal
-    bind:isOpen={isConfirm1Open}
-    title="Paso 1: Programación Física"
-    description="¿Has programado físicamente la tarjeta de acceso en el sistema externo?"
-    confirmText="Sí, está programada"
-    cancelText="Aún no"
-    variant="warning"
-    onConfirm={handleConfirm1}
-/>
-
-<ConfirmationModal
-    bind:isOpen={isConfirm2Open}
-    title="Paso 2: Finalizar Proceso"
-    description="Esto actualizará el estado de la tarjeta y eliminará este ticket del sistema. ¿Deseas continuar?"
-    confirmText="Finalizar Registro"
-    cancelText="Regresar"
-    variant="info"
-    onConfirm={handleFinalConfirm}
 />
 
 <ModificationCompareModal
