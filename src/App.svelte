@@ -44,7 +44,21 @@
 
     // Listen for auth changes
     supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log("🔥 [DEBUG] Auth State Change:", event, newSession?.user?.id);
       if (newSession) {
+        // Prevent background token refreshes from trashing Svelte state if it's the same user
+        // and we already have a profile loaded
+        if (
+          event === "TOKEN_REFRESHED" &&
+          userState.profile &&
+          userState.profile.id === newSession.user.id
+        ) {
+          console.log(
+            "🔥 [DEBUG] Token refreshed but user is the same, skipping initData to prevent UI freeze.",
+          );
+          return;
+        }
+
         const { data: profile } = await auth.getProfile(newSession.user.id);
         userState.setProfile(profile);
         initData(true);
@@ -55,6 +69,7 @@
   });
 
   async function initData(isBackground = false) {
+    console.log("🚀 [DEBUG] initData called. Background:", isBackground);
     try {
       if (!isBackground) {
         loadingAuth = true;
