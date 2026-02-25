@@ -297,7 +297,7 @@ export const personnelService = {
             const payload = {
                 first_name: data.first_name || data.nombres,
                 last_name: data.last_name || data.apellidos,
-                employee_no: data.employee_no || data.noEmpleado,
+                employee_no: (data.employee_no || data.noEmpleado)?.trim() || null,
                 area: data.area || data.areaEquipo,
                 position: data.position || data.puestoFuncion,
                 dependency_id: data.dependency_id || data.dependencyId,

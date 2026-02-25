@@ -52,7 +52,7 @@
             horario: p.horario,
             horaEntrada: p.hora_entrada,
             horaSalida: p.hora_salida,
-            correo: p.correo?.replace(/^mailto:/i, "").trim(),
+            correo: p.correo?.replace(/^mailto:\s*/i, "").trim(),
             pisosP2000: p.pisos_p2000
                 ? p.pisos_p2000
                       .split(",")

@@ -275,7 +275,7 @@
                 first_name: nombres,
                 last_name: apellidos,
                 employee_no: noEmpleado,
-                email,
+                email: email?.replace(/^mailto:\s*/i, "").trim(),
                 floor: pisoBase,
                 floors_p2000: pisosP2000,
                 floors_kone: pisosKone,

@@ -221,7 +221,13 @@ function parseSheet(ws: ExcelJS.Worksheet, key: SheetKey): ParsedSheet {
         let hasData = false;
 
         cfg.cols.forEach((col, idx) => {
-            const val = cellText(row.getCell(idx + 1));
+            let val = cellText(row.getCell(idx + 1));
+
+            // Sanitization: Strip mailto: from emails
+            if (col.field === "correo" && val.toLowerCase().startsWith("mailto:")) {
+                val = val.replace(/^mailto:\s*/i, "").trim();
+            }
+
             fields[col.field] = val;
             if (val) hasData = true;
         });

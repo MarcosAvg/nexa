@@ -55,7 +55,7 @@ export const personnelActions = {
         cardData: { type: string; folio: string },
         personId: string,
         onSuccess?: () => Promise<void>,
-        replacementOptions?: { oldCardStatus: string }
+        replacementOptions?: { oldCardStatus: string, skipTicket?: boolean }
     ) {
         try {
             await cardService.save({

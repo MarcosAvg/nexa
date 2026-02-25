@@ -201,7 +201,7 @@ export const cardService = {
         return { card: data, ownerName };
     },
 
-    async save(data: any, replacementOptions?: { oldCardStatus: string }) {
+    async save(data: any, replacementOptions?: { oldCardStatus: string, skipTicket?: boolean }) {
         try {
             // Check if this is a new assignment
             let isNewAssignment = false;
@@ -291,7 +291,7 @@ export const cardService = {
             }
 
             // Trigger Automatic Ticket for Programming
-            if (isNewAssignment) {
+            if (isNewAssignment && (!replacementOptions || !replacementOptions.skipTicket)) {
                 const { ticketService } = await import("./tickets");
                 await ticketService.create({
                     type: replacementOptions ? "Reposición" : "Programación", // Distinct type for replacement

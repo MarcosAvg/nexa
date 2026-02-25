@@ -24,7 +24,10 @@
         allowedCardTypes?: string[] | null;
         onSave?: (
             card: { type: string; folio: string },
-            replacementOptions?: { oldCardStatus: string },
+            replacementOptions?: {
+                oldCardStatus: string;
+                skipTicket?: boolean;
+            },
         ) => void;
         onclose?: () => void;
     };
@@ -46,6 +49,7 @@
     let isSubmitting = $state(false);
     let confirmCreate = $state(false);
     let oldCardStatus = $state("blocked"); // blocked | available
+    let skipTicket = $state(false);
 
     // Sync card type when replacing or when allowedCardTypes restricts to one type
     $effect(() => {
@@ -211,7 +215,7 @@
 
             // Pass replacement options if replacing
             if (replacingCard) {
-                await onSave?.(savePayload, { oldCardStatus });
+                await onSave?.(savePayload, { oldCardStatus, skipTicket });
             } else {
                 await onSave?.(savePayload);
             }
@@ -400,6 +404,33 @@
                     </button>
                 </div>
             </div>
+
+            <!-- Skip Ticket Toggle -->
+            <label
+                class="flex items-center gap-3 p-3.5 rounded-xl border-2 border-slate-100 bg-slate-50/50 cursor-pointer hover:bg-slate-50 transition-colors group"
+            >
+                <div class="relative flex items-center">
+                    <input
+                        type="checkbox"
+                        bind:checked={skipTicket}
+                        class="peer sr-only"
+                    />
+                    <div
+                        class="w-10 h-5 bg-slate-200 rounded-full transition-colors peer-checked:bg-blue-600"
+                    ></div>
+                    <div
+                        class="absolute left-1 top-1 w-3 h-3 bg-white rounded-full transition-transform peer-checked:translate-x-5"
+                    ></div>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-xs font-bold text-slate-700"
+                        >No generar ticket de reposición</span
+                    >
+                    <span class="text-[9px] text-slate-400"
+                        >Útil si ya existe un ticket o es un trámite manual.</span
+                    >
+                </div>
+            </label>
         {/if}
 
         <!-- Smart Search Input -->
