@@ -18,8 +18,10 @@
         Plus,
         ChevronDown,
         FileStack,
+        Upload,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
+    import KoneUsageImportModal from "../components/modals/KoneUsageImportModal.svelte";
     import { personnelService } from "../services/personnel";
     import { cardService } from "../services/cards";
     import { exportPersonnelToExcel } from "../utils/xlsxExport";
@@ -154,6 +156,7 @@
     }
 
     let showExportMenu = $state(false);
+    let showKoneUsageModal = $state(false);
 
     async function handleExportExcel(splitByDependency: boolean = false) {
         showExportMenu = false;
@@ -329,6 +332,14 @@
         {/snippet}
 
         {#snippet actions()}
+            <Button
+                variant="soft-blue"
+                onclick={() => (showKoneUsageModal = true)}
+                class="flex items-center gap-2.5 h-10 px-5"
+            >
+                <Upload size={18} strokeWidth={2.5} class="text-blue-600/80" />
+                Importar Conteo KONE
+            </Button>
             <div class="relative">
                 <Button
                     variant="soft-emerald"
@@ -561,3 +572,5 @@
 {#if currentUser?.role !== "viewer"}
     <FloatingActionButton onclick={onOpenAddModal} label="Nueva Alta" />
 {/if}
+
+<KoneUsageImportModal bind:isOpen={showKoneUsageModal} />
