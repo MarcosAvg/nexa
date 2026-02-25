@@ -34,6 +34,412 @@ export interface ExportOptions {
     splitByDependency?: boolean;
 }
 
+// ─── Statistics Sheet Helper ───────────────────────────────────────────
+async function addStatsSheet(workbook: ExcelJS.Workbook, data: ExportPersonnelData[], filterInfo: string) {
+    const ws = workbook.addWorksheet('Resumen Ejecutivo');
+
+    const C = {
+        title: 'FF1E293B',
+        meta: 'FF64748B',
+        separator: 'FF94A3B8',
+        white: 'FFFFFFFF',
+        sectionHead: 'FF0F172A',
+        emerald: { bg: 'FFD1FAE5', fg: 'FF065F46' },
+        rose: { bg: 'FFFEE2E2', fg: 'FF991B1B' },
+        amber: { bg: 'FFFEF3C7', fg: 'FF92400E' },
+        sky: { bg: 'FFE0F2FE', fg: 'FF075985' },
+        violet: { bg: 'FFEDE9FE', fg: 'FF5B21B6' },
+        slate: { bg: 'FFF1F5F9', fg: 'FF334155' },
+        blue: { bg: 'FFDBEAFE', fg: 'FF1E40AF' },
+        pink: { bg: 'FFFCE7F3', fg: 'FF9D174D' },
+    };
+
+    // Column widths
+    ws.columns = [
+        { width: 4 },   // A spacer
+        { width: 30 },  // B label
+        { width: 16 },  // C value
+        { width: 14 },  // D percent
+        { width: 4 },   // E spacer
+        { width: 30 },  // F label
+        { width: 16 },  // G value
+        { width: 14 },  // H percent
+    ];
+
+    let row = 1;
+
+    // ── Helpers ──
+    const thin = (argb: string): ExcelJS.Border => ({ style: 'thin', color: { argb } });
+    const setBorder = (cell: ExcelJS.Cell, color = 'FFCBD5E1') => {
+        cell.border = { top: thin(color), bottom: thin(color), left: thin(color), right: thin(color) };
+    };
+
+    const sectionTitle = (text: string) => {
+        ws.mergeCells(`B${row}:H${row}`);
+        const cell = ws.getCell(`B${row}`);
+        cell.value = text;
+        cell.font = { name: 'Arial', bold: true, size: 12, color: { argb: C.sectionHead } };
+        cell.alignment = { vertical: 'middle' };
+        ws.getRow(row).height = 30;
+        row++;
+        // Separator line
+        ws.mergeCells(`B${row}:H${row}`);
+        const sep = ws.getCell(`B${row}`);
+        sep.border = { top: { style: 'medium', color: { argb: C.separator } } };
+        ws.getRow(row).height = 6;
+        row++;
+    };
+
+    const kpiCard = (col: string, label: string, value: number | string, colors: { bg: string; fg: string }, pct?: string) => {
+        const colIdx = col.charCodeAt(0) - 64;
+        const valCol = String.fromCharCode(col.charCodeAt(0) + 1);
+        const pctCol = String.fromCharCode(col.charCodeAt(0) + 2);
+
+        const lCell = ws.getCell(`${col}${row}`);
+        lCell.value = label;
+        lCell.font = { name: 'Arial', bold: true, size: 10, color: { argb: colors.fg } };
+        lCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.bg } };
+        lCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        setBorder(lCell);
+
+        const vCell = ws.getCell(`${valCol}${row}`);
+        vCell.value = value;
+        vCell.font = { name: 'Arial', bold: true, size: 14, color: { argb: colors.fg } };
+        vCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.bg } };
+        vCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        setBorder(vCell);
+
+        if (pct !== undefined) {
+            const pCell = ws.getCell(`${pctCol}${row}`);
+            pCell.value = pct;
+            pCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: colors.fg } };
+            pCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.bg } };
+            pCell.alignment = { vertical: 'middle', horizontal: 'center' };
+            setBorder(pCell);
+        }
+    };
+
+    const tableHeader = (cols: { col: string; label: string }[], colors: { bg: string; fg: string }) => {
+        cols.forEach(({ col, label }) => {
+            const cell = ws.getCell(`${col}${row}`);
+            cell.value = label;
+            cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: C.white } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.fg } };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            setBorder(cell, colors.fg);
+        });
+        ws.getRow(row).height = 26;
+        row++;
+    };
+
+    const tableRow = (cols: { col: string; value: string | number }[], colors: { bg: string; fg: string }, bold = false) => {
+        cols.forEach(({ col, value }, i) => {
+            const cell = ws.getCell(`${col}${row}`);
+            cell.value = value;
+            cell.font = { name: 'Arial', size: 9, color: { argb: C.sectionHead }, bold };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i === 0 ? colors.bg : C.white } };
+            cell.alignment = { vertical: 'middle', horizontal: i === 0 ? 'left' : 'center', indent: i === 0 ? 1 : 0 };
+            setBorder(cell);
+        });
+        ws.getRow(row).height = 22;
+        row++;
+    };
+
+    const pct = (n: number, total: number) => total > 0 ? `${((n / total) * 100).toFixed(1)}%` : '0%';
+
+    // ── Compute all stats ──
+    const total = data.length;
+    const activos = data.filter(p => p.status === 'Activo/a').length;
+    const parciales = data.filter(p => p.status === 'Parcial').length;
+    const bloqueados = data.filter(p => p.status === 'Bloqueado/a').length;
+    const inactivos = data.filter(p => p.status === 'Inactivo/a').length;
+    const bajas = data.filter(p => p.status === 'Baja').length;
+    const activosOperativos = activos + parciales; // personas con algún nivel de acceso
+
+    // Card coverage (only for "operativos" — active + parcial)
+    const operativos = data.filter(p => p.status === 'Activo/a' || p.status === 'Parcial');
+    const conP2000 = operativos.filter(p => p.cards?.some(c => c.type.toUpperCase() === 'P2000')).length;
+    const conKone = operativos.filter(p => p.cards?.some(c => c.type.toUpperCase() === 'KONE')).length;
+    const sinP2000 = activosOperativos - conP2000;
+    const sinKone = activosOperativos - conKone;
+
+    // Data quality
+    const sinEmail = data.filter(p => !p.email).length;
+    const sinSchedule = data.filter(p => !p.schedule?.days).length;
+    const sinPosition = data.filter(p => !p.position).length;
+    const sinArea = data.filter(p => !p.area).length;
+    const sinFloor = data.filter(p => !p.floor).length;
+
+    // Dependency distribution
+    const depMap: Record<string, { total: number; activos: number; inactivos: number }> = {};
+    data.forEach(p => {
+        const dep = p.dependency || 'Sin Dependencia';
+        if (!depMap[dep]) depMap[dep] = { total: 0, activos: 0, inactivos: 0 };
+        depMap[dep].total++;
+        if (p.status === 'Activo/a' || p.status === 'Parcial') depMap[dep].activos++;
+        else depMap[dep].inactivos++;
+    });
+    const depEntries = Object.entries(depMap).sort((a, b) => b[1].total - a[1].total);
+
+    // Special accesses
+    const accessMap: Record<string, number> = {};
+    data.forEach(p => {
+        (p.specialAccesses || []).forEach(a => {
+            accessMap[a] = (accessMap[a] || 0) + 1;
+        });
+    });
+    const conAccesoEspecial = data.filter(p => p.specialAccesses?.length > 0).length;
+    const accessEntries = Object.entries(accessMap).sort((a, b) => b[1] - a[1]);
+
+    // Schedule distribution (by days only, hours are free-form)
+    const schedMap: Record<string, number> = {};
+    data.forEach(p => {
+        const key = p.schedule?.days || null;
+        if (key) schedMap[key] = (schedMap[key] || 0) + 1;
+    });
+    const schedEntries = Object.entries(schedMap).sort((a, b) => b[1] - a[1]);
+
+    // Building distribution
+    const buildMap: Record<string, number> = {};
+    data.forEach(p => {
+        const key = p.building || 'Sin Edificio';
+        buildMap[key] = (buildMap[key] || 0) + 1;
+    });
+    const buildEntries = Object.entries(buildMap).sort((a, b) => b[1] - a[1]);
+
+    // ══════════════════════════════════════════════════════════════
+    // ROW 1: Title
+    // ══════════════════════════════════════════════════════════════
+    ws.mergeCells('A1:H1');
+    const titleCell = ws.getCell('A1');
+    titleCell.value = `       RESUMEN EJECUTIVO — DIRECTORIO DE PERSONAL${filterInfo}`;
+    titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: C.title } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    ws.getRow(1).height = 40;
+
+    try {
+        const response = await fetch('/favicon.svg');
+        if (response.ok) {
+            const blob = await response.blob();
+            const buffer = await blob.arrayBuffer();
+            const imageId = workbook.addImage({ buffer, extension: 'svg' as any });
+            ws.addImage(imageId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 32, height: 32 } });
+        }
+    } catch { /* logo optional */ }
+
+    // ROW 2: Meta
+    ws.mergeCells('A2:H2');
+    const metaCell = ws.getCell('A2');
+    const dateStr = new Date().toLocaleDateString('es-MX', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    metaCell.value = `Reporte generado: ${dateStr}  |  Total de registros: ${total}`;
+    metaCell.font = { name: 'Arial', size: 9, color: { argb: C.meta } };
+    metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    ws.getRow(2).height = 20;
+
+    row = 4;
+
+    // ══════════════════════════════════════════════════════════════
+    // SECTION 1: KPIs por Estado
+    // ══════════════════════════════════════════════════════════════
+    sectionTitle('📊  INDICADORES CLAVE POR ESTADO');
+
+    // Left column KPIs
+    ws.getRow(row).height = 32;
+    kpiCard('B', 'TOTAL PERSONAL', total, C.blue);
+    kpiCard('F', 'ACTIVOS OPERATIVOS', activosOperativos, C.emerald, pct(activosOperativos, total));
+    row++;
+
+    ws.getRow(row).height = 28;
+    kpiCard('B', 'Activo/a', activos, C.emerald, pct(activos, total));
+    kpiCard('F', 'Parcial', parciales, C.amber, pct(parciales, total));
+    row++;
+
+    ws.getRow(row).height = 28;
+    kpiCard('B', 'Bloqueado/a', bloqueados, C.rose, pct(bloqueados, total));
+    kpiCard('F', 'Inactivo/a', inactivos, C.slate, pct(inactivos, total));
+    row++;
+
+    ws.getRow(row).height = 28;
+    kpiCard('B', 'Baja', bajas, C.slate, pct(bajas, total));
+    row++;
+    row++;
+
+    // ══════════════════════════════════════════════════════════════
+    // SECTION 2: Cobertura de Tarjetas
+    // ══════════════════════════════════════════════════════════════
+    sectionTitle('🪪  COBERTURA DE TARJETAS DE ACCESO');
+
+    // Sub header note
+    ws.mergeCells(`B${row}:H${row}`);
+    const noteCell = ws.getCell(`B${row}`);
+    noteCell.value = `Calculado sobre personal operativo (Activo/a + Parcial): ${activosOperativos} personas`;
+    noteCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: C.meta } };
+    ws.getRow(row).height = 18;
+    row++;
+
+    ws.getRow(row).height = 28;
+    kpiCard('B', 'Con tarjeta P2000', conP2000, C.amber, pct(conP2000, activosOperativos));
+    kpiCard('F', 'Sin tarjeta P2000', sinP2000, sinP2000 > 0 ? C.rose : C.emerald, pct(sinP2000, activosOperativos));
+    row++;
+
+    ws.getRow(row).height = 28;
+    kpiCard('B', 'Con tarjeta KONE', conKone, C.sky, pct(conKone, activosOperativos));
+    kpiCard('F', 'Sin tarjeta KONE', sinKone, sinKone > 0 ? C.rose : C.emerald, pct(sinKone, activosOperativos));
+    row++;
+
+    ws.getRow(row).height = 28;
+    kpiCard('B', '% Cobertura P2000', pct(conP2000, activosOperativos), activosOperativos > 0 && conP2000 / activosOperativos >= 0.9 ? C.emerald : C.amber);
+    kpiCard('F', '% Cobertura KONE', pct(conKone, activosOperativos), activosOperativos > 0 && conKone / activosOperativos >= 0.9 ? C.emerald : C.amber);
+    row++;
+    row++;
+
+    // ══════════════════════════════════════════════════════════════
+    // SECTION 3: Distribución por Dependencia
+    // ══════════════════════════════════════════════════════════════
+    sectionTitle('🏢  DISTRIBUCIÓN POR DEPENDENCIA');
+    tableHeader([
+        { col: 'B', label: 'DEPENDENCIA' },
+        { col: 'C', label: 'TOTAL' },
+        { col: 'D', label: '% DEL TOTAL' },
+        { col: 'F', label: 'ACTIVOS' },
+        { col: 'G', label: 'INACTIVOS' },
+        { col: 'H', label: '% ACTIVOS' },
+    ], C.violet);
+
+    depEntries.forEach(([dep, stats]) => {
+        tableRow([
+            { col: 'B', value: dep },
+            { col: 'C', value: stats.total },
+            { col: 'D', value: pct(stats.total, total) },
+            { col: 'F', value: stats.activos },
+            { col: 'G', value: stats.inactivos },
+            { col: 'H', value: pct(stats.activos, stats.total) },
+        ], C.violet);
+    });
+    row++;
+
+    // ══════════════════════════════════════════════════════════════
+    // SECTION 4: Distribución por Edificio
+    // ══════════════════════════════════════════════════════════════
+    if (buildEntries.length > 0) {
+        sectionTitle('🏗️  DISTRIBUCIÓN POR EDIFICIO');
+        tableHeader([
+            { col: 'B', label: 'EDIFICIO' },
+            { col: 'C', label: 'TOTAL' },
+            { col: 'D', label: '% DEL TOTAL' },
+        ], C.sky);
+
+        buildEntries.forEach(([building, count]) => {
+            tableRow([
+                { col: 'B', value: building },
+                { col: 'C', value: count },
+                { col: 'D', value: pct(count, total) },
+            ], C.sky);
+        });
+        row++;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // SECTION 5: Calidad de Datos
+    // ══════════════════════════════════════════════════════════════
+    sectionTitle('⚠️  CALIDAD DE DATOS — CAMPOS INCOMPLETOS');
+
+    tableHeader([
+        { col: 'B', label: 'CAMPO' },
+        { col: 'C', label: 'SIN DATO' },
+        { col: 'D', label: '% INCOMPLETO' },
+    ], C.rose);
+
+    const qualityRows: [string, number][] = [
+        ['Correo Electrónico', sinEmail],
+        ['Jornada Laboral', sinSchedule],
+        ['Puesto', sinPosition],
+        ['Equipo / Área', sinArea],
+        ['Piso Base', sinFloor],
+    ];
+    qualityRows.forEach(([label, count]) => {
+        const colors = count > 0 ? C.rose : C.emerald;
+        tableRow([
+            { col: 'B', value: label },
+            { col: 'C', value: count },
+            { col: 'D', value: pct(count, total) },
+        ], colors);
+    });
+
+    // Totals row
+    const totalMissing = qualityRows.reduce((sum, [, c]) => sum + c, 0);
+    const maxPossible = total * qualityRows.length;
+    ws.getRow(row).height = 24;
+    const summCols = [
+        { col: 'B', value: 'TOTAL CAMPOS VACÍOS' },
+        { col: 'C', value: `${totalMissing} / ${maxPossible}` },
+        { col: 'D', value: pct(totalMissing, maxPossible) },
+    ];
+    summCols.forEach(({ col, value }, i) => {
+        const cell = ws.getCell(`${col}${row}`);
+        cell.value = value;
+        cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: C.sectionHead } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.slate.bg } };
+        cell.alignment = { vertical: 'middle', horizontal: i === 0 ? 'left' : 'center', indent: i === 0 ? 1 : 0 };
+        setBorder(cell);
+    });
+    row++;
+    row++;
+
+    // ══════════════════════════════════════════════════════════════
+    // SECTION 6: Accesos Especiales
+    // ══════════════════════════════════════════════════════════════
+    if (accessEntries.length > 0) {
+        sectionTitle('🔐  ACCESOS ESPECIALES');
+
+        ws.getRow(row).height = 28;
+        kpiCard('B', 'Personas con acceso especial', conAccesoEspecial, C.pink, pct(conAccesoEspecial, total));
+        row++;
+
+        tableHeader([
+            { col: 'B', label: 'TIPO DE ACCESO' },
+            { col: 'C', label: 'PERSONAS' },
+            { col: 'D', label: '% DEL TOTAL' },
+        ], C.pink);
+
+        accessEntries.forEach(([access, count]) => {
+            tableRow([
+                { col: 'B', value: access },
+                { col: 'C', value: count },
+                { col: 'D', value: pct(count, total) },
+            ], C.pink);
+        });
+        row++;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // SECTION 7: Distribución de Jornada
+    // ══════════════════════════════════════════════════════════════
+    if (schedEntries.length > 0) {
+        sectionTitle('🕐  DISTRIBUCIÓN DE JORNADA LABORAL');
+
+        tableHeader([
+            { col: 'B', label: 'JORNADA' },
+            { col: 'C', label: 'PERSONAS' },
+            { col: 'D', label: '% DEL TOTAL' },
+        ], C.emerald);
+
+        schedEntries.forEach(([sched, count]) => {
+            tableRow([
+                { col: 'B', value: sched },
+                { col: 'C', value: count },
+                { col: 'D', value: pct(count, total) },
+            ], C.emerald);
+        });
+    }
+
+    // Freeze and print setup
+    ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 3 }];
+    ws.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1 };
+}
+
 export async function exportPersonnelToExcel(data: ExportPersonnelData[], options?: ExportOptions) {
     const workbook = new ExcelJS.Workbook();
 
@@ -279,6 +685,9 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
             filterDescription = `      -  Filtros: ${activeFilters.join(' - ')}`;
         }
     }
+
+    // ── Stats sheet is always first ──
+    await addStatsSheet(workbook, data, filterDescription);
 
     if (options?.splitByDependency) {
         // Group data by dependency

@@ -94,3 +94,30 @@ export interface AppStateData {
     filteredHistoryLogs: any[]; // HistoryLog interface could be added later
     userProfile: UserProfile | null;
 }
+
+export interface DashboardMetrics {
+    totalPersonnel: number;
+    statusCounts: {
+        activo: number;
+        parcial: number;
+        inactivo: number;
+        bloqueado: number;
+        baja: number;
+    };
+    cardCoverage: {
+        conP2000: number;
+        sinP2000: number;
+        conKone: number;
+        sinKone: number;
+        operativos: number;
+    };
+    topDependencies: { name: string; total: number; activos: number }[];
+    topBuildings: { name: string; total: number }[];
+    dataQuality: {
+        sinEmail: number;
+        sinSchedule: number;
+        sinPosition: number;
+        sinArea: number;
+        total: number;
+    };
+}

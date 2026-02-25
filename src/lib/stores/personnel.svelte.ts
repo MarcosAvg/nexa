@@ -1,4 +1,4 @@
-import type { Person, Card } from "../types";
+import type { Person, Card, DashboardMetrics } from "../types";
 
 export class PersonnelState {
     personnel = $state<Person[]>([]);
@@ -16,12 +16,22 @@ export class PersonnelState {
     searchQuery = $state("");
     statusFilter = $state("Todos");
     dependencyId = $state("");
+    buildingId = $state("");
     isLoading = $state(false);
     dashboardStats = $state({
         activePersonnel: 0,
         koneStock: 0,
         p2000Stock: 0
     });
+    dashboardMetrics = $state<DashboardMetrics>({
+        totalPersonnel: 0,
+        statusCounts: { activo: 0, parcial: 0, inactivo: 0, bloqueado: 0, baja: 0 },
+        cardCoverage: { conP2000: 0, sinP2000: 0, conKone: 0, sinKone: 0, operativos: 0 },
+        topDependencies: [],
+        topBuildings: [],
+        dataQuality: { sinEmail: 0, sinSchedule: 0, sinPosition: 0, sinArea: 0, total: 0 },
+    });
+    metricsLoading = $state(false);
 
     setPersonnel(data: Person[], count: number) {
         this.personnel = data;
@@ -34,8 +44,6 @@ export class PersonnelState {
 
     async refreshDashboardStats() {
         try {
-            // Single RPC round-trip instead of 3 sequential paginated queries.
-            // Requires the 'get_dashboard_stats' function in Supabase SQL (see migration).
             const { supabase } = await import("../supabase");
             const { data, error } = await supabase.rpc('get_dashboard_stats');
             if (error) throw error;
@@ -55,12 +63,25 @@ export class PersonnelState {
         }
     }
 
-    async refresh(page: number = 1, search: string = "", status: string = "Todos", depId: string = "") {
+    async refreshDashboardMetrics() {
+        this.metricsLoading = true;
+        try {
+            const { personnelService } = await import("../services/personnel");
+            this.dashboardMetrics = await personnelService.fetchDashboardMetrics();
+        } catch (error) {
+            console.error("Error refreshing dashboard metrics:", error);
+        } finally {
+            this.metricsLoading = false;
+        }
+    }
+
+    async refresh(page: number = 1, search: string = "", status: string = "Todos", depId: string = "", bldgId: string = "") {
         this.isLoading = true;
         this.currentPage = page;
         this.searchQuery = search;
         this.statusFilter = status;
         this.dependencyId = depId;
+        this.buildingId = bldgId;
 
         try {
             const { personnelService } = await import("../services/personnel");
@@ -69,7 +90,8 @@ export class PersonnelState {
                 this.pageSize,
                 this.searchQuery,
                 this.statusFilter,
-                this.dependencyId
+                this.dependencyId,
+                this.buildingId
             );
             this.setPersonnel(data, count);
         } finally {
@@ -79,26 +101,26 @@ export class PersonnelState {
 
     async nextPage() {
         if (this.currentPage * this.pageSize < this.totalRecords) {
-            await this.refresh(this.currentPage + 1, this.searchQuery, this.statusFilter, this.dependencyId);
+            await this.refresh(this.currentPage + 1, this.searchQuery, this.statusFilter, this.dependencyId, this.buildingId);
         }
     }
 
     async prevPage() {
         if (this.currentPage > 1) {
-            await this.refresh(this.currentPage - 1, this.searchQuery, this.statusFilter, this.dependencyId);
+            await this.refresh(this.currentPage - 1, this.searchQuery, this.statusFilter, this.dependencyId, this.buildingId);
         }
     }
 
     async goToPage(page: number) {
-        await this.refresh(page, this.searchQuery, this.statusFilter, this.dependencyId);
+        await this.refresh(page, this.searchQuery, this.statusFilter, this.dependencyId, this.buildingId);
     }
 
     async search(query: string) {
-        await this.refresh(1, query, this.statusFilter, this.dependencyId);
+        await this.refresh(1, query, this.statusFilter, this.dependencyId, this.buildingId);
     }
 
-    async filter(status: string, depId: string) {
-        await this.refresh(1, this.searchQuery, status, depId);
+    async filter(status: string, depId: string, bldgId: string = "") {
+        await this.refresh(1, this.searchQuery, status, depId, bldgId);
     }
 
     setCards(data: Card[]) {
@@ -118,7 +140,7 @@ export class PersonnelState {
     openEditModal(person: Person | null) {
         this.editingPerson = person;
         this.isEditModalOpen = true;
-        this.setDetailsOpen(false); // Close details when editing
+        this.setDetailsOpen(false);
     }
 
     closeEditModal() {

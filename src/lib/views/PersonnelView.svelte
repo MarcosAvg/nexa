@@ -31,10 +31,15 @@
     let buildings = $derived(catalogState.buildings);
 
     let dependencyNames = $derived(dependencies.map((d) => d.name));
+    let buildingNames = $derived([
+        ...buildings.map((b) => b.name),
+        "Sin Edificio",
+    ]);
 
     // Local UI filters
     let statusFilter = $state("Todos");
     let dependencyFilter = $state("");
+    let buildingFilter = $state("");
     let personSearch = $state("");
 
     // Modal State
@@ -55,22 +60,19 @@
         personnelState.filter(statusFilter, depId);
     }
 
-    // React to filter changes
     $effect(() => {
-        // We need to trigger this when statusFilter or dependencyFilter changes.
-        // However, we want to avoid double-triggering on mount.
-        // Let's use specific handlers or just call it here (with simple debounce if needed, but effect is okay for select inputs).
-        // Actually, we can just bind inputs to state proxy or call function on change.
-        // Since we are using bind:value on components, we need to inspect if they support onchange.
-        // For now, let's use an effect that watches these values.
         const depId =
             dependencies.find((d) => d.name === dependencyFilter)?.id || "";
-        // Only trigger if values are different from state (to avoid loops if state updates filters)
+        const bldgId =
+            buildingFilter === "Sin Edificio"
+                ? "__none__"
+                : buildings.find((b) => b.name === buildingFilter)?.id || "";
         if (
             statusFilter !== personnelState.statusFilter ||
-            depId !== personnelState.dependencyId
+            depId !== personnelState.dependencyId ||
+            bldgId !== personnelState.buildingId
         ) {
-            personnelState.filter(statusFilter, depId);
+            personnelState.filter(statusFilter, depId, bldgId);
         }
     });
 
@@ -296,6 +298,12 @@
                 options={dependencyNames}
                 placeholder="Todas las dependencias"
                 bind:value={dependencyFilter}
+            />
+            <FilterSelect
+                label="Edificio"
+                options={buildingNames}
+                placeholder="Todos los edificios"
+                bind:value={buildingFilter}
             />
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span
