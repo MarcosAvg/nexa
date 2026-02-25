@@ -2,6 +2,7 @@ import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import type { Card } from "../types";
 import { handleError, withTimeout } from "../utils/error";
+import { appEvents, EVENTS } from "../utils/appEvents";
 
 export const cardService = {
     async fetchAll(
@@ -178,6 +179,28 @@ export const cardService = {
         }
     },
 
+    /** Look up a card by exact folio + type, including owner info */
+    async findByFolio(folio: string, type: string): Promise<{
+        card: any;
+        ownerName: string | null;
+    } | null> {
+        const { data, error } = await supabase
+            .from("cards")
+            .select("id, folio, type, status, person_id, personnel(first_name, last_name)")
+            .eq("folio", folio)
+            .eq("type", type)
+            .maybeSingle();
+
+        if (error || !data) return null;
+
+        const person = data.personnel as any;
+        const ownerName = person
+            ? `${person.first_name || ""} ${person.last_name || ""}`.trim()
+            : null;
+
+        return { card: data, ownerName };
+    },
+
     async save(data: any, replacementOptions?: { oldCardStatus: string }) {
         try {
             // Check if this is a new assignment
@@ -293,6 +316,7 @@ export const cardService = {
                     });
                 }
             }
+            appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
             handleError(error, "Save Card");
             throw error;
@@ -332,6 +356,7 @@ export const cardService = {
             await HistoryService.log("CARD", cardId, "UPDATE", {
                 message: `Estado de programación actualizado a ${status || 'N/A'}`,
             });
+            appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
             handleError(error, "Update Programming Status");
             throw error;
@@ -356,6 +381,7 @@ export const cardService = {
             await HistoryService.log("CARD", cardId, "UPDATE", {
                 message: `Estado de responsiva actualizado a ${status}`,
             });
+            appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
             handleError(error, "Update Responsiva Status");
             throw error;
@@ -389,6 +415,7 @@ export const cardService = {
             await HistoryService.log("CARD", cardId, "UPDATE_STATUS", {
                 message: `Estado de tarjeta actualizado a ${finalStatus}`,
             });
+            appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
             handleError(error, "Update Card Status");
             throw error;
@@ -416,6 +443,7 @@ export const cardService = {
             await HistoryService.log("CARD", cardId, "UNASSIGN", {
                 message: `Tarjeta desvinculada de la persona`,
             });
+            appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
             handleError(error, "Unassign Card");
             throw error;
@@ -435,6 +463,7 @@ export const cardService = {
             // Delete the card
             const { error } = await supabase.from("cards").delete().eq("id", id);
             if (error) throw error;
+            appEvents.emit(EVENTS.CARDS_CHANGED);
 
         } catch (error) {
             handleError(error, "Delete Card");

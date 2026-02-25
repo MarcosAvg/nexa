@@ -72,12 +72,14 @@
         initData(true);
       } else {
         userState.clear();
+        // Clear cached userId so next login doesn't inherit old user
+        const { HistoryService } = await import("./lib/services/history");
+        HistoryService.clearCache();
       }
     });
   });
 
   async function initData(isBackground = false) {
-    console.log("🚀 [DEBUG] initData called. Background:", isBackground);
     try {
       if (!isBackground) {
         loadingAuth = true;

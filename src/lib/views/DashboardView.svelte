@@ -18,20 +18,41 @@
         Activity,
         FileText,
     } from "lucide-svelte";
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
+    import { appEvents, EVENTS } from "../utils/appEvents";
+
+    let unsubs: (() => void)[] = [];
 
     onMount(() => {
         personnelState.refreshDashboardStats();
+
+        // Auto-refresh when data changes in other views
+        unsubs.push(
+            appEvents.on(EVENTS.PERSONNEL_CHANGED, () =>
+                personnelState.refreshDashboardStats(),
+            ),
+            appEvents.on(EVENTS.CARDS_CHANGED, () =>
+                personnelState.refreshDashboardStats(),
+            ),
+            appEvents.on(EVENTS.TICKETS_CHANGED, () => {
+                // Tickets are already in ticketState via optimistic updates, no extra fetch needed
+            }),
+        );
     });
 
-    // Re-derive from stores for reactivity
+    onDestroy(() => unsubs.forEach((fn) => fn()));
+
+    // Use personnelOptions (full lightweight list) instead of paginated personnel
+    // This ensures the Map contains ALL people, not just the current page of 50
     let rawPendingItems = $derived(ticketState.pendingItems);
-    let personnel = $derived(personnelState.personnel);
+    let personnelOptions = $derived(personnelState.personnelOptions);
     let extraCards = $derived(personnelState.extraCards);
     let filteredHistoryLogs = $derived(historyState.historyLogs);
 
-    // O(1) map lookup instead of O(n) .find() per ticket — critical for large personnel lists
-    let personnelMap = $derived(new Map(personnel.map((p) => [p.id ?? "", p])));
+    // O(1) map lookup using the full personnel list
+    let personnelMap = $derived(
+        new Map(personnelOptions.map((p) => [p.id, p])),
+    );
 
     let pendingItems = $derived(
         rawPendingItems.map((t) => {

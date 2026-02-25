@@ -15,7 +15,13 @@
     import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
     import ModificationCompareModal from "../components/modals/ModificationCompareModal.svelte";
     import ManualTicketDetailsModal from "../components/modals/ManualTicketDetailsModal.svelte";
-    import { Search, Plus, FileSpreadsheet } from "lucide-svelte";
+    import {
+        Search,
+        Plus,
+        FileSpreadsheet,
+        ChevronLeft,
+        ChevronRight,
+    } from "lucide-svelte";
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
     import { personnelService } from "../services/personnel";
@@ -24,7 +30,13 @@
     import ConfirmAltaModal from "../components/modals/ConfirmAltaModal.svelte";
     import TicketImportedDetailsModal from "../components/modals/TicketImportedDetailsModal.svelte";
 
-    let pendingItems = $derived(ticketState.pendingItems);
+    // Server-side paginated tickets (replaces client-side filtering)
+    let tickets = $state<any[]>([]);
+    let currentPage = $state(1);
+    let pageSize = $state(50);
+    let totalRecords = $state(0);
+    let totalPages = $derived(Math.max(1, Math.ceil(totalRecords / pageSize)));
+    let isLoading = $state(false);
 
     // Filters
     let typeFilter = $state("Todos");
@@ -57,62 +69,18 @@
 
     let personnel = $derived(personnelState.personnel);
 
-    let filteredTickets = $derived.by(() => {
-        let items = pendingItems.filter((ticket) => {
-            // ... (filters remain the same)
-            // 1. Type Filter
-            const matchType =
-                typeFilter === "Todos" || ticket.type === typeFilter;
-
-            // 2. Priority Filter
-            const matchPriority =
-                priorityFilter === "Todas" ||
-                ticket.priority.toLowerCase() === priorityFilter.toLowerCase();
-
-            // Helper for search
-            let pName = "Desconocido";
-            if (ticket.personnel) {
-                pName = `${ticket.personnel.first_name} ${ticket.personnel.last_name}`;
-            } else if (ticket.payload?.relatedPerson?.name) {
-                pName = ticket.payload.relatedPerson.name;
-            }
-
-            // 3. Search Filter
-            const searchLower = searchQuery.toLowerCase();
-            const matchSearch =
-                searchQuery === "" ||
-                ticket.title.toLowerCase().includes(searchLower) ||
-                ticket.description.toLowerCase().includes(searchLower) ||
-                pName.toLowerCase().includes(searchLower) ||
-                (ticket.cardFolio || "").toLowerCase().includes(searchLower);
-
-            return matchType && matchPriority && matchSearch;
-        });
-
-        // Basic sort by date desc
-        items.sort((a: any, b: any) => {
-            return (
-                new Date(b.created_at).getTime() -
-                new Date(a.created_at).getTime()
-            );
-        });
-
-        return items.map((t) => {
+    // Server-paginated data with person name resolution
+    let filteredTickets = $derived(
+        tickets.map((t) => {
             let personName = "Desconocido";
-
-            // Use joined data if available
             if (t.personnel) {
                 personName = `${t.personnel.first_name} ${t.personnel.last_name}`;
             } else if (t.payload?.relatedPerson?.name) {
                 personName = t.payload.relatedPerson.name;
             }
-
-            return {
-                ...t,
-                personName,
-            };
-        });
-    });
+            return { ...t, personName };
+        }),
+    );
 
     const ticketTypes = [
         "Todos",
@@ -129,25 +97,62 @@
         "Otro",
     ];
 
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
+    import { appEvents, EVENTS } from "../utils/appEvents";
 
-    // ... imports
-
-    // ... existing code ...
-
-    async function refreshData() {
-        // ... existing refresh logic
-        const [tickets, extraCards] = await Promise.all([
-            ticketService.fetchAll(),
-            cardService.fetchExtra(),
-        ]);
-        ticketState.setTickets(tickets);
-        personnelState.setCards(extraCards);
+    async function refreshData(page: number = 1) {
+        isLoading = true;
+        currentPage = page;
+        try {
+            const [result, extraCards] = await Promise.all([
+                ticketService.fetchPaginated(
+                    currentPage,
+                    pageSize,
+                    typeFilter,
+                    priorityFilter,
+                    searchQuery,
+                ),
+                cardService.fetchExtra(),
+            ]);
+            tickets = result.data;
+            totalRecords = result.count;
+            // Also update the global store for Dashboard pending count
+            ticketState.setTickets(result.data);
+            personnelState.setCards(extraCards);
+        } finally {
+            isLoading = false;
+        }
     }
+
+    // Debounced search
+    let searchTimeout: ReturnType<typeof setTimeout>;
+    function onSearch(e: Event) {
+        const value = (e.target as HTMLInputElement).value;
+        searchQuery = value;
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => refreshData(1), 300);
+    }
+
+    function onFilterChange() {
+        refreshData(1);
+    }
+
+    function goToPage(page: number) {
+        refreshData(page);
+    }
+
+    let unsubs: (() => void)[] = [];
 
     onMount(() => {
         refreshData();
+        unsubs.push(
+            appEvents.on(EVENTS.TICKETS_CHANGED, () =>
+                refreshData(currentPage),
+            ),
+        );
     });
+
+    onDestroy(() => unsubs.forEach((fn) => fn()));
 
     // Handlers
     const IMPORTED_TYPES = new Set([
@@ -220,17 +225,23 @@
     async function handleFinalConfirm() {
         if (!ticketToComplete) return;
 
-        try {
-            // Delete ticket usually done here for simple tickets that don't have sidepanel logic
-            await ticketService.delete(ticketToComplete.id);
+        const ticket = ticketToComplete;
+        ticketToComplete = null;
 
+        // Optimistic: remove from local array immediately (no flash)
+        const prevTickets = tickets;
+        tickets = tickets.filter((t) => t.id !== ticket.id);
+        totalRecords = Math.max(0, totalRecords - 1);
+
+        try {
+            await ticketService.delete(ticket.id);
             toast.success("Ticket completado");
-            await refreshData();
         } catch (e) {
             console.error(e);
             toast.error("Error al completar el ticket");
-        } finally {
-            ticketToComplete = null;
+            // Rollback on error
+            tickets = prevTickets;
+            totalRecords = totalRecords + 1;
         }
     }
 </script>
@@ -247,6 +258,7 @@
                         label="Tipo"
                         options={ticketTypes}
                         bind:value={typeFilter}
+                        onchange={onFilterChange}
                     />
                 </div>
 
@@ -256,6 +268,7 @@
                         label="Prioridad"
                         options={["Todas", "Alta", "Media", "Baja"]}
                         bind:value={priorityFilter}
+                        onchange={onFilterChange}
                     />
                 </div>
 
@@ -269,7 +282,8 @@
                         id="ticket-search"
                         placeholder="Buscar por folio, persona..."
                         class="pl-10 h-9 text-xs font-bold"
-                        bind:value={searchQuery}
+                        value={searchQuery}
+                        oninput={onSearch}
                     />
                 </div>
             </div>
@@ -295,6 +309,41 @@
         {/snippet}
     </SectionHeader>
 
+    <!-- Top Pagination -->
+    {#if totalRecords > pageSize}
+        <div class="flex items-center justify-between px-2">
+            <p class="text-xs text-slate-500">
+                Mostrando {(currentPage - 1) * pageSize + 1}–{Math.min(
+                    currentPage * pageSize,
+                    totalRecords,
+                )} de {totalRecords} tickets
+            </p>
+            <div class="flex items-center gap-2">
+                <button
+                    type="button"
+                    class="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    onclick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                >
+                    <ChevronLeft size={14} />
+                    Anterior
+                </button>
+                <span class="text-xs text-slate-500 font-bold">
+                    {currentPage} / {totalPages}
+                </span>
+                <button
+                    type="button"
+                    class="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    onclick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                >
+                    Siguiente
+                    <ChevronRight size={14} />
+                </button>
+            </div>
+        </div>
+    {/if}
+
     <div class="flex flex-col gap-4">
         {#if filteredTickets.length === 0}
             <div
@@ -312,6 +361,41 @@
             {/each}
         {/if}
     </div>
+
+    <!-- Pagination Controls -->
+    {#if totalRecords > pageSize}
+        <div class="flex items-center justify-between px-2">
+            <p class="text-xs text-slate-500">
+                Mostrando {(currentPage - 1) * pageSize + 1}–{Math.min(
+                    currentPage * pageSize,
+                    totalRecords,
+                )} de {totalRecords} tickets
+            </p>
+            <div class="flex items-center gap-2">
+                <button
+                    type="button"
+                    class="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    onclick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                >
+                    <ChevronLeft size={14} />
+                    Anterior
+                </button>
+                <span class="text-xs text-slate-500 font-bold">
+                    {currentPage} / {totalPages}
+                </span>
+                <button
+                    type="button"
+                    class="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    onclick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                >
+                    Siguiente
+                    <ChevronRight size={14} />
+                </button>
+            </div>
+        </div>
+    {/if}
 </div>
 
 <TicketModal bind:isOpen={isModalOpen} {editingTicket} />

@@ -1,6 +1,7 @@
 <script lang="ts">
     import { personnelState, userState, uiState } from "../stores";
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
+    import { appEvents, EVENTS } from "../utils/appEvents";
     import SectionHeader from "../components/SectionHeader.svelte";
     import FilterGroup from "../components/FilterGroup.svelte";
     import Button from "../components/Button.svelte";
@@ -106,9 +107,21 @@
         refreshData(1);
     }
 
+    let unsubs: (() => void)[] = [];
+
     onMount(() => {
         refreshData();
+
+        // Auto-refresh when cards change from other views (e.g. PersonDetailsPanel)
+        unsubs.push(
+            appEvents.on(EVENTS.CARDS_CHANGED, () => refreshData(currentPage)),
+            appEvents.on(EVENTS.PERSONNEL_CHANGED, () =>
+                refreshData(currentPage),
+            ),
+        );
     });
+
+    onDestroy(() => unsubs.forEach((fn) => fn()));
 
     async function onBlockCard(card: any) {
         const isReactivation =
@@ -380,6 +393,64 @@
             {/if}
         {/snippet}
     </SectionHeader>
+
+    <!-- Top Pagination -->
+    {#if totalRecords > 0}
+        <div
+            class="flex flex-col sm:flex-row justify-between items-center gap-4 py-2"
+        >
+            <div class="text-sm text-slate-500">
+                Mostrando <span class="font-medium text-slate-900"
+                    >{(currentPage - 1) * pageSize + 1}</span
+                >
+                a
+                <span class="font-medium text-slate-900"
+                    >{Math.min(currentPage * pageSize, totalRecords)}</span
+                >
+                de
+                <span class="font-medium text-slate-900">{totalRecords}</span>
+                registros
+            </div>
+
+            <div class="flex items-center gap-2">
+                <Button
+                    variant="soft-blue"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onclick={() => refreshData(currentPage - 1)}
+                >
+                    Anterior
+                </Button>
+
+                <div class="flex items-center gap-1">
+                    {#each getPageRange(currentPage, totalPages) as page}
+                        {#if page === "..."}
+                            <span class="px-2 text-slate-400">...</span>
+                        {:else}
+                            <button
+                                class="w-8 h-8 rounded-lg text-sm font-medium transition-colors {currentPage ===
+                                page
+                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                                    : 'text-slate-600 hover:bg-slate-100'}"
+                                onclick={() => refreshData(page as number)}
+                            >
+                                {page}
+                            </button>
+                        {/if}
+                    {/each}
+                </div>
+
+                <Button
+                    variant="soft-blue"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onclick={() => refreshData(currentPage + 1)}
+                >
+                    Siguiente
+                </Button>
+            </div>
+        </div>
+    {/if}
 
     <Card class="overflow-hidden">
         <DataTable

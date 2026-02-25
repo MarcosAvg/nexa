@@ -1,77 +1,67 @@
 import { supabase } from "../supabase";
 import { handleError } from "../utils/error";
 
+// Module-level userId cache — avoids calling getSession() on every log
+let _cachedUserId: string | undefined;
+
 export const HistoryService = {
     /**
      * Log an action to the history table.
+     * 
+     * PERF: Entity name is now accepted as an optional parameter so callers
+     * can pass it directly (they almost always have it). This eliminates
+     * 1-3 extra SELECT queries that the old implementation used to resolve names.
+     * 
      * @param entityType - 'PERSONNEL', 'CARD', 'TICKET', 'SYSTEM'
      * @param entityId - The ID of the entity (string or number, converted to string)
      * @param action - Short action name e.g. 'CREATE', 'UPDATE', 'BLOCK'
-     * @param details - Object or string with details
-     * @param performedBy - Optional user UUID (defaults to auth user if not provided, or handling in RLS)
+     * @param details - Object or string with details. If details.entityName is set, it's used as the entity_name.
+     * @param performedBy - Optional user UUID (cached after first call)
      */
     async log(entityType: string, entityId: string | number | undefined, action: string, details: any, performedBy?: string) {
         if (!entityId) {
             console.warn("HistoryService: No entityId provided for log", { entityType, action });
-            // We allow logging without entityId for system events?
-            // defined in schema as nullable, so yes.
         }
 
-        let entityName: string | null = null;
         const idStr = entityId ? String(entityId) : null;
+        const detailsObj = typeof details === 'string' ? { message: details } : details;
 
-        // Proactively capture entity name/folio
-        try {
-            if (idStr) {
-                if (entityType === "CARD") {
-                    const { data } = await supabase.from("cards").select("folio, type").eq("id", idStr).single();
-                    if (data) entityName = `Tarjeta: ${data.folio} (${data.type})`;
-                } else if (entityType === "PERSONNEL" || entityType === "PERSON") {
-                    const { data } = await supabase.from("personnel").select("first_name, last_name").eq("id", idStr).single();
-                    if (data) entityName = `${data.first_name} ${data.last_name}`;
-                } else if (entityType === "TICKET") {
-                    const { data } = await supabase.from("tickets").select("id, title").eq("id", idStr).single();
-                    if (data) entityName = `Ticket #${data.id}: ${data.title}`;
-                }
-            }
-        } catch (e) {
-            console.warn("HistoryService: Could not capture entity snapshot name", e);
+        // Extract entityName from details if provided by caller, avoiding extra queries
+        const entityName: string | null = detailsObj?.entityName || null;
+        // Remove entityName from persisted details to keep them clean
+        if (detailsObj?.entityName) {
+            delete detailsObj.entityName;
         }
 
-        const payload = {
-            entity_type: entityType,
-            entity_id: idStr,
-            entity_name: entityName,
-            action,
-            details: typeof details === 'string' ? { message: details } : details,
-            // performed_by is handled by RLS 'default: auth.uid()' usually? 
-            // In our schema we didn't set default. 
-            // Let's try to set it if we have it, or let supabase auth context handle it if we had a trigger.
-            // Since we are inserting from client, we should probably let RLS handle it or pass it.
-            // But 'performed_by' is a column. If we don't send it, it's null unless default. 
-            // Our schema: "performed_by uuid references auth.users(id)". No default.
-            // So we must send it, or use a trigger. 
-            // For now, let's try to get it from current session if not passed.
-            // Actually, best practice: Let Supabase handle 'auth.uid()' via default value or trigger.
-            // But we didn't add that in migration. 
-            // We can try fetching session here, or rely on the caller passing it.
-            // For simplicity/robustness, let's fetch session if not present.
-        };
-
-        // Helper to get user if needed
+        // Cache userId after first call to avoid repeated getSession() round-trips
         let userId = performedBy;
         if (!userId) {
-            const { data: { session } } = await supabase.auth.getSession();
-            userId = session?.user?.id;
+            if (!_cachedUserId) {
+                const { data: { session } } = await supabase.auth.getSession();
+                _cachedUserId = session?.user?.id;
+            }
+            userId = _cachedUserId;
         }
 
         const { error } = await supabase
             .from("history_logs")
-            .insert([{ ...payload, performed_by: userId }]);
+            .insert([{
+                entity_type: entityType,
+                entity_id: idStr,
+                entity_name: entityName,
+                action,
+                details: detailsObj,
+                performed_by: userId,
+            }]);
 
         if (error) {
             console.error("Failed to log history:", error);
         }
+    },
+
+    /** Reset cached userId (call on logout) */
+    clearCache() {
+        _cachedUserId = undefined;
     },
 
     async fetchAll(
@@ -89,13 +79,13 @@ export const HistoryService = {
             const from = (page - 1) * limit;
             const to = from + limit - 1;
 
+            // Only select columns actually used by the UI
             let query = supabase
                 .from("history_logs")
-                .select("*", { count: "exact" });
+                .select("id, timestamp, entity_type, entity_id, entity_name, action, details, performed_by", { count: "exact" });
 
             // Apply Filters
             if (filters.person) {
-                // Search in entity_name (snapshot) primarily
                 query = query.ilike("entity_name", `%${filters.person}%`);
             }
 

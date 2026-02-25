@@ -13,6 +13,7 @@
         ArrowRight,
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
+    import { cardService } from "../../services/cards";
 
     type Props = {
         isOpen: boolean;
@@ -73,42 +74,92 @@
         );
     });
 
-    // Full search status for the specific query
-    const searchStatus = $derived.by(() => {
-        const query = searchQuery.trim();
-        if (!query) return null;
+    // ─── Async search status (server-side lookup) ───────────────────────
+    // Checks extraCards locally first, then queries Supabase for assigned cards.
+    // This ensures ALL cards are checked, not just the paginated personnel subset.
+    let searchStatus = $state<{
+        type: "available" | "occupied" | "restricted" | "new";
+        card?: any;
+        owner?: string;
+        status?: string;
+    } | null>(null);
+    let isSearching = $state(false);
+    let searchDebounce: ReturnType<typeof setTimeout>;
 
-        // 1. Check in available cards (extraCards)
+    $effect(() => {
+        const query = searchQuery.trim();
+        const type = cardType;
+
+        clearTimeout(searchDebounce);
+
+        if (!query) {
+            searchStatus = null;
+            isSearching = false;
+            return;
+        }
+
+        // 1. Quick local check — available cards (extraCards, no person_id)
         const inAvailable = extraCards.find(
-            (c) => c.folio === query && c.type === cardType,
+            (c) => c.folio === query && c.type === type,
         );
         if (inAvailable) {
-            // Check if it's actually blocked/inactive
             if (
                 inAvailable.status === "blocked" ||
                 inAvailable.status === "inactive"
             ) {
-                return {
+                searchStatus = {
                     type: "restricted",
                     status: inAvailable.status,
                     card: inAvailable,
                 };
+            } else {
+                searchStatus = { type: "available", card: inAvailable };
             }
-            return { type: "available", card: inAvailable };
+            isSearching = false;
+            return;
         }
 
-        // 2. Check in assigned cards
-        for (const person of personnel) {
-            const assigned = person.cards?.find(
-                (c: any) => c.folio === query && c.type === cardType,
-            );
-            if (assigned) {
-                return { type: "occupied", owner: person.name, card: assigned };
-            }
-        }
+        // 2. Debounced server lookup — checks ALL cards including assigned
+        isSearching = true;
+        searchDebounce = setTimeout(async () => {
+            try {
+                const result = await cardService.findByFolio(query, type);
 
-        // 3. Not found -> New
-        return { type: "new" };
+                // Guard: query may have changed during fetch
+                if (searchQuery.trim() !== query || cardType !== type) return;
+
+                if (result) {
+                    if (result.card.person_id && result.ownerName) {
+                        searchStatus = {
+                            type: "occupied",
+                            owner: result.ownerName,
+                            card: result.card,
+                        };
+                    } else if (
+                        result.card.status === "blocked" ||
+                        result.card.status === "inactive"
+                    ) {
+                        searchStatus = {
+                            type: "restricted",
+                            status: result.card.status,
+                            card: result.card,
+                        };
+                    } else {
+                        searchStatus = {
+                            type: "available",
+                            card: result.card,
+                        };
+                    }
+                } else {
+                    searchStatus = { type: "new" };
+                }
+            } catch {
+                // On error, fall back to "new"
+                searchStatus = { type: "new" };
+            } finally {
+                isSearching = false;
+            }
+        }, 300);
     });
 
     // Reset confirm when search or type changes
@@ -432,7 +483,16 @@
                 <div
                     class="animate-in fade-in slide-in-from-top-2 duration-200"
                 >
-                    {#if searchStatus?.type === "available"}
+                    {#if isSearching}
+                        <div
+                            class="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100 text-slate-500"
+                        >
+                            <div
+                                class="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"
+                            ></div>
+                            <span class="text-sm">Buscando folio...</span>
+                        </div>
+                    {:else if searchStatus?.type === "available"}
                         <div
                             class="flex items-center gap-3 p-3 rounded-lg {mode ===
                             'inventory'

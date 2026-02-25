@@ -39,12 +39,19 @@ export const responsivaService = {
     },
 
     async delete(id: string, personId: string) {
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from("signed_responsivas")
             .delete()
-            .eq("id", id);
+            .eq("id", id)
+            .select();
 
         if (error) throw error;
+
+        // Supabase RLS can silently block deletes (returns no error, 0 rows affected).
+        // If data array is empty, the row was NOT deleted.
+        if (!data || data.length === 0) {
+            throw new Error("No se pudo eliminar la responsiva. Verifique permisos (RLS).");
+        }
 
         await HistoryService.log("PERSONNEL", personId, "DELETE_RESPONSIVA", {
             message: `Responsiva eliminada`

@@ -2,6 +2,7 @@ import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import { handleError, withTimeout } from "../utils/error";
 import { catalogCache } from "../utils/catalogCache";
+import { appEvents, EVENTS } from "../utils/appEvents";
 import type { Person, Card } from "../types";
 
 const mapPersonRecord = (p: any): Person => {
@@ -273,12 +274,12 @@ export const personnelService = {
             if (personId) {
                 const { error } = await withTimeout(supabase.from("personnel").update(payload).eq("id", personId));
                 if (error) throw error;
-                await HistoryService.log("PERSONNEL", personId, "UPDATE", { message: `Actualización de ${payload.first_name}` });
+                await HistoryService.log("PERSONNEL", personId, "UPDATE", { message: `Actualización de ${payload.first_name}`, entityName: `${payload.first_name} ${payload.last_name}` });
             } else {
                 const { data: newPerson, error } = await withTimeout(supabase.from("personnel").insert([payload]).select().single());
                 if (error) throw error;
                 personId = newPerson.id;
-                await HistoryService.log("PERSONNEL", personId, "CREATE", { message: `Registro de ${payload.first_name}` });
+                await HistoryService.log("PERSONNEL", personId, "CREATE", { message: `Registro de ${payload.first_name}`, entityName: `${payload.first_name} ${payload.last_name}` });
             }
 
             // Assign cards to the person
@@ -292,6 +293,8 @@ export const personnelService = {
                     });
                 }
             }
+
+            appEvents.emit(EVENTS.PERSONNEL_CHANGED);
         } catch (error) {
             handleError(error, "Save Personnel");
             throw error;
@@ -320,6 +323,8 @@ export const personnelService = {
             }
 
             await HistoryService.log("PERSONNEL", id, "UPDATE_STATUS", { message: `Estado actualizado a ${status} (y sus tarjetas)` });
+            appEvents.emit(EVENTS.PERSONNEL_CHANGED);
+            appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
             handleError(error, "Update Personnel Status");
             throw error;
@@ -334,6 +339,7 @@ export const personnelService = {
             // Delete the person
             const { error } = await supabase.from("personnel").delete().eq("id", id);
             if (error) throw error;
+            appEvents.emit(EVENTS.PERSONNEL_CHANGED);
         } catch (error) {
             handleError(error, "Delete Personnel");
             throw error;

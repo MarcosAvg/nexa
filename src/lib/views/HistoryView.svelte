@@ -17,7 +17,8 @@
 
     const PAGE_SIZE = 50;
 
-    // Reset page when filters change
+    // Debounce refresh so typing in filter inputs doesn't fire on every keystroke
+    let filterDebounce: ReturnType<typeof setTimeout>;
     $effect(() => {
         // Track dependencies
         historyState.filters.person;
@@ -25,11 +26,10 @@
         historyState.filters.folio;
         historyState.filters.action;
 
-        // Debounce refresh for text inputs if needed, but for now direct refresh
-        // To avoid rapid firing on typing, we might want a debounced input in valid components
-        // But HistoryFilters might be using oninput.
-        // Let's rely on standard refresh.
-        historyState.refresh(1);
+        clearTimeout(filterDebounce);
+        filterDebounce = setTimeout(() => {
+            historyState.refresh(1);
+        }, 400);
     });
 
     // Get data directly from Store (already paginated by server)
@@ -161,6 +161,41 @@
             </Button>
         {/snippet}
     </SectionHeader>
+
+    <!-- Top Pagination -->
+    {#if totalRecords > 0}
+        <div class="flex items-center justify-between px-2">
+            <p class="text-xs text-slate-500">
+                Mostrando {(currentPage - 1) * pageSize + 1}–{Math.min(
+                    currentPage * pageSize,
+                    totalRecords,
+                )} de {totalRecords} registros
+            </p>
+            <div class="flex items-center gap-2">
+                <Button
+                    variant="outline"
+                    onclick={() => historyState.prevPage()}
+                    disabled={currentPage <= 1}
+                    class="flex items-center gap-1 text-xs px-3 py-1.5"
+                >
+                    <ChevronLeft size={14} />
+                    Anterior
+                </Button>
+                <span class="text-xs text-slate-500 font-bold">
+                    {currentPage} / {totalPages}
+                </span>
+                <Button
+                    variant="outline"
+                    onclick={() => historyState.nextPage()}
+                    disabled={currentPage >= totalPages}
+                    class="flex items-center gap-1 text-xs px-3 py-1.5"
+                >
+                    Siguiente
+                    <ChevronRight size={14} />
+                </Button>
+            </div>
+        </div>
+    {/if}
 
     <Card class="overflow-hidden">
         <DataTable

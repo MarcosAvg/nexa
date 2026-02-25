@@ -3,6 +3,7 @@ import { HistoryService } from "./history";
 import type { Ticket } from "../types";
 import { handleError } from "../utils/error";
 import { ticketState } from "../stores";
+import { appEvents, EVENTS } from "../utils/appEvents";
 
 export const ticketService = {
     async fetchAll(throwOnError: boolean = false): Promise<Ticket[]> {
@@ -10,7 +11,9 @@ export const ticketService = {
             const { data, error } = await supabase
                 .from("tickets")
                 .select("*, personnel(first_name, last_name)")
-                .order('created_at', { ascending: false });
+                .eq("status", "pending")
+                .order('created_at', { ascending: false })
+                .limit(200); // Cap at 200 to avoid overloading initial load
 
             if (error) throw error;
             return (data || []).map(t => ({
@@ -22,6 +25,51 @@ export const ticketService = {
             handleError(error, "Fetch Tickets");
             if (throwOnError) throw error;
             return [];
+        }
+    },
+
+    async fetchPaginated(
+        page: number = 1,
+        limit: number = 50,
+        typeFilter: string = "Todos",
+        priorityFilter: string = "Todas",
+        search: string = "",
+    ): Promise<{ data: Ticket[]; count: number }> {
+        try {
+            const from = (page - 1) * limit;
+            const to = from + limit - 1;
+
+            let query = supabase
+                .from("tickets")
+                .select("*, personnel(first_name, last_name)", { count: "exact" })
+                .eq("status", "pending");
+
+            if (typeFilter && typeFilter !== "Todos") {
+                query = query.eq("type", typeFilter);
+            }
+            if (priorityFilter && priorityFilter !== "Todas") {
+                query = query.ilike("priority", priorityFilter);
+            }
+            if (search) {
+                query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+            }
+
+            const { data, count, error } = await query
+                .order('created_at', { ascending: false })
+                .range(from, to);
+
+            if (error) throw error;
+
+            const mapped = (data || []).map(t => ({
+                ...t,
+                personId: t.person_id,
+                cardId: t.card_id,
+            } as Ticket));
+
+            return { data: mapped, count: count || 0 };
+        } catch (error) {
+            handleError(error, "Fetch Tickets Paginated");
+            return { data: [], count: 0 };
         }
     },
 
@@ -51,6 +99,7 @@ export const ticketService = {
             });
 
             ticketState.addTicket(newTicket as Ticket);
+            appEvents.emit(EVENTS.TICKETS_CHANGED);
         } catch (error) {
             handleError(error, "Create Ticket");
             throw error;
@@ -112,6 +161,7 @@ export const ticketService = {
             const { error } = await supabase.from("tickets").delete().eq("id", id);
             if (error) throw error;
             ticketState.removeTicket(id);
+            appEvents.emit(EVENTS.TICKETS_CHANGED);
         } catch (error) {
             handleError(error, "Delete Ticket");
             throw error;
