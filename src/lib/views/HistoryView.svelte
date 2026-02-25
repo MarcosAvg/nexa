@@ -162,9 +162,9 @@
         {/snippet}
     </SectionHeader>
 
-    <!-- Top Pagination -->
+    <!-- Top Pagination (hidden on mobile) -->
     {#if totalRecords > 0}
-        <div class="flex items-center justify-between px-2">
+        <div class="hidden sm:flex items-center justify-between px-2">
             <p class="text-xs text-slate-500">
                 Mostrando {(currentPage - 1) * pageSize + 1}–{Math.min(
                     currentPage * pageSize,

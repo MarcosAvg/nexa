@@ -18,6 +18,7 @@
         Plus,
         FileSpreadsheet,
     } from "lucide-svelte";
+    import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import AddCardModal from "../components/modals/AddCardModal.svelte";
     import { cardService } from "../services/cards";
     import { toast } from "svelte-sonner";
@@ -394,10 +395,10 @@
         {/snippet}
     </SectionHeader>
 
-    <!-- Top Pagination -->
+    <!-- Top Pagination (hidden on mobile) -->
     {#if totalRecords > 0}
         <div
-            class="flex flex-col sm:flex-row justify-between items-center gap-4 py-2"
+            class="hidden sm:flex flex-col sm:flex-row justify-between items-center gap-4 py-2"
         >
             <div class="text-sm text-slate-500">
                 Mostrando <span class="font-medium text-slate-900"
@@ -655,3 +656,7 @@
     onConfirm={confirmModal.onConfirm}
     onCancel={() => (confirmModal.isOpen = false)}
 />
+
+{#if currentUser?.role !== "viewer"}
+    <FloatingActionButton onclick={onOpenAddCard} label="Nueva Tarjeta" />
+{/if}

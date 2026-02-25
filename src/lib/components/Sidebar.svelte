@@ -17,7 +17,7 @@
 <aside
     class="fixed inset-y-0 left-0 z-50 flex h-full w-72 flex-col bg-slate-950 text-slate-300 transition-transform duration-300 ease-in-out lg:translate-x-0 {uiState.isSidebarOpen
         ? 'translate-x-0'
-        : '-translate-x-full'} border-r border-white/5 shadow-[20px_0_50px_rgba(0,0,0,0.3)]"
+        : '-translate-x-full'} border-r border-white/5"
 >
     <!-- Background Decor -->
     <div

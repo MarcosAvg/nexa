@@ -1,8 +1,8 @@
 <script lang="ts">
     import Sidebar from "./Sidebar.svelte";
+    import BottomNav from "./BottomNav.svelte";
     import { uiState } from "../stores";
     import { type Snippet, type Component } from "svelte";
-    import { Menu } from "lucide-svelte";
 
     type SidebarItem = {
         label: string;
@@ -30,24 +30,11 @@
     <div
         class="flex flex-1 flex-col overflow-hidden transition-all duration-500 lg:pl-72"
     >
-        <!-- Mobile toggle button (Visible only on mobile/tablet) -->
+        <!-- Mobile WCO safe area -->
         <div
-            class="lg:hidden sticky top-0 z-30 flex items-center h-14 px-4 bg-white/40 backdrop-blur-xl border-b border-slate-200/40"
-            style="padding-top: env(titlebar-area-height, 0px); height: calc(3.5rem + env(titlebar-area-height, 0px)); -webkit-app-region: drag;"
-        >
-            <button
-                class="flex items-center justify-center h-10 w-10 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all duration-300 active:scale-90"
-                style="-webkit-app-region: no-drag;"
-                onclick={() => uiState.toggleSidebar()}
-                aria-label="Toggle sidebar"
-            >
-                <Menu size={22} strokeWidth={2.5} />
-            </button>
-            <span
-                class="ml-4 text-sm font-extrabold text-slate-900 tracking-tight"
-                style="-webkit-app-region: no-drag;">{uiState.activePage}</span
-            >
-        </div>
+            class="lg:hidden flex-shrink-0"
+            style="height: env(titlebar-area-height, 0px); -webkit-app-region: drag;"
+        ></div>
 
         <!-- Desktop Drag Region (Invisible but functional for WCO) -->
         <div
@@ -55,10 +42,13 @@
             style="height: env(titlebar-area-height, 0px); -webkit-app-region: drag;"
         ></div>
 
-        <main class="flex-1 overflow-y-auto p-6 lg:p-10">
+        <main class="flex-1 overflow-y-auto p-4 pb-24 lg:p-10 lg:pb-10">
             <div class="mx-auto max-w-[1600px] h-full space-y-8">
                 {@render children?.()}
             </div>
         </main>
     </div>
+
+    <!-- Mobile Bottom Navigation -->
+    <BottomNav />
 </div>

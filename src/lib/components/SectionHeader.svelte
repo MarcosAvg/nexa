@@ -64,17 +64,14 @@
                 </div>
             </div>
 
-            <div
-                class="flex items-center gap-2 sm:gap-3 pb-1 sm:pb-0 no-scrollbar overflow-visible"
-            >
-                {#if actions}
-                    <div
-                        class="flex items-center gap-2 shrink-0 w-full sm:w-auto"
-                    >
-                        {@render actions()}
-                    </div>
-                {/if}
-            </div>
+            <!-- Actions: hidden on mobile, visible from sm: up -->
+            {#if actions}
+                <div
+                    class="hidden sm:flex items-center gap-2 sm:gap-3 shrink-0"
+                >
+                    {@render actions()}
+                </div>
+            {/if}
         </div>
 
         <!-- Filters (Collapsible on mobile) -->

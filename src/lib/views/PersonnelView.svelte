@@ -19,6 +19,7 @@
         ChevronDown,
         FileStack,
     } from "lucide-svelte";
+    import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import { personnelService } from "../services/personnel";
     import { cardService } from "../services/cards";
     import { exportPersonnelToExcel } from "../utils/xlsxExport";
@@ -391,10 +392,10 @@
         {/snippet}
     </SectionHeader>
 
-    <!-- Top Pagination -->
+    <!-- Top Pagination (hidden on mobile) -->
     {#if totalRecords > 0}
         <div
-            class="flex flex-col sm:flex-row justify-between items-center gap-4 py-2"
+            class="hidden sm:flex flex-col sm:flex-row justify-between items-center gap-4 py-2"
         >
             <div class="text-sm text-slate-500">
                 Mostrando <span class="font-medium text-slate-900"
@@ -556,3 +557,7 @@
         </div>
     {/if}
 </div>
+
+{#if currentUser?.role !== "viewer"}
+    <FloatingActionButton onclick={onOpenAddModal} label="Nueva Alta" />
+{/if}

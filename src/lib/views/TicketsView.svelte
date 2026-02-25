@@ -22,6 +22,7 @@
         ChevronLeft,
         ChevronRight,
     } from "lucide-svelte";
+    import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
     import { personnelService } from "../services/personnel";
@@ -309,9 +310,9 @@
         {/snippet}
     </SectionHeader>
 
-    <!-- Top Pagination -->
+    <!-- Top Pagination (hidden on mobile) -->
     {#if totalRecords > pageSize}
-        <div class="flex items-center justify-between px-2">
+        <div class="hidden sm:flex items-center justify-between px-2">
             <p class="text-xs text-slate-500">
                 Mostrando {(currentPage - 1) * pageSize + 1}–{Math.min(
                     currentPage * pageSize,
@@ -425,3 +426,5 @@
     ticket={importedTicket}
     onComplete={refreshData}
 />
+
+<FloatingActionButton onclick={onOpenAddTicket} label="Nuevo Ticket" />
