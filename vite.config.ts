@@ -22,9 +22,10 @@ export default defineConfig({
         description: 'Sistema Profesional de Control de Accesos y Personal',
         start_url: '/',
         scope: '/',
-        theme_color: '#2563eb',
-        background_color: '#ffffff',
+        theme_color: '#f8fafc',
+        background_color: '#f8fafc',
         display: 'standalone',
+        display_override: ['window-controls-overlay'],
         orientation: 'any',
         categories: ['business', 'productivity'],
         icons: [

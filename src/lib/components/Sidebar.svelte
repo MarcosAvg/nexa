@@ -25,8 +25,13 @@
     ></div>
 
     <!-- Header/Logo Area -->
-    <div class="flex h-24 items-center flex-shrink-0 px-8 mb-4 relative">
-        <Logo showText={true} class="scale-110 origin-left" />
+    <div
+        class="flex h-24 items-center flex-shrink-0 px-8 mb-4 relative"
+        style="padding-top: env(titlebar-area-height, 0px); -webkit-app-region: drag;"
+    >
+        <div style="-webkit-app-region: no-drag;">
+            <Logo showText={true} class="scale-110 origin-left" />
+        </div>
     </div>
 
     <!-- Navigation -->
