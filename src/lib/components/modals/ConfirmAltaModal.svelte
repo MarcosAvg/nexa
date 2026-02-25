@@ -11,7 +11,14 @@
     import { personnelService } from "../../services/personnel";
     import { HistoryService } from "../../services/history";
     import { toast } from "svelte-sonner";
-    import { AlertTriangle, Loader2, User, XCircle } from "lucide-svelte";
+    import Badge from "../Badge.svelte";
+    import {
+        AlertTriangle,
+        CreditCard,
+        Loader2,
+        User,
+        XCircle,
+    } from "lucide-svelte";
     import Button from "../Button.svelte";
 
     let {
@@ -26,6 +33,7 @@
 
     let isRejectOpen = $state(false);
     let isRejecting = $state(false);
+    let selectedCandidate = $state<any>(null);
 
     let p = $derived(ticket?.payload ?? {});
 
@@ -44,7 +52,7 @@
             horario: p.horario,
             horaEntrada: p.hora_entrada,
             horaSalida: p.hora_salida,
-            correo: p.correo,
+            correo: p.correo?.replace(/^mailto:/i, "").trim(),
             pisosP2000: p.pisos_p2000
                 ? p.pisos_p2000
                       .split(",")
@@ -57,6 +65,9 @@
                       .map((s: string) => s.trim())
                       .filter(Boolean)
                 : [],
+            specialAccesses: [p.acceso1, p.acceso2, p.acceso3]
+                .map((s: string) => s?.trim())
+                .filter(Boolean),
         };
     });
 
@@ -99,6 +110,7 @@
         }
         if (!isOpen) {
             candidates = [];
+            selectedCandidate = null;
             searchDone = false;
             isSearching = false;
         }
@@ -147,13 +159,33 @@
     bind:isOpen
     {prefill}
     {allowedCardTypes}
-    editingPerson={null}
+    editingPerson={selectedCandidate}
+    forceDirectSave={!!selectedCandidate}
     oncomplete={handlePersonSaved}
     onclose={() => {
         isOpen = false;
     }}
 >
     {#snippet headerContent()}
+        <!-- Requested Cards Badge -->
+        {#if allowedCardTypes}
+            <div
+                class="flex items-center gap-2 mb-4 p-3 rounded-lg border border-blue-100 bg-blue-50/50"
+            >
+                <span
+                    class="text-[10px] font-bold text-blue-600 uppercase tracking-widest"
+                    >Solicitando:</span
+                >
+                <div class="flex gap-1.5">
+                    {#each allowedCardTypes as type}
+                        <Badge variant={type === "KONE" ? "blue" : "amber"}
+                            >{type}</Badge
+                        >
+                    {/each}
+                </div>
+            </div>
+        {/if}
+
         {#if isSearching}
             <div class="rounded-xl border border-slate-200 p-3 mb-4">
                 <div class="flex items-center gap-2 text-sm text-slate-500">
@@ -178,20 +210,100 @@
                 </div>
                 <div class="space-y-1.5 max-h-32 overflow-y-auto mt-2">
                     {#each candidates as c}
-                        <div
-                            class="w-full flex items-center gap-3 p-2 rounded-lg border border-amber-200/50 bg-white text-left"
+                        <button
+                            type="button"
+                            class="w-full flex items-center justify-between p-2 rounded-lg border border-amber-200/50 bg-white hover:bg-amber-100/50 hover:border-amber-300 transition-all text-left"
+                            onclick={() => (selectedCandidate = c)}
                         >
-                            <User size={14} class="text-slate-400 shrink-0" />
-                            <div>
-                                <p class="text-sm font-semibold text-slate-800">
-                                    {c.last_name}, {c.first_name}
-                                </p>
-                                <p class="text-xs text-slate-400">
-                                    {c.dependency} · {c.building}
-                                </p>
+                            <div class="flex items-center gap-3">
+                                <User
+                                    size={14}
+                                    class="text-slate-400 shrink-0"
+                                />
+                                <div>
+                                    <p
+                                        class="text-sm font-semibold text-slate-800"
+                                    >
+                                        {c.last_name}, {c.first_name}
+                                    </p>
+                                    <p class="text-xs text-slate-400">
+                                        {c.dependency} · {c.building}
+                                    </p>
+                                </div>
                             </div>
-                        </div>
+                            <span
+                                class="text-[10px] font-bold text-amber-600 uppercase"
+                                >Vincular →</span
+                            >
+                        </button>
                     {/each}
+                </div>
+            </div>
+        {/if}
+
+        {#if selectedCandidate}
+            <div
+                class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 mb-4"
+            >
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"
+                        >
+                            <User size={16} />
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-emerald-800">
+                                Vincular a: {selectedCandidate.last_name}, {selectedCandidate.first_name}
+                            </p>
+                            <p class="text-xs text-emerald-600">
+                                Se añadirán los accesos solicitados a esta
+                                persona.
+                            </p>
+                            {#if selectedCandidate.cards && selectedCandidate.cards.length > 0}
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    {#each selectedCandidate.cards as card}
+                                        <div
+                                            class="flex items-center gap-1.5 px-2 py-1 bg-white border border-emerald-100 rounded text-[10px] font-medium text-slate-600 shadow-sm"
+                                        >
+                                            <CreditCard
+                                                size={10}
+                                                class="text-slate-400"
+                                            />
+                                            <span class="font-bold"
+                                                >{card.type}:</span
+                                            >
+                                            <span>{card.folio}</span>
+                                            <Badge
+                                                variant={card.status ===
+                                                "active"
+                                                    ? "emerald"
+                                                    : "rose"}
+                                                class="scale-[0.8] origin-left ml-0.5"
+                                            >
+                                                {card.status === "active"
+                                                    ? "Activa"
+                                                    : "Bloqueada"}
+                                            </Badge>
+                                        </div>
+                                    {/each}
+                                </div>
+                            {:else}
+                                <p
+                                    class="text-[10px] text-emerald-500 mt-1 italic italic flex items-center gap-1"
+                                >
+                                    <CreditCard size={10} /> Sin tarjetas asignadas
+                                    actualmente.
+                                </p>
+                            {/if}
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        class="text-xs font-bold text-slate-400 hover:text-slate-600"
+                        onclick={() => (selectedCandidate = null)}
+                        >Desvincular</button
+                    >
                 </div>
             </div>
         {/if}

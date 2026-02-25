@@ -25,6 +25,7 @@
         leftFooterContent,
         oncomplete,
         onclose,
+        forceDirectSave = false,
     }: {
         isOpen: boolean;
         editingPerson?: Person | null;
@@ -44,6 +45,7 @@
             correo?: string;
             pisosP2000?: string[];
             pisosKone?: string[];
+            specialAccesses?: string[];
         } | null;
         /** If set, only these card types can be added ('P2000', 'KONE') */
         allowedCardTypes?: string[] | null;
@@ -51,6 +53,8 @@
         leftFooterContent?: Snippet;
         oncomplete?: () => void;
         onclose?: () => void;
+        /** If true, editing an existing person will save DIRECTLY instead of creating a ticket */
+        forceDirectSave?: boolean;
     } = $props();
 
     // Catalogs
@@ -150,6 +154,50 @@
                 email = editingPerson.email || "";
                 accesosEspeciales = [...(editingPerson.specialAccesses || [])];
                 tarjetasAsignadas = [...(editingPerson.cards || [])];
+
+                // If we also have a prefill (linking an Alta ticket), overwrite the requested data selectivly
+                if (prefill) {
+                    const wantsP2000 =
+                        !allowedCardTypes || allowedCardTypes.includes("P2000");
+                    const wantsKONE =
+                        !allowedCardTypes || allowedCardTypes.includes("KONE");
+
+                    if (wantsP2000) {
+                        if (
+                            prefill.pisosP2000 &&
+                            prefill.pisosP2000.length > 0
+                        ) {
+                            pisosP2000 = [...prefill.pisosP2000];
+                        } else if (prefill.pisosP2000) {
+                            pisosP2000 = [];
+                        }
+                    }
+
+                    if (wantsKONE) {
+                        if (prefill.pisosKone && prefill.pisosKone.length > 0) {
+                            pisosKone = [...prefill.pisosKone];
+                        } else if (prefill.pisosKone) {
+                            pisosKone = [];
+                        }
+                    }
+
+                    if (
+                        prefill.specialAccesses &&
+                        prefill.specialAccesses.length > 0
+                    ) {
+                        accesosEspeciales = [...prefill.specialAccesses];
+                    } else if (prefill.specialAccesses) {
+                        accesosEspeciales = [];
+                    }
+
+                    // Also overwrite building, base floor and schedule as they are part of the "access" profile
+                    if (prefill.edificio) edificio = prefill.edificio;
+                    if (prefill.pisoBase) pisoBase = prefill.pisoBase;
+                    if (prefill.horario) diasHorario = prefill.horario;
+                    if (prefill.horaEntrada) horaEntrada = prefill.horaEntrada;
+                    if (prefill.horaSalida) horaSalida = prefill.horaSalida;
+                }
+
                 lastLoadedPersonId = editingPerson.id;
             });
         } else if (
@@ -180,6 +228,7 @@
                 email = prefill.correo ?? "";
                 pisosP2000 = prefill.pisosP2000 ?? [];
                 pisosKone = prefill.pisosKone ?? [];
+                accesosEspeciales = prefill.specialAccesses ?? [];
                 lastLoadedPersonId = "__prefill__";
             });
         } else if (
@@ -237,7 +286,7 @@
                 specialAccesses: accesosEspeciales,
             };
 
-            if (editingPerson) {
+            if (editingPerson && !forceDirectSave) {
                 const normalizedOriginal = {
                     id: editingPerson.id,
                     nombres: editingPerson.first_name,
@@ -317,13 +366,100 @@
             isOpen = false;
         }
     }
+
+    // ── Comparison Logic ──────────────────────────────────
+    const comparisonFields = [
+        {
+            key: "nombres",
+            state: () => nombres,
+            setter: (v: string) => (nombres = v),
+            label: "Nombres",
+        },
+        {
+            key: "apellidos",
+            state: () => apellidos,
+            setter: (v: string) => (apellidos = v),
+            label: "Apellidos",
+        },
+        {
+            key: "noEmpleado",
+            state: () => noEmpleado,
+            setter: (v: string) => (noEmpleado = v),
+            label: "No. Empleado",
+        },
+        {
+            key: "dependencia",
+            state: () => dependency,
+            setter: (v: string) => (dependency = v),
+            label: "Dependencia",
+        },
+        {
+            key: "area",
+            state: () => areaEquipo,
+            setter: (v: string) => (areaEquipo = v),
+            label: "Área/Equipo",
+        },
+        {
+            key: "puesto",
+            state: () => puestoFuncion,
+            setter: (v: string) => (puestoFuncion = v),
+            label: "Puesto",
+        },
+        {
+            key: "correo",
+            state: () => email,
+            setter: (v: string) => (email = v),
+            label: "Correo",
+        },
+    ];
+
+    function getTicketValue(key: string) {
+        if (!prefill) return null;
+        return (prefill as any)[key] || "";
+    }
+
+    function isDifferent(field: any) {
+        if (!prefill || !editingPerson) return false;
+        const ticketVal = getTicketValue(field.key);
+        if (!ticketVal) return false;
+        return (
+            String(field.state()).trim().toLowerCase() !==
+            String(ticketVal).trim().toLowerCase()
+        );
+    }
 </script>
+
+{#snippet DiffIndicator(field: any)}
+    {#if isDifferent(field)}
+        <div
+            class="flex items-center justify-between gap-2 p-1.5 px-2 bg-amber-50 border border-amber-200 rounded text-[10px] mt-1 pulse-amber"
+        >
+            <span class="text-amber-700 font-medium"
+                >Solicitado: <strong class="text-amber-900"
+                    >{getTicketValue(field.key)}</strong
+                ></span
+            >
+            <button
+                type="button"
+                class="text-amber-600 font-bold hover:text-amber-800 underline transition-colors"
+                onclick={() => field.setter(getTicketValue(field.key))}
+                >Aplicar</button
+            >
+        </div>
+    {/if}
+{/snippet}
 
 <Modal
     bind:isOpen
-    title={editingPerson ? "Editar Personal" : "Nueva Alta de Personal"}
+    title={editingPerson
+        ? prefill
+            ? "Vincular Alta a Persona"
+            : "Editar Personal"
+        : "Nueva Alta de Personal"}
     description={editingPerson
-        ? "Modifique los datos requeridos. Se generará un ticket."
+        ? prefill
+            ? "Se actualizarán los accesos de la persona existente directamente."
+            : "Modifique los datos requeridos. Se generará un ticket."
         : "Complete la información para registrar una nueva persona."}
     size="xl"
     onclose={resetAndClose}
@@ -359,7 +495,11 @@
                         id="nombres"
                         bind:value={nombres}
                         placeholder="Juan Carlos"
+                        class={isDifferent(comparisonFields[0])
+                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
+                            : ""}
                     />
+                    {@render DiffIndicator(comparisonFields[0])}
                 </div>
                 <div class="space-y-1.5">
                     <label
@@ -371,7 +511,11 @@
                         id="apellidos"
                         bind:value={apellidos}
                         placeholder="Pérez García"
+                        class={isDifferent(comparisonFields[1])
+                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
+                            : ""}
                     />
+                    {@render DiffIndicator(comparisonFields[1])}
                 </div>
             </div>
 
@@ -386,7 +530,11 @@
                         id="noEmpleado"
                         bind:value={noEmpleado}
                         placeholder="EMP-001"
+                        class={isDifferent(comparisonFields[2])
+                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
+                            : ""}
                     />
+                    {@render DiffIndicator(comparisonFields[2])}
                 </div>
                 <div class="md:col-span-2 space-y-1.5">
                     <label
@@ -394,11 +542,18 @@
                         class="text-xs font-bold text-slate-600 block"
                         >Dependencia</label
                     >
-                    <Select id="dependencia" bind:value={dependency}>
+                    <Select
+                        id="dependencia"
+                        bind:value={dependency}
+                        class={isDifferent(comparisonFields[3])
+                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
+                            : ""}
+                    >
                         {#each dependencies as dep}
                             <option value={dep.name}>{dep.name}</option>
                         {/each}
                     </Select>
+                    {@render DiffIndicator(comparisonFields[3])}
                 </div>
             </div>
 
@@ -413,7 +568,11 @@
                         id="area"
                         bind:value={areaEquipo}
                         placeholder="Sistemas"
+                        class={isDifferent(comparisonFields[4])
+                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
+                            : ""}
                     />
+                    {@render DiffIndicator(comparisonFields[4])}
                 </div>
                 <div class="space-y-1.5">
                     <label
@@ -425,7 +584,11 @@
                         id="puesto"
                         bind:value={puestoFuncion}
                         placeholder="Analista"
+                        class={isDifferent(comparisonFields[5])
+                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
+                            : ""}
                     />
+                    {@render DiffIndicator(comparisonFields[5])}
                 </div>
             </div>
 
@@ -440,7 +603,11 @@
                     type="email"
                     bind:value={email}
                     placeholder="correo@ejemplo.com"
+                    class={isDifferent(comparisonFields[6])
+                        ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
+                        : ""}
                 />
+                {@render DiffIndicator(comparisonFields[6])}
             </div>
         </fieldset>
 
@@ -557,7 +724,7 @@
         </fieldset>
 
         <!-- SECTION: Cards -->
-        {#if !editingPerson}
+        {#if !editingPerson || prefill}
             <fieldset
                 class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
             >
@@ -627,7 +794,9 @@
                     onclick={handleSave}
                     loading={isSubmitting}
                     >{editingPerson
-                        ? "Actualizar (Ticket)"
+                        ? forceDirectSave
+                            ? "Aplicar Alta a Persona"
+                            : "Actualizar (Ticket)"
                         : "Guardar Alta"}</Button
                 >
             </div>
@@ -640,3 +809,18 @@
     onSave={addCard}
     {allowedCardTypes}
 />
+
+<style>
+    @keyframes pulse-amber {
+        0%,
+        100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.7;
+        }
+    }
+    .pulse-amber {
+        animation: pulse-amber 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+</style>
