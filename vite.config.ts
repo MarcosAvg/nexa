@@ -11,13 +11,22 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'maskable-icon.svg'],
+      // Enable SW in dev mode so install prompt works on localhost
+      devOptions: {
+        enabled: true,
+      },
       manifest: {
+        id: '/',
         name: 'Nexa',
         short_name: 'Nexa',
         description: 'Sistema Profesional de Control de Accesos y Personal',
+        start_url: '/',
+        scope: '/',
         theme_color: '#2563eb',
         background_color: '#ffffff',
         display: 'standalone',
+        orientation: 'any',
+        categories: ['business', 'productivity'],
         icons: [
           {
             src: 'favicon.svg',
@@ -39,7 +48,7 @@ export default defineConfig({
             src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'maskable'
           }
         ]
       }
