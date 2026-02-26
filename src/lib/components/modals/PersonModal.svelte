@@ -102,6 +102,12 @@
         }
     });
 
+    // Auto-uppercase names
+    $effect(() => {
+        if (nombres) nombres = nombres.toUpperCase();
+        if (apellidos) apellidos = apellidos.toUpperCase();
+    });
+
     // Populate form
     let lastLoadedPersonId = $state("");
 
