@@ -188,7 +188,8 @@ export async function matchKoneUsageToPersonnel(
             if (p.status === 'active') {
                 if (readyTypes.size >= 2) displayStatus = 'Activo/a';
                 else if (readyTypes.size === 1) displayStatus = 'Parcial';
-                else displayStatus = 'Inactivo/a';
+                else if (allCards.length > 0) displayStatus = 'Bloqueado/a';
+                else displayStatus = 'Sin Acceso';
             } else if (p.status === 'blocked') {
                 displayStatus = 'Bloqueado/a';
             }

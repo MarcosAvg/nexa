@@ -85,7 +85,7 @@
         },
         {
             key: "inactivo" as const,
-            label: "Inactivo/a",
+            label: "Sin Acceso",
             color: "bg-slate-400",
             textColor: "text-slate-600",
             bgLight: "bg-slate-50",

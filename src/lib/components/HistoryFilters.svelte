@@ -87,16 +87,16 @@
         >
         <Select id="filter-action" bind:value={action} placeholder="">
             <option value="Todas">Todas</option>
-            <option value="Registro">Registro</option>
-            <option value="Actualización">Actualización</option>
-            <option value="Cambio de Estado">Cambio de Estado</option>
-            <option value="Asignación">Asignación</option>
-            <option value="Desvinculación">Desvinculación</option>
-            <option value="Firma">Firma</option>
-            <option value="Bloqueo">Bloqueo</option>
-            <option value="Eliminación">Eliminación</option>
-            <option value="Ticket">Ticket</option>
-            <option value="Modificación">Modificación</option>
+            <option value="CREATE">Registro</option>
+            <option value="UPDATE">Actualización</option>
+            <option value="UPDATE_STATUS">Cambio de Estado</option>
+            <option value="ASSIGN_CARD">Asignación</option>
+            <option value="UNASSIGN">Desvinculación</option>
+            <option value="SIGN_RESPONSIVA">Firma</option>
+            <option value="BLOCK">Bloqueo</option>
+            <option value="DELETE">Eliminación</option>
+            <option value="TICKET">Ticket</option>
+            <option value="APPLY_MODIFICATION">Modificación</option>
         </Select>
     </div>
 </div>

@@ -275,10 +275,7 @@ export const cardService = {
                     .update(payload)
                     .eq("id", cardId));
                 if (error) throw error;
-                await HistoryService.log("CARD", cardId, "UPDATE", {
-                    message: `Tarjeta ${payload.folio} actualizada`,
-                    entityName: `${payload.type} (Folio: ${payload.folio})`
-                });
+                // Minor updates no longer log to history to reduce noise
             } else {
                 const { data: newCard, error } = await withTimeout(supabase
                     .from("cards")
@@ -360,10 +357,7 @@ export const cardService = {
                 }
             }
 
-            await HistoryService.log("CARD", cardId, "UPDATE", {
-                message: `Estado de programación actualizado a ${status || 'N/A'}`,
-                entityName: card?.folio ? `${card.type || ''} (Folio: ${card.folio})` : `Tarjeta (${cardId})`
-            });
+            // Internal logic updates no longer log to history to avoid noise during cascades
             appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
             handleError(error, "Update Programming Status");
@@ -383,16 +377,13 @@ export const cardService = {
             // Delete "Firma Responsiva" tickets if signed
             if (status === "signed") {
                 const { ticketService } = await import("./tickets");
-                await ticketService.deleteByCard(cardId, ["Firma Responsiva"]);
+                await ticketService.deleteByCard(cardId, ["Firma Responsiva"], "Ticket completado/atendido");
             }
 
             // Fetch card info for history
             const { data: card } = await supabase.from("cards").select("folio, type").eq("id", cardId).single();
 
-            await HistoryService.log("CARD", cardId, "UPDATE", {
-                message: `Estado de responsiva actualizado a ${status}`,
-                entityName: card ? `${card.type} (Folio: ${card.folio})` : `Tarjeta (${cardId})`
-            });
+            // Internal logic updates no longer log to history to avoid noise during cascades
             appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
             handleError(error, "Update Responsiva Status");
@@ -427,10 +418,9 @@ export const cardService = {
             // Fetch card info for history
             const { data: cardInfo } = await supabase.from("cards").select("folio, type").eq("id", cardId).single();
 
-            await HistoryService.log("CARD", cardId, "UPDATE_STATUS", {
-                message: `Estado de tarjeta actualizado a ${finalStatus}`,
-                entityName: cardInfo ? `${cardInfo.type} (Folio: ${cardInfo.folio})` : `Tarjeta (${cardId})`
-            });
+            // Status updates directly on cards should only log if they are independent actions
+            // When called from personnelService (cascades), history is already handled there.
+            // For now, we reduce the noise here as well.
             appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
             handleError(error, "Update Card Status");
@@ -454,7 +444,7 @@ export const cardService = {
 
             // Delete associated Programming/Responsiva tickets
             const { ticketService } = await import("./tickets");
-            await ticketService.deleteByCard(cardId, ["Programación", "Firma Responsiva"]);
+            await ticketService.deleteByCard(cardId, ["Programación", "Firma Responsiva"], "Ticket cancelado por desvinculación de tarjeta");
 
             // Fetch card info for history before unassigning
             const { data: card } = await supabase.from("cards").select("folio, type").eq("id", cardId).single();

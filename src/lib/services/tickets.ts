@@ -158,9 +158,9 @@ export const ticketService = {
             // Fetch ticket title for history BEFORE deleting
             const { data: ticket } = await supabase.from("tickets").select("title").eq("id", id).single();
 
-            // Log deletion/completion BEFORE removing data
-            await HistoryService.log("TICKET", id, "COMPLETE_TICKET", {
-                message: reason || `Ticket completado/eliminado`,
+            // Log completion BEFORE removing data
+            await HistoryService.log("TICKET", id, "COMPLETE", {
+                message: reason || `Ticket completado/atendido`,
                 entityName: ticket ? `Ticket #${id}: ${ticket.title}` : `Ticket #${id}`
             });
 
@@ -174,7 +174,7 @@ export const ticketService = {
         }
     },
 
-    async deleteByCard(cardId: string, types?: string[]) {
+    async deleteByCard(cardId: string, types?: string[], reason?: string) {
         try {
             // 0. Fetch tickets to log deletion
             let fetchQuery = supabase.from("tickets")
@@ -186,8 +186,8 @@ export const ticketService = {
 
             if (tickets) {
                 for (const t of tickets) {
-                    await HistoryService.log("TICKET", t.id, "DELETE_TICKET_CASCADE", {
-                        message: `Ticket #${t.id} eliminado por baja de tarjeta`,
+                    await HistoryService.log("TICKET", t.id, "CANCEL", {
+                        message: reason || `Ticket #${t.id} cancelado por baja de tarjeta`,
                         entityName: `Ticket #${t.id}: ${t.title}`
                     });
                 }
@@ -206,7 +206,7 @@ export const ticketService = {
         }
     },
 
-    async deleteByPerson(personId: string) {
+    async deleteByPerson(personId: string, reason?: string) {
         try {
             // 0. Fetch tickets to log deletion
             const { data: tickets } = await supabase.from("tickets")
@@ -215,8 +215,8 @@ export const ticketService = {
 
             if (tickets) {
                 for (const t of tickets) {
-                    await HistoryService.log("TICKET", t.id, "DELETE_TICKET_CASCADE", {
-                        message: `Ticket #${t.id} eliminado por baja de personal`,
+                    await HistoryService.log("TICKET", t.id, "CANCEL", {
+                        message: reason || `Ticket #${t.id} cancelado por baja de personal`,
                         entityName: `Ticket #${t.id}: ${t.title}`
                     });
                 }

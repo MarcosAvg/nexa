@@ -55,7 +55,7 @@
         captureZone = {
             left: Math.max(
                 0,
-                Math.min(e.clientX - ZONE_W * 0.3, window.innerWidth - ZONE_W),
+                Math.min(e.clientX - ZONE_W * 0.25, window.innerWidth - ZONE_W),
             ),
             top: Math.max(
                 0,

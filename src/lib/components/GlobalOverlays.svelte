@@ -6,6 +6,7 @@
     import PersonModal from "./modals/PersonModal.svelte";
     import AddCardModal from "./modals/AddCardModal.svelte";
     import ConfirmationModal from "./modals/ConfirmationModal.svelte";
+    import DeletePersonnelModal from "./modals/DeletePersonnelModal.svelte";
     import { personnelActions } from "../utils/personnelActions";
 
     // Computed state from global store
@@ -47,6 +48,13 @@
     // Local state for Global Overlays (actions triggered from here)
     let isCardModalOpen = $state(false);
     let replacingCard = $state<any>(null);
+    let deleteModal = $state<{
+        isOpen: boolean;
+        person: any;
+    }>({
+        isOpen: false,
+        person: null,
+    });
 
     let confirmModal = $state({
         isOpen: false,
@@ -104,9 +112,9 @@
     const onDeactivate = (p: any) => {
         confirmModal = {
             isOpen: true,
-            title: "¿Dar de baja?",
+            title: "¿DAR DE BAJA?",
             description:
-                "La persona pasará a estado INACTIVO. Sus tarjetas se desactivarán.",
+                "Esta persona dejará de tener acceso, pero sus datos se conservarán en el sistema. Las tarjetas pasarán a estar bloqueadas.",
             variant: "danger",
             confirmText: "Dar de Baja",
             onConfirm: () =>
@@ -118,18 +126,9 @@
         personnelActions.handleReactivatePerson(p, refreshData);
 
     const onDeletePermanent = (p: any) => {
-        confirmModal = {
+        deleteModal = {
             isOpen: true,
-            title: "¿ELIMINAR PERMANENTEMENTE?",
-            description:
-                "Esta acción borrará todo el historial, tarjetas y accesos. NO SE PUEDE DESHACER.",
-            variant: "danger",
-            confirmText: "Eliminar Definitivamente",
-            onConfirm: () =>
-                personnelActions.handleDeletePersonPermanent(p, async () => {
-                    personnelState.setDetailsOpen(false);
-                    await refreshData();
-                }),
+            person: p,
         };
     };
 
@@ -250,4 +249,19 @@
     confirmText={confirmModal.confirmText}
     onConfirm={confirmModal.onConfirm}
     onCancel={() => (confirmModal.isOpen = false)}
+/>
+
+<DeletePersonnelModal
+    bind:isOpen={deleteModal.isOpen}
+    person={deleteModal.person}
+    onConfirm={async (cardActionMap) => {
+        await personnelActions.handleDeletePersonPermanent(
+            deleteModal.person,
+            cardActionMap,
+            async () => {
+                personnelState.setDetailsOpen(false);
+                await refreshData();
+            },
+        );
+    }}
 />

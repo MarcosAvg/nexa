@@ -12,7 +12,7 @@
     type Props = {
         type: "P2000" | "KONE";
         folio: string;
-        status?: "active" | "blocked";
+        status?: "active" | "blocked" | "inactive";
         responsiva_status?: string;
         programming_status?: string;
         isHighlighted?: boolean;
@@ -65,8 +65,18 @@
                 >
             {/if}
         </div>
-        <Badge variant={status === "active" ? "emerald" : "rose"}>
-            {status === "active" ? "Activa" : "Bloqueada"}
+        <Badge
+            variant={status === "active"
+                ? "emerald"
+                : status === "blocked"
+                  ? "rose"
+                  : "slate"}
+        >
+            {status === "active"
+                ? "Activa"
+                : status === "blocked"
+                  ? "Bloqueada"
+                  : "Baja"}
         </Badge>
     </div>
 

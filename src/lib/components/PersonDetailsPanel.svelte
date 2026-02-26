@@ -464,12 +464,18 @@
                         </button>
                         <button
                             type="button"
-                            class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-white transition-all active:scale-95"
-                            onclick={() => onBlock?.(person)}
+                            class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg {person.status ===
+                            'Bloqueado/a'
+                                ? 'text-emerald-600'
+                                : 'text-slate-500 hover:text-amber-600'} hover:bg-white transition-all active:scale-95"
+                            onclick={() =>
+                                person.status === "Bloqueado/a"
+                                    ? onReactivate?.(person)
+                                    : onBlock?.(person)}
                         >
                             <Lock size={20} />
                             <span class="text-[10px] font-bold uppercase"
-                                >{person.status_raw === "blocked"
+                                >{person.status === "Bloqueado/a"
                                     ? "Activar"
                                     : "Bloquear"}</span
                             >

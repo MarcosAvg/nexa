@@ -1,7 +1,7 @@
 export const ACTION_NAMES: Record<string, string> = {
-    CREATE: "Registro de Personal",
-    UPDATE: "Actualización de Datos",
-    DELETE: "Eliminación Permanente",
+    CREATE: "Registro",
+    UPDATE: "Actualización",
+    DELETE: "Eliminación",
     BLOCK: "Bloqueo de Acceso",
     ACTIVATE: "Activación de Acceso",
     DEACTIVATE: "Desactivación de Personal",
@@ -26,6 +26,8 @@ export const ACTION_NAMES: Record<string, string> = {
     CREATE_CATALOG: "Catálogo Creado",
     UPDATE_CATALOG: "Catálogo Actualizado",
     DELETE_CATALOG: "Catálogo Eliminado",
+    CANCEL: "Cancelación",
+    COMPLETE: "Completado",
 };
 
 export const ACTION_COLORS: Record<string, string> = {
@@ -56,6 +58,8 @@ export const ACTION_COLORS: Record<string, string> = {
     CREATE_CATALOG: "emerald",
     UPDATE_CATALOG: "blue",
     DELETE_CATALOG: "rose",
+    CANCEL: "rose",
+    COMPLETE: "emerald",
 };
 
 export function translateDetails(text: string) {

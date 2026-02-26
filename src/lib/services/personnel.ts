@@ -6,7 +6,8 @@ import { appEvents, EVENTS } from "../utils/appEvents";
 import type { Person, Card, DashboardMetrics } from "../types";
 
 const mapPersonRecord = (p: any): Person => {
-    const activeCards = (p.cards || []).filter((c: any) => c.status === "active");
+    const allCards = (p.cards || []);
+    const activeCards = allCards.filter((c: any) => c.status === "active");
     const readyCards = activeCards.filter(
         (c: any) => c.programming_status === "done" && (c.responsiva_status === "signed" || c.responsiva_status === "legacy")
     );
@@ -20,8 +21,10 @@ const mapPersonRecord = (p: any): Person => {
             displayStatus = "Activo/a";
         } else if (readyTypes.size === 1) {
             displayStatus = "Parcial";
+        } else if (allCards.length > 0) {
+            displayStatus = "Bloqueado/a";
         } else {
-            displayStatus = "Inactivo/a";
+            displayStatus = "Sin Acceso";
         }
     } else if (p.status === "blocked") {
         displayStatus = "Bloqueado/a";
@@ -56,13 +59,13 @@ const mapPersonRecord = (p: any): Person => {
 export const personnelService = {
     async fetchAll(page: number = 1, limit: number = 50, search: string = "", statusFilter: string = "Todos", dependencyId: string = "", buildingId: string = ""): Promise<{ data: Person[], count: number }> {
         try {
-            // "Activo/a", "Parcial", "Inactivo/a" are computed from DB status "active" + card readiness.
+            // "Activo/a", "Parcial", "Sin Acceso" are computed from DB status "active" + card readiness.
             // We can only filter "Bloqueado/a" and "Baja" directly at the DB level.
             // For computed statuses we must query all "active" records and post-filter.
-            const isComputedStatus = ["Activo/a", "Parcial", "Inactivo/a"].includes(statusFilter);
+            const isComputedStatus = ["Activo/a", "Parcial", "Sin Acceso"].includes(statusFilter);
             const dbStatusMap: Record<string, string> = {
                 "Bloqueado/a": "blocked",
-                "Baja": "deleted"
+                "Baja": "inactive"
             };
 
             let query = supabase
@@ -144,7 +147,7 @@ export const personnelService = {
             const { data, error } = await supabase
                 .from("personnel")
                 .select("id, first_name, last_name, employee_no")
-                .neq("status", "deleted")
+                .neq("status", "inactive")
                 .order("first_name", { ascending: true });
 
             if (error) throw error;
@@ -163,10 +166,10 @@ export const personnelService = {
 
     async fetchForExport(search: string = "", statusFilter: string = "Todos", dependencyId: string = ""): Promise<Person[]> {
         try {
-            const isComputedStatus = ["Activo/a", "Parcial", "Inactivo/a"].includes(statusFilter);
+            const isComputedStatus = ["Activo/a", "Parcial", "Sin Acceso"].includes(statusFilter);
             const dbStatusMap: Record<string, string> = {
                 "Bloqueado/a": "blocked",
-                "Baja": "deleted"
+                "Baja": "inactive"
             };
 
             const allData: Person[] = [];
@@ -254,7 +257,7 @@ export const personnelService = {
             if (nombres) query = query.ilike("first_name", `%${nombres.trim()}%`);
 
             const { data, error } = await query
-                .neq("status", "deleted")
+                .neq("status", "inactive")
                 .order("last_name", { ascending: true })
                 .limit(10);
 
@@ -370,8 +373,10 @@ export const personnelService = {
             const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", id).single();
             const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${id})`;
 
+            // Consolidated Log for status change (avoids noise from cascading card updates)
+            const statusLabel = status === 'active' ? 'activo' : status === 'blocked' ? 'bloqueado/a' : 'BAJA';
             await HistoryService.log("PERSONNEL", id, "UPDATE_STATUS", {
-                message: `Estado actualizado a ${status} (y sus tarjetas)`,
+                message: `Estado actualizado a ${statusLabel} (incluye tarjetas)`,
                 entityName: personName
             });
             appEvents.emit(EVENTS.PERSONNEL_CHANGED);
@@ -382,15 +387,34 @@ export const personnelService = {
         }
     },
 
-    async delete(id: string) {
+    async delete(id: string, cardActionMap?: Record<string, "delete" | "keep">) {
         try {
             // Log deletion BEFORE removing data
             // Fetch person name for history BEFORE deleting
             const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", id).single();
             const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${id})`;
 
+            // Handle card actions if provided
+            if (cardActionMap) {
+                for (const [cardId, action] of Object.entries(cardActionMap)) {
+                    if (action === "delete") {
+                        await supabase.from("cards").delete().eq("id", cardId);
+                    } else if (action === "keep") {
+                        await supabase
+                            .from("cards")
+                            .update({
+                                person_id: null,
+                                status: "available",
+                                responsiva_status: "unsigned",
+                                programming_status: "pending"
+                            })
+                            .eq("id", cardId);
+                    }
+                }
+            }
+
             await HistoryService.log("PERSONNEL", id, "DELETE", {
-                message: `Registro eliminado permanentemente`,
+                message: `Registro eliminado permanentemente${cardActionMap ? " (con gestión de tarjetas)" : ""}`,
                 entityName: personName
             });
 
@@ -532,7 +556,7 @@ export const personnelService = {
             // Status counts
             const activo = allData.filter(p => p.status === "Activo/a").length;
             const parcial = allData.filter(p => p.status === "Parcial").length;
-            const inactivo = allData.filter(p => p.status === "Inactivo/a").length;
+            const inactivo = allData.filter(p => p.status === "Sin Acceso").length;
             const bloqueado = allData.filter(p => p.status === "Bloqueado/a").length;
             const baja = allData.filter(p => p.status === "Baja").length;
 

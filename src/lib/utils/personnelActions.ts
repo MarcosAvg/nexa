@@ -40,9 +40,9 @@ export const personnelActions = {
         }
     },
 
-    async handleDeletePersonPermanent(person: Person, onSuccess?: () => Promise<void>) {
+    async handleDeletePersonPermanent(person: Person, cardActionMap?: Record<string, "delete" | "keep">, onSuccess?: () => Promise<void>) {
         try {
-            await personnelService.delete(person.id);
+            await personnelService.delete(person.id, cardActionMap);
             toast.success("Registro eliminado");
             await onSuccess?.();
         } catch (e) {

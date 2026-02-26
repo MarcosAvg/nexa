@@ -188,7 +188,7 @@
     function getStatusVariant(status: string) {
         if (status === "Activo/a") return "emerald";
         if (status === "Parcial") return "amber";
-        if (status === "Inactivo/a") return "slate";
+        if (status === "Sin Acceso") return "slate";
         if (status === "Bloqueado/a") return "rose";
         if (status === "Baja") return "slate";
         return "slate";
@@ -219,11 +219,6 @@
         <Badge variant={getStatusVariant(row.status)}>
             {row.status}
         </Badge>
-        {#if row.status === "Baja"}
-            <Badge variant="slate" class="opacity-50 text-[10px]"
-                >INACTIVO</Badge
-            >
-        {/if}
     </div>
 {/snippet}
 
@@ -291,7 +286,7 @@
                     "Todos",
                     "Activo/a",
                     "Parcial",
-                    "Inactivo/a",
+                    "Sin Acceso",
                     "Bloqueado/a",
                     "Baja",
                 ]}

@@ -152,7 +152,7 @@ async function addStatsSheet(workbook: ExcelJS.Workbook, data: ExportPersonnelDa
     const activos = data.filter(p => p.status === 'Activo/a').length;
     const parciales = data.filter(p => p.status === 'Parcial').length;
     const bloqueados = data.filter(p => p.status === 'Bloqueado/a').length;
-    const inactivos = data.filter(p => p.status === 'Inactivo/a').length;
+    const sinAcceso = data.filter(p => p.status === 'Sin Acceso').length;
     const bajas = data.filter(p => p.status === 'Baja').length;
     const activosOperativos = activos + parciales; // personas con algún nivel de acceso
 
@@ -258,7 +258,7 @@ async function addStatsSheet(workbook: ExcelJS.Workbook, data: ExportPersonnelDa
 
     ws.getRow(row).height = 28;
     kpiCard('B', 'Bloqueado/a', bloqueados, C.rose, pct(bloqueados, total));
-    kpiCard('F', 'Inactivo/a', inactivos, C.slate, pct(inactivos, total));
+    kpiCard('F', 'Sin Acceso', sinAcceso, C.slate, pct(sinAcceso, total));
     row++;
 
     ws.getRow(row).height = 28;
@@ -603,7 +603,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
             const row = worksheet.addRow(rowData);
             row.height = 24;
 
-            const isInactive = person.status === 'Baja' || person.status === 'Inactivo/a';
+            const isInactive = person.status === 'Baja' || person.status === 'Sin Acceso';
 
             row.eachCell((cell, colNumber) => {
                 const colLetter = String.fromCharCode(64 + colNumber);
@@ -647,6 +647,9 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
             if (person.status === 'Activo/a' && !isInactive) {
                 statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; // light-green-100
                 statusCell.font = { color: { argb: 'FF166534' }, bold: true, name: 'Arial', size: 9 };   // dark-green-800
+            } else if (person.status === 'Parcial' && !isInactive) {
+                statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } }; // light-amber-100
+                statusCell.font = { color: { argb: 'FF92400E' }, bold: true, name: 'Arial', size: 9 };   // dark-amber-800
             } else if (person.status === 'Bloqueado/a') {
                 statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; // light-red-100
                 statusCell.font = { color: { argb: 'FF991B1B' }, bold: true, name: 'Arial', size: 9 };   // dark-red-800
@@ -842,7 +845,7 @@ export async function exportCardsToExcel(data: any[], options?: ExportOptions) {
             personName: card.personName || 'Sin asignar',
             statusLabel: card.status === 'active' ? 'Activa' : (card.status === 'blocked' ? 'Bloqueada' : (card.status === 'inactive' ? 'Baja' : 'Disponible')),
             programmingText: card.programming_status === 'done' ? 'Programada' : (card.person_id ? 'PENDIENTE' : 'N/A'),
-            responsivaText: card.responsiva_status === 'signed' ? 'Firmada' : (card.person_id ? 'PENDIENTE' : 'N/A')
+            responsivaText: (card.responsiva_status === 'signed' || card.responsiva_status === 'legacy') ? 'Firmada' : (card.person_id ? 'PENDIENTE' : 'N/A')
         };
 
         const row = worksheet.addRow(rowData);
@@ -911,14 +914,15 @@ export async function exportHistoryToExcel(data: any[], options?: ExportOptions)
     };
 
     const actionNames: Record<string, string> = {
-        CREATE: "Registro de Personal", UPDATE: "Actualización de Datos", DELETE: "Eliminación Permanente",
+        CREATE: "Registro", UPDATE: "Actualización", DELETE: "Eliminación",
         BLOCK: "Bloqueo de Acceso", ACTIVATE: "Activación de Acceso", DEACTIVATE: "Desactivación de Personal",
         ASSIGN_CARD: "Asignación de Tarjeta", UNASSIGN_CARD: "Desvinculación de Tarjeta", UPSERT: "Guardado/Actualización",
         UPDATE_STATUS: "Cambio de Estado", UNASSIGN: "Desvinculación", UPDATE_PROGRAMMING: "Programación de Acceso",
         UPDATE_RESPONSIVA: "Estatus de Responsiva", REPLACE_CARD: "Reposición de Tarjeta", TICKET: "Ticket de Sistema",
         CREATE_TICKET: "Creación de Ticket", SIGN_RESPONSIVA: "Firma de Responsiva", DELETE_RESPONSIVA: "Eliminación de Responsiva",
         COMPLETE_TICKET: "Ticket Completado", APPLY_MODIFICATION: "Modificación Aprobada", REJECT_MODIFICATION: "Modificación Rechazada",
-        REPLACE_OLD: "Baja por Reposición", DELETE_TICKET_CASCADE: "Eliminación en Cascada"
+        REPLACE_OLD: "Baja por Reposición", DELETE_TICKET_CASCADE: "Eliminación en Cascada",
+        CANCEL: "Cancelación", COMPLETE: "Completado"
     };
 
     function translateText(text: string) {
@@ -1613,6 +1617,9 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
         if (person.status === 'Activo/a' && !isInactive) {
             statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
             statusCell.font = { color: { argb: 'FF166534' }, bold: true, name: 'Arial', size: 9 };
+        } else if (person.status === 'Parcial' && !isInactive) {
+            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+            statusCell.font = { color: { argb: 'FF92400E' }, bold: true, name: 'Arial', size: 9 };
         } else if (person.status === 'Bloqueado/a') {
             statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
             statusCell.font = { color: { argb: 'FF991B1B' }, bold: true, name: 'Arial', size: 9 };
