@@ -41,6 +41,9 @@
     /** Which sheet accordions are expanded */
     let expandedSheets = $state<Set<string>>(new Set());
 
+    /** Which rows are selected for import (key is 'sheetKey-rowNumber') */
+    let selectedRows = $state<Set<string>>(new Set());
+
     let fileInput = $state<HTMLInputElement>();
 
     // ── Helpers ────────────────────────────────────────
@@ -80,6 +83,17 @@
             }
             parseResult = result;
             step = "parsed";
+
+            // Initialize selections with all valid rows
+            const initialSelected = new Set<string>();
+            result.sheets.forEach((sheet) => {
+                sheet.rows.forEach((row) => {
+                    if (row.isValid) {
+                        initialSelected.add(`${sheet.key}-${row.rowNumber}`);
+                    }
+                });
+            });
+            selectedRows = initialSelected;
         } catch (err) {
             console.error(err);
             toast.error(
@@ -112,16 +126,45 @@
             .join("\n");
     }
 
+    function toggleRow(sheetKey: string, rowNumber: number) {
+        const key = `${sheetKey}-${rowNumber}`;
+        const next = new Set(selectedRows);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        selectedRows = next;
+    }
+
+    function toggleSheetSelection(sheet: ParsedSheet) {
+        const rowKeys = sheet.rows
+            .filter((r) => r.isValid)
+            .map((r) => `${sheet.key}-${r.rowNumber}`);
+        const allSelected = rowKeys.every((k) => selectedRows.has(k));
+
+        const next = new Set(selectedRows);
+        if (allSelected) {
+            rowKeys.forEach((k) => next.delete(k));
+        } else {
+            rowKeys.forEach((k) => next.add(k));
+        }
+        selectedRows = next;
+    }
+
+    let totalSelected = $derived(selectedRows.size);
+
     async function handleImport() {
         if (!parseResult) return;
 
         isImporting = true;
         step = "importing";
 
-        // Only import valid rows
+        // Only import valid AND selected rows
         const tickets = parseResult.sheets.flatMap((sheet) =>
             sheet.rows
-                .filter((r) => r.isValid)
+                .filter(
+                    (r) =>
+                        r.isValid &&
+                        selectedRows.has(`${sheet.key}-${r.rowNumber}`),
+                )
                 .map((r) => ({
                     type: SHEET_TO_TICKET_TYPE[sheet.key] ?? sheet.key,
                     title: buildTicketTitle(sheet.key, r),
@@ -236,10 +279,10 @@
                         class="rounded-lg p-3 bg-emerald-50 border border-emerald-200"
                     >
                         <p class="text-2xl font-bold text-emerald-700">
-                            {parseResult.totalValid}
+                            {totalSelected}
                         </p>
                         <p class="text-xs text-emerald-600 mt-0.5">
-                            Listas para importar
+                            Seleccionados
                         </p>
                     </div>
                     <div
@@ -274,39 +317,72 @@
                             class="rounded-lg border border-slate-200 overflow-hidden"
                         >
                             <!-- Header -->
-                            <button
-                                class="w-full flex items-center justify-between gap-3 px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
-                                onclick={() => toggleSheet(sheet.key)}
+                            <div
+                                class="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200/50"
                             >
-                                <div class="flex items-center gap-2">
-                                    <Badge
-                                        variant={SHEET_COLORS[sheet.key] ??
-                                            "slate"}>{sheet.label}</Badge
-                                    >
-                                    <span class="text-xs text-slate-500"
-                                        >{sheet.rows.length} fila(s)</span
-                                    >
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    {#if sheet.invalidCount > 0}
-                                        <span
-                                            class="text-xs text-rose-500 font-medium"
-                                            >{sheet.invalidCount} con error</span
+                                <input
+                                    type="checkbox"
+                                    class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                    checked={sheet.rows
+                                        .filter((r) => r.isValid)
+                                        .every((r) =>
+                                            selectedRows.has(
+                                                `${sheet.key}-${r.rowNumber}`,
+                                            ),
+                                        )}
+                                    indeterminate={sheet.rows
+                                        .filter((r) => r.isValid)
+                                        .some((r) =>
+                                            selectedRows.has(
+                                                `${sheet.key}-${r.rowNumber}`,
+                                            ),
+                                        ) &&
+                                        !sheet.rows
+                                            .filter((r) => r.isValid)
+                                            .every((r) =>
+                                                selectedRows.has(
+                                                    `${sheet.key}-${r.rowNumber}`,
+                                                ),
+                                            )}
+                                    onchange={() => toggleSheetSelection(sheet)}
+                                    disabled={sheet.rows.filter(
+                                        (r) => r.isValid,
+                                    ).length === 0}
+                                />
+                                <button
+                                    class="flex-1 flex items-center justify-between gap-3 text-left"
+                                    onclick={() => toggleSheet(sheet.key)}
+                                >
+                                    <div class="flex items-center gap-2">
+                                        <Badge
+                                            variant={SHEET_COLORS[sheet.key] ??
+                                                "slate"}>{sheet.label}</Badge
                                         >
-                                    {/if}
-                                    {#if isExpanded}
-                                        <ChevronDown
-                                            size={14}
-                                            class="text-slate-400"
-                                        />
-                                    {:else}
-                                        <ChevronRight
-                                            size={14}
-                                            class="text-slate-400"
-                                        />
-                                    {/if}
-                                </div>
-                            </button>
+                                        <span class="text-xs text-slate-500"
+                                            >{sheet.rows.length} fila(s)</span
+                                        >
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        {#if sheet.invalidCount > 0}
+                                            <span
+                                                class="text-xs text-rose-500 font-medium"
+                                                >{sheet.invalidCount} con error</span
+                                            >
+                                        {/if}
+                                        {#if isExpanded}
+                                            <ChevronDown
+                                                size={14}
+                                                class="text-slate-400"
+                                            />
+                                        {:else}
+                                            <ChevronRight
+                                                size={14}
+                                                class="text-slate-400"
+                                            />
+                                        {/if}
+                                    </div>
+                                </button>
+                            </div>
 
                             <!-- Rows detail (expandable) -->
                             {#if isExpanded}
@@ -320,9 +396,17 @@
                                                 : 'bg-rose-50/50'}"
                                         >
                                             {#if row.isValid}
-                                                <CheckCircle2
-                                                    size={14}
-                                                    class="text-emerald-500 mt-0.5 shrink-0"
+                                                <input
+                                                    type="checkbox"
+                                                    class="mt-1 w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                    checked={selectedRows.has(
+                                                        `${sheet.key}-${row.rowNumber}`,
+                                                    )}
+                                                    onchange={() =>
+                                                        toggleRow(
+                                                            sheet.key,
+                                                            row.rowNumber,
+                                                        )}
                                                 />
                                             {:else}
                                                 <AlertCircle
@@ -422,11 +506,11 @@
                     </Button>
                     <Button
                         variant="primary"
-                        disabled={(parseResult?.totalValid ?? 0) === 0}
+                        disabled={totalSelected === 0}
                         onclick={handleImport}
                     >
                         <Upload size={16} class="mr-2" />
-                        Importar {parseResult?.totalValid} ticket(s)
+                        Importar {totalSelected} ticket(s)
                     </Button>
                 </div>
             {:else if step === "importing"}
