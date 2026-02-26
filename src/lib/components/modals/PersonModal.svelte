@@ -102,27 +102,6 @@
         }
     });
 
-    // Auto-assign base floor to both access systems
-    let lastAutoAddedBase = $state("");
-    $effect(() => {
-        if (pisoBase) {
-            // Remove previous auto-added floor if it changed
-            if (lastAutoAddedBase && lastAutoAddedBase !== pisoBase) {
-                pisosP2000 = pisosP2000.filter((f) => f !== lastAutoAddedBase);
-                pisosKone = pisosKone.filter((f) => f !== lastAutoAddedBase);
-            }
-
-            if (!pisosP2000.includes(pisoBase)) {
-                pisosP2000 = [...pisosP2000, pisoBase];
-            }
-            if (!pisosKone.includes(pisoBase)) {
-                pisosKone = [...pisosKone, pisoBase];
-            }
-
-            lastAutoAddedBase = pisoBase;
-        }
-    });
-
     // Populate form
     let lastLoadedPersonId = $state("");
 
@@ -141,7 +120,6 @@
                 puestoFuncion = (editingPerson as any).position || "";
                 edificio = editingPerson.building;
                 pisoBase = editingPerson.floor || "";
-                lastAutoAddedBase = pisoBase;
                 pisosP2000 = [...(editingPerson.floors_p2000 || [])];
                 pisosKone = [...(editingPerson.floors_kone || [])];
 
@@ -217,7 +195,6 @@
                 pisoBase = prefill.pisoBase ?? "";
                 areaEquipo = prefill.area ?? "";
                 puestoFuncion = prefill.puesto ?? "";
-                lastAutoAddedBase = pisoBase;
 
                 const schedObj = cat.schedules.find(
                     (s) => s.name === prefill.horario,
@@ -355,7 +332,6 @@
         email = "";
         accesosEspeciales = [];
         tarjetasAsignadas = [];
-        lastAutoAddedBase = "";
     }
 
     function resetAndClose() {
