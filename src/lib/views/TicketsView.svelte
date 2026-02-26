@@ -76,25 +76,52 @@
             let personName = "Desconocido";
             if (t.personnel) {
                 personName = `${t.personnel.first_name} ${t.personnel.last_name}`;
+            } else if (t.payload?.nombres || t.payload?.apellidos) {
+                // Resolution for imported tickets (altas, mods, etc)
+                personName =
+                    `${t.payload.apellidos || ""}, ${t.payload.nombres || ""}`.trim();
+                if (personName.startsWith(","))
+                    personName = personName.slice(1).trim();
+                if (personName.endsWith(","))
+                    personName = personName.slice(0, -1).trim();
             } else if (t.payload?.relatedPerson?.name) {
                 personName = t.payload.relatedPerson.name;
             }
-            return { ...t, personName };
+
+            // Also try to resolve card info from payload if it's an import (e.g. Reposición)
+            let cardType = t.card_type;
+            let cardFolio = t.card_folio;
+
+            if (!cardFolio && t.payload) {
+                if (t.payload.folio_p2000) {
+                    cardType = "P2000";
+                    cardFolio = t.payload.folio_p2000;
+                } else if (t.payload.folio_kone) {
+                    cardType = "KONE";
+                    cardFolio = t.payload.folio_kone;
+                } else if (t.payload.folio) {
+                    cardType = t.payload.tipo_tarjeta || "N/A";
+                    cardFolio = t.payload.folio;
+                }
+            }
+
+            return { ...t, personName, cardType, cardFolio };
         }),
     );
 
     const ticketTypes = [
         "Todos",
+        "Alta de Persona",
         "Programación",
         "Firma Responsiva",
-        "Modificación de datos",
+        "Modificación",
         "Solicitud de acceso",
         "Reposición",
         "Bloqueo de tarjeta",
         "Baja de tarjeta",
         "Bloqueo de persona",
         "Baja de Persona",
-        "Reporte de Fallo",
+        "Reporte de Falla",
         "Otro",
     ];
 
@@ -179,7 +206,7 @@
             isImportedOpen = true;
             return;
         }
-        if (ticket.type === "Modificación de datos") {
+        if (ticket.type === "Modificación") {
             compareTicket = ticket;
             isCompareOpen = true;
             return;
@@ -208,7 +235,7 @@
             return;
         }
 
-        if (ticket.type === "Modificación de datos") {
+        if (ticket.type === "Modificación") {
             compareTicket = ticket;
             isCompareOpen = true;
             return;
@@ -345,7 +372,9 @@
         </div>
     {/if}
 
-    <div class="flex flex-col gap-4">
+    <div
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20"
+    >
         {#if filteredTickets.length === 0}
             <div
                 class="p-8 text-center text-slate-500 bg-slate-50 rounded-lg border border-slate-200 border-dashed"

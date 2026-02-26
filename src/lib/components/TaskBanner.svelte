@@ -1,5 +1,7 @@
 <script lang="ts" module>
-    export function getStatusVariant(priority: string) {
+    export function getStatusVariant(
+        priority: string,
+    ): "rose" | "amber" | "blue" | "slate" {
         const p = priority?.toLowerCase();
         if (p === "urgente") return "rose";
         if (p === "alta") return "rose";
@@ -17,12 +19,14 @@
         CreditCard,
         FileSignature,
         Wallet,
-        AlertCircle,
-        CheckCircle2,
-        Briefcase,
         Lock,
         ArrowRight,
         Calendar,
+        User,
+        Hash,
+        CheckCircle2,
+        MoreHorizontal,
+        AlertCircle,
     } from "lucide-svelte";
 
     type Ticket = {
@@ -36,40 +40,113 @@
         priority: string;
         status: string;
         created_at?: string;
+        payload?: any;
     };
 
-    type Props = {
+    let {
+        ticket,
+        onManage,
+        onComplete,
+    }: {
         ticket: Ticket;
         onManage?: (ticket: Ticket) => void;
         onComplete?: (ticket: Ticket) => void;
+    } = $props();
+
+    const typeConfig: Record<
+        string,
+        {
+            icon: any;
+            color: string;
+            bg: string;
+            border: string;
+            cardBg: string;
+            cardBorder: string;
+        }
+    > = {
+        Programación: {
+            icon: CreditCard,
+            color: "text-blue-600",
+            bg: "bg-blue-50",
+            border: "border-blue-100",
+            cardBg: "bg-blue-50/50",
+            cardBorder: "border-blue-200/50",
+        },
+        "Firma Responsiva": {
+            icon: FileSignature,
+            color: "text-indigo-600",
+            bg: "bg-indigo-50",
+            border: "border-indigo-100",
+            cardBg: "bg-indigo-50/50",
+            cardBorder: "border-indigo-200/50",
+        },
+        "Alta de Persona": {
+            icon: User,
+            color: "text-emerald-600",
+            bg: "bg-emerald-50",
+            border: "border-emerald-100",
+            cardBg: "bg-emerald-50/50",
+            cardBorder: "border-emerald-200/50",
+        },
+        "Baja de Persona": {
+            icon: Lock,
+            color: "text-rose-600",
+            bg: "bg-rose-50",
+            border: "border-rose-100",
+            cardBg: "bg-rose-50/50",
+            cardBorder: "border-rose-200/50",
+        },
+        "Modificación de datos": {
+            icon: ArrowRight,
+            color: "text-amber-600",
+            bg: "bg-amber-50",
+            border: "border-amber-100",
+            cardBg: "bg-amber-50/50",
+            cardBorder: "border-amber-200/50",
+        },
+        Modificación: {
+            icon: ArrowRight,
+            color: "text-amber-600",
+            bg: "bg-amber-50",
+            border: "border-amber-100",
+            cardBg: "bg-amber-50/50",
+            cardBorder: "border-amber-200/50",
+        },
+        Reposición: {
+            icon: CreditCard,
+            color: "text-sky-600",
+            bg: "bg-sky-50",
+            border: "border-sky-100",
+            cardBg: "bg-sky-50/50",
+            cardBorder: "border-sky-200/50",
+        },
+        "Reporte de Fallo": {
+            icon: AlertCircle,
+            color: "text-orange-600",
+            bg: "bg-orange-50",
+            border: "border-orange-100",
+            cardBg: "bg-orange-50/50",
+            cardBorder: "border-orange-200/50",
+        },
+        "Reporte de Falla": {
+            icon: AlertCircle,
+            color: "text-orange-600",
+            bg: "bg-orange-50",
+            border: "border-orange-100",
+            cardBg: "bg-orange-50/50",
+            cardBorder: "border-orange-200/50",
+        },
+        Default: {
+            icon: MoreHorizontal,
+            color: "text-slate-600",
+            bg: "bg-slate-50",
+            border: "border-slate-100",
+            cardBg: "bg-slate-50/50",
+            cardBorder: "border-slate-200/50",
+        },
     };
 
-    let { ticket, onManage, onComplete }: Props = $props();
-
-    const iconMap: Record<string, any> = {
-        Programación: CreditCard,
-        "Firma Responsiva": FileSignature,
-        Cobro: Wallet,
-        Bloqueo: Lock,
-        Otro: Briefcase,
-    };
-
-    const typeStyles: Record<string, string> = {
-        Programación: "bg-white border-slate-200",
-        "Firma Responsiva": "bg-white border-slate-200",
-        Cobro: "bg-white border-slate-200",
-        Bloqueo: "bg-white border-slate-200",
-        Otro: "bg-white border-slate-200",
-    };
-
-    const iconStyles: Record<string, string> = {
-        Programación: "bg-blue-50/50 text-blue-600 border-blue-100/50",
-        "Firma Responsiva":
-            "bg-indigo-50/50 text-indigo-600 border-indigo-100/50",
-        Cobro: "bg-emerald-50/50 text-emerald-600 border-emerald-100/50",
-        Bloqueo: "bg-rose-50/50 text-rose-600 border-rose-100/50",
-        Otro: "bg-slate-50/50 text-slate-600 border-slate-100/50",
-    };
+    const config = $derived(typeConfig[ticket.type] || typeConfig["Default"]);
 
     function formatDate(dateStr?: string) {
         if (!dateStr) return "";
@@ -81,137 +158,139 @@
             minute: "2-digit",
         });
     }
+
+    const priorityColor = $derived(getStatusVariant(ticket.priority));
 </script>
 
 <article
-    class="group relative rounded-xl border bg-white p-3.5 transition-all duration-200 hover:shadow-md border-slate-200 shadow-sm"
+    class="group relative flex flex-col h-full {config.cardBg} rounded-2xl border {config.cardBorder} overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1"
 >
-    <!-- Accent Line (optional, but adds a nice touch without being too much) -->
-    <div
-        class="absolute inset-y-0 left-0 w-1.5 rounded-l-xl {ticket.type ===
-        'Programación'
-            ? 'bg-blue-600'
-            : ticket.type === 'Firma Responsiva'
-              ? 'bg-indigo-600'
-              : ticket.type === 'Cobro'
-                ? 'bg-emerald-600'
-                : ticket.type === 'Bloqueo'
-                  ? 'bg-rose-600'
-                  : 'bg-slate-400'} opacity-0 group-hover:opacity-100 transition-opacity"
-    ></div>
-
-    <div class="relative flex flex-col md:flex-row md:items-center gap-4">
-        <!-- Icon Section -->
-        <div class="flex items-center gap-3.5 min-w-[160px]">
+    <!-- Header: Type Icon & Priority -->
+    <div class="p-4 flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3">
             <div
-                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border {iconStyles[
-                    ticket.type
-                ] || iconStyles['Otro']} shadow-sm"
+                class="flex h-11 w-11 items-center justify-center rounded-xl border-2 {config.bg} {config.border} {config.color} shadow-sm transition-transform duration-300 group-hover:scale-110"
             >
-                {#if iconMap[ticket.type]}
-                    {@const Icon = iconMap[ticket.type]}
-                    <Icon size={20} strokeWidth={2.5} />
-                {:else}
-                    <Briefcase size={20} strokeWidth={2.5} />
+                {#if true}
+                    {@const Icon = config.icon}
+                    <Icon size={22} strokeWidth={2.5} />
                 {/if}
             </div>
-
             <div class="min-w-0">
-                <span
-                    class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5"
+                <p
+                    class="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1"
                 >
                     {ticket.type}
-                </span>
-                <h3
-                    class="text-sm font-bold text-slate-900 leading-tight truncate"
-                >
-                    {ticket.title}
-                </h3>
-            </div>
-        </div>
-
-        <!-- Content Section -->
-        <div class="flex-1 min-w-0">
-            <p class="text-[13px] font-medium text-slate-500 line-clamp-1 mb-2">
-                {ticket.description}
-            </p>
-
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                <!-- Beneficiary -->
-                <div class="flex items-center gap-1.5">
-                    <div
-                        class="h-5 w-5 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400"
-                    >
-                        <Clock size={10} />
-                    </div>
-                    <span class="text-xs font-semibold text-slate-700"
-                        >{ticket.personName}</span
+                </p>
+                <div class="flex items-center gap-1.5 text-slate-300">
+                    <Hash size={10} />
+                    <span class="text-[10px] font-bold"
+                        >Ticket #{String(ticket.id)
+                            .slice(-6)
+                            .toUpperCase()}</span
                     >
                 </div>
-
-                <!-- Technical Details -->
-                {#if ticket.cardFolio}
-                    <div
-                        class="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-50 border border-slate-100"
-                    >
-                        <CreditCard size={10} class="text-slate-400" />
-                        <span class="text-[10px] font-bold text-slate-500">
-                            {ticket.cardType} ·
-                            <span class="text-slate-700"
-                                >{ticket.cardFolio}</span
-                            >
-                        </span>
-                    </div>
-                {/if}
-
-                <!-- Time -->
-                {#if ticket.created_at}
-                    <div class="flex items-center gap-1.5 text-slate-400">
-                        <Calendar size={10} />
-                        <span class="text-[10px] font-bold"
-                            >{formatDate(ticket.created_at)}</span
-                        >
-                    </div>
-                {/if}
             </div>
         </div>
 
-        <!-- Priority & Actions -->
-        <div
-            class="flex flex-row md:items-center justify-between md:justify-end gap-3 min-w-fit border-t md:border-t-0 border-slate-50 pt-3 md:pt-0"
+        <Badge
+            variant={priorityColor}
+            class="px-2 py-0.5 text-[9px] uppercase font-black tracking-tight rounded-lg shadow-sm"
         >
-            <Badge
-                variant={getStatusVariant(ticket.priority)}
-                class="px-2.5 py-0.5 text-[10px] uppercase font-bold tracking-tight"
-            >
-                {ticket.priority}
-            </Badge>
+            {ticket.priority}
+        </Badge>
+    </div>
 
-            {#if ticket.type === "Programación" || ticket.type === "Firma Responsiva"}
-                <Button
-                    variant="soft-emerald"
-                    size="sm"
-                    class="h-9 px-4 rounded-xl active:scale-95"
-                    onclick={() => onComplete?.(ticket)}
+    <!-- Body: Title & Description -->
+    <div class="px-4 pb-2 flex-1">
+        <h3
+            class="text-sm font-bold text-slate-900 leading-snug mb-1.5 line-clamp-2 min-h-[2.5rem]"
+        >
+            {ticket.title}
+        </h3>
+        <p class="text-xs font-medium text-slate-500 line-clamp-2 min-h-[2rem]">
+            {ticket.description}
+        </p>
+    </div>
+
+    <!-- Metadata Section -->
+    <div class="px-4 pb-4 space-y-3">
+        <!-- Main Person Label -->
+        <div
+            class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50/80 border border-slate-100/50"
+        >
+            <div
+                class="h-8 w-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm shrink-0"
+            >
+                <User size={14} />
+            </div>
+            <div class="min-w-0 overflow-hidden">
+                <p
+                    class="text-[9px] font-bold text-slate-400 uppercase leading-none mb-0.5"
                 >
-                    <CheckCircle2 size={15} strokeWidth={2.5} class="mr-2" />
-                    Completar
-                </Button>
-            {:else}
-                <Button
-                    variant="soft-slate"
-                    size="sm"
-                    class="h-9 px-4 rounded-xl active:scale-95"
-                    onclick={() => onManage?.(ticket)}
+                    Solicitante / Beneficiario
+                </p>
+                <p class="text-xs font-bold text-slate-700 truncate">
+                    {ticket.personName}
+                </p>
+            </div>
+        </div>
+
+        <!-- Secondary Meta (Date & Assets) -->
+        <div
+            class="flex items-center justify-between text-[10px] font-bold px-1"
+        >
+            <div class="flex items-center gap-1.5 text-slate-400">
+                <Calendar size={12} />
+                <span>{formatDate(ticket.created_at)}</span>
+            </div>
+
+            {#if ticket.cardFolio}
+                <div
+                    class="flex items-center gap-1.5 text-slate-600 bg-slate-100/50 px-2 py-0.5 rounded-md"
                 >
-                    Gestionar
-                    <ArrowRight
-                        size={15}
-                        strokeWidth={2.5}
-                        class="ml-2 text-slate-400 group-hover:translate-x-0.5 transition-transform"
-                    />
-                </Button>
+                    <CreditCard size={12} />
+                    <span>{ticket.cardType} · {ticket.cardFolio}</span>
+                </div>
             {/if}
         </div>
     </div>
+
+    <!-- Actions -->
+    <div class="p-3 bg-slate-50/50 border-t border-slate-100 flex gap-2">
+        {#if (ticket.type === "Programación" || ticket.type === "Firma Responsiva") && onComplete}
+            <Button
+                variant="primary"
+                class="flex-1 h-9 rounded-xl shadow-md shadow-blue-500/10 active:scale-95 text-xs font-bold"
+                onclick={() => onComplete(ticket)}
+            >
+                <CheckCircle2 size={16} class="mr-2" />
+                Completar
+            </Button>
+            <Button
+                variant="outline"
+                class="w-10 h-9 p-0 rounded-xl active:scale-90"
+                onclick={() => onManage?.(ticket)}
+            >
+                <MoreHorizontal size={18} class="text-slate-400" />
+            </Button>
+        {:else}
+            <Button
+                variant="primary"
+                class="flex-1 h-9 rounded-xl shadow-lg shadow-blue-500/20 active:scale-95 text-xs font-bold"
+                onclick={() => onManage?.(ticket)}
+            >
+                Gestionar Ticket
+                <ArrowRight
+                    size={16}
+                    class="ml-2 group-hover:translate-x-1 transition-transform"
+                />
+            </Button>
+        {/if}
+    </div>
+
+    <!-- Background Decoration -->
+    <div
+        class="absolute -right-6 -top-6 w-24 h-24 {config.bg} opacity-[0.03] rounded-full blur-2xl group-hover:opacity-10 group-hover:scale-150 transition-all duration-700 pointer-events-none"
+    ></div>
 </article>

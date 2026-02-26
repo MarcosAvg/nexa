@@ -37,7 +37,7 @@
     // Form State
     let formData = $state({
         createdBy: "",
-        type: "Reporte de Fallo",
+        type: "Reporte de Falla",
         priority: "Media",
         title: "", // Still kept for internal summary or email subject
         description: "",
@@ -66,14 +66,14 @@
 
     // Options
     const ticketTypes = [
-        "Modificación de datos",
+        "Modificación",
         "Solicitud de acceso",
         "Bloqueo de tarjeta",
         "Baja de tarjeta",
         "Bloqueo de persona",
         "Baja de Persona",
         "Reposición",
-        "Reporte de Fallo",
+        "Reporte de Falla",
         "Otro",
     ];
 
@@ -95,7 +95,7 @@
                 // ... existing reset logic
                 formData = {
                     createdBy: currentUser?.id || "",
-                    type: "Reporte de Fallo",
+                    type: "Reporte de Falla",
                     priority: "Media",
                     title: "",
                     description: "",

@@ -112,16 +112,14 @@
             .filter(Boolean)
             .join(", ");
         const dep = row.fields.dependencia || "";
-        const base =
-            SHEET_TO_TICKET_TYPE[
-                sheetKey as keyof typeof SHEET_TO_TICKET_TYPE
-            ] ?? sheetKey;
-        return dep ? `${base} — ${name} (${dep})` : `${base} — ${name}`;
+        // Reduced title: only the name and dependency, no type prefix (it's redundant in card layout)
+        return dep ? `${name} (${dep})` : name;
     }
 
     function buildTicketDescription(row: ParsedRow): string {
+        // Filter out names from description to avoid redundancy with the "Beneficiario" field
         return Object.entries(row.fields)
-            .filter(([, v]) => v)
+            .filter(([k, v]) => v && k !== "nombres" && k !== "apellidos")
             .map(([k, v]) => `${FIELD_LABELS[k] ?? k}: ${v}`)
             .join("\n");
     }
@@ -165,13 +163,26 @@
                         r.isValid &&
                         selectedRows.has(`${sheet.key}-${r.rowNumber}`),
                 )
-                .map((r) => ({
-                    type: SHEET_TO_TICKET_TYPE[sheet.key] ?? sheet.key,
-                    title: buildTicketTitle(sheet.key, r),
-                    description: buildTicketDescription(r),
-                    priority: "media",
-                    payload: r.fields,
-                })),
+                .map((r) => {
+                    const type = SHEET_TO_TICKET_TYPE[sheet.key] ?? sheet.key;
+                    let priority = "media";
+
+                    // Specific priority logic for Fallo or others if present in fields
+                    if (r.fields.urgencia) {
+                        const urg = r.fields.urgencia.toLowerCase();
+                        if (urg.includes("alta") || urg.includes("urgente"))
+                            priority = "alta";
+                        else if (urg.includes("baja")) priority = "baja";
+                    }
+
+                    return {
+                        type,
+                        title: buildTicketTitle(sheet.key, r),
+                        description: buildTicketDescription(r),
+                        priority,
+                        payload: r.fields,
+                    };
+                }),
         );
 
         try {

@@ -12,7 +12,7 @@ export const ticketService = {
                 .from("tickets")
                 .select("*, personnel(first_name, last_name)")
                 .eq("status", "pending")
-                .order('created_at', { ascending: false })
+                .order('created_at', { ascending: true })
                 .limit(200); // Cap at 200 to avoid overloading initial load
 
             if (error) throw error;
@@ -55,7 +55,7 @@ export const ticketService = {
             }
 
             const { data, count, error } = await query
-                .order('created_at', { ascending: false })
+                .order('created_at', { ascending: true })
                 .range(from, to);
 
             if (error) throw error;
