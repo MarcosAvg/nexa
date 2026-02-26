@@ -121,66 +121,101 @@
         // Since ModificationCompareModal compares the raw floor arrays, we need to apply the action
         // to generate the "proposed" final state of floors/accesses.
 
+        // Helper for robust action matching
+        const isAction = (
+            act: string,
+            type: "replace" | "add" | "remove" | "clear",
+        ) => {
+            const a = (act ?? "").toLowerCase();
+            if (type === "clear")
+                return (
+                    a.includes("todo") ||
+                    a.includes("vaciar") ||
+                    a.includes("limpiar")
+                );
+            if (type === "replace")
+                return (
+                    a.includes("reemplazar") ||
+                    a.includes("remplazar") ||
+                    a.includes("sustituir")
+                );
+            if (type === "add")
+                return (
+                    a.includes("añadir") ||
+                    a.includes("anadir") ||
+                    a.includes("sumar") ||
+                    a.includes("agregar")
+                );
+            if (type === "remove")
+                return (
+                    a.includes("quitar") ||
+                    a.includes("eliminar") ||
+                    a.includes("borrar") ||
+                    a.includes("remover")
+                );
+            return false;
+        };
+
         let proposedP2000 = [...(selectedPerson.floors_p2000 || [])];
         if (p.accion_p2000) {
-            const action = (p.accion_p2000 ?? "").toLowerCase();
+            const action = p.accion_p2000;
             const floorsStr = p.pisos_p2000 || "";
             const parsedFloors = floorsStr
                 .split(",")
                 .map((s: string) => s.trim())
                 .filter(Boolean);
 
-            if (action.includes("reemplazar")) proposedP2000 = parsedFloors;
-            else if (action.includes("añadir"))
+            if (isAction(action, "clear")) proposedP2000 = [];
+            else if (isAction(action, "replace")) proposedP2000 = parsedFloors;
+            else if (isAction(action, "add"))
                 proposedP2000 = [
                     ...new Set([...proposedP2000, ...parsedFloors]),
                 ];
-            else if (action.includes("quitar"))
+            else if (isAction(action, "remove"))
                 proposedP2000 = proposedP2000.filter(
                     (f) => !parsedFloors.includes(f),
                 );
-            else if (action.includes("remover todo")) proposedP2000 = [];
         }
         // Force the compare modal to show differences by explicitly passing the generated arrays
         modifiedPayload.floors_p2000 = proposedP2000;
 
         let proposedKONE = [...(selectedPerson.floors_kone || [])];
         if (p.accion_kone) {
-            const action = (p.accion_kone ?? "").toLowerCase();
+            const action = p.accion_kone;
             const floorsStr = p.pisos_kone || "";
             const parsedFloors = floorsStr
                 .split(",")
                 .map((s: string) => s.trim())
                 .filter(Boolean);
 
-            if (action.includes("reemplazar")) proposedKONE = parsedFloors;
-            else if (action.includes("añadir"))
+            if (isAction(action, "clear")) proposedKONE = [];
+            else if (isAction(action, "replace")) proposedKONE = parsedFloors;
+            else if (isAction(action, "add"))
                 proposedKONE = [...new Set([...proposedKONE, ...parsedFloors])];
-            else if (action.includes("quitar"))
+            else if (isAction(action, "remove"))
                 proposedKONE = proposedKONE.filter(
                     (f) => !parsedFloors.includes(f),
                 );
-            else if (action.includes("remover todo")) proposedKONE = [];
         }
         modifiedPayload.floors_kone = proposedKONE;
 
         let proposedAccesses = [...(selectedPerson.specialAccesses || [])];
         if (p.accion_acc) {
-            const action = (p.accion_acc ?? "").toLowerCase();
+            const action = p.accion_acc;
             const accesses = [p.acceso1, p.acceso2, p.acceso3]
                 .map((s) => s?.trim())
                 .filter(Boolean);
 
-            if (action.includes("reemplazar")) proposedAccesses = accesses;
-            else if (action.includes("añadir"))
+            if (isAction(action, "clear")) proposedAccesses = [];
+            else if (isAction(action, "replace")) proposedAccesses = accesses;
+            else if (isAction(action, "add"))
                 proposedAccesses = [
                     ...new Set([...proposedAccesses, ...accesses]),
                 ];
-            else if (action.includes("quitar"))
+            else if (isAction(action, "remove"))
                 proposedAccesses = proposedAccesses.filter(
                     (a) => !accesses.includes(a),
                 );
-            else if (action.includes("remover todo")) proposedAccesses = [];
         }
         modifiedPayload.specialAccesses = proposedAccesses;
 
@@ -455,34 +490,51 @@
                         </div>
                     </div>
                 {:else if candidates.length > 1 && !selectedPerson}
-                    <p
-                        class="text-xs text-amber-600 mb-2 flex items-center gap-1.5"
+                    <div
+                        class="p-3 bg-amber-50 rounded-lg border border-amber-200 mb-3"
                     >
-                        <AlertCircle size={12} /> Se encontraron {candidates.length}
-                        personas. Selecciona la correcta:
-                    </p>
-                    <div class="space-y-1.5 max-h-36 overflow-y-auto">
-                        {#each candidates as c}
-                            <button
-                                class="w-full flex items-center gap-3 p-2 rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-200 text-left transition-colors"
-                                onclick={() => (selectedPerson = c)}
-                            >
-                                <User
-                                    size={14}
-                                    class="text-slate-400 shrink-0"
-                                />
-                                <div>
-                                    <p
-                                        class="text-sm font-semibold text-slate-800"
+                        <p
+                            class="text-xs font-bold text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-1.5"
+                        >
+                            <AlertCircle size={12} /> Se encontraron {candidates.length}
+                            coincidencias
+                        </p>
+                        <p class="text-[10px] text-amber-600 mb-3">
+                            Selecciona la persona correcta para vincular este
+                            ticket:
+                        </p>
+                        <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                            {#each candidates as c}
+                                <button
+                                    class="w-full flex items-center justify-between p-2.5 rounded-lg border border-amber-200/50 bg-white hover:bg-amber-100 hover:border-amber-300 text-left transition-all group"
+                                    onclick={() => (selectedPerson = c)}
+                                >
+                                    <div class="flex items-center gap-3">
+                                        <div
+                                            class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-amber-200 group-hover:text-amber-600 transition-colors"
+                                        >
+                                            <User size={14} />
+                                        </div>
+                                        <div>
+                                            <p
+                                                class="text-sm font-bold text-slate-800"
+                                            >
+                                                {c.last_name}, {c.first_name}
+                                            </p>
+                                            <p
+                                                class="text-[10px] text-slate-500"
+                                            >
+                                                {c.dependency} · {c.building}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span
+                                        class="text-[10px] font-bold text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >Seleccionar →</span
                                     >
-                                        {c.last_name}, {c.first_name}
-                                    </p>
-                                    <p class="text-xs text-slate-400">
-                                        {c.dependency} · {c.building}
-                                    </p>
-                                </div>
-                            </button>
-                        {/each}
+                                </button>
+                            {/each}
+                        </div>
                     </div>
                 {:else if selectedPerson}
                     <div class="flex items-center justify-between">

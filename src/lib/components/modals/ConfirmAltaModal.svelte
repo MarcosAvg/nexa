@@ -212,27 +212,30 @@
                     {#each candidates as c}
                         <button
                             type="button"
-                            class="w-full flex items-center justify-between p-2 rounded-lg border border-amber-200/50 bg-white hover:bg-amber-100/50 hover:border-amber-300 transition-all text-left"
+                            class="w-full flex items-center justify-between p-2.5 rounded-lg border border-amber-200/50 bg-white hover:bg-amber-100 hover:border-amber-300 transition-all text-left group"
                             onclick={() => (selectedCandidate = c)}
                         >
                             <div class="flex items-center gap-3">
-                                <User
-                                    size={14}
-                                    class="text-slate-400 shrink-0"
-                                />
-                                <div>
+                                <div
+                                    class="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 group-hover:bg-amber-200 group-hover:text-amber-600 transition-colors"
+                                >
+                                    <User size={14} />
+                                </div>
+                                <div class="min-w-0">
                                     <p
-                                        class="text-sm font-semibold text-slate-800"
+                                        class="text-sm font-bold text-slate-800 truncate"
                                     >
                                         {c.last_name}, {c.first_name}
                                     </p>
-                                    <p class="text-xs text-slate-400">
+                                    <p
+                                        class="text-[10px] text-slate-500 truncate"
+                                    >
                                         {c.dependency} · {c.building}
                                     </p>
                                 </div>
                             </div>
                             <span
-                                class="text-[10px] font-bold text-amber-600 uppercase"
+                                class="text-[10px] font-bold text-amber-600 uppercase group-hover:translate-x-1 transition-transform shrink-0"
                                 >Vincular →</span
                             >
                         </button>

@@ -249,21 +249,39 @@ export const personnelService = {
      * Returns all candidates ordered by last_name. Caller decides how to handle 0/1/many results. */
     async searchByName(apellidos: string, nombres: string): Promise<Person[]> {
         try {
-            let query = supabase
-                .from("personnel")
-                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+            const cleanApellidos = (apellidos || "").trim();
+            const cleanNombres = (nombres || "").trim();
 
-            if (apellidos) query = query.ilike("last_name", `%${apellidos.trim()}%`);
-            if (nombres) query = query.ilike("first_name", `%${nombres.trim()}%`);
+            if (!cleanApellidos && !cleanNombres) return [];
 
-            const { data, error } = await query
-                .neq("status", "inactive")
-                .order("last_name", { ascending: true })
-                .limit(10);
+            // Call the PostgreSQL RPC function for robust fuzzy search
+            const { data, error } = await supabase.rpc('search_personnel_fuzzy', {
+                p_last_name: cleanApellidos,
+                p_first_name: cleanNombres,
+                p_limit: 20
+            });
 
             if (error) throw error;
 
-            return (data || []).map((p: any) => ({
+            // The RPC returns SETOF personnel, but we need the joins for mapPersonRecord.
+            // However, Supabase RPC doesn't support complex joins in the same call easily.
+            // We can fetch the full records for these IDs to get the joins, or map partially.
+            // Given the original code had joins, we'll fetch the full details for the returned IDs.
+            if (!data || data.length === 0) return [];
+
+            const ids = data.map((p: any) => p.id);
+            const { data: fullPeople, error: fetchError } = await supabase
+                .from("personnel")
+                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)")
+                .in("id", ids);
+
+            if (fetchError) throw fetchError;
+
+            // Sort them back according to the order from RPC (similarity score)
+            const idToData = Object.fromEntries(fullPeople.map(p => [p.id, p]));
+            const orderedPeople = data.map((p: any) => idToData[p.id]).filter(Boolean);
+
+            return (orderedPeople || []).map((p: any) => ({
                 id: p.id,
                 first_name: p.first_name,
                 last_name: p.last_name,
@@ -290,7 +308,7 @@ export const personnelService = {
                 specialAccesses: p.special_accesses || []
             } as Person));
         } catch (error) {
-            handleError(error, "Search Personnel by Name");
+            handleError(error, "Search Personnel by Name (Fuzzy)");
             return [];
         }
     },
