@@ -6,7 +6,7 @@
     import ToggleGroup from "../ToggleGroup.svelte";
     import AddCardModal from "./AddCardModal.svelte";
     import Select from "../Select.svelte";
-    import { Plus, CreditCard, Trash2 } from "lucide-svelte";
+    import { Plus, CreditCard, Trash2, AlertTriangle } from "lucide-svelte";
     import { untrack } from "svelte";
 
     import { personnelService, ticketService } from "../../services";
@@ -86,6 +86,11 @@
     let isCardModalOpen = $state(false);
     let isSubmitting = $state(false);
 
+    // Duplicate detection
+    let potentialDuplicates = $state<any[]>([]);
+    let isCheckingDuplicates = $state(false);
+    let lastCheckedName = $state("");
+
     // Derived floors based on selected building
     let availableFloors = $derived.by(() => {
         const b = buildings.find((b) => b.name === edificio);
@@ -102,11 +107,54 @@
         }
     });
 
-    // Auto-uppercase names
+    // Auto-uppercase names + Duplicate check
     $effect(() => {
         if (nombres) nombres = nombres.toUpperCase();
         if (apellidos) apellidos = apellidos.toUpperCase();
+
+        // Only check if we are creating a NEW person or prefilling
+        if (!editingPerson || prefill) {
+            const fullName = `${nombres.trim()} ${apellidos.trim()}`.trim();
+            if (
+                nombres.trim().length >= 3 &&
+                apellidos.trim().length >= 2 &&
+                fullName !== lastCheckedName
+            ) {
+                lastCheckedName = fullName;
+                checkDuplicates(nombres.trim(), apellidos.trim());
+            } else if (
+                nombres.trim().length < 3 ||
+                apellidos.trim().length < 2
+            ) {
+                potentialDuplicates = [];
+                lastCheckedName = "";
+            }
+        }
     });
+
+    async function checkDuplicates(nom: string, ape: string) {
+        isCheckingDuplicates = true;
+        try {
+            // We use the fuzzy search but with a high threshold or just name matching
+            const results = await personnelService.searchByName(ape, nom);
+            // Filter to find very close matches (insensitive to accents)
+            potentialDuplicates = results.filter((p) => {
+                const n1 = (p.first_name + " " + p.last_name)
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "");
+                const n2 = (nom + " " + ape)
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "");
+                return n1.includes(n2) || n2.includes(n1);
+            });
+        } catch (e) {
+            console.error(e);
+        } finally {
+            isCheckingDuplicates = false;
+        }
+    }
 
     // Populate form
     let lastLoadedPersonId = $state("");
@@ -465,6 +513,42 @@
                 class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
                 >Datos Personales</legend
             >
+
+            {#if potentialDuplicates.length > 0}
+                <div
+                    class="mx-2 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2"
+                >
+                    <div
+                        class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0"
+                    >
+                        <AlertTriangle size={18} />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-bold text-amber-800">
+                            Posibles registros duplicados encontrados:
+                        </p>
+                        <div class="mt-1 space-y-1">
+                            {#each potentialDuplicates as p}
+                                <div
+                                    class="text-[10px] text-amber-700 flex items-center gap-1"
+                                >
+                                    <span class="font-bold"
+                                        >• {p.last_name}, {p.first_name}</span
+                                    >
+                                    <span class="opacity-70"
+                                        >en {p.dependency || "N/A"} ({p.building ||
+                                            "N/A"})</span
+                                    >
+                                </div>
+                            {/each}
+                        </div>
+                        <p class="text-[9px] text-amber-600 mt-2 italic">
+                            Si es la misma persona, considera actualizar su
+                            registro actual en lugar de crear uno nuevo.
+                        </p>
+                    </div>
+                </div>
+            {/if}
 
             <div class="grid gap-4 md:grid-cols-2">
                 <div class="space-y-1.5">

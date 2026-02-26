@@ -315,6 +315,31 @@ export const personnelService = {
 
     async save(data: any) {
         try {
+            // 1. Validation: Prevent duplicates by name for NEW records
+            if (!data.id) {
+                const results = await this.searchByName(
+                    data.apellidos || data.last_name || "",
+                    data.nombres || data.first_name || "",
+                );
+                // Compare normalized names to decide if it's a "hard" duplicate
+                const isDuplicate = results.some((r) => {
+                    const n1 = (r.first_name + " " + r.last_name)
+                        .toLowerCase()
+                        .normalize("NFD")
+                        .replace(/[\u0300-\u036f]/g, "");
+                    const n2 = ((data.nombres || data.first_name || "") + " " + (data.apellidos || data.last_name || ""))
+                        .toLowerCase()
+                        .normalize("NFD")
+                        .replace(/[\u0300-\u036f]/g, "");
+                    return n1 === n2;
+                });
+
+                if (isDuplicate) {
+                    throw new Error(
+                        `Ya existe un registro activo con el nombre "${data.nombres || data.first_name} ${data.apellidos || data.last_name}".`,
+                    );
+                }
+            }
             const payload = {
                 first_name: data.first_name || data.nombres,
                 last_name: data.last_name || data.apellidos,
