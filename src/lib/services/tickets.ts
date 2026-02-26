@@ -95,7 +95,8 @@ export const ticketService = {
             if (error) throw error;
 
             await HistoryService.log("TICKET", newTicket.id, "CREATE", {
-                message: `Ticket creado: ${payload.title}`
+                message: `Ticket creado: ${payload.title}`,
+                entityName: `Ticket #${newTicket.id}: ${payload.title}`
             });
 
             ticketState.addTicket(newTicket as Ticket);
@@ -137,6 +138,7 @@ export const ticketService = {
             if (created > 0) {
                 await HistoryService.log('TICKET', newTickets![0].id, 'CREATE', {
                     message: `Importación masiva: ${created} ticket(s) creados desde plantilla Excel`,
+                    entityName: `Importación Excel (${new Date().toLocaleDateString()})`
                 });
             }
 
@@ -153,9 +155,13 @@ export const ticketService = {
 
     async delete(id: number, reason?: string) {
         try {
+            // Fetch ticket title for history BEFORE deleting
+            const { data: ticket } = await supabase.from("tickets").select("title").eq("id", id).single();
+
             // Log deletion/completion BEFORE removing data
             await HistoryService.log("TICKET", id, "COMPLETE_TICKET", {
-                message: reason || `Ticket completado/eliminado`
+                message: reason || `Ticket completado/eliminado`,
+                entityName: ticket ? `Ticket #${id}: ${ticket.title}` : `Ticket #${id}`
             });
 
             const { error } = await supabase.from("tickets").delete().eq("id", id);
@@ -181,7 +187,8 @@ export const ticketService = {
             if (tickets) {
                 for (const t of tickets) {
                     await HistoryService.log("TICKET", t.id, "DELETE_TICKET_CASCADE", {
-                        message: `Ticket #${t.id} eliminado por baja de tarjeta`
+                        message: `Ticket #${t.id} eliminado por baja de tarjeta`,
+                        entityName: `Ticket #${t.id}: ${t.title}`
                     });
                 }
             }
@@ -209,7 +216,8 @@ export const ticketService = {
             if (tickets) {
                 for (const t of tickets) {
                     await HistoryService.log("TICKET", t.id, "DELETE_TICKET_CASCADE", {
-                        message: `Ticket #${t.id} eliminado por baja de personal`
+                        message: `Ticket #${t.id} eliminado por baja de personal`,
+                        entityName: `Ticket #${t.id}: ${t.title}`
                     });
                 }
             }
@@ -228,8 +236,12 @@ export const ticketService = {
         try {
             const { error } = await supabase.from("tickets").update({ status }).eq("id", id);
             if (error) throw error;
+            // Fetch ticket title for history
+            const { data: ticket } = await supabase.from("tickets").select("title").eq("id", id).single();
+
             await HistoryService.log("TICKET", id, "UPDATE_STATUS", {
-                message: `Estado actualizado a ${status} ${details ? `(${details})` : ''}`
+                message: `Estado actualizado a ${status} ${details ? `(${details})` : ''}`,
+                entityName: ticket ? `Ticket #${id}: ${ticket.title}` : `Ticket #${id}`
             });
 
             // Fetch the updated ticket to sync with store

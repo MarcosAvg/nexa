@@ -251,6 +251,7 @@ export const cardService = {
                         message: `Tarjeta ${oldCard.folio} reemplazada. Nuevo estado: ${newStatus === "blocked" ? "Baja Definitiva" : "Disponible"
                             }`,
                         related_person_id: data.person_id,
+                        entityName: `${data.type} (Folio: ${oldCard.folio})`
                     });
                 }
             }
@@ -276,6 +277,7 @@ export const cardService = {
                 if (error) throw error;
                 await HistoryService.log("CARD", cardId, "UPDATE", {
                     message: `Tarjeta ${payload.folio} actualizada`,
+                    entityName: `${payload.type} (Folio: ${payload.folio})`
                 });
             } else {
                 const { data: newCard, error } = await withTimeout(supabase
@@ -287,32 +289,36 @@ export const cardService = {
                 cardId = newCard.id;
                 await HistoryService.log("CARD", cardId, "CREATE", {
                     message: `Tarjeta ${payload.folio} creada`,
+                    entityName: `${payload.type} (Folio: ${payload.folio})`
                 });
             }
 
             // Trigger Automatic Ticket for Programming
-            if (isNewAssignment && (!replacementOptions || !replacementOptions.skipTicket)) {
+            if (isNewAssignment) {
                 const { ticketService } = await import("./tickets");
                 await ticketService.create({
-                    type: replacementOptions ? "Reposición" : "Programación", // Distinct type for replacement
+                    type: "Programación",
                     description: replacementOptions
                         ? `Reponer tarjeta ${payload.type} (Folio anterior dado de baja/liberado). Nuevo folio: ${payload.folio}`
                         : `Programar acceso para tarjeta ${payload.type} folio ${payload.folio}`,
-                    priority: replacementOptions ? "urgente" : "alta",
+                    priority: "alta",
                     person_id: data.person_id,
                     card_id: cardId,
-                    title: replacementOptions
-                        ? `Reposición: ${payload.folio}`
-                        : `Programación: ${payload.folio}`,
+                    title: `Programación: ${payload.folio}`,
                 });
 
-                // Log history for new card to link it to the person explicitly
+                // Log history for card assignment/replacement
                 if (data.person_id) {
+                    // Fetch person name for the log
+                    const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", data.person_id).single();
+                    const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${data.person_id})`;
+
                     await HistoryService.log("PERSON", data.person_id, replacementOptions ? "REPLACE_CARD" : "ASSIGN_CARD", {
                         message: replacementOptions
                             ? `Tarjeta ${payload.folio} (${payload.type}) asignada por Reposición`
                             : `Tarjeta ${payload.folio} (${payload.type}) asignada`,
                         related_card_id: cardId,
+                        entityName: personName
                     });
                 }
             }
@@ -325,6 +331,13 @@ export const cardService = {
 
     async updateProgrammingStatus(cardId: string, status: string | null) {
         try {
+            // Fetch card info for history and triggers
+            const { data: card } = await supabase
+                .from("cards")
+                .select("folio, responsiva_status, person_id, type")
+                .eq("id", cardId)
+                .single();
+
             const { error } = await supabase
                 .from("cards")
                 .update({ programming_status: status })
@@ -334,12 +347,6 @@ export const cardService = {
 
             // Trigger "Firma Responsiva" ticket if status is 'done' AND card is not signed
             if (status === "done") {
-                const { data: card } = await supabase
-                    .from("cards")
-                    .select("folio, responsiva_status, person_id, type")
-                    .eq("id", cardId)
-                    .single();
-
                 if (card && card.responsiva_status !== "signed" && card.person_id) {
                     const { ticketService } = await import("./tickets");
                     await ticketService.create({
@@ -355,6 +362,7 @@ export const cardService = {
 
             await HistoryService.log("CARD", cardId, "UPDATE", {
                 message: `Estado de programación actualizado a ${status || 'N/A'}`,
+                entityName: card?.folio ? `${card.type || ''} (Folio: ${card.folio})` : `Tarjeta (${cardId})`
             });
             appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
@@ -378,8 +386,12 @@ export const cardService = {
                 await ticketService.deleteByCard(cardId, ["Firma Responsiva"]);
             }
 
+            // Fetch card info for history
+            const { data: card } = await supabase.from("cards").select("folio, type").eq("id", cardId).single();
+
             await HistoryService.log("CARD", cardId, "UPDATE", {
                 message: `Estado de responsiva actualizado a ${status}`,
+                entityName: card ? `${card.type} (Folio: ${card.folio})` : `Tarjeta (${cardId})`
             });
             appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
@@ -412,8 +424,12 @@ export const cardService = {
 
             if (error) throw error;
 
+            // Fetch card info for history
+            const { data: cardInfo } = await supabase.from("cards").select("folio, type").eq("id", cardId).single();
+
             await HistoryService.log("CARD", cardId, "UPDATE_STATUS", {
                 message: `Estado de tarjeta actualizado a ${finalStatus}`,
+                entityName: cardInfo ? `${cardInfo.type} (Folio: ${cardInfo.folio})` : `Tarjeta (${cardId})`
             });
             appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
@@ -440,8 +456,12 @@ export const cardService = {
             const { ticketService } = await import("./tickets");
             await ticketService.deleteByCard(cardId, ["Programación", "Firma Responsiva"]);
 
+            // Fetch card info for history before unassigning
+            const { data: card } = await supabase.from("cards").select("folio, type").eq("id", cardId).single();
+
             await HistoryService.log("CARD", cardId, "UNASSIGN", {
                 message: `Tarjeta desvinculada de la persona`,
+                entityName: card ? `${card.type} (Folio: ${card.folio})` : `Tarjeta (${cardId})`
             });
             appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
@@ -452,8 +472,15 @@ export const cardService = {
 
     async delete(id: string) {
         try {
+            // Fetch card info for history BEFORE deleting
+            const { data: card } = await supabase.from("cards").select("folio, type").eq("id", id).single();
+            const cardName = card ? `${card.type} (Folio: ${card.folio})` : `Tarjeta (${id})`;
+
             // Log deletion BEFORE removing data so proactive snapshotting can capture the name
-            await HistoryService.log("CARD", id, "DELETE", { message: `Tarjeta eliminada permanentemente` });
+            await HistoryService.log("CARD", id, "DELETE", {
+                message: `Tarjeta eliminada permanentemente`,
+                entityName: cardName
+            });
 
             // Associated tickets are transient and can be deleted. 
             // History remains readable because HistoryService captures names PROACTIVELY.

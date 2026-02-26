@@ -366,7 +366,14 @@ export const personnelService = {
                 await ticketService.deleteByPerson(id);
             }
 
-            await HistoryService.log("PERSONNEL", id, "UPDATE_STATUS", { message: `Estado actualizado a ${status} (y sus tarjetas)` });
+            // Fetch person name for history before logging
+            const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", id).single();
+            const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${id})`;
+
+            await HistoryService.log("PERSONNEL", id, "UPDATE_STATUS", {
+                message: `Estado actualizado a ${status} (y sus tarjetas)`,
+                entityName: personName
+            });
             appEvents.emit(EVENTS.PERSONNEL_CHANGED);
             appEvents.emit(EVENTS.CARDS_CHANGED);
         } catch (error) {
@@ -378,7 +385,14 @@ export const personnelService = {
     async delete(id: string) {
         try {
             // Log deletion BEFORE removing data
-            await HistoryService.log("PERSONNEL", id, "DELETE", { message: `Registro eliminado permanentemente` });
+            // Fetch person name for history BEFORE deleting
+            const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", id).single();
+            const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${id})`;
+
+            await HistoryService.log("PERSONNEL", id, "DELETE", {
+                message: `Registro eliminado permanentemente`,
+                entityName: personName
+            });
 
             // Delete the person
             const { error } = await supabase.from("personnel").delete().eq("id", id);

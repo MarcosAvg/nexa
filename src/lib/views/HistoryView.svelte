@@ -52,18 +52,37 @@
 </script>
 
 {#snippet renderEntity(row: any)}
+    {@const entityLabel =
+        row.entity_type === "PERSONNEL" || row.entity_type === "PERSON"
+            ? "PERSONAL"
+            : row.entity_type === "CARD"
+              ? "TARJETA"
+              : row.entity_type}
+
+    <!-- Heuristic for old logs or missing names -->
+    {@const fallbackName = (row.details?.message || "")
+        .match(
+            /(?:Actualización de|Registro de|para tarjeta \w+ folio|con folio)\s+([^,.(]+)/i,
+        )?.[1]
+        ?.trim()}
+
+    {@const displayName =
+        row.entity_name ||
+        row.resolvedName ||
+        fallbackName ||
+        (row.entity_id?.length > 15
+            ? `${row.entity_type} (${row.entity_id.slice(0, 8)}...)`
+            : `${row.entity_type} (${row.entity_id})`)}
+
     <div class="flex flex-col">
-        <span class="font-medium text-slate-900 text-[10px] uppercase"
-            >{row.entity_type === "PERSONNEL" || row.entity_type === "PERSON"
-                ? "PERSONAL"
-                : row.entity_type === "CARD"
-                  ? "TARJETA"
-                  : row.entity_type}</span
+        <span
+            class="font-medium text-slate-500 text-[10px] tracking-wider uppercase"
+            >{entityLabel}</span
         >
-        <span class="text-xs text-slate-600 font-bold leading-tight mt-0.5">
-            {row.resolvedName ||
-                row.entity_name ||
-                `${row.entity_type} (${row.entity_id})`}
+        <span
+            class="text-xs text-slate-900 font-bold leading-tight mt-0.5 break-words max-w-[220px]"
+        >
+            {displayName}
         </span>
     </div>
 {/snippet}
