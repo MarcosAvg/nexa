@@ -199,19 +199,15 @@
             return;
         }
 
-        const isModificacion =
-            ticket.type === "Modificación" ||
-            ticket.type === "Modificación de datos";
-
-        if (IMPORTED_TYPES.has(ticket.type) && !isModificacion) {
-            importedTicket = ticket;
-            isImportedOpen = true;
+        if (ticket.type === "Modificación de datos") {
+            compareTicket = ticket;
+            isCompareOpen = true;
             return;
         }
 
-        if (isModificacion) {
-            compareTicket = ticket;
-            isCompareOpen = true;
+        if (IMPORTED_TYPES.has(ticket.type)) {
+            importedTicket = ticket;
+            isImportedOpen = true;
             return;
         }
 
@@ -239,12 +235,15 @@
             return;
         }
 
-        if (
-            ticket.type === "Modificación" ||
-            ticket.type === "Modificación de datos"
-        ) {
+        if (ticket.type === "Modificación de datos") {
             compareTicket = ticket;
             isCompareOpen = true;
+            return;
+        }
+
+        if (ticket.type === "Modificación") {
+            importedTicket = ticket;
+            isImportedOpen = true;
             return;
         }
 
