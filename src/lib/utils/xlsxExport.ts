@@ -1099,14 +1099,8 @@ export async function exportHistoryToExcel(data: any[], options?: ExportOptions)
 
 import type { KoneUsageMatchedEntry } from './xlsxKoneUsage';
 
-export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[]) {
-    const workbook = new ExcelJS.Workbook();
-
-    // ══════════════════════════════════════════════════════════════
-    // SHEET 1: Executive Summary — Usage Metrics
-    // ══════════════════════════════════════════════════════════════
-
-    const ws = workbook.addWorksheet('Resumen — Uso KONE');
+async function addKoneSummarySheet(workbook: ExcelJS.Workbook, matchedData: KoneUsageMatchedEntry[], sheetName: string, title: string, usageThreshold: number) {
+    const ws = workbook.addWorksheet(sheetName);
 
     const C = {
         title: 'FF1E293B',
@@ -1236,6 +1230,8 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
         { label: '101+ usos', filter: (c: number) => c > 100 },
     ];
 
+    const bajoUsoData = matchedData.filter(m => m.conteo < usageThreshold);
+
     // Dependency distribution
     const depMap: Record<string, { count: number; totalUsos: number }> = {};
     matchedData.forEach(m => {
@@ -1259,7 +1255,7 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
     // ══════ ROW 1: Title ══════
     ws.mergeCells('A1:H1');
     const titleCell = ws.getCell('A1');
-    titleCell.value = `       REPORTE DE USO DE TARJETAS KONE — NEXA`;
+    titleCell.value = `       ${title}`;
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: C.title } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     ws.getRow(1).height = 40;
@@ -1279,7 +1275,7 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
     const dateStr = new Date().toLocaleDateString('es-MX', {
         year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
-    metaCell.value = `Reporte generado: ${dateStr}  |  Personal encontrado: ${total}`;
+    metaCell.value = `Reporte generado: ${dateStr}  |  Personal en esta hoja: ${total}`;
     metaCell.font = { name: 'Arial', size: 9, color: { argb: C.meta } };
     metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
     ws.getRow(2).height = 20;
@@ -1290,8 +1286,8 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
     sectionTitle('📊  INDICADORES CLAVE DE USO');
 
     ws.getRow(row).height = 32;
-    kpiCard('B', 'PERSONAL ENCONTRADO', total, C.blue);
-    kpiCard('F', 'TOTAL DE USOS REGISTRADOS', totalUsos, C.sky);
+    kpiCard('B', 'PERSONAL REGISTRADO', total, C.blue);
+    kpiCard('F', 'TOTAL DE USOS', totalUsos, C.sky);
     row++;
 
     ws.getRow(row).height = 28;
@@ -1301,7 +1297,7 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
 
     ws.getRow(row).height = 28;
     kpiCard('B', 'Máximo de usos', maximo, C.amber);
-    kpiCard('F', 'Mínimo de usos', total > 0 ? Math.min(...conteos) : 0, C.slate);
+    kpiCard('F', 'Personal bajo uso', bajoUsoData.length, bajoUsoData.length > 0 ? C.rose : C.emerald, pct(bajoUsoData.length, total));
     row++;
     row++;
 
@@ -1329,8 +1325,8 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
     });
     row++;
 
-    // ══════ SECTION 3: Top 10 Users ══════
-    sectionTitle('🏆  TOP 10 — MAYOR USO DE TARJETA');
+    // ══════ SECTION 3: Top Users ══════
+    sectionTitle(total > 10 ? '🏆  TOP 10 — MAYOR USO' : '🏆  LISTADO DE USO');
 
     tableHeader([
         { col: 'B', label: 'NOMBRE' },
@@ -1341,8 +1337,8 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
         { col: 'H', label: 'ESTADO' },
     ], C.amber);
 
-    const top10 = matchedData.slice(0, 10); // already sorted by conteo desc
-    top10.forEach((m, i) => {
+    const usersToShow = matchedData.slice(0, 10);
+    usersToShow.forEach((m, i) => {
         tableRow([
             { col: 'B', value: `${m.person.last_name} ${m.person.first_name}` },
             { col: 'C', value: m.folio },
@@ -1356,7 +1352,7 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
 
     // ══════ SECTION 4: By Dependency ══════
     if (depEntries.length > 0) {
-        sectionTitle('🏢  USO POR DEPENDENCIA');
+        sectionTitle('🏢  DISTRIBUCIÓN POR DEPENDENCIA');
 
         tableHeader([
             { col: 'B', label: 'DEPENDENCIA' },
@@ -1380,7 +1376,7 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
 
     // ══════ SECTION 5: By Building ══════
     if (buildEntries.length > 0) {
-        sectionTitle('🏗️  USO POR EDIFICIO');
+        sectionTitle('🏗️  DISTRIBUCIÓN POR EDIFICIO');
 
         tableHeader([
             { col: 'B', label: 'EDIFICIO' },
@@ -1403,10 +1399,22 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
 
     ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 3 }];
     ws.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1 };
+}
 
-    // ══════════════════════════════════════════════════════════════
-    // SHEET 2: Personnel Directory with Usage Count
-    // ══════════════════════════════════════════════════════════════
+export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[], usageThreshold: number = 10) {
+    const workbook = new ExcelJS.Workbook();
+
+    // Define shared constants and helpers
+    const dateStr = new Date().toLocaleDateString('es-MX', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    const total = matchedData.length;
+    const totalUsos = matchedData.reduce((sum, m) => sum + m.conteo, 0);
+
+    const thin = (argb: string): ExcelJS.Border => ({ style: 'thin', color: { argb } });
+    const setBorder = (cell: ExcelJS.Cell, color = 'FFCBD5E1') => {
+        cell.border = { top: thin(color), bottom: thin(color), left: thin(color), right: thin(color) };
+    };
 
     const COLORS = {
         title: 'FF1E293B',
@@ -1419,90 +1427,10 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
         status: { head: 'FFEDE9FE', sub: 'FF5B21B6', fill: 'FFFAF5FF' },
         additional: { head: 'FFFCE7F3', sub: 'FF9D174D', fill: 'FFFFF1F2' },
         emerald: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
+        rose: { head: 'FFFEE2E2', sub: 'FF991B1B', fill: 'FFFFF1F2' },
         koneUsage: { head: 'FFCFFAFE', sub: 'FF155E75', fill: 'FFECFEFF' },
     };
 
-    const dataSheet = workbook.addWorksheet('Directorio con Conteo');
-
-    dataSheet.columns = [
-        { key: 'last_name', width: 25 },
-        { key: 'first_name', width: 25 },
-        { key: 'employee_no', width: 15 },
-        { key: 'building', width: 22 },
-        { key: 'dependency', width: 28 },
-        { key: 'area', width: 22 },
-        { key: 'position', width: 28 },
-        { key: 'floor', width: 12 },
-        { key: 'folioP2000', width: 20 },
-        { key: 'pisosP2000Text', width: 25 },
-        { key: 'folioKone', width: 22 },
-        { key: 'pisosKoneText', width: 25 },
-        { key: 'conteoUsoKone', width: 18 },
-        { key: 'status', width: 15 },
-        { key: 'specialAccessesText', width: 28 },
-        { key: 'days', width: 22 },
-        { key: 'entry', width: 14 },
-        { key: 'exit', width: 14 },
-        { key: 'email', width: 35 },
-    ];
-
-    // Row 1: Header
-    dataSheet.mergeCells('A1:S1');
-    const dtTitle = dataSheet.getCell('A1');
-    dtTitle.value = `       DIRECTORIO DE PERSONAL CON CONTEO DE USO KONE — NEXA`;
-    dtTitle.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
-    dtTitle.alignment = { vertical: 'middle', horizontal: 'left' };
-    dataSheet.getRow(1).height = 40;
-
-    try {
-        const response = await fetch('/favicon.svg');
-        if (response.ok) {
-            const blob = await response.blob();
-            const buffer = await blob.arrayBuffer();
-            const imageId = workbook.addImage({ buffer, extension: 'svg' as any });
-            dataSheet.addImage(imageId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 32, height: 32 } });
-        }
-    } catch { /* logo optional */ }
-
-    // Row 2: Meta
-    dataSheet.mergeCells('A2:S2');
-    const dtMeta = dataSheet.getCell('A2');
-    dtMeta.value = `Reporte generado: ${dateStr}  |  Registros: ${total}  |  Total usos: ${totalUsos}`;
-    dtMeta.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
-    dtMeta.alignment = { vertical: 'middle', horizontal: 'left' };
-    dataSheet.getRow(2).height = 20;
-
-    // Row 3: Super-Headers (19 columns, A–S)
-    const groups = [
-        { label: 'DATOS PERSONALES', range: 'A3:C3', colors: COLORS.personal },
-        { label: 'UBICACIÓN Y PUESTO', range: 'D3:H3', colors: COLORS.location },
-        { label: 'ACCESO PUERTAS (P2000)', range: 'I3:J3', colors: COLORS.amber },
-        { label: 'ACCESO ELEVADORES (KONE)', range: 'K3:L3', colors: COLORS.sky },
-        { label: 'CONTEO USO KONE', range: 'M3:M3', colors: COLORS.koneUsage },
-        { label: 'ESTADO', range: 'N3:N3', colors: COLORS.status },
-        { label: 'ADICIONALES', range: 'O3:O3', colors: COLORS.additional },
-        { label: 'JORNADA LABORAL', range: 'P3:R3', colors: COLORS.emerald },
-        { label: 'CONTACTO', range: 'S3:S3', colors: COLORS.personal }
-    ];
-
-    groups.forEach(group => {
-        dataSheet.mergeCells(group.range);
-        const cell = dataSheet.getCell(group.range.split(':')[0]);
-        cell.value = group.label;
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.head } };
-        cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: group.colors.sub } };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        cell.border = {
-            top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-            left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-            bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-            right: { style: 'medium', color: { argb: COLORS.separator } }
-        };
-    });
-
-    // Row 4: Sub-Headers
-    const headerRow = dataSheet.getRow(4);
-    headerRow.height = 30;
     const headerLabels = [
         'APELLIDOS', 'NOMBRES', 'NO. EMPLEADO', 'EDIFICIO', 'DEPENDENCIA', 'EQUIPO', 'PUESTO', 'PISO BASE',
         'FOLIO ACCESO', 'PISOS ASIGNADOS', 'FOLIO ACCESO', 'PISOS ASIGNADOS',
@@ -1511,126 +1439,218 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
         'DIAS LABORALES', 'ENTRADA', 'SALIDA', 'CORREO ELECTRÓNICO'
     ];
 
-    headerLabels.forEach((label, i) => {
-        const cell = headerRow.getCell(i + 1);
-        cell.value = label;
-        const colLetter = String.fromCharCode(65 + i);
-        const group = groups.find(g => {
-            const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
-            return colLetter >= (start || 'A') && colLetter <= (end || start || 'A');
-        }) || groups[0];
+    // ══════════════════════════════════════════════════════════════
+    // SHEET 1: Executive Summary — Usage Metrics (All)
+    // ══════════════════════════════════════════════════════════════
+    await addKoneSummarySheet(workbook, matchedData, 'Resumen — Uso KONE', 'REPORTE DE USO DE TARJETAS KONE — NEXA', usageThreshold);
 
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
-        cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
-        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    const bajoUsoData = matchedData.filter(m => m.conteo < usageThreshold);
 
-        const isGroupEnd = [3, 8, 10, 12, 13, 14, 15, 18, 19].includes(i + 1);
-        cell.border = {
-            bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
-            right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFFFFFFF' } }
-        };
-    });
+    // ══════════════════════════════════════════════════════════════
+    // SHEET 2: Executive Summary — Low Usage Metrics
+    // ══════════════════════════════════════════════════════════════
+    if (bajoUsoData.length > 0) {
+        await addKoneSummarySheet(workbook, bajoUsoData, 'Resumen — Bajo Uso', `PERSONAL CON BAJO USO DE TARJETA (< ${usageThreshold})`, usageThreshold);
+    }
 
-    // Data Rows
-    matchedData.forEach((entry) => {
-        const person = entry.person;
-        const folioP2000 = person.cards?.filter(c => c.type.toUpperCase() === 'P2000').map(c => c.folio).join(', ') || '-';
-        const folioKone = person.cards?.filter(c => c.type.toUpperCase() === 'KONE').map(c => c.folio).join(', ') || '-';
+    // ══════════════════════════════════════════════════════════════
+    // SHEET 3: Personnel Directory with Usage Count
+    // ══════════════════════════════════════════════════════════════
+    const dataSheet = workbook.addWorksheet('Directorio con Conteo');
+    dataSheet.columns = [
+        { key: 'last_name', width: 25 }, { key: 'first_name', width: 25 }, { key: 'employee_no', width: 15 },
+        { key: 'building', width: 22 }, { key: 'dependency', width: 28 }, { key: 'area', width: 22 },
+        { key: 'position', width: 28 }, { key: 'floor', width: 12 }, { key: 'folioP2000', width: 20 },
+        { key: 'pisosP2000Text', width: 25 }, { key: 'folioKone', width: 22 }, { key: 'pisosKoneText', width: 25 },
+        { key: 'conteoUsoKone', width: 18 }, { key: 'status', width: 15 }, { key: 'specialAccessesText', width: 28 },
+        { key: 'days', width: 22 }, { key: 'entry', width: 14 }, { key: 'exit', width: 14 }, { key: 'email', width: 35 },
+    ];
 
-        const rowData = {
-            last_name: person.last_name || '-',
-            first_name: person.first_name || '-',
-            employee_no: person.employee_no || '-',
-            building: person.building || '-',
-            dependency: person.dependency || '-',
-            area: person.area || '-',
-            position: person.position || '-',
-            floor: person.floor || '-',
-            folioP2000,
-            pisosP2000Text: person.floors_p2000?.join(', ') || '-',
-            folioKone,
-            pisosKoneText: person.floors_kone?.join(', ') || '-',
-            conteoUsoKone: entry.conteo,
-            status: person.status || '-',
-            specialAccessesText: person.specialAccesses?.join(', ') || '-',
-            days: person.schedule?.days || '-',
-            entry: person.schedule?.entry || '-',
-            exit: person.schedule?.exit || '-',
-            email: person.email || '-'
-        };
+    const setupDirectorySheet = async (ws: ExcelJS.Worksheet, title: string, meta: string) => {
+        ws.mergeCells('A1:S1');
+        const dtTitle = ws.getCell('A1');
+        dtTitle.value = `       ${title}`;
+        dtTitle.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
+        dtTitle.alignment = { vertical: 'middle', horizontal: 'left' };
+        ws.getRow(1).height = 40;
 
-        const dataRow = dataSheet.addRow(rowData);
-        dataRow.height = 24;
-
-        const isInactive = person.status === 'Baja' || person.status === 'Inactivo/a';
-
-        dataRow.eachCell((cell, colNumber) => {
-            const colLetter = String.fromCharCode(64 + colNumber);
-            const group = groups.find(g => {
-                const parts = g.range.replace(/[0-9]/g, '').split(':');
-                return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
-            }) || groups[0];
-
-            cell.font = {
-                name: 'Arial', size: 9,
-                color: { argb: isInactive ? 'FF64748B' : 'FF111827' },
-                italic: isInactive
-            };
-            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-
-            if (isInactive) {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-            } else {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
+        try {
+            const response = await fetch('/favicon.svg');
+            if (response.ok) {
+                const blob = await response.blob();
+                const buffer = await blob.arrayBuffer();
+                const imageId = workbook.addImage({ buffer, extension: 'svg' as any });
+                ws.addImage(imageId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 32, height: 32 } });
             }
+        } catch { /* logo optional */ }
 
-            const isGroupEnd = [3, 8, 10, 12, 13, 14, 15, 18, 19].includes(colNumber);
+        ws.mergeCells('A2:S2');
+        const dtMeta = ws.getCell('A2');
+        dtMeta.value = meta;
+        dtMeta.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
+        dtMeta.alignment = { vertical: 'middle', horizontal: 'left' };
+        ws.getRow(2).height = 20;
+
+        const groups = [
+            { label: 'DATOS PERSONALES', range: 'A3:C3', colors: COLORS.personal },
+            { label: 'UBICACIÓN Y PUESTO', range: 'D3:H3', colors: COLORS.location },
+            { label: 'ACCESO PUERTAS (P2000)', range: 'I3:J3', colors: COLORS.amber },
+            { label: 'ACCESO ELEVADORES (KONE)', range: 'K3:L3', colors: COLORS.sky },
+            { label: 'CONTEO USO KONE', range: 'M3:M3', colors: COLORS.koneUsage },
+            { label: 'ESTADO', range: 'N3:N3', colors: COLORS.status },
+            { label: 'ADICIONALES', range: 'O3:O3', colors: COLORS.additional },
+            { label: 'JORNADA LABORAL', range: 'P3:R3', colors: COLORS.emerald },
+            { label: 'CONTACTO', range: 'S3:S3', colors: COLORS.personal }
+        ];
+
+        groups.forEach(group => {
+            ws.mergeCells(group.range);
+            const cell = ws.getCell(group.range.split(':')[0]);
+            cell.value = group.label;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.head } };
+            cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: group.colors.sub } };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
             cell.border = {
+                top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
                 bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-                right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFCBD5E1' } }
+                right: { style: 'medium', color: { argb: COLORS.separator } }
             };
-
-            // Highlight conteo column specifically
-            if (colNumber === 13 && !isInactive) {
-                const conteoVal = entry.conteo;
-                if (conteoVal > 100) {
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
-                    cell.font = { ...cell.font, bold: true, color: { argb: 'FF065F46' } };
-                } else if (conteoVal > 50) {
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
-                    cell.font = { ...cell.font, bold: true, color: { argb: 'FF075985' } };
-                } else if (conteoVal === 0) {
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
-                    cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, italic: true };
-                }
-            }
-
-            if (cell.value === '-' || cell.value === 'N/A' || !cell.value) {
-                cell.value = '[SIN DATO]';
-                cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, italic: true };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
-            }
         });
 
-        // Status Colors
-        const statusCell = dataRow.getCell('status');
-        if (person.status === 'Activo/a' && !isInactive) {
-            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
-            statusCell.font = { color: { argb: 'FF166534' }, bold: true, name: 'Arial', size: 9 };
-        } else if (person.status === 'Parcial' && !isInactive) {
-            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
-            statusCell.font = { color: { argb: 'FF92400E' }, bold: true, name: 'Arial', size: 9 };
-        } else if (person.status === 'Bloqueado/a') {
-            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
-            statusCell.font = { color: { argb: 'FF991B1B' }, bold: true, name: 'Arial', size: 9 };
-        } else if (isInactive) {
-            statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-            statusCell.font = { color: { argb: 'FF475569' }, italic: true, name: 'Arial', size: 9 };
-        }
-    });
+        const subHeaderRow = ws.getRow(4);
+        subHeaderRow.height = 30;
+        headerLabels.forEach((label, i) => {
+            const cell = subHeaderRow.getCell(i + 1);
+            cell.value = label;
+            const colLetter = String.fromCharCode(65 + i);
+            const group = groups.find(g => {
+                const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
+                return colLetter >= (start || 'A') && colLetter <= (end || start || 'A');
+            }) || groups[0];
 
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
+            cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            const isGroupEnd = [3, 8, 10, 12, 13, 14, 15, 18, 19].includes(i + 1);
+            cell.border = {
+                bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
+                right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFFFFFFF' } }
+            };
+        });
+
+        return groups;
+    };
+
+    const populateRows = (ws: ExcelJS.Worksheet, data: KoneUsageMatchedEntry[], groups: any[]) => {
+        data.forEach(entry => {
+            const person = entry.person;
+            const folioP2000 = person.cards?.filter(c => c.type.toUpperCase() === 'P2000').map(c => c.folio).join(', ') || '-';
+            const folioKone = person.cards?.filter(c => c.type.toUpperCase() === 'KONE').map(c => c.folio).join(', ') || '-';
+
+            const rowData = {
+                last_name: person.last_name || '-',
+                first_name: person.first_name || '-',
+                employee_no: person.employee_no || '-',
+                building: person.building || '-',
+                dependency: person.dependency || '-',
+                area: person.area || '-',
+                position: person.position || '-',
+                floor: person.floor || '-',
+                folioP2000,
+                pisosP2000Text: person.floors_p2000?.join(', ') || '-',
+                folioKone,
+                pisosKoneText: person.floors_kone?.join(', ') || '-',
+                conteoUsoKone: entry.conteo,
+                status: person.status || '-',
+                specialAccessesText: person.specialAccesses?.join(', ') || '-',
+                days: person.schedule?.days || '-',
+                entry: person.schedule?.entry || '-',
+                exit: person.schedule?.exit || '-',
+                email: person.email || '-'
+            };
+
+            const dataRow = ws.addRow(rowData);
+            dataRow.height = 24;
+            const isInactive = person.status === 'Baja' || person.status === 'Inactivo/a';
+
+            dataRow.eachCell((cell, colNumber) => {
+                const colLetter = String.fromCharCode(64 + colNumber);
+                const group = groups.find(g => {
+                    const parts = g.range.replace(/[0-9]/g, '').split(':');
+                    return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
+                }) || groups[0];
+
+                cell.font = { name: 'Arial', size: 9, color: { argb: isInactive ? 'FF64748B' : 'FF111827' }, italic: isInactive };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                const isGroupEnd = [3, 8, 10, 12, 13, 14, 15, 18, 19].includes(colNumber);
+                setBorder(cell, isGroupEnd ? COLORS.separator : 'FFCBD5E1');
+
+                if (isInactive) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+                } else {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
+                }
+
+                // Highlight conteo column specifically
+                if (colNumber === 13 && !isInactive) {
+                    const conteoVal = entry.conteo;
+                    if (conteoVal > 100) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+                        cell.font = { ...cell.font, bold: true, color: { argb: 'FF065F46' } };
+                    } else if (conteoVal > 50) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
+                        cell.font = { ...cell.font, bold: true, color: { argb: 'FF075985' } };
+                    } else if (conteoVal === 0) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+                        cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, italic: true };
+                    } else if (conteoVal < usageThreshold) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F2' } };
+                        cell.font = { ...cell.font, bold: true, color: { argb: 'FF991B1B' } };
+                    }
+                }
+
+                if (cell.value === '-' || cell.value === 'N/A' || !cell.value) {
+                    cell.value = '[SIN DATO]';
+                    cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, italic: true };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+                }
+            });
+
+            // Status Colors
+            const statusCell = dataRow.getCell('status');
+            if (person.status === 'Activo/a' && !isInactive) {
+                statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+                statusCell.font = { color: { argb: 'FF166534' }, bold: true, name: 'Arial', size: 9 };
+            } else if (person.status === 'Parcial' && !isInactive) {
+                statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+                statusCell.font = { color: { argb: 'FF92400E' }, bold: true, name: 'Arial', size: 9 };
+            } else if (person.status === 'Bloqueado/a') {
+                statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+                statusCell.font = { color: { argb: 'FF991B1B' }, bold: true, name: 'Arial', size: 9 };
+            } else if (isInactive) {
+                statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+                statusCell.font = { color: { argb: 'FF475569' }, italic: true, name: 'Arial', size: 9 };
+            }
+        });
+    };
+
+    const mainGroups = await setupDirectorySheet(dataSheet, 'DIRECTORIO DE PERSONAL CON CONTEO DE USO KONE — NEXA', `Reporte generado: ${dateStr}  |  Registros: ${total}  |  Total usos: ${totalUsos}`);
+    populateRows(dataSheet, matchedData, mainGroups);
     dataSheet.autoFilter = 'A4:S4';
     dataSheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 4 }];
+
+    // ══════════════════════════════════════════════════════════════
+    // SHEET 4: Low Usage Directory
+    // ══════════════════════════════════════════════════════════════
+    if (bajoUsoData.length > 0) {
+        const lowUsageSheet = workbook.addWorksheet('Personal Bajo Uso');
+        lowUsageSheet.columns = dataSheet.columns;
+        const luGroups = await setupDirectorySheet(lowUsageSheet, `PERSONAL CON BAJO USO (< ${usageThreshold}) — NEXA`, `Filtrado por: Conteo < ${usageThreshold}  |  Registros: ${bajoUsoData.length}`);
+        populateRows(lowUsageSheet, bajoUsoData, luGroups);
+        lowUsageSheet.autoFilter = 'A4:S4';
+        lowUsageSheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 4 }];
+    }
 
     // ── Save ──
     const finalFileName = `Conteo_Uso_KONE_${new Date().toISOString().split('T')[0]}.xlsx`;

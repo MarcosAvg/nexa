@@ -69,80 +69,80 @@
             color: "text-blue-600",
             bg: "bg-blue-50",
             border: "border-blue-100",
-            cardBg: "bg-blue-50/50",
-            cardBorder: "border-blue-200/50",
+            cardBg: "bg-blue-50/60",
+            cardBorder: "border-blue-200/60",
         },
         "Firma Responsiva": {
             icon: FileSignature,
             color: "text-indigo-600",
             bg: "bg-indigo-50",
             border: "border-indigo-100",
-            cardBg: "bg-indigo-50/50",
-            cardBorder: "border-indigo-200/50",
+            cardBg: "bg-indigo-50/60",
+            cardBorder: "border-indigo-200/60",
         },
         "Alta de Persona": {
             icon: User,
             color: "text-emerald-600",
             bg: "bg-emerald-50",
             border: "border-emerald-100",
-            cardBg: "bg-emerald-50/50",
-            cardBorder: "border-emerald-200/50",
+            cardBg: "bg-emerald-50/60",
+            cardBorder: "border-emerald-200/60",
         },
         "Baja de Persona": {
             icon: Lock,
             color: "text-rose-600",
             bg: "bg-rose-50",
             border: "border-rose-100",
-            cardBg: "bg-rose-50/50",
-            cardBorder: "border-rose-200/50",
+            cardBg: "bg-rose-50/60",
+            cardBorder: "border-rose-200/60",
         },
         "Modificación de datos": {
             icon: ArrowRight,
             color: "text-amber-600",
             bg: "bg-amber-50",
             border: "border-amber-100",
-            cardBg: "bg-amber-50/50",
-            cardBorder: "border-amber-200/50",
+            cardBg: "bg-amber-50/60",
+            cardBorder: "border-amber-200/60",
         },
         Modificación: {
             icon: ArrowRight,
             color: "text-amber-600",
             bg: "bg-amber-50",
             border: "border-amber-100",
-            cardBg: "bg-amber-50/50",
-            cardBorder: "border-amber-200/50",
+            cardBg: "bg-amber-50/60",
+            cardBorder: "border-amber-200/60",
         },
         Reposición: {
             icon: CreditCard,
             color: "text-sky-600",
             bg: "bg-sky-50",
             border: "border-sky-100",
-            cardBg: "bg-sky-50/50",
-            cardBorder: "border-sky-200/50",
+            cardBg: "bg-sky-50/60",
+            cardBorder: "border-sky-200/60",
         },
         "Reporte de Fallo": {
             icon: AlertCircle,
             color: "text-orange-600",
             bg: "bg-orange-50",
             border: "border-orange-100",
-            cardBg: "bg-orange-50/50",
-            cardBorder: "border-orange-200/50",
+            cardBg: "bg-orange-50/60",
+            cardBorder: "border-orange-200/60",
         },
         "Reporte de Falla": {
             icon: AlertCircle,
             color: "text-orange-600",
             bg: "bg-orange-50",
             border: "border-orange-100",
-            cardBg: "bg-orange-50/50",
-            cardBorder: "border-orange-200/50",
+            cardBg: "bg-orange-50/60",
+            cardBorder: "border-orange-200/60",
         },
         Default: {
             icon: MoreHorizontal,
             color: "text-slate-600",
             bg: "bg-slate-50",
             border: "border-slate-100",
-            cardBg: "bg-slate-50/50",
-            cardBorder: "border-slate-200/50",
+            cardBg: "bg-slate-50/60",
+            cardBorder: "border-slate-200/60",
         },
     };
 
@@ -163,7 +163,7 @@
 </script>
 
 <article
-    class="group relative flex flex-col h-full {config.cardBg} rounded-2xl border {config.cardBorder} overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1"
+    class="group relative flex flex-col h-full {config.cardBg} rounded-2xl border {config.cardBorder} overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/60 hover:-translate-y-1"
 >
     <!-- Header: Type Icon & Priority -->
     <div class="p-4 flex items-start justify-between gap-4">
@@ -217,7 +217,7 @@
     <div class="px-4 pb-4 space-y-3">
         <!-- Main Person Label -->
         <div
-            class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50/80 border border-slate-100/50"
+            class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50/80 border border-slate-100/60"
         >
             <div
                 class="h-8 w-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm shrink-0"
@@ -247,7 +247,7 @@
 
             {#if ticket.cardFolio}
                 <div
-                    class="flex items-center gap-1.5 text-slate-600 bg-slate-100/50 px-2 py-0.5 rounded-md"
+                    class="flex items-center gap-1.5 text-slate-600 bg-slate-100/60 px-2 py-0.5 rounded-md"
                 >
                     <CreditCard size={12} />
                     <span>{ticket.cardType} · {ticket.cardFolio}</span>
@@ -256,20 +256,21 @@
         </div>
     </div>
 
-    <!-- Actions -->
     <div class="p-3 bg-slate-50/50 border-t border-slate-100 flex gap-2">
-        {#if (ticket.type === "Programación" || ticket.type === "Firma Responsiva") && onComplete}
+        {#if (ticket.type === "Programación" || ticket.type === "Firma Responsiva" || ticket.type === "Modificación" || ticket.type === "Modificación de datos") && onComplete}
             <Button
                 variant="primary"
-                class="flex-1 h-9 rounded-xl shadow-md shadow-blue-500/10 active:scale-95 text-xs font-bold"
+                size="sm"
+                class="flex-1 shadow-md shadow-slate-200/50"
                 onclick={() => onComplete(ticket)}
             >
                 <CheckCircle2 size={16} class="mr-2" />
                 Completar
             </Button>
             <Button
-                variant="outline"
-                class="w-10 h-9 p-0 rounded-xl active:scale-90"
+                variant="secondary"
+                size="sm"
+                class="w-10 p-0"
                 onclick={() => onManage?.(ticket)}
             >
                 <MoreHorizontal size={18} class="text-slate-400" />
@@ -277,7 +278,8 @@
         {:else}
             <Button
                 variant="primary"
-                class="flex-1 h-9 rounded-xl shadow-lg shadow-blue-500/20 active:scale-95 text-xs font-bold"
+                size="sm"
+                class="flex-1 shadow-lg shadow-slate-200/50"
                 onclick={() => onManage?.(ticket)}
             >
                 Gestionar Ticket

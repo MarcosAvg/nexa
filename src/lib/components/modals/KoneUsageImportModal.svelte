@@ -28,6 +28,7 @@
     let step = $state<"idle" | "parsing" | "matching" | "results">("idle");
     let matchResult = $state<KoneUsageMatchResult | null>(null);
     let isExporting = $state(false);
+    let usageThreshold = $state(10);
     let fileInput = $state<HTMLInputElement>();
 
     function reset() {
@@ -75,7 +76,7 @@
 
         isExporting = true;
         try {
-            await exportKoneUsageToExcel(matchResult.matched);
+            await exportKoneUsageToExcel(matchResult.matched, usageThreshold);
             toast.success("Exportación completada");
         } catch (err) {
             console.error("Export Error:", err);
@@ -110,6 +111,14 @@
                     : "0",
             totalUsos,
             promedio,
+            byDependency: matchResult.matched.reduce(
+                (acc, m) => {
+                    const dep = m.person.dependency || "N/A";
+                    acc[dep] = (acc[dep] || 0) + 1;
+                    return acc;
+                },
+                {} as Record<string, number>,
+            ),
         };
     });
 </script>
@@ -260,6 +269,68 @@
                     <p class="text-[11px] font-medium text-sky-500">
                         Promedio por persona
                     </p>
+                </div>
+            </div>
+
+            <!-- Threshold and Metrics by Dependency -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <div class="flex items-center justify-between mb-3">
+                        <p
+                            class="text-xs font-bold text-slate-700 uppercase tracking-wider"
+                        >
+                            Umbral de bajo uso
+                        </p>
+                        <Badge variant="blue" class="font-mono"
+                            >{usageThreshold}</Badge
+                        >
+                    </div>
+                    <p class="text-[11px] text-slate-400 mb-3">
+                        Define la cantidad de usos para generar la hoja de
+                        personal con bajo uso.
+                    </p>
+                    <div class="flex items-center gap-3">
+                        <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="1"
+                            bind:value={usageThreshold}
+                            class="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                        />
+                        <input
+                            type="number"
+                            min="0"
+                            bind:value={usageThreshold}
+                            class="w-16 h-8 text-center text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                        />
+                    </div>
+                </div>
+
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <p
+                        class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3"
+                    >
+                        Conteo por Dependencia
+                    </p>
+                    <div
+                        class="max-h-32 overflow-y-auto space-y-2 pr-1 custom-scrollbar"
+                    >
+                        {#each Object.entries(stats.byDependency).sort((a, b) => b[1] - a[1]) as [dep, count]}
+                            <div
+                                class="flex items-center justify-between text-[11px]"
+                            >
+                                <span
+                                    class="text-slate-600 truncate mr-2"
+                                    title={dep}>{dep}</span
+                                >
+                                <span
+                                    class="font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200"
+                                    >{count}</span
+                                >
+                            </div>
+                        {/each}
+                    </div>
                 </div>
             </div>
 

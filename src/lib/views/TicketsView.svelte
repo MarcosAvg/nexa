@@ -198,19 +198,23 @@
             isAltaOpen = true;
             return;
         }
-        if (
-            IMPORTED_TYPES.has(ticket.type) &&
-            ticket.type !== "Alta de Persona"
-        ) {
+
+        const isModificacion =
+            ticket.type === "Modificación" ||
+            ticket.type === "Modificación de datos";
+
+        if (IMPORTED_TYPES.has(ticket.type) && !isModificacion) {
             importedTicket = ticket;
             isImportedOpen = true;
             return;
         }
-        if (ticket.type === "Modificación") {
+
+        if (isModificacion) {
             compareTicket = ticket;
             isCompareOpen = true;
             return;
         }
+
         // Default: manual details
         manualTicket = ticket;
         isManualDetailsOpen = true;
@@ -235,7 +239,10 @@
             return;
         }
 
-        if (ticket.type === "Modificación") {
+        if (
+            ticket.type === "Modificación" ||
+            ticket.type === "Modificación de datos"
+        ) {
             compareTicket = ticket;
             isCompareOpen = true;
             return;
