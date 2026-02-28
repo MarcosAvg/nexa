@@ -147,6 +147,30 @@ export class PersonnelState {
         this.isEditModalOpen = false;
         this.editingPerson = null;
     }
+
+    async initRealtime() {
+        try {
+            const { personnelService } = await import("../services/personnel");
+            personnelService.subscribeToChanges((payload: any) => {
+                // Always refresh metrics on any change
+                this.refreshDashboardMetrics();
+                this.refreshDashboardStats();
+
+                // If user is on page 1, refresh the list to show new/updated records
+                // Or if the record being changed is the one currently selected
+                const isRelevant =
+                    this.currentPage === 1 ||
+                    this.selectedPersonId === payload.new?.id ||
+                    this.selectedPersonId === payload.old?.id;
+
+                if (isRelevant && !this.isLoading) {
+                    this.refresh(this.currentPage, this.searchQuery, this.statusFilter, this.dependencyId, this.buildingId);
+                }
+            });
+        } catch (error) {
+            console.error("Failed to initialize Realtime:", error);
+        }
+    }
 }
 
 export const personnelState = new PersonnelState();

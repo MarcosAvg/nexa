@@ -2,38 +2,63 @@ import { personnelService } from "../services/personnel";
 import { cardService } from "../services/cards";
 import { toast } from "svelte-sonner";
 import { handleError } from "../utils/error";
+import { personnelState } from "../stores/personnel.svelte";
 import type { Person } from "../types";
 
 export const personnelActions = {
     async handleBlockPerson(person: Person, onSuccess?: () => Promise<void>) {
+        const oldStatusRaw = person.status_raw;
+        const newStatus = oldStatusRaw === "blocked" ? "active" : "blocked";
+
+        // Optimistic UI Update
+        const localPerson = personnelState.personnel.find(p => p.id === person.id);
+        if (localPerson) localPerson.status_raw = newStatus;
+
         try {
-            const newStatus = person.status_raw === "blocked" ? "active" : "blocked";
             await personnelService.updateStatus(person.id, newStatus);
             toast.success(
                 newStatus === "blocked" ? "Persona Bloqueada" : "Persona Reactivada"
             );
             await onSuccess?.();
         } catch (e) {
+            // Revert on error
+            if (localPerson) localPerson.status_raw = oldStatusRaw;
             handleError(e, "Error al actualizar estado");
         }
     },
 
     async handleDeactivatePerson(person: Person, onSuccess?: () => Promise<void>) {
+        const oldStatusRaw = person.status_raw;
+
+        // Optimistic UI Update
+        const localPerson = personnelState.personnel.find(p => p.id === person.id);
+        if (localPerson) localPerson.status_raw = "inactive";
+
         try {
             await personnelService.updateStatus(person.id, "inactive");
             toast.success("Persona dada de baja");
             await onSuccess?.();
         } catch (e) {
+            // Revert on error
+            if (localPerson) localPerson.status_raw = oldStatusRaw;
             handleError(e, "Error al dar de baja");
         }
     },
 
     async handleReactivatePerson(person: Person, onSuccess?: () => Promise<void>) {
+        const oldStatusRaw = person.status_raw;
+
+        // Optimistic UI Update
+        const localPerson = personnelState.personnel.find(p => p.id === person.id);
+        if (localPerson) localPerson.status_raw = "active";
+
         try {
             await personnelService.updateStatus(person.id, "active");
             toast.success("Persona reactivada");
             await onSuccess?.();
         } catch (e) {
+            // Revert on error
+            if (localPerson) localPerson.status_raw = oldStatusRaw;
             handleError(e, "Error al reactivar");
         }
     },

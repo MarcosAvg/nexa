@@ -114,14 +114,16 @@
           personnelState.setCards(_c);
           ticketState.setTickets(_t);
           historyState.setHistory(_h.data, _h.count);
-          
+
           // Refresh dashboard metrics with the new efficient RPC
           personnelState.refreshDashboardMetrics();
+
+          // Init Realtime subscriptions
+          personnelState.initRealtime();
         } catch (e) {
           console.warn("Error loading background data:", e);
         }
       })();
-
     } catch (err) {
       console.error("Error general en initData:", err);
       if (!isBackground) {

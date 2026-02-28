@@ -51,8 +51,11 @@
         else if (path.includes("settings"))
             uiState.setActivePage("Configuración");
     });
+    import CommandPalette from "./CommandPalette.svelte";
 </script>
 
 <DashboardLayout {sidebarItems} user={currentUser} onLogout={handleLogout}>
     {@render children()}
 </DashboardLayout>
+
+<CommandPalette />

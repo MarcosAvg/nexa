@@ -597,8 +597,18 @@ export const personnelService = {
                 dataQuality: { sinEmail: 0, sinSchedule: 0, sinPosition: 0, sinArea: 0, total: 0 },
             };
         }
-    }
+    },
 
+    subscribeToChanges(callback: (payload: any) => void) {
+        return supabase
+            .channel('personnel-changes')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'personnel' },
+                (payload) => callback(payload)
+            )
+            .subscribe();
+    }
 };
 
 

@@ -13,6 +13,7 @@
     import { personnelState, catalogState } from "../../stores";
     import { toast } from "svelte-sonner";
     import type { Person } from "../../types";
+    import { personnelSchema } from "../../schemas";
 
     import { type Snippet } from "svelte";
 
@@ -85,6 +86,7 @@
     // Nested modal state
     let isCardModalOpen = $state(false);
     let isSubmitting = $state(false);
+    let errors = $state<Record<string, string>>({});
 
     // Duplicate detection
     let potentialDuplicates = $state<any[]>([]);
@@ -285,6 +287,38 @@
 
     async function handleSave() {
         if (isSubmitting) return;
+        errors = {};
+
+        const dataToValidate = {
+            first_name: nombres,
+            last_name: apellidos,
+            dependency,
+            building: edificio,
+            floor: pisoBase,
+            schedule_days: diasHorario,
+            entry_time: horaEntrada,
+            exit_time: horaSalida,
+            email,
+            employee_no: noEmpleado,
+            area: areaEquipo,
+            position: puestoFuncion,
+        };
+
+        const result = personnelSchema.safeParse(dataToValidate);
+
+        if (!result.success) {
+            const newErrors: Record<string, string> = {};
+            result.error.issues.forEach((issue) => {
+                if (issue.path[0])
+                    newErrors[issue.path[0].toString()] = issue.message;
+            });
+            errors = newErrors;
+            toast.error("Error de Validación", {
+                description: "Por favor corrija los campos marcados en rojo.",
+            });
+            return;
+        }
+
         isSubmitting = true;
 
         try {
@@ -561,10 +595,18 @@
                         id="nombres"
                         bind:value={nombres}
                         placeholder="Juan Carlos"
-                        class={isDifferent(comparisonFields[0])
-                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
-                            : ""}
+                        class={(isDifferent(comparisonFields[0])
+                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30 "
+                            : "") +
+                            (errors.first_name
+                                ? "border-red-500 ring-red-200"
+                                : "")}
                     />
+                    {#if errors.first_name}
+                        <p class="text-[10px] text-red-500 font-medium">
+                            {errors.first_name}
+                        </p>
+                    {/if}
                     {@render DiffIndicator(comparisonFields[0])}
                 </div>
                 <div class="space-y-1.5">
@@ -577,10 +619,18 @@
                         id="apellidos"
                         bind:value={apellidos}
                         placeholder="Pérez García"
-                        class={isDifferent(comparisonFields[1])
-                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
-                            : ""}
+                        class={(isDifferent(comparisonFields[1])
+                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30 "
+                            : "") +
+                            (errors.last_name
+                                ? "border-red-500 ring-red-200"
+                                : "")}
                     />
+                    {#if errors.last_name}
+                        <p class="text-[10px] text-red-500 font-medium">
+                            {errors.last_name}
+                        </p>
+                    {/if}
                     {@render DiffIndicator(comparisonFields[1])}
                 </div>
             </div>
@@ -611,14 +661,23 @@
                     <Select
                         id="dependencia"
                         bind:value={dependency}
-                        class={isDifferent(comparisonFields[3])
-                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
-                            : ""}
+                        class={(isDifferent(comparisonFields[3])
+                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30 "
+                            : "") +
+                            (errors.dependency
+                                ? "border-red-500 ring-red-200"
+                                : "")}
                     >
+                        <option value="">Seleccionar...</option>
                         {#each dependencies as dep}
                             <option value={dep.name}>{dep.name}</option>
                         {/each}
                     </Select>
+                    {#if errors.dependency}
+                        <p class="text-[10px] text-red-500 font-medium">
+                            {errors.dependency}
+                        </p>
+                    {/if}
                     {@render DiffIndicator(comparisonFields[3])}
                 </div>
             </div>
@@ -669,10 +728,16 @@
                     type="email"
                     bind:value={email}
                     placeholder="correo@ejemplo.com"
-                    class={isDifferent(comparisonFields[6])
-                        ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
-                        : ""}
+                    class={(isDifferent(comparisonFields[6])
+                        ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30 "
+                        : "") +
+                        (errors.email ? "border-red-500 ring-red-200" : "")}
                 />
+                {#if errors.email}
+                    <p class="text-[10px] text-red-500 font-medium">
+                        {errors.email}
+                    </p>
+                {/if}
                 {@render DiffIndicator(comparisonFields[6])}
             </div>
         </fieldset>
@@ -693,11 +758,23 @@
                         class="text-xs font-bold text-slate-600 block"
                         >Edificio</label
                     >
-                    <Select id="edificio" bind:value={edificio}>
+                    <Select
+                        id="edificio"
+                        bind:value={edificio}
+                        class={errors.building
+                            ? "border-red-500 ring-red-200"
+                            : ""}
+                    >
+                        <option value="">Seleccionar...</option>
                         {#each buildings as b}
                             <option value={b.name}>{b.name}</option>
                         {/each}
                     </Select>
+                    {#if errors.building}
+                        <p class="text-[10px] text-red-500 font-medium">
+                            {errors.building}
+                        </p>
+                    {/if}
                 </div>
                 <div class="space-y-1.5">
                     <label
@@ -709,11 +786,20 @@
                         id="pisoBase"
                         bind:value={pisoBase}
                         disabled={!edificio}
+                        class={errors.floor
+                            ? "border-red-500 ring-red-200"
+                            : ""}
                     >
+                        <option value="">Seleccionar...</option>
                         {#each availableFloors as f}
                             <option value={f}>{f}</option>
                         {/each}
                     </Select>
+                    {#if errors.floor}
+                        <p class="text-[10px] text-red-500 font-medium">
+                            {errors.floor}
+                        </p>
+                    {/if}
                 </div>
             </div>
 
@@ -747,11 +833,23 @@
                 <label for="dias" class="text-xs font-bold text-slate-600 block"
                     >Días</label
                 >
-                <Select id="dias" bind:value={diasHorario}>
+                <Select
+                    id="dias"
+                    bind:value={diasHorario}
+                    class={errors.schedule_days
+                        ? "border-red-500 ring-red-200"
+                        : ""}
+                >
+                    <option value="">Seleccionar...</option>
                     {#each schedules as s}
                         <option value={s.name}>{s.name}</option>
                     {/each}
                 </Select>
+                {#if errors.schedule_days}
+                    <p class="text-[10px] text-red-500 font-medium">
+                        {errors.schedule_days}
+                    </p>
+                {/if}
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
