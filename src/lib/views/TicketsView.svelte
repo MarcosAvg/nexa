@@ -15,6 +15,7 @@
     import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
     import ModificationCompareModal from "../components/modals/ModificationCompareModal.svelte";
     import ManualTicketDetailsModal from "../components/modals/ManualTicketDetailsModal.svelte";
+    import PermissionGuard from "../components/PermissionGuard.svelte";
     import {
         Search,
         Plus,
@@ -324,22 +325,26 @@
         {/snippet}
 
         {#snippet actions()}
-            <Button
-                variant="outline"
-                onclick={() => (isImportOpen = true)}
-                class="flex items-center gap-2 h-10 px-4 border-slate-300"
-            >
-                <FileSpreadsheet size={16} />
-                Importar Plantilla
-            </Button>
-            <Button
-                variant="primary"
-                onclick={onOpenAddTicket}
-                class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
-            >
-                <Plus size={18} strokeWidth={3} />
-                Nuevo Ticket
-            </Button>
+            <PermissionGuard requireEdit>
+                <Button
+                    variant="outline"
+                    onclick={() => (isImportOpen = true)}
+                    class="flex items-center gap-2 h-10 px-4 border-slate-300"
+                >
+                    <FileSpreadsheet size={16} />
+                    Importar Plantilla
+                </Button>
+            </PermissionGuard>
+            <PermissionGuard requireEdit>
+                <Button
+                    variant="primary"
+                    onclick={onOpenAddTicket}
+                    class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
+                >
+                    <Plus size={18} strokeWidth={3} />
+                    Nuevo Ticket
+                </Button>
+            </PermissionGuard>
         {/snippet}
     </SectionHeader>
 
@@ -462,4 +467,6 @@
     onComplete={refreshData}
 />
 
-<FloatingActionButton onclick={onOpenAddTicket} label="Nuevo Ticket" />
+<PermissionGuard requireEdit>
+    <FloatingActionButton onclick={onOpenAddTicket} label="Nuevo Ticket" />
+</PermissionGuard>

@@ -14,6 +14,7 @@
 <script lang="ts">
     import Badge from "./Badge.svelte";
     import Button from "./Button.svelte";
+    import PermissionGuard from "./PermissionGuard.svelte";
     import {
         Clock,
         CreditCard,
@@ -257,38 +258,45 @@
     </div>
 
     <div class="p-3 bg-slate-50/50 border-t border-slate-100 flex gap-2">
-        {#if (ticket.type === "Programación" || ticket.type === "Firma Responsiva" || ticket.type === "Modificación" || ticket.type === "Modificación de datos") && onComplete}
-            <Button
-                variant="primary"
-                size="sm"
-                class="flex-1 shadow-md shadow-slate-200/50"
-                onclick={() => onComplete(ticket)}
-            >
-                <CheckCircle2 size={16} class="mr-2" />
-                Completar
-            </Button>
-            <Button
-                variant="secondary"
-                size="sm"
-                class="w-10 p-0"
-                onclick={() => onManage?.(ticket)}
-            >
-                <MoreHorizontal size={18} class="text-slate-400" />
-            </Button>
-        {:else}
-            <Button
-                variant="primary"
-                size="sm"
-                class="flex-1 shadow-lg shadow-slate-200/50"
-                onclick={() => onManage?.(ticket)}
-            >
-                Gestionar Ticket
-                <ArrowRight
-                    size={16}
-                    class="ml-2 group-hover:translate-x-1 transition-transform"
-                />
-            </Button>
-        {/if}
+        <PermissionGuard requireEdit disabledOnly>
+            {#snippet children({ disabled })}
+                {#if (ticket.type === "Programación" || ticket.type === "Firma Responsiva" || ticket.type === "Modificación" || ticket.type === "Modificación de datos") && onComplete}
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        class="flex-1 shadow-md shadow-slate-200/50"
+                        onclick={() => onComplete(ticket)}
+                        {disabled}
+                    >
+                        <CheckCircle2 size={16} class="mr-2" />
+                        Completar
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        class="w-10 p-0"
+                        onclick={() => onManage?.(ticket)}
+                        {disabled}
+                    >
+                        <MoreHorizontal size={18} class="text-slate-400" />
+                    </Button>
+                {:else}
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        class="flex-1 shadow-lg shadow-slate-200/50"
+                        onclick={() => onManage?.(ticket)}
+                        {disabled}
+                    >
+                        Gestionar Ticket
+                        <ArrowRight
+                            size={16}
+                            class="ml-2 group-hover:translate-x-1 transition-transform"
+                        />
+                    </Button>
+                {/if}
+            {/snippet}
+        </PermissionGuard>
     </div>
 
     <!-- Background Decoration -->

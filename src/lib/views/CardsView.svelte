@@ -8,6 +8,7 @@
     import Card from "../components/Card.svelte";
     import DataTable from "../components/DataTable.svelte";
     import Badge from "../components/Badge.svelte";
+    import PermissionGuard from "../components/PermissionGuard.svelte";
     import {
         Search,
         User,
@@ -382,7 +383,7 @@
                 />
                 Exportar Excel
             </Button>
-            {#if currentUser?.role !== "viewer"}
+            <PermissionGuard requireEdit>
                 <Button
                     variant="primary"
                     class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
@@ -391,7 +392,7 @@
                     <Plus size={18} strokeWidth={3} />
                     Nueva Tarjeta
                 </Button>
-            {/if}
+            </PermissionGuard>
         {/snippet}
     </SectionHeader>
 
@@ -493,7 +494,7 @@
                         </button>
                     {/if}
 
-                    {#if currentUser?.role !== "viewer"}
+                    <PermissionGuard requireEdit>
                         {#if row.status === "inactive"}
                             <!-- Reactivar: Emerald -->
                             <button
@@ -551,7 +552,7 @@
                         >
                             <Trash2 size={16} />
                         </button>
-                    {/if}
+                    </PermissionGuard>
                 </div>
             {/snippet}
         </DataTable>
@@ -657,6 +658,6 @@
     onCancel={() => (confirmModal.isOpen = false)}
 />
 
-{#if currentUser?.role !== "viewer"}
+<PermissionGuard requireEdit>
     <FloatingActionButton onclick={onOpenAddCard} label="Nueva Tarjeta" />
-{/if}
+</PermissionGuard>

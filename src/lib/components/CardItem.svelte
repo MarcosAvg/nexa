@@ -8,6 +8,7 @@
         RefreshCw,
         CheckCircle2,
     } from "lucide-svelte";
+    import PermissionGuard from "./PermissionGuard.svelte";
 
     type Props = {
         type: "P2000" | "KONE";
@@ -83,80 +84,91 @@
     <div
         class="flex items-center justify-between pt-3 border-t border-slate-100"
     >
-        <!-- Responsiva: Distinct Emerald icon with label -->
-        <button
-            type="button"
-            class="flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 group {programming_status ===
-            'done'
-                ? 'text-emerald-600 hover:bg-emerald-50'
-                : 'text-slate-300 cursor-not-allowed grayscale bg-slate-50'}"
-            onclick={programming_status === "done"
-                ? onGenerateResponsiva
-                : undefined}
-            disabled={programming_status !== "done"}
-            title={programming_status === "done"
-                ? "Generar y firmar responsiva"
-                : "Debe programar la tarjeta antes de generar la responsiva"}
-        >
-            <FileSignature
-                size={16}
-                class={programming_status === "done"
-                    ? "group-hover:scale-110 transition-transform"
-                    : ""}
-            />
-            <span class="text-[10px] font-bold uppercase tracking-wider"
-                >Responsiva</span
-            >
-        </button>
-
-        {#if programming_status !== "done"}
-            <!-- Programar: Blue -->
-            <button
-                type="button"
-                class="flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 group text-blue-600 hover:bg-blue-50"
-                onclick={onProgram}
-                title="Marcar tarjeta como programada físicamente"
-            >
-                <CheckCircle2
-                    size={16}
-                    class="group-hover:scale-110 transition-transform"
-                />
-                <span class="text-[10px] font-bold uppercase tracking-wider"
-                    >Programar</span
+        <PermissionGuard requireEdit disabledOnly>
+            {#snippet children({ disabled: permissionDisabled })}
+                <!-- Responsiva: Distinct Emerald icon with label -->
+                <button
+                    type="button"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 group {programming_status ===
+                        'done' && !permissionDisabled
+                        ? 'text-emerald-600 hover:bg-emerald-50'
+                        : 'text-slate-300 cursor-not-allowed grayscale bg-slate-50'}"
+                    onclick={programming_status === "done" &&
+                    !permissionDisabled
+                        ? onGenerateResponsiva
+                        : undefined}
+                    disabled={programming_status !== "done" ||
+                        permissionDisabled}
+                    title={programming_status === "done"
+                        ? "Generar y firmar responsiva"
+                        : "Debe programar la tarjeta antes de generar la responsiva"}
                 >
-            </button>
-        {/if}
+                    <FileSignature
+                        size={16}
+                        class={programming_status === "done"
+                            ? "group-hover:scale-110 transition-transform"
+                            : ""}
+                    />
+                    <span class="text-[10px] font-bold uppercase tracking-wider"
+                        >Responsiva</span
+                    >
+                </button>
 
-        <div class="flex items-center gap-1">
-            <!-- Bloquear: Amber -->
-            <button
-                type="button"
-                class="p-2 rounded-full text-slate-400 hover:text-amber-500 hover:bg-amber-50 transition-all duration-200"
-                onclick={onBlock}
-                title={status === "active" ? "Bloquear" : "Desbloquear"}
-            >
-                <Lock size={16} />
-            </button>
+                {#if programming_status !== "done"}
+                    <!-- Programar: Blue -->
+                    <button
+                        type="button"
+                        class="flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 group text-blue-600 hover:bg-blue-50 disabled:text-slate-300 disabled:bg-slate-50"
+                        onclick={onProgram}
+                        disabled={permissionDisabled}
+                        title="Marcar tarjeta como programada físicamente"
+                    >
+                        <CheckCircle2
+                            size={16}
+                            class="group-hover:scale-110 transition-transform"
+                        />
+                        <span
+                            class="text-[10px] font-bold uppercase tracking-wider"
+                            >Programar</span
+                        >
+                    </button>
+                {/if}
 
-            <!-- Reposición: Indigo -->
-            <button
-                type="button"
-                class="p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all duration-200"
-                onclick={onReplace}
-                title="Reposición por extravío"
-            >
-                <RefreshCw size={16} />
-            </button>
+                <div class="flex items-center gap-1">
+                    <!-- Bloquear: Amber -->
+                    <button
+                        type="button"
+                        class="p-2 rounded-full text-slate-400 hover:text-amber-500 hover:bg-amber-50 transition-all duration-200 disabled:opacity-50"
+                        onclick={onBlock}
+                        disabled={permissionDisabled}
+                        title={status === "active" ? "Bloquear" : "Desbloquear"}
+                    >
+                        <Lock size={16} />
+                    </button>
 
-            <!-- Dar de baja: Rose -->
-            <button
-                type="button"
-                class="p-2 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200"
-                onclick={onUnassign}
-                title="Dar de baja (Desvincular)"
-            >
-                <Ban size={16} />
-            </button>
-        </div>
+                    <!-- Reposición: Indigo -->
+                    <button
+                        type="button"
+                        class="p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all duration-200 disabled:opacity-50"
+                        onclick={onReplace}
+                        disabled={permissionDisabled}
+                        title="Reposición por extravío"
+                    >
+                        <RefreshCw size={16} />
+                    </button>
+
+                    <!-- Dar de baja: Rose -->
+                    <button
+                        type="button"
+                        class="p-2 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200 disabled:opacity-50"
+                        onclick={onUnassign}
+                        disabled={permissionDisabled}
+                        title="Dar de baja (Desvincular)"
+                    >
+                        <Ban size={16} />
+                    </button>
+                </div>
+            {/snippet}
+        </PermissionGuard>
     </div>
 </div>

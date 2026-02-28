@@ -3,6 +3,7 @@
     import Button from "./Button.svelte";
     import Badge from "./Badge.svelte";
     import CardItem from "./CardItem.svelte";
+    import PermissionGuard from "./PermissionGuard.svelte";
     import {
         Edit,
         Lock,
@@ -431,65 +432,87 @@
                     class="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-100"
                 >
                     {#if person.status_raw === "inactive" || person.status === "Baja"}
-                        <button
-                            type="button"
-                            class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-emerald-600 hover:bg-white hover:shadow-sm transition-all active:scale-95"
-                            onclick={() => onReactivate?.(person)}
-                        >
-                            <Lock size={20} />
-                            <span class="text-[10px] font-bold uppercase"
-                                >Reactivar</span
-                            >
-                        </button>
-                        <button
-                            type="button"
-                            class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-rose-600 hover:bg-white hover:shadow-sm transition-all active:scale-95"
-                            onclick={() => onDeletePermanent?.(person)}
-                        >
-                            <Trash2 size={20} />
-                            <span class="text-[10px] font-bold uppercase"
-                                >Eliminar</span
-                            >
-                        </button>
+                        <PermissionGuard requireEdit disabledOnly>
+                            {#snippet children({ disabled })}
+                                <button
+                                    type="button"
+                                    class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-emerald-600 hover:bg-white hover:shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                                    onclick={() => onReactivate?.(person)}
+                                    {disabled}
+                                >
+                                    <Lock size={20} />
+                                    <span
+                                        class="text-[10px] font-bold uppercase"
+                                        >Reactivar</span
+                                    >
+                                </button>
+                            {/snippet}
+                        </PermissionGuard>
+                        <PermissionGuard requireAdmin disabledOnly>
+                            {#snippet children({ disabled })}
+                                <button
+                                    type="button"
+                                    class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-rose-600 hover:bg-white hover:shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                                    onclick={() => onDeletePermanent?.(person)}
+                                    {disabled}
+                                >
+                                    <Trash2 size={20} />
+                                    <span
+                                        class="text-[10px] font-bold uppercase"
+                                        >Eliminar</span
+                                    >
+                                </button>
+                            {/snippet}
+                        </PermissionGuard>
                     {:else}
-                        <button
-                            type="button"
-                            class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-white transition-all active:scale-95"
-                            onclick={() => onEdit?.(person)}
-                        >
-                            <Edit size={20} />
-                            <span class="text-[10px] font-bold uppercase"
-                                >Editar</span
-                            >
-                        </button>
-                        <button
-                            type="button"
-                            class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg {person.status ===
-                            'Bloqueado/a'
-                                ? 'text-emerald-600'
-                                : 'text-slate-500 hover:text-amber-600'} hover:bg-white transition-all active:scale-95"
-                            onclick={() =>
-                                person.status === "Bloqueado/a"
-                                    ? onReactivate?.(person)
-                                    : onBlock?.(person)}
-                        >
-                            <Lock size={20} />
-                            <span class="text-[10px] font-bold uppercase"
-                                >{person.status === "Bloqueado/a"
-                                    ? "Activar"
-                                    : "Bloquear"}</span
-                            >
-                        </button>
-                        <button
-                            type="button"
-                            class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-white transition-all active:scale-95"
-                            onclick={() => onDeactivate?.(person)}
-                        >
-                            <UserX size={20} />
-                            <span class="text-[10px] font-bold uppercase"
-                                >Baja</span
-                            >
-                        </button>
+                        <PermissionGuard requireEdit disabledOnly>
+                            {#snippet children({ disabled })}
+                                <button
+                                    type="button"
+                                    class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-white transition-all active:scale-95 disabled:opacity-50"
+                                    onclick={() => onEdit?.(person)}
+                                    {disabled}
+                                >
+                                    <Edit size={20} />
+                                    <span
+                                        class="text-[10px] font-bold uppercase"
+                                        >Editar</span
+                                    >
+                                </button>
+                                <button
+                                    type="button"
+                                    class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg {person.status ===
+                                    'Bloqueado/a'
+                                        ? 'text-emerald-600'
+                                        : 'text-slate-500 hover:text-amber-600'} hover:bg-white transition-all active:scale-95 disabled:opacity-50"
+                                    onclick={() =>
+                                        person.status === "Bloqueado/a"
+                                            ? onReactivate?.(person)
+                                            : onBlock?.(person)}
+                                    {disabled}
+                                >
+                                    <Lock size={20} />
+                                    <span
+                                        class="text-[10px] font-bold uppercase"
+                                        >{person.status === "Bloqueado/a"
+                                            ? "Activar"
+                                            : "Bloquear"}</span
+                                    >
+                                </button>
+                                <button
+                                    type="button"
+                                    class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-white transition-all active:scale-95 disabled:opacity-50"
+                                    onclick={() => onDeactivate?.(person)}
+                                    {disabled}
+                                >
+                                    <UserX size={20} />
+                                    <span
+                                        class="text-[10px] font-bold uppercase"
+                                        >Baja</span
+                                    >
+                                </button>
+                            {/snippet}
+                        </PermissionGuard>
                     {/if}
                 </div>
             </section>
@@ -503,14 +526,16 @@
                         Tarjetas Asignadas
                     </h3>
                     {#if person.status !== "Baja" && person.status_raw !== "inactive"}
-                        <Button
-                            variant="soft-blue"
-                            size="sm"
-                            class="h-7 px-3"
-                            onclick={() => onCardAdd?.(person)}
-                        >
-                            Asignar Tarjeta
-                        </Button>
+                        <PermissionGuard requireEdit>
+                            <Button
+                                variant="soft-blue"
+                                size="sm"
+                                class="h-7 px-3"
+                                onclick={() => onCardAdd?.(person)}
+                            >
+                                Asignar Tarjeta
+                            </Button>
+                        </PermissionGuard>
                     {/if}
                 </div>
                 {#if person.cards && person.cards.length > 0}
@@ -589,14 +614,16 @@
                                     >
                                         <Eye size={16} />
                                     </button>
-                                    <button
-                                        class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                        onclick={() =>
-                                            handleDeleteResponsiva(resp.id)}
-                                        title="Eliminar registro"
-                                    >
-                                        <TrashIcon size={16} />
-                                    </button>
+                                    <PermissionGuard requireAdmin>
+                                        <button
+                                            class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                            onclick={() =>
+                                                handleDeleteResponsiva(resp.id)}
+                                            title="Eliminar registro"
+                                        >
+                                            <TrashIcon size={16} />
+                                        </button>
+                                    </PermissionGuard>
                                 </div>
                             </div>
                         {/each}

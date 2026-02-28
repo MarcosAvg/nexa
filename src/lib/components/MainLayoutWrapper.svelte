@@ -13,15 +13,26 @@
     } from "lucide-svelte";
     import { onMount } from "svelte";
 
-    // Icons
-    const sidebarItems = [
-        { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-        { label: "Personal", href: "/personal", icon: Users },
-        { label: "Tarjetas", href: "/cards", icon: CreditCard },
-        { label: "Pendientes", href: "/tickets", icon: ClipboardList },
-        { label: "Historial", href: "/history", icon: History },
-        { label: "Configuración", href: "/settings", icon: Settings },
-    ];
+    // Navigation items filtered by role
+    const sidebarItems = $derived.by(() => {
+        const items = [
+            { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+            { label: "Personal", href: "/personal", icon: Users },
+            { label: "Tarjetas", href: "/cards", icon: CreditCard },
+            { label: "Pendientes", href: "/tickets", icon: ClipboardList },
+            { label: "Historial", href: "/history", icon: History },
+        ];
+
+        if (userState.isAdmin) {
+            items.push({
+                label: "Configuración",
+                href: "/settings",
+                icon: Settings,
+            });
+        }
+
+        return items;
+    });
 
     let { children } = $props();
 

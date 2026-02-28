@@ -12,6 +12,7 @@
     import Card from "../components/Card.svelte";
     import DataTable from "../components/DataTable.svelte";
     import Badge from "../components/Badge.svelte";
+    import PermissionGuard from "../components/PermissionGuard.svelte";
     import {
         Search,
         FileSpreadsheet,
@@ -327,14 +328,21 @@
         {/snippet}
 
         {#snippet actions()}
-            <Button
-                variant="soft-blue"
-                onclick={() => (showKoneUsageModal = true)}
-                class="flex items-center gap-2.5 h-10 px-5"
-            >
-                <Upload size={18} strokeWidth={2.5} class="text-blue-600/80" />
-                Importar Conteo KONE
-            </Button>
+            <PermissionGuard requireEdit>
+                <Button
+                    variant="soft-blue"
+                    onclick={() => (showKoneUsageModal = true)}
+                    class="flex items-center gap-2.5 h-10 px-5"
+                >
+                    <Upload
+                        size={18}
+                        strokeWidth={2.5}
+                        class="text-blue-600/80"
+                    />
+                    Importar Conteo KONE
+                </Button>
+            </PermissionGuard>
+
             <div class="relative">
                 <Button
                     variant="soft-emerald"
@@ -385,7 +393,8 @@
                     </div>
                 {/if}
             </div>
-            {#if currentUser?.role !== "viewer"}
+
+            <PermissionGuard requireEdit>
                 <Button
                     variant="primary"
                     class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
@@ -394,7 +403,7 @@
                     <Plus size={18} strokeWidth={3} class="mr-2" />
                     Nueva Alta
                 </Button>
-            {/if}
+            </PermissionGuard>
         {/snippet}
     </SectionHeader>
 
@@ -564,8 +573,8 @@
     {/if}
 </div>
 
-{#if currentUser?.role !== "viewer"}
+<PermissionGuard requireEdit>
     <FloatingActionButton onclick={onOpenAddModal} label="Nueva Alta" />
-{/if}
+</PermissionGuard>
 
 <KoneUsageImportModal bind:isOpen={showKoneUsageModal} />

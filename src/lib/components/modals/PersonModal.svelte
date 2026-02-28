@@ -10,7 +10,8 @@
     import { untrack } from "svelte";
 
     import { personnelService, ticketService } from "../../services";
-    import { personnelState, catalogState } from "../../stores";
+    import { personnelState, catalogState, userState } from "../../stores";
+    import PermissionGuard from "../PermissionGuard.svelte";
     import { toast } from "svelte-sonner";
     import type { Person } from "../../types";
     import { personnelSchema } from "../../schemas";
@@ -542,6 +543,7 @@
         <!-- SECTION: Personal Info -->
         <fieldset
             class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
+            disabled={!userState.canEdit}
         >
             <legend
                 class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
@@ -745,6 +747,7 @@
         <!-- SECTION: Location -->
         <fieldset
             class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
+            disabled={!userState.canEdit}
         >
             <legend
                 class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
@@ -824,6 +827,7 @@
         <!-- SECTION: Schedule -->
         <fieldset
             class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
+            disabled={!userState.canEdit}
         >
             <legend
                 class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
@@ -875,6 +879,7 @@
         <!-- SECTION: Special Access -->
         <fieldset
             class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
+            disabled={!userState.canEdit}
         >
             <legend
                 class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
@@ -930,15 +935,20 @@
                     </div>
                 {/if}
 
-                <Button
-                    type="button"
-                    variant="outline"
-                    class="w-full"
-                    onclick={() => (isCardModalOpen = true)}
-                >
-                    <Plus size={16} />
-                    Asignar Tarjeta Inicial
-                </Button>
+                <PermissionGuard requireEdit disabledOnly>
+                    {#snippet children({ disabled })}
+                        <Button
+                            type="button"
+                            variant="outline"
+                            class="w-full"
+                            onclick={() => (isCardModalOpen = true)}
+                            {disabled}
+                        >
+                            <Plus size={16} />
+                            Asignar Tarjeta Inicial
+                        </Button>
+                    {/snippet}
+                </PermissionGuard>
             </fieldset>
         {/if}
     </form>
@@ -953,16 +963,18 @@
             <div class="flex items-center gap-2">
                 <Button variant="ghost" onclick={resetAndClose}>Cancelar</Button
                 >
-                <Button
-                    variant="primary"
-                    onclick={handleSave}
-                    loading={isSubmitting}
-                    >{editingPerson
-                        ? forceDirectSave
-                            ? "Aplicar Alta a Persona"
-                            : "Actualizar (Ticket)"
-                        : "Guardar Alta"}</Button
-                >
+                <PermissionGuard requireEdit>
+                    <Button
+                        variant="primary"
+                        onclick={handleSave}
+                        loading={isSubmitting}
+                        >{editingPerson
+                            ? forceDirectSave
+                                ? "Aplicar Alta a Persona"
+                                : "Actualizar (Ticket)"
+                            : "Guardar Alta"}</Button
+                    >
+                </PermissionGuard>
             </div>
         </div>
     {/snippet}
