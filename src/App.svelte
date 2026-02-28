@@ -86,27 +86,42 @@
         initError = false;
       }
 
-      const [_pOptions, _c, _t, _d, _b, _a, _s, _h] = await Promise.all([
+      // 1. Critical data for immediate UI (Dashboard / Catalogs)
+      // Replaced old personnelService.fetchOptions with new efficient one if available
+      const [_pOptions, _d, _b, _a, _s] = await Promise.all([
         personnelService.fetchOptions(true),
-        cardService.fetchExtra(true),
-        ticketService.fetchAll(true),
         catalogService.fetchDependencies(true),
         catalogService.fetchBuildings(true),
         catalogService.fetchAccesses(true),
         catalogService.fetchSchedules(true),
-        HistoryService.fetchAll(1, 50, {}, true),
       ]);
 
       personnelState.setPersonnelOptions(_pOptions);
-      personnelState.setCards(_c);
-      ticketState.setTickets(_t);
-
       catalogState.setDependencies(_d);
       catalogState.setBuildings(_b);
       catalogState.setSpecialAccesses(_a);
       catalogState.setSchedules(_s);
 
-      historyState.setHistory(_h.data, _h.count);
+      // 2. Secondary data loaded in background (Non-blocking)
+      // This allows the app to be interactive faster
+      (async () => {
+        try {
+          const [_c, _t, _h] = await Promise.all([
+            cardService.fetchExtra(true),
+            ticketService.fetchAll(true),
+            HistoryService.fetchAll(1, 50, {}, true),
+          ]);
+          personnelState.setCards(_c);
+          ticketState.setTickets(_t);
+          historyState.setHistory(_h.data, _h.count);
+          
+          // Refresh dashboard metrics with the new efficient RPC
+          personnelState.refreshDashboardMetrics();
+        } catch (e) {
+          console.warn("Error loading background data:", e);
+        }
+      })();
+
     } catch (err) {
       console.error("Error general en initData:", err);
       if (!isBackground) {

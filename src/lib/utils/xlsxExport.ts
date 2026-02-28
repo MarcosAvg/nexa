@@ -1,5 +1,7 @@
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+import type * as ExcelJSTypes from 'exceljs';
+import type { saveAs as saveAsType } from 'file-saver';
+
+// Dynamic imports moved inside functions to reduce initial bundle size
 
 export interface ExportPersonnelData {
     first_name: string;
@@ -35,7 +37,7 @@ export interface ExportOptions {
 }
 
 // ─── Statistics Sheet Helper ───────────────────────────────────────────
-async function addStatsSheet(workbook: ExcelJS.Workbook, data: ExportPersonnelData[], filterInfo: string) {
+async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPersonnelData[], filterInfo: string) {
     const ws = workbook.addWorksheet('Resumen Ejecutivo');
 
     const C = {
@@ -69,8 +71,8 @@ async function addStatsSheet(workbook: ExcelJS.Workbook, data: ExportPersonnelDa
     let row = 1;
 
     // ── Helpers ──
-    const thin = (argb: string): ExcelJS.Border => ({ style: 'thin', color: { argb } });
-    const setBorder = (cell: ExcelJS.Cell, color = 'FFCBD5E1') => {
+    const thin = (argb: string): ExcelJSTypes.Border => ({ style: 'thin', color: { argb } });
+    const setBorder = (cell: ExcelJSTypes.Cell, color = 'FFCBD5E1') => {
         cell.border = { top: thin(color), bottom: thin(color), left: thin(color), right: thin(color) };
     };
 
@@ -441,7 +443,11 @@ async function addStatsSheet(workbook: ExcelJS.Workbook, data: ExportPersonnelDa
 }
 
 export async function exportPersonnelToExcel(data: ExportPersonnelData[], options?: ExportOptions) {
-    const workbook = new ExcelJS.Workbook();
+    const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
+        import('exceljs'),
+        import('file-saver')
+    ]);
+    const workbook = new (ExcelJSModule.default || ExcelJSModule).Workbook();
 
     // Helper Colors
     const COLORS = {
@@ -716,11 +722,15 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
     const finalFileName = `${fileNameParts.join('_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
 
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), finalFileName);
+    saveAsFunction(new Blob([buffer]), finalFileName);
 }
 
 export async function exportCardsToExcel(data: any[], options?: ExportOptions) {
-    const workbook = new ExcelJS.Workbook();
+    const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
+        import('exceljs'),
+        import('file-saver')
+    ]);
+    const workbook = new (ExcelJSModule.default || ExcelJSModule).Workbook();
     const worksheet = workbook.addWorksheet('Tarjetas');
 
     const COLORS = {
@@ -893,11 +903,15 @@ export async function exportCardsToExcel(data: any[], options?: ExportOptions) {
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
     const finalFileName = `Tarjetas_Nexa_${new Date().toISOString().split('T')[0]}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), finalFileName);
+    saveAsFunction(new Blob([buffer]), finalFileName);
 }
 
 export async function exportHistoryToExcel(data: any[], options?: ExportOptions) {
-    const workbook = new ExcelJS.Workbook();
+    const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
+        import('exceljs'),
+        import('file-saver')
+    ]);
+    const workbook = new (ExcelJSModule.default || ExcelJSModule).Workbook();
     const worksheet = workbook.addWorksheet('Historial');
 
     const COLORS = {
@@ -1092,14 +1106,14 @@ export async function exportHistoryToExcel(data: any[], options?: ExportOptions)
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
     const finalFileName = `Historial_Nexa_${new Date().toISOString().split('T')[0]}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), finalFileName);
+    saveAsFunction(new Blob([buffer]), finalFileName);
 }
 
 // ─── KONE Usage Export ─────────────────────────────────────────────────
 
 import type { KoneUsageMatchedEntry } from './xlsxKoneUsage';
 
-async function addKoneSummarySheet(workbook: ExcelJS.Workbook, matchedData: KoneUsageMatchedEntry[], sheetName: string, title: string, usageThreshold: number) {
+async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData: KoneUsageMatchedEntry[], sheetName: string, title: string, usageThreshold: number) {
     const ws = workbook.addWorksheet(sheetName);
 
     const C = {
@@ -1132,8 +1146,8 @@ async function addKoneSummarySheet(workbook: ExcelJS.Workbook, matchedData: Kone
 
     let row = 1;
 
-    const thin = (argb: string): ExcelJS.Border => ({ style: 'thin', color: { argb } });
-    const setBorder = (cell: ExcelJS.Cell, color = 'FFCBD5E1') => {
+    const thin = (argb: string): ExcelJSTypes.Border => ({ style: 'thin', color: { argb } });
+    const setBorder = (cell: ExcelJSTypes.Cell, color = 'FFCBD5E1') => {
         cell.border = { top: thin(color), bottom: thin(color), left: thin(color), right: thin(color) };
     };
 
@@ -1402,7 +1416,11 @@ async function addKoneSummarySheet(workbook: ExcelJS.Workbook, matchedData: Kone
 }
 
 export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[], usageThreshold: number = 10) {
-    const workbook = new ExcelJS.Workbook();
+    const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
+        import('exceljs'),
+        import('file-saver')
+    ]);
+    const workbook = new (ExcelJSModule.default || ExcelJSModule).Workbook();
 
     // Define shared constants and helpers
     const dateStr = new Date().toLocaleDateString('es-MX', {
@@ -1411,8 +1429,8 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
     const total = matchedData.length;
     const totalUsos = matchedData.reduce((sum, m) => sum + m.conteo, 0);
 
-    const thin = (argb: string): ExcelJS.Border => ({ style: 'thin', color: { argb } });
-    const setBorder = (cell: ExcelJS.Cell, color = 'FFCBD5E1') => {
+    const thin = (argb: string): ExcelJSTypes.Border => ({ style: 'thin', color: { argb } });
+    const setBorder = (cell: ExcelJSTypes.Cell, color = 'FFCBD5E1') => {
         cell.border = { top: thin(color), bottom: thin(color), left: thin(color), right: thin(color) };
     };
 
@@ -1466,7 +1484,7 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
         { key: 'days', width: 22 }, { key: 'entry', width: 14 }, { key: 'exit', width: 14 }, { key: 'email', width: 35 },
     ];
 
-    const setupDirectorySheet = async (ws: ExcelJS.Worksheet, title: string, meta: string) => {
+    const setupDirectorySheet = async (ws: ExcelJSTypes.Worksheet, title: string, meta: string) => {
         ws.mergeCells('A1:S1');
         const dtTitle = ws.getCell('A1');
         dtTitle.value = `       ${title}`;
@@ -1542,7 +1560,7 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
         return groups;
     };
 
-    const populateRows = (ws: ExcelJS.Worksheet, data: KoneUsageMatchedEntry[], groups: any[]) => {
+    const populateRows = (ws: ExcelJSTypes.Worksheet, data: KoneUsageMatchedEntry[], groups: any[]) => {
         data.forEach(entry => {
             const person = entry.person;
             const folioP2000 = person.cards?.filter(c => c.type.toUpperCase() === 'P2000').map(c => c.folio).join(', ') || '-';
@@ -1655,5 +1673,5 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
     // ── Save ──
     const finalFileName = `Conteo_Uso_KONE_${new Date().toISOString().split('T')[0]}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), finalFileName);
+    saveAsFunction(new Blob([buffer]), finalFileName);
 }

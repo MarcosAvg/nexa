@@ -59,17 +59,10 @@ const mapPersonRecord = (p: any): Person => {
 export const personnelService = {
     async fetchAll(page: number = 1, limit: number = 50, search: string = "", statusFilter: string = "Todos", dependencyId: string = "", buildingId: string = ""): Promise<{ data: Person[], count: number }> {
         try {
-            // "Activo/a", "Parcial", "Sin Acceso" are computed from DB status "active" + card readiness.
-            // We can only filter "Bloqueado/a" and "Baja" directly at the DB level.
-            // For computed statuses we must query all "active" records and post-filter.
-            const isComputedStatus = ["Activo/a", "Parcial", "Sin Acceso"].includes(statusFilter);
-            const dbStatusMap: Record<string, string> = {
-                "Bloqueado/a": "blocked",
-                "Baja": "inactive"
-            };
-
+            // Use the optimized view if available (personnel_with_status includes computed_status)
+            // If the view doesn't exist yet, it will fallback to the original logic
             let query = supabase
-                .from("personnel")
+                .from("personnel_with_status")
                 .select("*, cards(*), buildings(name), dependencies(name), schedules(*)", { count: "exact" });
 
             if (search) {
@@ -78,13 +71,7 @@ export const personnelService = {
             }
 
             if (statusFilter !== "Todos") {
-                if (dbStatusMap[statusFilter]) {
-                    // Direct DB status
-                    query = query.eq("status", dbStatusMap[statusFilter]);
-                } else if (isComputedStatus) {
-                    // All computed statuses derive from "active"
-                    query = query.eq("status", "active");
-                }
+                query = query.eq("computed_status", statusFilter);
             }
 
             if (dependencyId) {
@@ -97,48 +84,79 @@ export const personnelService = {
                 query = query.eq("building_id", buildingId);
             }
 
-            // For computed statuses, we need to fetch ALL matching "active" records to post-filter
-            // and then manually paginate. Supabase caps at 1000 rows per request, so we batch.
-            if (isComputedStatus) {
-                const allMapped: Person[] = [];
-                let batchPage = 0;
-                const batchSize = 1000;
-                let hasMore = true;
+            const from = (page - 1) * limit;
+            const to = from + limit - 1;
 
-                while (hasMore) {
-                    const { data: batch, error } = await query
-                        .order("first_name", { ascending: true })
-                        .range(batchPage * batchSize, (batchPage + 1) * batchSize - 1);
-                    if (error) throw error;
+            const { data, count, error } = await query
+                .order("first_name", { ascending: true })
+                .range(from, to);
 
-                    if (batch && batch.length > 0) {
-                        allMapped.push(...batch.map(p => mapPersonRecord(p)));
-                        if (batch.length < batchSize) hasMore = false;
-                        else batchPage++;
-                    } else {
-                        hasMore = false;
-                    }
-                }
-
-                const filtered = allMapped.filter(p => p.status === statusFilter);
-                const from = (page - 1) * limit;
-                const paged = filtered.slice(from, from + limit);
-
-                return { data: paged, count: filtered.length };
-            } else {
-                const from = (page - 1) * limit;
-                const to = from + limit - 1;
-                const { data, count, error } = await query
-                    .order("first_name", { ascending: true })
-                    .range(from, to);
-
-                if (error) throw error;
-                const mappedData = (data || []).map(p => mapPersonRecord(p));
-                return { data: mappedData, count: count || 0 };
+            if (error) {
+                // Fallback to original personnel table if view fails
+                console.warn("Falling back from personnel_with_status view:", error.message);
+                return this._fetchAllFallback(page, limit, search, statusFilter, dependencyId, buildingId);
             }
+
+            const mappedData = (data || []).map(p => mapPersonRecord(p));
+            return { data: mappedData, count: count || 0 };
         } catch (error) {
             handleError(error, "Fetch Personnel");
             return { data: [], count: 0 };
+        }
+    },
+
+    // Helper for fallback logic
+    async _fetchAllFallback(page: number, limit: number, search: string, statusFilter: string, dependencyId: string, buildingId: string) {
+        const isComputedStatus = ["Activo/a", "Parcial", "Sin Acceso"].includes(statusFilter);
+        const dbStatusMap: Record<string, string> = {
+            "Bloqueado/a": "blocked",
+            "Baja": "inactive"
+        };
+
+        let query = supabase
+            .from("personnel")
+            .select("*, cards(*), buildings(name), dependencies(name), schedules(*)", { count: "exact" });
+
+        if (search) {
+            const searchTerm = `%${search}%`;
+            query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},employee_no.ilike.${searchTerm}`);
+        }
+
+        if (statusFilter !== "Todos") {
+            if (dbStatusMap[statusFilter]) {
+                query = query.eq("status", dbStatusMap[statusFilter]);
+            } else if (isComputedStatus) {
+                query = query.eq("status", "active");
+            }
+        }
+
+        if (dependencyId) query = query.eq("dependency_id", dependencyId);
+        if (buildingId === "__none__") query = query.is("building_id", null);
+        else if (buildingId) query = query.eq("building_id", buildingId);
+
+        if (isComputedStatus) {
+            const allMapped: Person[] = [];
+            let batchPage = 0;
+            const batchSize = 1000;
+            let hasMore = true;
+            while (hasMore) {
+                const { data: batch, error } = await query.order("first_name", { ascending: true }).range(batchPage * batchSize, (batchPage + 1) * batchSize - 1);
+                if (error) throw error;
+                if (batch && batch.length > 0) {
+                    allMapped.push(...batch.map(p => mapPersonRecord(p)));
+                    if (batch.length < batchSize) hasMore = false;
+                    else batchPage++;
+                } else hasMore = false;
+            }
+            const filtered = allMapped.filter(p => p.status === statusFilter);
+            const from = (page - 1) * limit;
+            return { data: filtered.slice(from, from + limit), count: filtered.length };
+        } else {
+            const from = (page - 1) * limit;
+            const to = from + limit - 1;
+            const { data, count, error } = await query.order("first_name", { ascending: true }).range(from, to);
+            if (error) throw error;
+            return { data: (data || []).map(p => mapPersonRecord(p)), count: count || 0 };
         }
     },
 
@@ -561,94 +579,23 @@ export const personnelService = {
     },
 
     async fetchDashboardMetrics(): Promise<DashboardMetrics> {
-        const empty: DashboardMetrics = {
-            totalPersonnel: 0,
-            statusCounts: { activo: 0, parcial: 0, inactivo: 0, bloqueado: 0, baja: 0 },
-            cardCoverage: { conP2000: 0, sinP2000: 0, conKone: 0, sinKone: 0, operativos: 0 },
-            topDependencies: [],
-            topBuildings: [],
-            dataQuality: { sinEmail: 0, sinSchedule: 0, sinPosition: 0, sinArea: 0, total: 0 },
-        };
         try {
-            // Fetch ALL personnel with cards (batched)
-            const allData: Person[] = [];
-            let page = 0;
-            const batchSize = 1000;
-            let hasMore = true;
-
-            while (hasMore) {
-                const { data, error } = await supabase
-                    .from("personnel")
-                    .select("*, cards(*), buildings(name), dependencies(name), schedules(*)")
-                    .order("first_name", { ascending: true })
-                    .range(page * batchSize, (page + 1) * batchSize - 1);
-
-                if (error) throw error;
-                if (data && data.length > 0) {
-                    allData.push(...data.map(p => mapPersonRecord(p)));
-                    if (data.length < batchSize) hasMore = false;
-                    else page++;
-                } else {
-                    hasMore = false;
-                }
-            }
-
-            const total = allData.length;
-            if (total === 0) return empty;
-
-            // Status counts
-            const activo = allData.filter(p => p.status === "Activo/a").length;
-            const parcial = allData.filter(p => p.status === "Parcial").length;
-            const inactivo = allData.filter(p => p.status === "Sin Acceso").length;
-            const bloqueado = allData.filter(p => p.status === "Bloqueado/a").length;
-            const baja = allData.filter(p => p.status === "Baja").length;
-
-            // Card coverage (operativos = activo + parcial)
-            const operativos = allData.filter(p => p.status === "Activo/a" || p.status === "Parcial");
-            const opCount = operativos.length;
-            const conP2000 = operativos.filter(p => p.cards?.some(c => c.type?.toUpperCase() === "P2000")).length;
-            const conKone = operativos.filter(p => p.cards?.some(c => c.type?.toUpperCase() === "KONE")).length;
-
-            // Top Dependencies
-            const depMap: Record<string, { total: number; activos: number }> = {};
-            allData.forEach(p => {
-                const dep = p.dependency || "Sin Dependencia";
-                if (!depMap[dep]) depMap[dep] = { total: 0, activos: 0 };
-                depMap[dep].total++;
-                if (p.status === "Activo/a" || p.status === "Parcial") depMap[dep].activos++;
-            });
-            const topDependencies = Object.entries(depMap)
-                .sort((a, b) => b[1].total - a[1].total)
-                .map(([name, stats]) => ({ name, total: stats.total, activos: stats.activos }));
-
-            // Building distribution
-            const buildMap: Record<string, number> = {};
-            allData.forEach(p => {
-                const b = p.building || "Sin Edificio";
-                buildMap[b] = (buildMap[b] || 0) + 1;
-            });
-            const topBuildings = Object.entries(buildMap)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 6)
-                .map(([name, total]) => ({ name, total }));
-
-            // Data Quality
-            const sinEmail = allData.filter(p => !p.email).length;
-            const sinSchedule = allData.filter(p => !p.schedule?.days).length;
-            const sinPosition = allData.filter(p => !p.position).length;
-            const sinArea = allData.filter(p => !p.area).length;
-
-            return {
-                totalPersonnel: total,
-                statusCounts: { activo, parcial, inactivo, bloqueado, baja },
-                cardCoverage: { conP2000, sinP2000: opCount - conP2000, conKone, sinKone: opCount - conKone, operativos: opCount },
-                topDependencies,
-                topBuildings,
-                dataQuality: { sinEmail, sinSchedule, sinPosition, sinArea, total },
-            };
+            // Replaced manual computation (downloading all personnel) with a single RPC call
+            const { data, error } = await supabase.rpc('get_dashboard_metrics');
+            if (error) throw error;
+            return data as DashboardMetrics;
         } catch (error) {
-            handleError(error, "Fetch Dashboard Metrics");
-            return empty;
+            // Fallback: If RPC not deployed, we keep returning an empty state or we could 
+            // re-implement the heavy logic here, but RPC is the goal.
+            handleError(error, "Fetch Dashboard Metrics (RPC)");
+            return {
+                totalPersonnel: 0,
+                statusCounts: { activo: 0, parcial: 0, inactivo: 0, bloqueado: 0, baja: 0 },
+                cardCoverage: { conP2000: 0, sinP2000: 0, conKone: 0, sinKone: 0, operativos: 0 },
+                topDependencies: [],
+                topBuildings: [],
+                dataQuality: { sinEmail: 0, sinSchedule: 0, sinPosition: 0, sinArea: 0, total: 0 },
+            };
         }
     }
 

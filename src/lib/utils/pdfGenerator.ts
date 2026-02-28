@@ -1,5 +1,5 @@
 // src/lib/utils/pdfGenerator.ts
-import { jsPDF } from "jspdf";
+import type { jsPDF as jsPDFType } from "jspdf";
 import { RESPONSIVA_LEGAL_TEXT } from "../constants/legal";
 
 export async function generateResponsivaPdf(
@@ -10,6 +10,7 @@ export async function generateResponsivaPdf(
     paragraphs: string[] = RESPONSIVA_LEGAL_TEXT,
     shouldSave: boolean = true
 ) {
+    const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
