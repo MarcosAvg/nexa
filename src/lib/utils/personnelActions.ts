@@ -1,6 +1,7 @@
 import { personnelService } from "../services/personnel";
 import { cardService } from "../services/cards";
 import { toast } from "svelte-sonner";
+import { handleError } from "../utils/error";
 import type { Person } from "../types";
 
 export const personnelActions = {
@@ -13,8 +14,7 @@ export const personnelActions = {
             );
             await onSuccess?.();
         } catch (e) {
-            console.error(e);
-            toast.error("Error al actualizar estado");
+            handleError(e, "Error al actualizar estado");
         }
     },
 
@@ -24,8 +24,7 @@ export const personnelActions = {
             toast.success("Persona dada de baja");
             await onSuccess?.();
         } catch (e) {
-            console.error(e);
-            toast.error("Error al dar de baja");
+            handleError(e, "Error al dar de baja");
         }
     },
 
@@ -35,8 +34,7 @@ export const personnelActions = {
             toast.success("Persona reactivada");
             await onSuccess?.();
         } catch (e) {
-            console.error(e);
-            toast.error("Error al reactivar");
+            handleError(e, "Error al reactivar");
         }
     },
 
@@ -46,8 +44,7 @@ export const personnelActions = {
             toast.success("Registro eliminado");
             await onSuccess?.();
         } catch (e) {
-            console.error(e);
-            toast.error("Error al eliminar");
+            handleError(e, "Error al eliminar");
         }
     },
 
@@ -64,7 +61,7 @@ export const personnelActions = {
             }, replacementOptions);
             await onSuccess?.();
         } catch (e) {
-            console.error(e);
+            handleError(e, "Error al guardar tarjeta");
             throw e;
         }
     },
@@ -81,8 +78,7 @@ export const personnelActions = {
             );
             await onSuccess?.();
         } catch (e) {
-            console.error(e);
-            toast.error("Error al actualizar tarjeta");
+            handleError(e, "Error al actualizar tarjeta");
         }
     },
 
@@ -92,8 +88,7 @@ export const personnelActions = {
             toast.success("Tarjeta desvinculada");
             await onSuccess?.();
         } catch (e) {
-            console.error(e);
-            toast.error("Error al desvincular tarjeta");
+            handleError(e, "Error al desvincular tarjeta");
         }
     },
 
@@ -121,8 +116,7 @@ export const personnelActions = {
             }
             await onSuccess?.();
         } catch (e) {
-            console.error(e);
-            toast.error("Error al programar tarjeta");
+            handleError(e, "Error al programar tarjeta");
         }
     }
 };

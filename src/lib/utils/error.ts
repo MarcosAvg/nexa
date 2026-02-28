@@ -12,8 +12,6 @@ export class AppError extends Error {
 }
 
 export function handleError(error: any, context: string = "An error occurred") {
-    console.error(`[${context}]`, error);
-
     let message = "Ha ocurrido un error inesperado.";
 
     if (error instanceof AppError) {

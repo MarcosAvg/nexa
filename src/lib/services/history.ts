@@ -55,7 +55,7 @@ export const HistoryService = {
             }]);
 
         if (error) {
-            console.error("Failed to log history:", error);
+            // Silently handle history logging errors - not critical for user flow
         }
     },
 
@@ -217,7 +217,7 @@ export const HistoryService = {
             if (error) throw error;
             return data || [];
         } catch (error) {
-            console.error("Fetch History By Entity Error", error);
+            // Return empty array on fetch error - non-critical functionality
             return [];
         }
     }

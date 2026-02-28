@@ -59,7 +59,7 @@ export class PersonnelState {
             const stats = await personnelService.fetchDashboardStats();
             this.dashboardStats = stats;
         } catch (error) {
-            console.error("Error refreshing dashboard stats:", error);
+            // Silently handle dashboard stats refresh error - will retry on next refresh
         }
     }
 
@@ -69,7 +69,7 @@ export class PersonnelState {
             const { personnelService } = await import("../services/personnel");
             this.dashboardMetrics = await personnelService.fetchDashboardMetrics();
         } catch (error) {
-            console.error("Error refreshing dashboard metrics:", error);
+            // Silently handle dashboard metrics refresh error - will retry on next refresh
         } finally {
             this.metricsLoading = false;
         }

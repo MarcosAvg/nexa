@@ -149,7 +149,6 @@ export async function generateResponsivaPdf(
         }
         return doc;
     } catch (e) {
-        console.error("Error generating PDF:", e);
         throw e;
     }
 }
