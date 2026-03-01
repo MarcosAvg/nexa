@@ -1138,10 +1138,9 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
         { width: 30 },  // B label
         { width: 16 },  // C value
         { width: 14 },  // D percent
-        { width: 4 },   // E spacer
-        { width: 30 },  // F label
-        { width: 16 },  // G value
-        { width: 14 },  // H percent
+        { width: 30 },  // E label
+        { width: 16 },  // F value
+        { width: 14 },  // G percent
     ];
 
     let row = 1;
@@ -1152,14 +1151,14 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
     };
 
     const sectionTitle = (text: string) => {
-        ws.mergeCells(`B${row}:H${row}`);
+        ws.mergeCells(`B${row}:G${row}`);
         const cell = ws.getCell(`B${row}`);
         cell.value = text;
         cell.font = { name: 'Arial', bold: true, size: 12, color: { argb: C.sectionHead } };
         cell.alignment = { vertical: 'middle' };
         ws.getRow(row).height = 30;
         row++;
-        ws.mergeCells(`B${row}:H${row}`);
+        ws.mergeCells(`B${row}:G${row}`);
         const sep = ws.getCell(`B${row}`);
         sep.border = { top: { style: 'medium', color: { argb: C.separator } } };
         ws.getRow(row).height = 6;
@@ -1267,7 +1266,7 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
     const buildEntries = Object.entries(buildMap).sort((a, b) => b[1].totalUsos - a[1].totalUsos);
 
     // ══════ ROW 1: Title ══════
-    ws.mergeCells('A1:H1');
+    ws.mergeCells('A1:G1');
     const titleCell = ws.getCell('A1');
     titleCell.value = `       ${title}`;
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: C.title } };
@@ -1284,7 +1283,7 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
         }
     } catch { /* logo optional */ }
 
-    ws.mergeCells('A2:H2');
+    ws.mergeCells('A2:G2');
     const metaCell = ws.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
         year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -1301,17 +1300,17 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
 
     ws.getRow(row).height = 32;
     kpiCard('B', 'PERSONAL REGISTRADO', total, C.blue);
-    kpiCard('F', 'TOTAL DE USOS', totalUsos, C.sky);
+    kpiCard('E', 'TOTAL DE USOS', totalUsos, C.sky);
     row++;
 
     ws.getRow(row).height = 28;
     kpiCard('B', 'Promedio de usos', promedio.toFixed(1), C.emerald);
-    kpiCard('F', 'Mediana de usos', mediana.toFixed(1), C.emerald);
+    kpiCard('E', 'Mediana de usos', mediana.toFixed(1), C.emerald);
     row++;
 
     ws.getRow(row).height = 28;
     kpiCard('B', 'Máximo de usos', maximo, C.amber);
-    kpiCard('F', 'Personal bajo uso', bajoUsoData.length, bajoUsoData.length > 0 ? C.rose : C.emerald, pct(bajoUsoData.length, total));
+    kpiCard('E', 'Personal bajo uso', bajoUsoData.length, bajoUsoData.length > 0 ? C.rose : C.emerald, pct(bajoUsoData.length, total));
     row++;
     row++;
 
@@ -1322,8 +1321,8 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
         { col: 'B', label: 'RANGO' },
         { col: 'C', label: 'PERSONAS' },
         { col: 'D', label: '% DEL TOTAL' },
-        { col: 'F', label: 'USOS EN RANGO' },
-        { col: 'G', label: '% DE USOS' },
+        { col: 'E', label: 'USOS EN RANGO' },
+        { col: 'F', label: '% DE USOS' },
     ], C.cyan);
 
     ranges.forEach(range => {
@@ -1333,8 +1332,8 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
             { col: 'B', value: range.label },
             { col: 'C', value: personas.length },
             { col: 'D', value: pct(personas.length, total) },
-            { col: 'F', value: usosEnRango },
-            { col: 'G', value: pct(usosEnRango, totalUsos) },
+            { col: 'E', value: usosEnRango },
+            { col: 'F', value: pct(usosEnRango, totalUsos) },
         ], C.cyan);
     });
     row++;
@@ -1346,9 +1345,9 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
         { col: 'B', label: 'NOMBRE' },
         { col: 'C', label: 'FOLIO KONE' },
         { col: 'D', label: 'USOS' },
-        { col: 'F', label: 'DEPENDENCIA' },
-        { col: 'G', label: 'EDIFICIO' },
-        { col: 'H', label: 'ESTADO' },
+        { col: 'E', label: 'DEPENDENCIA' },
+        { col: 'F', label: 'EDIFICIO' },
+        { col: 'G', label: 'ESTADO' },
     ], C.amber);
 
     const usersToShow = matchedData.slice(0, 10);
@@ -1357,9 +1356,9 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
             { col: 'B', value: `${m.person.last_name} ${m.person.first_name}` },
             { col: 'C', value: m.folio },
             { col: 'D', value: m.conteo },
-            { col: 'F', value: m.person.dependency || '-' },
-            { col: 'G', value: m.person.building || '-' },
-            { col: 'H', value: m.person.status || '-' },
+            { col: 'E', value: m.person.dependency || '-' },
+            { col: 'F', value: m.person.building || '-' },
+            { col: 'G', value: m.person.status || '-' },
         ], i % 2 === 0 ? C.amber : C.slate);
     });
     row++;
@@ -1372,8 +1371,8 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
             { col: 'B', label: 'DEPENDENCIA' },
             { col: 'C', label: 'PERSONAS' },
             { col: 'D', label: 'USOS TOTALES' },
-            { col: 'F', label: 'PROMEDIO' },
-            { col: 'G', label: '% DE USOS' },
+            { col: 'E', label: 'PROMEDIO' },
+            { col: 'F', label: '% DE USOS' },
         ], C.violet);
 
         depEntries.forEach(([dep, stats]) => {
@@ -1381,8 +1380,8 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
                 { col: 'B', value: dep },
                 { col: 'C', value: stats.count },
                 { col: 'D', value: stats.totalUsos },
-                { col: 'F', value: (stats.totalUsos / stats.count).toFixed(1) },
-                { col: 'G', value: pct(stats.totalUsos, totalUsos) },
+                { col: 'E', value: (stats.totalUsos / stats.count).toFixed(1) },
+                { col: 'F', value: pct(stats.totalUsos, totalUsos) },
             ], C.violet);
         });
         row++;
@@ -1396,8 +1395,8 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
             { col: 'B', label: 'EDIFICIO' },
             { col: 'C', label: 'PERSONAS' },
             { col: 'D', label: 'USOS TOTALES' },
-            { col: 'F', label: 'PROMEDIO' },
-            { col: 'G', label: '% DE USOS' },
+            { col: 'E', label: 'PROMEDIO' },
+            { col: 'F', label: '% DE USOS' },
         ], C.sky);
 
         buildEntries.forEach(([bld, stats]) => {
@@ -1405,8 +1404,8 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
                 { col: 'B', value: bld },
                 { col: 'C', value: stats.count },
                 { col: 'D', value: stats.totalUsos },
-                { col: 'F', value: (stats.totalUsos / stats.count).toFixed(1) },
-                { col: 'G', value: pct(stats.totalUsos, totalUsos) },
+                { col: 'E', value: (stats.totalUsos / stats.count).toFixed(1) },
+                { col: 'F', value: pct(stats.totalUsos, totalUsos) },
             ], C.sky);
         });
     }
