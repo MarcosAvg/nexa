@@ -63,7 +63,18 @@
             uiState.setActivePage("Configuración");
     });
     import CommandPalette from "./CommandPalette.svelte";
+    import { networkStore } from "../stores/network.svelte";
+    import { WifiOff } from "lucide-svelte";
 </script>
+
+{#if !networkStore.isOnline}
+    <div
+        class="fixed top-0 left-0 right-0 z-[100] bg-red-500 text-white text-xs font-bold py-1.5 px-4 text-center flex items-center justify-center gap-2 shadow-sm animate-in slide-in-from-top"
+    >
+        <WifiOff size={14} />
+        Modo Sin Conexión (Solo Lectura)
+    </div>
+{/if}
 
 <DashboardLayout {sidebarItems} user={currentUser} onLogout={handleLogout}>
     {@render children()}

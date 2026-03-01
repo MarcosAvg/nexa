@@ -24,6 +24,7 @@ export interface Person {
     area?: string;
     position?: string;
     floor?: string;
+    photo_url?: string | null;
 }
 
 export interface Card {

@@ -25,6 +25,7 @@
     import { toast } from "svelte-sonner";
     import { personnelService } from "../services/personnel";
     import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
+    import { networkStore } from "../stores/network.svelte";
 
     let personnel = $derived(personnelState.personnel);
     let extraCards = $derived(personnelState.extraCards);
@@ -350,6 +351,7 @@
             <Button
                 variant="soft-emerald"
                 class="flex items-center gap-2.5 h-10 px-6"
+                disabled={!networkStore.isOnline}
                 onclick={async () => {
                     const loadingToast = toast.loading(
                         "Preparando exportación...",
@@ -388,6 +390,7 @@
                     variant="primary"
                     class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
                     onclick={onOpenAddCard}
+                    disabled={!networkStore.isOnline}
                 >
                     <Plus size={18} strokeWidth={3} />
                     Nueva Tarjeta
@@ -499,8 +502,11 @@
                             <!-- Reactivar: Emerald -->
                             <button
                                 type="button"
-                                class="p-1.5 rounded-full text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
+                                class="p-1.5 rounded-full transition-colors {networkStore.isOnline
+                                    ? 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50'
+                                    : 'text-slate-300 cursor-not-allowed opacity-50'}"
                                 onclick={() => onBlockCard(row)}
+                                disabled={!networkStore.isOnline}
                                 title="Reactivar Tarjeta"
                             >
                                 <RefreshCw size={16} />
@@ -509,8 +515,11 @@
                             <!-- Bloquear: Amber -->
                             <button
                                 type="button"
-                                class="p-1.5 rounded-full text-slate-400 hover:text-amber-500 hover:bg-amber-50 transition-colors"
+                                class="p-1.5 rounded-full transition-colors {networkStore.isOnline
+                                    ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50'
+                                    : 'text-slate-300 cursor-not-allowed opacity-50'}"
                                 onclick={() => onBlockCard(row)}
+                                disabled={!networkStore.isOnline}
                                 title={row.status === "blocked"
                                     ? "Desbloquear"
                                     : "Bloquear"}
@@ -523,8 +532,11 @@
                             <!-- Reposición: Indigo -->
                             <button
                                 type="button"
-                                class="p-1.5 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
+                                class="p-1.5 rounded-full transition-colors {networkStore.isOnline
+                                    ? 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50'
+                                    : 'text-slate-300 cursor-not-allowed opacity-50'}"
                                 onclick={() => onReplaceCard(row)}
+                                disabled={!networkStore.isOnline}
                                 title="Reposición por extravío"
                             >
                                 <RefreshCw size={16} />
@@ -533,8 +545,11 @@
                             <!-- Dar de baja/Desvincular: Rose -->
                             <button
                                 type="button"
-                                class="p-1.5 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                                class="p-1.5 rounded-full transition-colors {networkStore.isOnline
+                                    ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'
+                                    : 'text-slate-300 cursor-not-allowed opacity-50'}"
                                 onclick={() => onUnassignCard(row)}
+                                disabled={!networkStore.isOnline}
                                 title="Dar de baja (Desvincular)"
                             >
                                 <Ban size={16} />
@@ -544,8 +559,11 @@
                         <!-- Eliminar / Baja permanente -->
                         <button
                             type="button"
-                            class="p-1.5 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-100 transition-colors"
+                            class="p-1.5 rounded-full transition-colors {networkStore.isOnline
+                                ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-100'
+                                : 'text-slate-300 cursor-not-allowed opacity-50'}"
                             onclick={() => onDeleteCard(row)}
+                            disabled={!networkStore.isOnline}
                             title={row.status === "inactive"
                                 ? "Eliminar permanentemente"
                                 : "Dar de baja (Inactivar)"}
@@ -659,5 +677,7 @@
 />
 
 <PermissionGuard requireEdit>
-    <FloatingActionButton onclick={onOpenAddCard} label="Nueva Tarjeta" />
+    {#if networkStore.isOnline}
+        <FloatingActionButton onclick={onOpenAddCard} label="Nueva Tarjeta" />
+    {/if}
 </PermissionGuard>

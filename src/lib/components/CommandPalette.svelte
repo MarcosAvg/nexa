@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
+    import { cardService } from "../services/cards";
     import { Search, User, CreditCard, FileText, X } from "lucide-svelte";
     import { personnelService } from "../services/personnel";
     import { personnelState } from "../stores";
@@ -19,13 +20,13 @@
             category: "Navegación",
         },
         {
-            title: "Listado de Personal",
-            path: "/personnel",
+            title: "Directorio de Personal",
+            path: "/personal",
             icon: User,
             category: "Navegación",
         },
         {
-            title: "Gestión de Tarjetas",
+            title: "Inventario de Tarjetas",
             path: "/cards",
             icon: CreditCard,
             category: "Navegación",
@@ -43,19 +44,47 @@
     async function search() {
         isLoading = true;
         try {
-            const data = await personnelService.searchByName("", query);
-            results = data.slice(0, 5).map((p) => ({
+            const [people, cards] = await Promise.all([
+                personnelService.searchByName("", query),
+                cardService.searchByFolio(query),
+            ]);
+
+            const peopleResults = people.slice(0, 4).map((p) => ({
                 id: p.id,
                 title: `${p.first_name} ${p.last_name}`,
-                subtitle: `${p.employee_no || "Sin empleado"} - ${p.dependency || "Sin dep."}`,
+                subtitle: `${p.employee_no || "S/E"} - ${p.dependency || "Sin dep."}`,
                 icon: User,
                 category: "Personal",
                 action: () => {
                     personnelState.selectPerson(p.id);
-                    push("/personnel");
+                    push("/personal");
                     close();
                 },
             }));
+
+            const cardResults = cards.map((c: any) => ({
+                id: c.id,
+                title: `Folio: ${c.folio} (${c.type})`,
+                subtitle: c.person_id
+                    ? `Asignada a: ${c.personnel?.first_name} ${c.personnel?.last_name}`
+                    : "Disponible en inventario",
+                icon: CreditCard,
+                category: "Tarjeta",
+                action: () => {
+                    // Si tiene persona, mandarlo a Personnel View con ese id seleccionado
+                    if (c.person_id) {
+                        personnelState.selectPerson(c.person_id);
+                        push("/personal");
+                    } else {
+                        // Sino, llevarlo a Cards View buscando su folio
+                        push("/cards");
+                        // Ideally we could set a filter store here, for now it will just route.
+                    }
+                    close();
+                },
+            }));
+
+            results = [...peopleResults, ...cardResults];
         } catch (e) {
             console.error(e);
         } finally {

@@ -27,6 +27,7 @@
     import { cardService } from "../services/cards";
     import { exportPersonnelToExcel } from "../utils/xlsxExport";
     import { toast } from "svelte-sonner";
+    import { networkStore } from "../stores/network.svelte";
 
     import { onMount } from "svelte";
 
@@ -333,6 +334,7 @@
                     variant="soft-blue"
                     onclick={() => (showKoneUsageModal = true)}
                     class="flex items-center gap-2.5 h-10 px-5"
+                    disabled={!networkStore.isOnline}
                 >
                     <Upload
                         size={18}
@@ -348,7 +350,7 @@
                     variant="soft-emerald"
                     onclick={() => (showExportMenu = !showExportMenu)}
                     class="flex items-center gap-2.5 h-10 px-5"
-                    disabled={personnel.length === 0}
+                    disabled={personnel.length === 0 || !networkStore.isOnline}
                 >
                     <FileSpreadsheet
                         size={18}
@@ -399,6 +401,7 @@
                     variant="primary"
                     class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
                     onclick={onOpenAddModal}
+                    disabled={!networkStore.isOnline}
                 >
                     <Plus size={18} strokeWidth={3} class="mr-2" />
                     Nueva Alta

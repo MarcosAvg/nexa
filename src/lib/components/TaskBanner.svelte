@@ -29,6 +29,7 @@
         MoreHorizontal,
         AlertCircle,
     } from "lucide-svelte";
+    import { networkStore } from "../stores/network.svelte";
 
     type Ticket = {
         id: number | string;
@@ -266,7 +267,7 @@
                         size="sm"
                         class="flex-1 shadow-md shadow-slate-200/50"
                         onclick={() => onComplete(ticket)}
-                        {disabled}
+                        disabled={disabled || !networkStore.isOnline}
                     >
                         <CheckCircle2 size={16} class="mr-2" />
                         Completar
@@ -276,7 +277,7 @@
                         size="sm"
                         class="w-10 p-0"
                         onclick={() => onManage?.(ticket)}
-                        {disabled}
+                        disabled={disabled || !networkStore.isOnline}
                     >
                         <MoreHorizontal size={18} class="text-slate-400" />
                     </Button>
@@ -286,7 +287,7 @@
                         size="sm"
                         class="flex-1 shadow-lg shadow-slate-200/50"
                         onclick={() => onManage?.(ticket)}
-                        {disabled}
+                        disabled={disabled || !networkStore.isOnline}
                     >
                         Gestionar Ticket
                         <ArrowRight

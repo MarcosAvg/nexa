@@ -82,11 +82,11 @@ CREATE OR REPLACE FUNCTION "public"."clean_personnel_floors_on_card_change"() RE
 BEGIN
     -- Si se eliminó una tarjeta o se cambió el person_id (desvinculación)
     IF (TG_OP = 'DELETE') OR (OLD.person_id IS NOT NULL AND (NEW.person_id IS NULL OR NEW.person_id <> OLD.person_id)) THEN
-        
+
         -- Verificar si la persona aún tiene alguna tarjeta del mismo tipo
         IF NOT EXISTS (
-            SELECT 1 FROM cards 
-            WHERE person_id = OLD.person_id 
+            SELECT 1 FROM cards
+            WHERE person_id = OLD.person_id
             AND type = OLD.type
             AND id <> OLD.id -- Excluir la que se está borrando o moviendo
         ) THEN
@@ -97,7 +97,7 @@ BEGIN
                 UPDATE personnel SET floors_kone = ARRAY[]::text[] WHERE id = OLD.person_id;
             END IF;
         END IF;
-        
+
     END IF;
     RETURN NULL;
 END;
@@ -105,6 +105,124 @@ $$;
 
 
 ALTER FUNCTION "public"."clean_personnel_floors_on_card_change"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_dashboard_metrics"() RETURNS json
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+    total_count integer;
+    status_counts json;
+    card_coverage json;
+    top_dependencies json;
+    top_buildings json;
+    data_quality json;
+    operativos_count integer;
+    con_p2000_count integer;
+    con_kone_count integer;
+BEGIN
+    -- Total Personal
+    SELECT COUNT(*) INTO total_count FROM personnel;
+
+    -- Status Counts (Basado en lógica de negocio de Nexa)
+    -- Activo/a: status='active' AND min 2 ready cards
+    -- Parcial: status='active' AND 1 ready card
+    -- Sin Acceso: status='active' AND 0 ready cards
+    WITH person_ready_cards AS (
+        SELECT p.id, p.status as db_status, COUNT(DISTINCT c.type) as ready_types
+        FROM personnel p
+        LEFT JOIN cards c ON c.person_id = p.id
+            AND c.status = 'active'
+            AND c.programming_status = 'done'
+            AND c.responsiva_status IN ('signed', 'legacy')
+        GROUP BY p.id, p.status
+    ),
+    computed_statuses AS (
+        SELECT
+            CASE
+                WHEN db_status = 'active' AND ready_types >= 2 THEN 'activo'
+                WHEN db_status = 'active' AND ready_types = 1 THEN 'parcial'
+                WHEN db_status = 'active' AND ready_types = 0 THEN 'inactivo' -- Sin Acceso
+                WHEN db_status = 'blocked' THEN 'bloqueado'
+                ELSE 'baja'
+            END as final_status
+        FROM person_ready_cards
+    )
+    SELECT json_build_object(
+        'activo', COUNT(*) FILTER (WHERE final_status = 'activo'),
+        'parcial', COUNT(*) FILTER (WHERE final_status = 'parcial'),
+        'inactivo', COUNT(*) FILTER (WHERE final_status = 'inactivo'),
+        'bloqueado', COUNT(*) FILTER (WHERE final_status = 'bloqueado'),
+        'baja', COUNT(*) FILTER (WHERE final_status = 'baja')
+    ) INTO status_counts FROM computed_statuses;
+
+    -- Card Coverage (Solo personal operativo: activo + parcial)
+    SELECT COUNT(*) INTO operativos_count
+    FROM (
+        SELECT p.id
+        FROM personnel p
+        JOIN cards c ON c.person_id = p.id
+            AND c.status = 'active'
+            AND c.programming_status = 'done'
+            AND c.responsiva_status IN ('signed', 'legacy')
+        WHERE p.status = 'active'
+        GROUP BY p.id
+        HAVING COUNT(DISTINCT c.type) >= 1
+    ) AS op;
+
+    SELECT COUNT(DISTINCT person_id) INTO con_p2000_count FROM cards WHERE type = 'P2000' AND status = 'active' AND person_id IS NOT NULL;
+    SELECT COUNT(DISTINCT person_id) INTO con_kone_count FROM cards WHERE type = 'KONE' AND status = 'active' AND person_id IS NOT NULL;
+
+    SELECT json_build_object(
+        'operativos', operativos_count,
+        'conP2000', con_p2000_count,
+        'sinP2000', GREATEST(0, operativos_count - con_p2000_count),
+        'conKone', con_kone_count,
+        'sinKone', GREATEST(0, operativos_count - con_kone_count)
+    ) INTO card_coverage;
+
+    -- Top Dependencies (Top 10)
+    SELECT json_agg(t) INTO top_dependencies FROM (
+        SELECT d.name, COUNT(p.id) as total, COUNT(p.id) FILTER (WHERE p.status = 'active') as activos
+        FROM dependencies d
+        LEFT JOIN personnel p ON p.dependency_id = d.id
+        GROUP BY d.name
+        ORDER BY total DESC
+        LIMIT 10
+    ) t;
+
+    -- Top Buildings (Top 6)
+    SELECT json_agg(t) INTO top_buildings FROM (
+        SELECT b.name, COUNT(p.id) as total
+        FROM buildings b
+        LEFT JOIN personnel p ON p.building_id = b.id
+        GROUP BY b.name
+        ORDER BY total DESC
+        LIMIT 6
+    ) t;
+
+    -- Data Quality
+    SELECT json_build_object(
+        'sinEmail', COUNT(*) FILTER (WHERE email IS NULL OR email = ''),
+        'sinSchedule', COUNT(*) FILTER (WHERE schedule_id IS NULL),
+        'sinPosition', COUNT(*) FILTER (WHERE position IS NULL OR position = ''),
+        'sinArea', COUNT(*) FILTER (WHERE area IS NULL OR area = ''),
+        'total', total_count
+    ) INTO data_quality FROM personnel;
+
+    RETURN json_build_object(
+        'totalPersonnel', total_count,
+        'statusCounts', status_counts,
+        'cardCoverage', card_coverage,
+        'topDependencies', COALESCE(top_dependencies, '[]'::json),
+        'topBuildings', COALESCE(top_buildings, '[]'::json),
+        'dataQuality', data_quality
+    );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_dashboard_metrics"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."get_dashboard_stats"() RETURNS json
@@ -151,8 +269,8 @@ CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
 BEGIN
     INSERT INTO public.profiles (id, email, full_name, role)
     VALUES (
-        NEW.id, 
-        NEW.email, 
+        NEW.id,
+        NEW.email,
         COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
         'viewer'
     );
@@ -223,7 +341,7 @@ BEGIN
         (search_term_2 = '' AND (lower(unaccent(p.last_name)) ILIKE '%' || search_term_1 || '%' OR lower(unaccent(p.first_name)) ILIKE '%' || search_term_1 || '%'))
       )
     )
-  ORDER BY 
+  ORDER BY
     similarity(lower(unaccent(p.last_name || ' ' || p.first_name)), search_term_1 || ' ' || search_term_2) DESC,
     p.last_name ASC
   LIMIT p_limit;
@@ -317,6 +435,65 @@ ALTER TABLE "public"."history_logs" ALTER COLUMN "id" ADD GENERATED BY DEFAULT A
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."schedules" (
+    "id" bigint NOT NULL,
+    "name" "text" NOT NULL,
+    "days" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "default_entry" time without time zone,
+    "default_exit" time without time zone
+);
+
+
+ALTER TABLE "public"."schedules" OWNER TO "postgres";
+
+
+CREATE OR REPLACE VIEW "public"."personnel_with_status" AS
+ WITH "person_ready_cards" AS (
+         SELECT "p_1"."id",
+            "count"(DISTINCT "c"."type") AS "ready_types"
+           FROM ("public"."personnel" "p_1"
+             LEFT JOIN "public"."cards" "c" ON ((("c"."person_id" = "p_1"."id") AND ("c"."status" = 'active'::"text") AND ("c"."programming_status" = 'done'::"text") AND ("c"."responsiva_status" = ANY (ARRAY['signed'::"text", 'legacy'::"text"])))))
+          GROUP BY "p_1"."id"
+        )
+ SELECT "p"."id",
+    "p"."first_name",
+    "p"."last_name",
+    "p"."employee_no",
+    "p"."email",
+    "p"."area",
+    "p"."position",
+    "p"."dependency_id",
+    "p"."building_id",
+    "p"."floor",
+    "p"."floors_p2000",
+    "p"."floors_kone",
+    "p"."schedule_id",
+    "p"."entry_time",
+    "p"."exit_time",
+    "p"."special_accesses",
+    "p"."status",
+    "p"."photo_url",
+    "p"."created_at",
+    COALESCE("b"."name", 'N/A'::"text") AS "building_name",
+    COALESCE("d"."name", 'N/A'::"text") AS "dependency_name",
+    COALESCE("s"."name", 'Sin Horario'::"text") AS "schedule_name",
+        CASE
+            WHEN (("p"."status" = 'active'::"text") AND ("prc"."ready_types" >= 2)) THEN 'Activo/a'::"text"
+            WHEN (("p"."status" = 'active'::"text") AND ("prc"."ready_types" = 1)) THEN 'Parcial'::"text"
+            WHEN (("p"."status" = 'active'::"text") AND ("prc"."ready_types" = 0)) THEN 'Sin Acceso'::"text"
+            WHEN ("p"."status" = 'blocked'::"text") THEN 'Bloqueado/a'::"text"
+            ELSE 'Baja'::"text"
+        END AS "computed_status"
+   FROM (((("public"."personnel" "p"
+     LEFT JOIN "person_ready_cards" "prc" ON (("prc"."id" = "p"."id")))
+     LEFT JOIN "public"."buildings" "b" ON (("b"."id" = "p"."building_id")))
+     LEFT JOIN "public"."dependencies" "d" ON (("d"."id" = "p"."dependency_id")))
+     LEFT JOIN "public"."schedules" "s" ON (("s"."id" = "p"."schedule_id")));
+
+
+ALTER VIEW "public"."personnel_with_status" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "id" "uuid" NOT NULL,
     "email" "text",
@@ -329,18 +506,6 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
 
 
 ALTER TABLE "public"."profiles" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."schedules" (
-    "id" bigint NOT NULL,
-    "name" "text" NOT NULL,
-    "days" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
-    "default_entry" time without time zone,
-    "default_exit" time without time zone
-);
-
-
-ALTER TABLE "public"."schedules" OWNER TO "postgres";
 
 
 ALTER TABLE "public"."schedules" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
@@ -873,6 +1038,10 @@ ALTER TABLE "public"."tickets" ENABLE ROW LEVEL SECURITY;
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
 
 
+
+
+
+
 GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
@@ -1047,6 +1216,12 @@ GRANT ALL ON FUNCTION "public"."gtrgm_out"("public"."gtrgm") TO "service_role";
 GRANT ALL ON FUNCTION "public"."clean_personnel_floors_on_card_change"() TO "anon";
 GRANT ALL ON FUNCTION "public"."clean_personnel_floors_on_card_change"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."clean_personnel_floors_on_card_change"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_dashboard_metrics"() TO "anon";
+GRANT ALL ON FUNCTION "public"."get_dashboard_metrics"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_dashboard_metrics"() TO "service_role";
 
 
 
@@ -1362,15 +1537,21 @@ GRANT ALL ON SEQUENCE "public"."history_logs_id_seq" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."profiles" TO "anon";
-GRANT ALL ON TABLE "public"."profiles" TO "authenticated";
-GRANT ALL ON TABLE "public"."profiles" TO "service_role";
-
-
-
 GRANT ALL ON TABLE "public"."schedules" TO "anon";
 GRANT ALL ON TABLE "public"."schedules" TO "authenticated";
 GRANT ALL ON TABLE "public"."schedules" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."personnel_with_status" TO "anon";
+GRANT ALL ON TABLE "public"."personnel_with_status" TO "authenticated";
+GRANT ALL ON TABLE "public"."personnel_with_status" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."profiles" TO "anon";
+GRANT ALL ON TABLE "public"."profiles" TO "authenticated";
+GRANT ALL ON TABLE "public"."profiles" TO "service_role";
 
 
 

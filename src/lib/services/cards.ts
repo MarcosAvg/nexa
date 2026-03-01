@@ -3,6 +3,8 @@ import { HistoryService } from "./history";
 import type { Card } from "../types";
 import { handleError, withTimeout } from "../utils/error";
 import { appEvents, EVENTS } from "../utils/appEvents";
+import { dbCache } from "../utils/dbCache";
+import { networkStore } from "../stores/network.svelte";
 
 export const cardService = {
     async fetchAll(
@@ -13,6 +15,14 @@ export const cardService = {
         statusFilter: string = "Todas"
     ): Promise<{ data: Card[]; count: number }> {
         try {
+            // Offline fallback
+            if (!networkStore.isOnline) {
+                const cacheKey = `cards_page_${page}_${typeFilter}_${statusFilter}_${search}`;
+                const cachedData = await dbCache.load<{ data: Card[], count: number }>(cacheKey);
+                if (cachedData) return cachedData;
+                return { data: [], count: 0 };
+            }
+
             const from = (page - 1) * limit;
             const to = from + limit - 1;
 
@@ -70,7 +80,13 @@ export const cardService = {
                 personStatus: c.personnel?.status
             }));
 
-            return { data: mappedData, count: count || 0 };
+            const result = { data: mappedData, count: count || 0 };
+
+            // Save to cache
+            const cacheKey = `cards_page_${page}_${typeFilter}_${statusFilter}_${search}`;
+            await dbCache.save(cacheKey, result);
+
+            return result;
         } catch (error) {
             handleError(error, "Fetch All Cards");
             return { data: [], count: 0 };
@@ -199,6 +215,26 @@ export const cardService = {
             : null;
 
         return { card: data, ownerName };
+    },
+
+    /** Search cards by folio loosely */
+    async searchByFolio(folioPart: string): Promise<any[]> {
+        try {
+            const cleanFolio = (folioPart || "").trim();
+            if (!cleanFolio) return [];
+
+            const { data, error } = await supabase
+                .from("cards")
+                .select("id, folio, type, status, person_id, personnel(first_name, last_name)")
+                .ilike("folio", `%${cleanFolio}%`)
+                .limit(5);
+
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            handleError(error, "Search Cards by Folio");
+            return [];
+        }
     },
 
     async save(data: any, replacementOptions?: { oldCardStatus: string, skipTicket?: boolean }) {

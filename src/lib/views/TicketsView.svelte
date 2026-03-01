@@ -31,6 +31,7 @@
     import ImportPreviewModal from "../components/modals/ImportPreviewModal.svelte";
     import ConfirmAltaModal from "../components/modals/ConfirmAltaModal.svelte";
     import TicketImportedDetailsModal from "../components/modals/TicketImportedDetailsModal.svelte";
+    import { networkStore } from "../stores/network.svelte";
 
     // Server-side paginated tickets (replaces client-side filtering)
     let tickets = $state<any[]>([]);
@@ -330,6 +331,7 @@
                     variant="outline"
                     onclick={() => (isImportOpen = true)}
                     class="flex items-center gap-2 h-10 px-4 border-slate-300"
+                    disabled={!networkStore.isOnline}
                 >
                     <FileSpreadsheet size={16} />
                     Importar Plantilla
@@ -340,6 +342,7 @@
                     variant="primary"
                     onclick={onOpenAddTicket}
                     class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
+                    disabled={!networkStore.isOnline}
                 >
                     <Plus size={18} strokeWidth={3} />
                     Nuevo Ticket

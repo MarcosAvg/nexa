@@ -14,6 +14,7 @@
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
     import { HistoryService } from "../services/history";
+    import { networkStore } from "../stores/network.svelte";
 
     const PAGE_SIZE = 50;
 
@@ -152,6 +153,7 @@
             <Button
                 variant="soft-emerald"
                 class="flex items-center gap-2.5 h-10 px-6"
+                disabled={!networkStore.isOnline}
                 onclick={async () => {
                     const loadingToast = toast.loading(
                         "Preparando exportación...",

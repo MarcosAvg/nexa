@@ -4,6 +4,8 @@ import { handleError, withTimeout } from "../utils/error";
 import { catalogCache } from "../utils/catalogCache";
 import { appEvents, EVENTS } from "../utils/appEvents";
 import type { Person, Card, DashboardMetrics } from "../types";
+import { dbCache } from "../utils/dbCache";
+import { networkStore } from "../stores/network.svelte";
 
 const mapPersonRecord = (p: any): Person => {
     const allCards = (p.cards || []);
@@ -14,20 +16,22 @@ const mapPersonRecord = (p: any): Person => {
 
     const readyTypes = new Set(readyCards.map((c: any) => c.type));
 
-    let displayStatus = "Baja";
-
-    if (p.status === "active") {
-        if (readyTypes.size >= 2) {
-            displayStatus = "Activo/a";
-        } else if (readyTypes.size === 1) {
-            displayStatus = "Parcial";
-        } else if (allCards.length > 0) {
+    let displayStatus = p.computed_status;
+    if (!displayStatus) {
+        displayStatus = "Baja";
+        if (p.status === "active") {
+            if (readyTypes.size >= 2) {
+                displayStatus = "Activo/a";
+            } else if (readyTypes.size === 1) {
+                displayStatus = "Parcial";
+            } else if (allCards.length > 0) {
+                displayStatus = "Bloqueado/a";
+            } else {
+                displayStatus = "Sin Acceso";
+            }
+        } else if (p.status === "blocked") {
             displayStatus = "Bloqueado/a";
-        } else {
-            displayStatus = "Sin Acceso";
         }
-    } else if (p.status === "blocked") {
-        displayStatus = "Bloqueado/a";
     }
 
     return {
@@ -40,13 +44,17 @@ const mapPersonRecord = (p: any): Person => {
         area: p.area,
         position: p.position,
         floor: p.floor,
-        building: p.buildings?.name || "N/A",
-        dependency: p.dependencies?.name || "N/A",
+        building: p.building_name || p.buildings?.name || "N/A",
+        dependency: p.dependency_name || p.dependencies?.name || "N/A",
         schedule: p.schedules ? {
             days: p.schedules.name,
             entry: p.entry_time || p.schedules.default_entry || "09:00",
             exit: p.exit_time || p.schedules.default_exit || "18:00"
-        } : null,
+        } : (p.schedule_name ? {
+            days: p.schedule_name,
+            entry: p.entry_time || "09:00",
+            exit: p.exit_time || "18:00"
+        } : null),
         status_raw: p.status,
         status: displayStatus,
         cards: p.cards || [],
@@ -59,11 +67,19 @@ const mapPersonRecord = (p: any): Person => {
 export const personnelService = {
     async fetchAll(page: number = 1, limit: number = 50, search: string = "", statusFilter: string = "Todos", dependencyId: string = "", buildingId: string = ""): Promise<{ data: Person[], count: number }> {
         try {
+            // Offline fallback
+            if (!networkStore.isOnline) {
+                const cacheKey = `personnel_page_${page}_${statusFilter}_${dependencyId}_${buildingId}_${search}`;
+                const cachedData = await dbCache.load<{ data: Person[], count: number }>(cacheKey);
+                if (cachedData) return cachedData;
+                return { data: [], count: 0 };
+            }
+
             // Use the optimized view if available (personnel_with_status includes computed_status)
             // If the view doesn't exist yet, it will fallback to the original logic
             let query = supabase
                 .from("personnel_with_status")
-                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)", { count: "exact" });
+                .select("*, cards(id, type, status, programming_status, responsiva_status)", { count: "exact" });
 
             if (search) {
                 const searchTerm = `%${search}%`;
@@ -98,7 +114,13 @@ export const personnelService = {
             }
 
             const mappedData = (data || []).map(p => mapPersonRecord(p));
-            return { data: mappedData, count: count || 0 };
+            const result = { data: mappedData, count: count || 0 };
+
+            // Save to cache
+            const cacheKey = `personnel_page_${page}_${statusFilter}_${dependencyId}_${buildingId}_${search}`;
+            await dbCache.save(cacheKey, result);
+
+            return result;
         } catch (error) {
             handleError(error, "Fetch Personnel");
             return { data: [], count: 0 };

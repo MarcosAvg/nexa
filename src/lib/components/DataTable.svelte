@@ -74,18 +74,44 @@
             sortDirection = "asc";
         }
     }
+
+    // Virtual Scrolling State & Logic
+    let scrollTop = $state(0);
+    const rowHeight = 56; // estimated row height in px
+    const overscan = 10;
+    const clientHeight = 600; // estimated max height of the scroll container
+
+    let startIndex = $derived(
+        Math.max(0, Math.floor(scrollTop / rowHeight) - overscan),
+    );
+    let endIndex = $derived(
+        Math.min(
+            sortedData.length,
+            Math.floor((scrollTop + clientHeight) / rowHeight) + overscan,
+        ),
+    );
+
+    let visibleData = $derived(sortedData.slice(startIndex, endIndex));
+    let offsetY = $derived(startIndex * rowHeight);
+    let totalHeight = $derived(sortedData.length * rowHeight);
 </script>
 
 <!-- Desktop Table View (hidden on small/medium screens) -->
 <div
     class="hidden lg:block overflow-hidden rounded-2xl border border-slate-200/50 shadow-sm bg-white/80 backdrop-blur-sm"
 >
-    <div class="w-full overflow-x-auto custom-scrollbar">
+    <div
+        class="w-full overflow-auto custom-scrollbar"
+        style="max-height: 65vh;"
+        onscroll={(e) => {
+            scrollTop = e.currentTarget.scrollTop;
+        }}
+    >
         <table
-            class="w-full min-w-[1024px] table-fixed text-left text-sm text-slate-600 border-collapse"
+            class="w-full min-w-[1024px] table-fixed text-left text-sm text-slate-600 border-collapse relative"
         >
             <thead
-                class="bg-slate-50/40 text-[11px] uppercase tracking-[0.15em] text-slate-500 font-bold border-b border-slate-200/50"
+                class="bg-slate-50/95 backdrop-blur-sm text-[11px] uppercase tracking-[0.15em] text-slate-500 font-bold border-b border-slate-200/50 sticky top-0 z-20"
             >
                 <tr>
                     {#each columns as column}
@@ -93,7 +119,7 @@
                             scope="col"
                             class="px-5 py-4 lg:px-6 lg:py-5 {column.class ||
                                 ''} {column.sortable !== false
-                                ? 'cursor-pointer hover:bg-slate-100/30 transition-all duration-300 group select-none'
+                                ? 'cursor-pointer hover:bg-slate-100/70 transition-all duration-300 group select-none'
                                 : ''}"
                             style:width={column.width}
                             style:max-width={column.maxWidth}
@@ -142,48 +168,91 @@
                     {/if}
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100/60">
-                {#each sortedData as row (row.id || Math.random())}
-                    <tr
-                        class="group transition-all duration-300 hover:bg-blue-50/30"
-                    >
-                        {#each columns as column}
-                            <td
-                                class="px-5 py-4 lg:px-6 lg:py-4.5 text-[13.5px] font-medium text-slate-700/90 transition-colors group-hover:text-slate-900 {column.width ||
-                                column.maxWidth
-                                    ? 'truncate'
-                                    : ''} {column.class || ''}"
-                                style:width={column.width}
-                                style:max-width={column.maxWidth}
-                            >
-                                <div
-                                    class={column.width || column.maxWidth
-                                        ? "truncate"
-                                        : ""}
-                                >
-                                    {#if column.render}
-                                        {@render column.render(row)}
-                                    {:else}
-                                        {row[column.key]}
-                                    {/if}
-                                </div>
-                            </td>
-                        {/each}
-                        {#if actions}
-                            <td
-                                class="px-5 py-4 lg:px-6 lg:py-4.5 whitespace-nowrap text-right"
-                                style:width={actionsWidth}
-                            >
-                                <div
-                                    class="flex justify-end opacity-60 group-hover:opacity-100 transition-opacity duration-300"
-                                >
-                                    {@render actions(row)}
-                                </div>
-                            </td>
-                        {/if}
+            <!-- Virtual Scrolling implementation -->
+            {#if sortedData.length === 0}
+                <tbody class="divide-y divide-slate-100/60">
+                    <tr>
+                        <td
+                            colspan={columns.length + (actions ? 1 : 0)}
+                            class="px-5 py-8 text-center text-slate-500 text-sm border-0"
+                        >
+                            No hay datos para mostrar
+                        </td>
                     </tr>
-                {/each}
-            </tbody>
+                </tbody>
+            {:else}
+                <tbody class="divide-y divide-slate-100/60">
+                    <!-- Spacer superior para el offset -->
+                    {#if offsetY > 0}
+                        <tr
+                            class="border-0 m-0 p-0"
+                            style="height: {offsetY}px; pointer-events: none;"
+                        >
+                            <td
+                                class="border-0 m-0 p-0"
+                                colspan={columns.length + (actions ? 1 : 0)}
+                            ></td>
+                        </tr>
+                    {/if}
+
+                    {#each visibleData as row (row.id || Math.random())}
+                        <tr
+                            class="group transition-all duration-300 hover:bg-blue-50/30"
+                        >
+                            {#each columns as column}
+                                <td
+                                    class="px-5 py-4 lg:px-6 lg:py-4.5 text-[13.5px] font-medium text-slate-700/90 transition-colors group-hover:text-slate-900 {column.width ||
+                                    column.maxWidth
+                                        ? 'truncate'
+                                        : ''} {column.class || ''}"
+                                    style:width={column.width}
+                                    style:max-width={column.maxWidth}
+                                >
+                                    <div
+                                        class={column.width || column.maxWidth
+                                            ? "truncate"
+                                            : ""}
+                                    >
+                                        {#if column.render}
+                                            {@render column.render(row)}
+                                        {:else}
+                                            {row[column.key]}
+                                        {/if}
+                                    </div>
+                                </td>
+                            {/each}
+                            {#if actions}
+                                <td
+                                    class="px-5 py-4 lg:px-6 lg:py-4.5 whitespace-nowrap text-right"
+                                    style:width={actionsWidth}
+                                >
+                                    <div
+                                        class="flex justify-end opacity-60 group-hover:opacity-100 transition-opacity duration-300"
+                                    >
+                                        {@render actions(row)}
+                                    </div>
+                                </td>
+                            {/if}
+                        </tr>
+                    {/each}
+
+                    <!-- Spacer inferior -->
+                    {#if totalHeight - offsetY - visibleData.length * rowHeight > 0}
+                        <tr
+                            class="border-0 m-0 p-0"
+                            style="height: {totalHeight -
+                                offsetY -
+                                visibleData.length *
+                                    rowHeight}px; pointer-events: none;"
+                        >
+                            <td
+                                class="border-0 m-0 p-0"
+                                colspan={columns.length + (actions ? 1 : 0)}
+                            ></td>
+                        </tr>
+                    {/if}
+                </tbody>
+            {/if}
         </table>
     </div>
 </div>

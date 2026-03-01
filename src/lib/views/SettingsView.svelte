@@ -29,6 +29,7 @@
 
     import { catalogState, userState } from "../stores";
     import { generateRequestTemplate } from "../utils/xlsxTemplate";
+    import { networkStore } from "../stores/network.svelte";
 
     let activeTab = $state<"catalogos" | "usuarios">("catalogos");
     let activeCatalog = $state<
@@ -48,7 +49,8 @@
     });
 
     let canEdit = $derived(
-        currentUser.role === "admin" || currentUser.role === "operator",
+        (currentUser.role === "admin" || currentUser.role === "operator") &&
+            networkStore.isOnline,
     );
 
     onMount(async () => {
@@ -429,7 +431,7 @@
                 <button
                     class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
                     onclick={handleGenerateTemplate}
-                    disabled={isGeneratingTemplate}
+                    disabled={isGeneratingTemplate || !networkStore.isOnline}
                 >
                     <FileDown
                         size={18}

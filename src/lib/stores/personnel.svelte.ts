@@ -156,19 +156,57 @@ export class PersonnelState {
                 this.refreshDashboardMetrics();
                 this.refreshDashboardStats();
 
-                // If user is on page 1, refresh the list to show new/updated records
-                // Or if the record being changed is the one currently selected
-                const isRelevant =
-                    this.currentPage === 1 ||
-                    this.selectedPersonId === payload.new?.id ||
-                    this.selectedPersonId === payload.old?.id;
+                if (payload.eventType === 'UPDATE') {
+                    // Update the local personnel array optimally
+                    const index = this.personnel.findIndex(p => p.id === payload.new.id);
+                    if (index !== -1) {
+                        // Apply optimistic changes for basic fields
+                        const current = this.personnel[index];
+                        this.personnel[index] = {
+                            ...current,
+                            first_name: payload.new.first_name,
+                            last_name: payload.new.last_name,
+                            name: `${payload.new.first_name} ${payload.new.last_name}`,
+                            employee_no: payload.new.employee_no,
+                            status_raw: payload.new.status,
+                            photo_url: payload.new.photo_url || current.photo_url,
+                        };
 
-                if (isRelevant && !this.isLoading) {
-                    this.refresh(this.currentPage, this.searchQuery, this.statusFilter, this.dependencyId, this.buildingId);
+                        this._refreshOptimisticPerson(payload.new.id);
+                    }
+                } else if (payload.eventType === 'DELETE' || payload.eventType === 'INSERT') {
+                    // Only refresh full list for INSERT/DELETE if we are on page 1
+                    // Or if the record being changed is the one currently selected
+                    const isRelevant =
+                        this.currentPage === 1 ||
+                        this.selectedPersonId === payload.new?.id ||
+                        this.selectedPersonId === payload.old?.id;
+
+                    if (isRelevant && !this.isLoading) {
+                        this.refresh(this.currentPage, this.searchQuery, this.statusFilter, this.dependencyId, this.buildingId);
+                    }
                 }
             });
         } catch (error) {
             console.error("Failed to initialize Realtime:", error);
+        }
+    }
+
+    async _refreshOptimisticPerson(id: string) {
+        try {
+            const { personnelService } = await import("../services/personnel");
+            const updated = await personnelService.fetchById(id);
+            if (updated) {
+                const index = this.personnel.findIndex(p => p.id === id);
+                if (index !== -1) {
+                    this.personnel[index] = updated;
+                }
+                if (this.editingPerson?.id === id) {
+                    this.editingPerson = { ...updated };
+                }
+            }
+        } catch (e) {
+            // fail silently on optimistic update error
         }
     }
 }
