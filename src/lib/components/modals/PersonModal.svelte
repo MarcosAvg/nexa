@@ -305,19 +305,23 @@
             position: puestoFuncion,
         };
 
-        const result = personnelSchema.safeParse(dataToValidate);
+        // Solo validar esquema si es una nueva alta
+        if (!editingPerson) {
+            const result = personnelSchema.safeParse(dataToValidate);
 
-        if (!result.success) {
-            const newErrors: Record<string, string> = {};
-            result.error.issues.forEach((issue) => {
-                if (issue.path[0])
-                    newErrors[issue.path[0].toString()] = issue.message;
-            });
-            errors = newErrors;
-            toast.error("Error de Validación", {
-                description: "Por favor corrija los campos marcados en rojo.",
-            });
-            return;
+            if (!result.success) {
+                const newErrors: Record<string, string> = {};
+                result.error.issues.forEach((issue) => {
+                    if (issue.path[0])
+                        newErrors[issue.path[0].toString()] = issue.message;
+                });
+                errors = newErrors;
+                toast.error("Error de Validación", {
+                    description:
+                        "Por favor corrija los campos marcados en rojo.",
+                });
+                return;
+            }
         }
 
         isSubmitting = true;
