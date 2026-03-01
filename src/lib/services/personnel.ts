@@ -79,7 +79,7 @@ export const personnelService = {
             // If the view doesn't exist yet, it will fallback to the original logic
             let query = supabase
                 .from("personnel_with_status")
-                .select("*, cards(id, type, status, programming_status, responsiva_status)", { count: "exact" });
+                .select("*, cards(id, folio, type, status, programming_status, responsiva_status)", { count: "exact" });
 
             if (search) {
                 const searchTerm = `%${search}%`;
