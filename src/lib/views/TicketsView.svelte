@@ -351,40 +351,7 @@
         {/snippet}
     </SectionHeader>
 
-    <!-- Top Pagination (hidden on mobile) -->
-    {#if totalRecords > pageSize}
-        <div class="hidden sm:flex items-center justify-between px-2">
-            <p class="text-xs text-slate-500">
-                Mostrando {(currentPage - 1) * pageSize + 1}–{Math.min(
-                    currentPage * pageSize,
-                    totalRecords,
-                )} de {totalRecords} tickets
-            </p>
-            <div class="flex items-center gap-2">
-                <button
-                    type="button"
-                    class="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-                    onclick={() => goToPage(currentPage - 1)}
-                    disabled={currentPage <= 1}
-                >
-                    <ChevronLeft size={14} />
-                    Anterior
-                </button>
-                <span class="text-xs text-slate-500 font-bold">
-                    {currentPage} / {totalPages}
-                </span>
-                <button
-                    type="button"
-                    class="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-                    onclick={() => goToPage(currentPage + 1)}
-                    disabled={currentPage >= totalPages}
-                >
-                    Siguiente
-                    <ChevronRight size={14} />
-                </button>
-            </div>
-        </div>
-    {/if}
+    <!-- Top Pagination removed per request -->
 
     <div
         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20"

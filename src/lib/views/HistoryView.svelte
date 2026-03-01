@@ -183,40 +183,7 @@
         {/snippet}
     </SectionHeader>
 
-    <!-- Top Pagination (hidden on mobile) -->
-    {#if totalRecords > 0}
-        <div class="hidden sm:flex items-center justify-between px-2">
-            <p class="text-xs text-slate-500">
-                Mostrando {(currentPage - 1) * pageSize + 1}–{Math.min(
-                    currentPage * pageSize,
-                    totalRecords,
-                )} de {totalRecords} registros
-            </p>
-            <div class="flex items-center gap-2">
-                <Button
-                    variant="outline"
-                    onclick={() => historyState.prevPage()}
-                    disabled={currentPage <= 1}
-                    class="flex items-center gap-1 text-xs px-3 py-1.5"
-                >
-                    <ChevronLeft size={14} />
-                    Anterior
-                </Button>
-                <span class="text-xs text-slate-500 font-bold">
-                    {currentPage} / {totalPages}
-                </span>
-                <Button
-                    variant="outline"
-                    onclick={() => historyState.nextPage()}
-                    disabled={currentPage >= totalPages}
-                    class="flex items-center gap-1 text-xs px-3 py-1.5"
-                >
-                    Siguiente
-                    <ChevronRight size={14} />
-                </Button>
-            </div>
-        </div>
-    {/if}
+    <!-- Top Pagination removed per request -->
 
     <Card class="overflow-hidden">
         <DataTable
