@@ -1,7 +1,14 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
     import { cardService } from "../services/cards";
-    import { Search, User, CreditCard, FileText, X } from "lucide-svelte";
+    import {
+        Search,
+        User,
+        CreditCard,
+        FileText,
+        X,
+        ClipboardList,
+    } from "lucide-svelte";
     import { personnelService } from "../services/personnel";
     import { personnelState } from "../stores";
     import { push } from "svelte-spa-router";
@@ -29,6 +36,12 @@
             title: "Inventario de Tarjetas",
             path: "/cards",
             icon: CreditCard,
+            category: "Navegación",
+        },
+        {
+            title: "Tickets Pendientes",
+            path: "/tickets",
+            icon: ClipboardList,
             category: "Navegación",
         },
     ];
