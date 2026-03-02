@@ -15,7 +15,10 @@
     import {
         parseKoneUsageFile,
         matchKoneUsageToPersonnel,
+        findDuplicateFolios,
+        getDuplicateFoliosSummary,
         type KoneUsageMatchResult,
+        type DuplicateFolioInfo,
     } from "../../utils/xlsxKoneUsage";
     import { exportKoneUsageToExcel } from "../../utils/xlsxExport";
 
@@ -27,13 +30,21 @@
 
     let step = $state<"idle" | "parsing" | "matching" | "results">("idle");
     let matchResult = $state<KoneUsageMatchResult | null>(null);
+    let rawEntries = $state<any[]>([]);
+    let duplicates = $state<DuplicateFolioInfo[]>([]);
+    let showDuplicates = $state(false);
     let isExporting = $state(false);
     let usageThreshold = $state(10);
+    let creationLimitDate = $state<string>("");
+    let inactivityLimitDate = $state<string>("");
     let fileInput = $state<HTMLInputElement>();
 
     function reset() {
         step = "idle";
         matchResult = null;
+        rawEntries = [];
+        duplicates = [];
+        showDuplicates = false;
         isExporting = false;
     }
 
@@ -47,15 +58,32 @@
         const file = input.files?.[0];
         if (!file) return;
 
+        if (!creationLimitDate || !inactivityLimitDate) {
+            toast.error(
+                "Por favor seleccione ambas fechas límite para el análisis.",
+            );
+            if (input) input.value = "";
+            return;
+        }
+
         step = "parsing";
         try {
-            const entries = await parseKoneUsageFile(file);
+            const entries = await parseKoneUsageFile(
+                file,
+                creationLimitDate,
+                inactivityLimitDate,
+            );
 
             if (entries.length === 0) {
                 toast.error("No se encontraron datos en el archivo.");
                 step = "idle";
                 return;
             }
+
+            // Detect duplicates
+            const foundDuplicates = findDuplicateFolios(entries);
+            rawEntries = entries;
+            duplicates = foundDuplicates;
 
             step = "matching";
             const result = await matchKoneUsageToPersonnel(entries);
@@ -72,11 +100,11 @@
     }
 
     async function handleExport() {
-        if (!matchResult || matchResult.matched.length === 0) return;
+        if (!matchResult) return;
 
         isExporting = true;
         try {
-            await exportKoneUsageToExcel(matchResult.matched, usageThreshold);
+            await exportKoneUsageToExcel(matchResult, usageThreshold);
             toast.success("Exportación completada");
         } catch (err) {
             console.error("Export Error:", err);
@@ -111,14 +139,6 @@
                     : "0",
             totalUsos,
             promedio,
-            byDependency: matchResult.matched.reduce(
-                (acc, m) => {
-                    const dep = m.person.dependency || "N/A";
-                    acc[dep] = (acc[dep] || 0) + 1;
-                    return acc;
-                },
-                {} as Record<string, number>,
-            ),
         };
     });
 </script>
@@ -134,8 +154,51 @@
         <!-- ── STEP: IDLE ── -->
         {#if step === "idle"}
             <div
-                class="flex flex-col items-center justify-center gap-4 py-10 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50"
+                class="flex flex-col items-center justify-center gap-4 py-8 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50"
             >
+                <div
+                    class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full px-8 pb-2"
+                >
+                    <div
+                        class="text-left bg-white p-3 rounded-lg border border-slate-200 shadow-sm"
+                    >
+                        <label
+                            class="block text-xs font-bold text-slate-700 mb-1"
+                            >Inactividad (Fecha Límite)</label
+                        >
+                        <input
+                            type="date"
+                            bind:value={inactivityLimitDate}
+                            class="w-full h-9 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 text-sm outline-none bg-slate-50"
+                        />
+                        <p
+                            class="text-[10px] text-slate-500 mt-1.5 leading-tight"
+                        >
+                            Días de inactividad respecto al último registro de
+                            uso.
+                        </p>
+                    </div>
+                    <div
+                        class="text-left bg-white p-3 rounded-lg border border-slate-200 shadow-sm"
+                    >
+                        <label
+                            class="block text-xs font-bold text-slate-700 mb-1"
+                            >Cortesía (Límite Creación)</label
+                        >
+                        <input
+                            type="date"
+                            bind:value={creationLimitDate}
+                            class="w-full h-9 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 text-sm outline-none bg-slate-50"
+                        />
+                        <p
+                            class="text-[10px] text-slate-500 mt-1.5 leading-tight"
+                        >
+                            Ignorar tarjetas creadas/modificadas después de esta
+                            fecha.
+                        </p>
+                    </div>
+                </div>
+
                 <div
                     class="w-16 h-16 rounded-2xl bg-sky-50 flex items-center justify-center"
                 >
@@ -153,7 +216,15 @@
                 <Button
                     variant="soft-blue"
                     class="h-10 px-6"
-                    onclick={() => fileInput?.click()}
+                    onclick={() => {
+                        if (!creationLimitDate || !inactivityLimitDate) {
+                            toast.error(
+                                "Seleccione ambas fechas límite antes de subir el archivo.",
+                            );
+                            return;
+                        }
+                        fileInput?.click();
+                    }}
                 >
                     <FileSpreadsheet size={16} class="mr-2" />
                     Seleccionar Archivo
@@ -272,99 +343,97 @@
                 </div>
             </div>
 
-            <!-- Threshold and Metrics by Dependency -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <!-- Duplicates warning -->
+            {#if duplicates.length > 0}
+                <div class="p-4 rounded-xl bg-amber-50 border border-amber-200">
                     <div class="flex items-center justify-between mb-3">
-                        <p
-                            class="text-xs font-bold text-slate-700 uppercase tracking-wider"
-                        >
-                            Umbral de bajo uso
-                        </p>
-                        <Badge variant="blue" class="font-mono"
-                            >{usageThreshold}</Badge
-                        >
+                        <div class="flex items-center gap-2">
+                            <AlertTriangle size={16} class="text-amber-600" />
+                            <p class="text-xs font-bold text-amber-700 uppercase tracking-wider">
+                                Folios Duplicados Detectados
+                            </p>
+                        </div>
+                        <Badge variant="amber" class="font-mono">
+                            {duplicates.length} folios
+                        </Badge>
                     </div>
-                    <p class="text-[11px] text-slate-400 mb-3">
-                        Define la cantidad de usos para generar la hoja de
-                        personal con bajo uso.
+                    <p class="text-[11px] text-amber-600 mb-3">
+                        Se encontraron {duplicates.reduce((sum, dup) => sum + dup.occurrences - 1, 0)} filas duplicadas. 
+                        Los conteos fueron sumados automáticamente.
                     </p>
                     <div class="flex items-center gap-3">
-                        <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            step="1"
-                            bind:value={usageThreshold}
-                            class="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                        />
-                        <input
-                            type="number"
-                            min="0"
-                            bind:value={usageThreshold}
-                            class="w-16 h-8 text-center text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
-                        />
-                    </div>
-                </div>
-
-                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                    <p
-                        class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3"
-                    >
-                        Conteo por Dependencia
-                    </p>
-                    <div
-                        class="max-h-32 overflow-y-auto space-y-2 pr-1 custom-scrollbar"
-                    >
-                        {#each Object.entries(stats.byDependency).sort((a, b) => b[1] - a[1]) as [dep, count]}
-                            <div
-                                class="flex items-center justify-between text-[11px]"
-                            >
-                                <span
-                                    class="text-slate-600 truncate mr-2"
-                                    title={dep}>{dep}</span
-                                >
-                                <span
-                                    class="font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200"
-                                    >{count}</span
-                                >
-                            </div>
-                        {/each}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Unmatched folios (if any) -->
-            {#if matchResult && matchResult.unmatched.length > 0}
-                <div
-                    class="rounded-xl border border-amber-200 bg-amber-50/50 overflow-hidden"
-                >
-                    <div
-                        class="flex items-center gap-2 px-4 py-3 bg-amber-100/50"
-                    >
-                        <AlertTriangle
-                            size={16}
-                            class="text-amber-600 shrink-0"
-                        />
-                        <p class="text-xs font-bold text-amber-800">
-                            Folios no encontrados ({matchResult.unmatched
-                                .length})
-                        </p>
-                    </div>
-                    <div class="max-h-40 overflow-y-auto px-4 py-2">
-                        <div class="flex flex-wrap gap-1.5">
-                            {#each matchResult.unmatched as entry}
-                                <Badge variant="amber" class="text-[11px]">
-                                    {entry.folio}
-                                    <span class="opacity-60 ml-1"
-                                        >({entry.conteo})</span
-                                    >
-                                </Badge>
-                            {/each}
+                        <Button
+                            variant="soft-slate"
+                            size="sm"
+                            onclick={() => showDuplicates = !showDuplicates}
+                        >
+                            {showDuplicates ? 'Ocultar' : 'Ver'} detalles
+                        </Button>
+                        <div class="text-[10px] text-amber-500">
+                            Total filas: {rawEntries.length} → Folios únicos: {stats.totalImported}
                         </div>
                     </div>
+                    
+                    {#if showDuplicates}
+                        <div class="mt-3 max-h-48 overflow-y-auto border border-amber-200 rounded-lg bg-amber-25/50 p-3">
+                            {#each duplicates as dup}
+                                <div class="mb-3 pb-3 border-b border-amber-200 last:border-0">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="font-mono text-xs font-bold text-amber-800">
+                                            Folio: {dup.folio}
+                                        </span>
+                                        <span class="text-xs text-amber-600">
+                                            {dup.occurrences} veces → {dup.totalConteo} usos totales
+                                        </span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-1 text-[10px] text-amber-700">
+                                        {#each dup.rows as row, i}
+                                            <div class="flex justify-between">
+                                                <span>Fila {i + 1}:</span>
+                                                <span>conteo={row.conteo}, inactividad={row.diasInactividad || 'N/A'}</span>
+                                            </div>
+                                        {/each}
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
                 </div>
             {/if}
+
+            <!-- Threshold -->
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="flex items-center justify-between mb-3">
+                    <p
+                        class="text-xs font-bold text-slate-700 uppercase tracking-wider"
+                    >
+                        Umbral de bajo uso
+                    </p>
+                    <Badge variant="blue" class="font-mono"
+                        >{usageThreshold}</Badge
+                    >
+                </div>
+                <p class="text-[11px] text-slate-400 mb-3">
+                    Define la cantidad de usos para generar la hoja de personal
+                    con bajo uso.
+                </p>
+                <div class="flex items-center gap-3">
+                    <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        bind:value={usageThreshold}
+                        class="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                    />
+                    <input
+                        type="number"
+                        min="0"
+                        bind:value={usageThreshold}
+                        class="w-16 h-8 text-center text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                    />
+                </div>
+            </div>
 
             <!-- Success message -->
             {#if stats.found > 0}

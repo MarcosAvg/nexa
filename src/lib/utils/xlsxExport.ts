@@ -1111,7 +1111,7 @@ export async function exportHistoryToExcel(data: any[], options?: ExportOptions)
 
 // ─── KONE Usage Export ─────────────────────────────────────────────────
 
-import type { KoneUsageMatchedEntry } from './xlsxKoneUsage';
+import type { KoneUsageMatchResult, KoneUsageMatchedEntry } from './xlsxKoneUsage';
 
 async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData: KoneUsageMatchedEntry[], sheetName: string, title: string, usageThreshold: number) {
     const ws = workbook.addWorksheet(sheetName);
@@ -1245,6 +1245,10 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
 
     const bajoUsoData = matchedData.filter(m => m.conteo < usageThreshold);
 
+    // Personal que solo usó torniquete (0 usos pero con días de inactividad)
+    const soloTorniqueteData = matchedData.filter(m => m.conteo === 0 && m.diasInactividad !== null && m.diasInactividad > 0);
+    const soloTorniqueteCount = soloTorniqueteData.length;
+
     // Dependency distribution
     const depMap: Record<string, { count: number; totalUsos: number }> = {};
     matchedData.forEach(m => {
@@ -1312,6 +1316,11 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
     kpiCard('B', 'Máximo de usos', maximo, C.amber);
     kpiCard('E', 'Personal bajo uso', bajoUsoData.length, bajoUsoData.length > 0 ? C.rose : C.emerald, pct(bajoUsoData.length, total));
     row++;
+
+    ws.getRow(row).height = 28;
+    kpiCard('B', 'Solo usó torniquete', soloTorniqueteCount, soloTorniqueteCount > 0 ? C.rose : C.emerald, pct(soloTorniqueteCount, total));
+    kpiCard('E', 'Sin días de inactividad', matchedData.filter(m => m.diasInactividad === null).length, C.sky);
+    row++;
     row++;
 
     // ══════ SECTION 2: Distribution by Ranges ══════
@@ -1338,56 +1347,30 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
     });
     row++;
 
-    // ══════ SECTION 3: Top Users ══════
-    sectionTitle(total > 10 ? '🏆  TOP 10 — MAYOR USO' : '🏆  LISTADO DE USO');
+    // ══════ SECTION 3: Distribution by Dependencies ══════
+    sectionTitle('�  DISTRIBUCIÓN POR DEPENDENCIAS');
 
     tableHeader([
-        { col: 'B', label: 'NOMBRE' },
-        { col: 'C', label: 'FOLIO KONE' },
-        { col: 'D', label: 'USOS' },
-        { col: 'E', label: 'DEPENDENCIA' },
-        { col: 'F', label: 'EDIFICIO' },
-        { col: 'G', label: 'ESTADO' },
-    ], C.amber);
+        { col: 'B', label: 'DEPENDENCIA' },
+        { col: 'C', label: 'PERSONAS' },
+        { col: 'D', label: 'TOTAL USOS' },
+        { col: 'E', label: 'PROMEDIO USOS' },
+        { col: 'F', label: '% DEL TOTAL' },
+    ], C.violet);
 
-    const usersToShow = matchedData.slice(0, 10);
-    usersToShow.forEach((m, i) => {
+    depEntries.forEach(([dep, stats], i) => {
+        const avgUsos = stats.count > 0 ? (stats.totalUsos / stats.count).toFixed(1) : '0';
         tableRow([
-            { col: 'B', value: `${m.person.last_name} ${m.person.first_name}` },
-            { col: 'C', value: m.folio },
-            { col: 'D', value: m.conteo },
-            { col: 'E', value: m.person.dependency || '-' },
-            { col: 'F', value: m.person.building || '-' },
-            { col: 'G', value: m.person.status || '-' },
-        ], i % 2 === 0 ? C.amber : C.slate);
+            { col: 'B', value: dep },
+            { col: 'C', value: stats.count },
+            { col: 'D', value: stats.totalUsos },
+            { col: 'E', value: avgUsos },
+            { col: 'F', value: pct(stats.totalUsos, totalUsos) },
+        ], i % 2 === 0 ? C.violet : C.slate);
     });
     row++;
 
-    // ══════ SECTION 4: By Dependency ══════
-    if (depEntries.length > 0) {
-        sectionTitle('🏢  DISTRIBUCIÓN POR DEPENDENCIA');
-
-        tableHeader([
-            { col: 'B', label: 'DEPENDENCIA' },
-            { col: 'C', label: 'PERSONAS' },
-            { col: 'D', label: 'USOS TOTALES' },
-            { col: 'E', label: 'PROMEDIO' },
-            { col: 'F', label: '% DE USOS' },
-        ], C.violet);
-
-        depEntries.forEach(([dep, stats]) => {
-            tableRow([
-                { col: 'B', value: dep },
-                { col: 'C', value: stats.count },
-                { col: 'D', value: stats.totalUsos },
-                { col: 'E', value: (stats.totalUsos / stats.count).toFixed(1) },
-                { col: 'F', value: pct(stats.totalUsos, totalUsos) },
-            ], C.violet);
-        });
-        row++;
-    }
-
-    // ══════ SECTION 5: By Building ══════
+    // ══════ SECTION 4: By Building ══════
     if (buildEntries.length > 0) {
         sectionTitle('🏗️  DISTRIBUCIÓN POR EDIFICIO');
 
@@ -1414,7 +1397,8 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
     ws.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1 };
 }
 
-export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[], usageThreshold: number = 10) {
+export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, usageThreshold: number = 10) {
+    const matchedData = matchResult.matched;
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
         import('file-saver')
@@ -1449,11 +1433,9 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
     };
 
     const headerLabels = [
-        'APELLIDOS', 'NOMBRES', 'NO. EMPLEADO', 'EDIFICIO', 'DEPENDENCIA', 'EQUIPO', 'PUESTO', 'PISO BASE',
-        'FOLIO ACCESO', 'PISOS ASIGNADOS', 'FOLIO ACCESO', 'PISOS ASIGNADOS',
-        'USOS REGISTRADOS',
-        'ESTADO', 'ACCESOS ESPECIALES',
-        'DIAS LABORALES', 'ENTRADA', 'SALIDA', 'CORREO ELECTRÓNICO'
+        'APELLIDOS', 'NOMBRES', 'NO. EMPLEADO',
+        'EDIFICIO', 'DEPENDENCIA', 'EQUIPO', 'PUESTO', 'PISO BASE',
+        'FOLIO KONE', 'USOS REGISTRADOS', 'DÍAS INACTIVIDAD'
     ];
 
     // ══════════════════════════════════════════════════════════════
@@ -1477,14 +1459,12 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
     dataSheet.columns = [
         { key: 'last_name', width: 25 }, { key: 'first_name', width: 25 }, { key: 'employee_no', width: 15 },
         { key: 'building', width: 22 }, { key: 'dependency', width: 28 }, { key: 'area', width: 22 },
-        { key: 'position', width: 28 }, { key: 'floor', width: 12 }, { key: 'folioP2000', width: 20 },
-        { key: 'pisosP2000Text', width: 25 }, { key: 'folioKone', width: 22 }, { key: 'pisosKoneText', width: 25 },
-        { key: 'conteoUsoKone', width: 18 }, { key: 'status', width: 15 }, { key: 'specialAccessesText', width: 28 },
-        { key: 'days', width: 22 }, { key: 'entry', width: 14 }, { key: 'exit', width: 14 }, { key: 'email', width: 35 },
+        { key: 'position', width: 28 }, { key: 'floor', width: 12 },
+        { key: 'folioKone', width: 18 }, { key: 'conteoUsoKone', width: 18 }, { key: 'diasInactividad', width: 18 }
     ];
 
     const setupDirectorySheet = async (ws: ExcelJSTypes.Worksheet, title: string, meta: string) => {
-        ws.mergeCells('A1:S1');
+        ws.mergeCells('A1:K1');
         const dtTitle = ws.getCell('A1');
         dtTitle.value = `       ${title}`;
         dtTitle.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
@@ -1501,7 +1481,7 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
             }
         } catch { /* logo optional */ }
 
-        ws.mergeCells('A2:S2');
+        ws.mergeCells('A2:K2');
         const dtMeta = ws.getCell('A2');
         dtMeta.value = meta;
         dtMeta.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
@@ -1511,13 +1491,7 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
         const groups = [
             { label: 'DATOS PERSONALES', range: 'A3:C3', colors: COLORS.personal },
             { label: 'UBICACIÓN Y PUESTO', range: 'D3:H3', colors: COLORS.location },
-            { label: 'ACCESO PUERTAS (P2000)', range: 'I3:J3', colors: COLORS.amber },
-            { label: 'ACCESO ELEVADORES (KONE)', range: 'K3:L3', colors: COLORS.sky },
-            { label: 'CONTEO USO KONE', range: 'M3:M3', colors: COLORS.koneUsage },
-            { label: 'ESTADO', range: 'N3:N3', colors: COLORS.status },
-            { label: 'ADICIONALES', range: 'O3:O3', colors: COLORS.additional },
-            { label: 'JORNADA LABORAL', range: 'P3:R3', colors: COLORS.emerald },
-            { label: 'CONTACTO', range: 'S3:S3', colors: COLORS.personal }
+            { label: 'USO KONE', range: 'I3:K3', colors: COLORS.koneUsage }
         ];
 
         groups.forEach(group => {
@@ -1549,7 +1523,7 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
             cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
             cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            const isGroupEnd = [3, 8, 10, 12, 13, 14, 15, 18, 19].includes(i + 1);
+            const isGroupEnd = [3, 8, 11].includes(i + 1);
             cell.border = {
                 bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
                 right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFFFFFFF' } }
@@ -1574,17 +1548,9 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
                 area: person.area || '-',
                 position: person.position || '-',
                 floor: person.floor || '-',
-                folioP2000,
-                pisosP2000Text: person.floors_p2000?.join(', ') || '-',
-                folioKone,
-                pisosKoneText: person.floors_kone?.join(', ') || '-',
+                folioKone: entry.folio,
                 conteoUsoKone: entry.conteo,
-                status: person.status || '-',
-                specialAccessesText: person.specialAccesses?.join(', ') || '-',
-                days: person.schedule?.days || '-',
-                entry: person.schedule?.entry || '-',
-                exit: person.schedule?.exit || '-',
-                email: person.email || '-'
+                diasInactividad: entry.diasInactividad !== null ? entry.diasInactividad : 'Sin registro'
             };
 
             const dataRow = ws.addRow(rowData);
@@ -1600,7 +1566,7 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
 
                 cell.font = { name: 'Arial', size: 9, color: { argb: isInactive ? 'FF64748B' : 'FF111827' }, italic: isInactive };
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-                const isGroupEnd = [3, 8, 10, 12, 13, 14, 15, 18, 19].includes(colNumber);
+                const isGroupEnd = [3, 8, 11].includes(colNumber);
                 setBorder(cell, isGroupEnd ? COLORS.separator : 'FFCBD5E1');
 
                 if (isInactive) {
@@ -1610,7 +1576,7 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
                 }
 
                 // Highlight conteo column specifically
-                if (colNumber === 13 && !isInactive) {
+                if (colNumber === 10 && !isInactive) {
                     const conteoVal = entry.conteo;
                     if (conteoVal > 100) {
                         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
@@ -1619,42 +1585,42 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
                         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
                         cell.font = { ...cell.font, bold: true, color: { argb: 'FF075985' } };
                     } else if (conteoVal === 0) {
+                        cell.value = 'Sin registro';
                         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
-                        cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, italic: true };
+                        cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, bold: true };
                     } else if (conteoVal < usageThreshold) {
                         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F2' } };
                         cell.font = { ...cell.font, bold: true, color: { argb: 'FF991B1B' } };
                     }
                 }
 
-                if (cell.value === '-' || cell.value === 'N/A' || !cell.value) {
+                // Highlight dias de inactividad column in red
+                if (colNumber === 11) {
+                    if (entry.diasInactividad === null) {
+                        cell.value = 'Sin registro';
+                        cell.font = { ...cell.font, color: { argb: 'FFDC2626' }, bold: true };
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+                    } else {
+                        // Mantener el valor numérico (incluyendo 0)
+                        cell.font = { ...cell.font, color: { argb: 'FFDC2626' }, bold: true };
+                    }
+                }
+
+                // Handle other empty values (but not dias de inactividad column)
+                if (colNumber !== 11 && (cell.value === '-' || cell.value === 'N/A' || !cell.value)) {
                     cell.value = '[SIN DATO]';
                     cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, italic: true };
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
                 }
             });
 
-            // Status Colors
-            const statusCell = dataRow.getCell('status');
-            if (person.status === 'Activo/a' && !isInactive) {
-                statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
-                statusCell.font = { color: { argb: 'FF166534' }, bold: true, name: 'Arial', size: 9 };
-            } else if (person.status === 'Parcial' && !isInactive) {
-                statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
-                statusCell.font = { color: { argb: 'FF92400E' }, bold: true, name: 'Arial', size: 9 };
-            } else if (person.status === 'Bloqueado/a') {
-                statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
-                statusCell.font = { color: { argb: 'FF991B1B' }, bold: true, name: 'Arial', size: 9 };
-            } else if (isInactive) {
-                statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-                statusCell.font = { color: { argb: 'FF475569' }, italic: true, name: 'Arial', size: 9 };
-            }
+            // Remove Status coloring column since it's removed from export
         });
     };
 
     const mainGroups = await setupDirectorySheet(dataSheet, 'DIRECTORIO DE PERSONAL CON CONTEO DE USO KONE — NEXA', `Reporte generado: ${dateStr}  |  Registros: ${total}  |  Total usos: ${totalUsos}`);
     populateRows(dataSheet, matchedData, mainGroups);
-    dataSheet.autoFilter = 'A4:S4';
+    dataSheet.autoFilter = 'A4:K4';
     dataSheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 4 }];
 
     // ══════════════════════════════════════════════════════════════
@@ -1665,8 +1631,78 @@ export async function exportKoneUsageToExcel(matchedData: KoneUsageMatchedEntry[
         lowUsageSheet.columns = dataSheet.columns;
         const luGroups = await setupDirectorySheet(lowUsageSheet, `PERSONAL CON BAJO USO (< ${usageThreshold}) — NEXA`, `Filtrado por: Conteo < ${usageThreshold}  |  Registros: ${bajoUsoData.length}`);
         populateRows(lowUsageSheet, bajoUsoData, luGroups);
-        lowUsageSheet.autoFilter = 'A4:S4';
+        lowUsageSheet.autoFilter = 'A4:K4';
         lowUsageSheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 4 }];
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // SHEET 5: Unmatched Folios
+    // ══════════════════════════════════════════════════════════════
+    if (matchResult.unmatched && matchResult.unmatched.length > 0) {
+        const unmatchedSheet = workbook.addWorksheet('No Relacionados');
+        unmatchedSheet.columns = [
+            { key: 'folio', width: 25 },
+            { key: 'conteo', width: 20 },
+            { key: 'diasInactividad', width: 20 }
+        ];
+
+        unmatchedSheet.mergeCells('A1:C1');
+        const unfTitle = unmatchedSheet.getCell('A1');
+        unfTitle.value = `       FOLIOS NO ENCONTRADOS — NEXA`;
+        unfTitle.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
+        unfTitle.alignment = { vertical: 'middle', horizontal: 'left' };
+        unmatchedSheet.getRow(1).height = 40;
+
+        try {
+            const response = await fetch('/favicon.svg');
+            if (response.ok) {
+                const blob = await response.blob();
+                const buffer = await blob.arrayBuffer();
+                const imageId = workbook.addImage({ buffer, extension: 'svg' as any });
+                unmatchedSheet.addImage(imageId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 32, height: 32 } });
+            }
+        } catch { /* logo optional */ }
+
+        unmatchedSheet.mergeCells('A2:C2');
+        const unfMeta = unmatchedSheet.getCell('A2');
+        unfMeta.value = `Reporte generado: ${dateStr}  |  Folios no encontrados: ${matchResult.unmatched.length}`;
+        unfMeta.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
+        unfMeta.alignment = { vertical: 'middle', horizontal: 'left' };
+        unmatchedSheet.getRow(2).height = 20;
+
+        const subHeaderRow = unmatchedSheet.getRow(3);
+        subHeaderRow.height = 30;
+        const unfLabels = ['FOLIO', 'USOS REGISTRADOS', 'DÍAS INACTIVIDAD'];
+        unfLabels.forEach((label, i) => {
+            const cell = subHeaderRow.getCell(i + 1);
+            cell.value = label;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.amber.head } };
+            cell.font = { name: 'Arial', bold: true, color: { argb: COLORS.amber.sub }, size: 9 };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            cell.border = {
+                bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
+                right: { style: 'thin', color: { argb: 'FFFFFFFF' } }
+            };
+        });
+
+        matchResult.unmatched.forEach(entry => {
+            const dataRow = unmatchedSheet.addRow({
+                folio: entry.folio,
+                conteo: entry.conteo,
+                diasInactividad: entry.diasInactividad !== null ? entry.diasInactividad : '-'
+            });
+            dataRow.height = 24;
+
+            dataRow.eachCell((cell) => {
+                cell.font = { name: 'Arial', size: 9, color: { argb: 'FF111827' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.amber.fill } };
+                cell.border = { top: thin('FFCBD5E1'), bottom: thin('FFCBD5E1'), left: thin('FFCBD5E1'), right: thin('FFCBD5E1') };
+            });
+        });
+
+        unmatchedSheet.autoFilter = 'A3:C3';
+        unmatchedSheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 3 }];
     }
 
     // ── Save ──
