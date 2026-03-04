@@ -51,7 +51,21 @@ export const ticketService = {
                 query = query.ilike("priority", priorityFilter);
             }
             if (search) {
-                query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+                const searchTerm = `%${search}%`;
+
+                // Find matching people IDs first
+                const { data: people } = await supabase
+                    .from("personnel")
+                    .select("id")
+                    .or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm}`);
+
+                const personIds = people?.map(p => p.id) || [];
+
+                if (personIds.length > 0) {
+                    query = query.or(`title.ilike.${searchTerm},description.ilike.${searchTerm},person_id.in.(${personIds.join(',')})`);
+                } else {
+                    query = query.or(`title.ilike.${searchTerm},description.ilike.${searchTerm}`);
+                }
             }
 
             const { data, count, error } = await query
