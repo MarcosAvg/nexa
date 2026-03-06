@@ -63,6 +63,7 @@
     let searchResults = $state<any[]>([]);
     let selectedPerson = $state<any>(null);
     let showSearchResults = $state(false);
+    let searchDebounce: ReturnType<typeof setTimeout>;
 
     // Options
     const ticketTypes = [
@@ -121,8 +122,11 @@
 
     // Search Logic
     function handleSearch(e: Event) {
-        const term = (e.target as HTMLInputElement).value.toLowerCase();
-        searchTerm = term;
+        const val = (e.target as HTMLInputElement).value;
+        const term = val.toLowerCase();
+        searchTerm = val;
+
+        clearTimeout(searchDebounce);
 
         if (term.length < 2) {
             searchResults = [];
@@ -130,17 +134,21 @@
             return;
         }
 
-        const all = personnelState.personnelOptions;
+        searchDebounce = setTimeout(async () => {
+            try {
+                let searchResultData: any[] = [];
+                // If it looks like an employee number (mostly digits/letters with no spaces), use fetchAll
+                const { data } = await personnelService.fetchAll(1, 5, term);
 
-        searchResults = all
-            .filter(
-                (p) =>
-                    (p.name || "").toLowerCase().includes(term) ||
-                    (p.employee_no || "").toLowerCase().includes(term),
-            )
-            .slice(0, 5);
-
-        showSearchResults = true;
+                // Avoid race conditions if user cleared input
+                if (searchTerm === val) {
+                    searchResults = data;
+                    showSearchResults = true;
+                }
+            } catch (err) {
+                console.error("Search failed:", err);
+            }
+        }, 300);
     }
 
     function selectPerson(person: any) {
