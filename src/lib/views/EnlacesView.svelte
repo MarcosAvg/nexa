@@ -6,10 +6,20 @@
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import PermissionGuard from "../components/PermissionGuard.svelte";
     import AddEnlaceModal from "../components/modals/AddEnlaceModal.svelte";
+    import EditEnlaceModal from "../components/modals/EditEnlaceModal.svelte";
     import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
     import DataTable from "../components/DataTable.svelte";
     import { catalogState } from "../stores";
-    import { Trash2, Search, Contact, UserPlus } from "lucide-svelte";
+    import {
+        Trash2,
+        Search,
+        Contact,
+        UserPlus,
+        Edit,
+        Copy,
+        Mail,
+        Send,
+    } from "lucide-svelte";
     import { toast } from "svelte-sonner";
     import Input from "../components/Input.svelte";
 
@@ -20,6 +30,9 @@
 
     let isConfirmOpen = $state(false);
     let selectedEnlace = $state<Enlace | null>(null);
+
+    let isEditOpen = $state(false);
+    let selectedEnlaceForEdit = $state<Enlace | null>(null);
 
     let dependencies = $derived(catalogState.dependencies);
 
@@ -106,6 +119,38 @@
             selectedEnlace = null;
         }
     }
+
+    function requestEdit(row: Enlace) {
+        selectedEnlaceForEdit = row;
+        isEditOpen = true;
+    }
+
+    async function copyEmail(email: string) {
+        if (!email || email === "N/A") return;
+        try {
+            await navigator.clipboard.writeText(email);
+            toast.success("Correo copiado al portapapeles");
+        } catch {
+            toast.error("Error al copiar el correo");
+        }
+    }
+
+    function sendEmail(email: string) {
+        if (!email || email === "N/A") return;
+        window.location.href = `mailto:${email}`;
+    }
+
+    function broadcastEmail() {
+        const emails = filteredEnlaces
+            .map((e) => e.personnel?.email)
+            .filter((email) => email && email.trim() !== "" && email !== "N/A");
+
+        if (emails.length === 0) {
+            toast.error("No hay correos disponibles en esta lista.");
+            return;
+        }
+        window.location.href = `mailto:?bcc=${emails.join(",")}`;
+    }
 </script>
 
 {#snippet renderName(row: Enlace)}
@@ -156,7 +201,17 @@
         {#snippet actions()}
             <PermissionGuard requireEdit>
                 {#snippet children({ disabled })}
-                    <div class="w-full xl:w-auto mt-4 xl:mt-0 flex justify-end">
+                    <div
+                        class="w-full xl:w-auto mt-4 xl:mt-0 flex gap-2 justify-end"
+                    >
+                        <button
+                            type="button"
+                            class="hidden sm:flex items-center justify-center gap-2 h-10 px-4 bg-white text-slate-700 border border-slate-200 font-bold rounded-xl hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+                            onclick={broadcastEmail}
+                        >
+                            <Send size={16} class="text-slate-400" />
+                            Difusión
+                        </button>
                         <button
                             type="button"
                             class="hidden sm:flex items-center justify-center gap-2 h-10 px-6 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/10"
@@ -187,25 +242,59 @@
     {:else}
         <DataTable data={filteredEnlaces} {columns}>
             {#snippet actions(row: Enlace)}
-                <PermissionGuard requireEdit>
-                    {#snippet children({ disabled })}
+                <div class="flex items-center gap-1 justify-end">
+                    {#if row.personnel?.email && row.personnel?.email !== "N/A"}
                         <button
                             type="button"
-                            class="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
-                            onclick={() => requestRemove(row)}
-                            title="Remover"
-                            {disabled}
+                            class="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+                            onclick={() => copyEmail(row.personnel!.email!)}
+                            title="Copiar Correo"
                         >
-                            <Trash2 size={16} />
+                            <Copy size={16} />
                         </button>
-                    {/snippet}
-                </PermissionGuard>
+                        <button
+                            type="button"
+                            class="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent hover:border-indigo-100"
+                            onclick={() => sendEmail(row.personnel!.email!)}
+                            title="Enviar Correo"
+                        >
+                            <Mail size={16} />
+                        </button>
+                    {/if}
+                    <PermissionGuard requireEdit>
+                        {#snippet children({ disabled })}
+                            <button
+                                type="button"
+                                class="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors border border-transparent hover:border-emerald-100"
+                                onclick={() => requestEdit(row)}
+                                title="Editar Extensión"
+                                {disabled}
+                            >
+                                <Edit size={16} />
+                            </button>
+                            <button
+                                type="button"
+                                class="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
+                                onclick={() => requestRemove(row)}
+                                title="Remover"
+                                {disabled}
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        {/snippet}
+                    </PermissionGuard>
+                </div>
             {/snippet}
         </DataTable>
     {/if}
 </div>
 
 <AddEnlaceModal bind:isOpen={isAddModalOpen} onComplete={loadData} />
+<EditEnlaceModal
+    bind:isOpen={isEditOpen}
+    enlace={selectedEnlaceForEdit}
+    onComplete={loadData}
+/>
 
 <ConfirmationModal
     bind:isOpen={isConfirmOpen}

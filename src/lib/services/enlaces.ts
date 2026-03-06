@@ -72,6 +72,29 @@ export const enlaceService = {
         }
     },
 
+    async update(id: string, extension: string, personName: string) {
+        try {
+            const { data, error } = await supabase
+                .from('enlaces')
+                .update({ extension })
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            await HistoryService.log("ENLACE", id, "UPDATE", {
+                message: `Extensión actualizada a "${extension}"`,
+                entityName: `Enlace: ${personName}`
+            });
+
+            return data;
+        } catch (error) {
+            handleError(error, 'Update Enlace');
+            throw error;
+        }
+    },
+
     async remove(id: string, personName: string) {
         try {
             const { error } = await supabase
