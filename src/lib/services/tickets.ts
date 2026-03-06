@@ -34,6 +34,7 @@ export const ticketService = {
         typeFilter: string = "Todos",
         priorityFilter: string = "Todas",
         search: string = "",
+        section: string = "General"
     ): Promise<{ data: Ticket[]; count: number }> {
         try {
             const from = (page - 1) * limit;
@@ -44,8 +45,13 @@ export const ticketService = {
                 .select("*, personnel(first_name, last_name)", { count: "exact" })
                 .eq("status", "pending");
 
-            if (typeFilter && typeFilter !== "Todos") {
-                query = query.eq("type", typeFilter);
+            if (section === "Responsivas") {
+                query = query.eq("type", "Firma Responsiva");
+            } else {
+                query = query.neq("type", "Firma Responsiva");
+                if (typeFilter && typeFilter !== "Todos") {
+                    query = query.eq("type", typeFilter);
+                }
             }
             if (priorityFilter && priorityFilter !== "Todas") {
                 query = query.ilike("priority", priorityFilter);

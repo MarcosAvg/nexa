@@ -41,10 +41,28 @@
     let totalPages = $derived(Math.max(1, Math.ceil(totalRecords / pageSize)));
     let isLoading = $state(false);
 
+    // Sections
+    let currentSection = $state<"General" | "Responsivas">("General");
+
     // Filters
     let typeFilter = $state("Todos");
     let priorityFilter = $state("Todas");
     let searchQuery = $state("");
+
+    function switchSection(section: "General" | "Responsivas") {
+        if (currentSection !== section) {
+            currentSection = section;
+            typeFilter = "Todos";
+            priorityFilter = "Todas";
+            searchQuery = "";
+            // Reset search input if it exists
+            const searchInput = document.getElementById(
+                "ticket-search",
+            ) as HTMLInputElement;
+            if (searchInput) searchInput.value = "";
+            refreshData(1);
+        }
+    }
 
     // Modal State
     let isModalOpen = $state(false);
@@ -115,7 +133,6 @@
         "Todos",
         "Alta de Persona",
         "Programación",
-        "Firma Responsiva",
         "Modificación",
         "Solicitud de acceso",
         "Reposición",
@@ -141,6 +158,7 @@
                     typeFilter,
                     priorityFilter,
                     searchQuery,
+                    currentSection,
                 ),
                 cardService.fetchExtra(),
             ]);
@@ -283,20 +301,48 @@
 </script>
 
 <div class="space-y-6">
-    <SectionHeader title="Tickets de trabajo">
+    <!-- Section Tabs -->
+    <div class="flex border-b border-slate-200">
+        <button
+            class="px-6 py-3 text-sm font-bold border-b-2 transition-colors {currentSection ===
+            'General'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}"
+            onclick={() => switchSection("General")}
+        >
+            Tickets Generales
+        </button>
+        <button
+            class="px-6 py-3 text-sm font-bold border-b-2 transition-colors {currentSection ===
+            'Responsivas'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}"
+            onclick={() => switchSection("Responsivas")}
+        >
+            Firmas de Responsiva
+        </button>
+    </div>
+
+    <SectionHeader
+        title={currentSection === "General"
+            ? "Tickets de trabajo"
+            : "Firmas de Responsiva"}
+    >
         {#snippet filters()}
             <div
                 class="flex flex-col xl:flex-row flex-wrap gap-4 items-center w-full"
             >
                 <!-- Type Filters -->
-                <div class="w-full xl:w-auto">
-                    <FilterSelect
-                        label="Tipo"
-                        options={ticketTypes}
-                        bind:value={typeFilter}
-                        onchange={onFilterChange}
-                    />
-                </div>
+                {#if currentSection === "General"}
+                    <div class="w-full xl:w-auto">
+                        <FilterSelect
+                            label="Tipo"
+                            options={ticketTypes}
+                            bind:value={typeFilter}
+                            onchange={onFilterChange}
+                        />
+                    </div>
+                {/if}
 
                 <!-- Priority -->
                 <div class="w-full xl:w-auto">
