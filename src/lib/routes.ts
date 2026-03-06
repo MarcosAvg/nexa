@@ -5,6 +5,7 @@ import CardsView from './views/CardsView.svelte';
 import TicketsView from './views/TicketsView.svelte';
 import HistoryView from './views/HistoryView.svelte';
 import SettingsView from './views/SettingsView.svelte';
+import EnlacesView from './views/EnlacesView.svelte';
 
 // NOTE: svelte-spa-router requires the `wrap()` helper for lazy loading.
 // Keeping eager imports for now to ensure compatibility with all router versions.
@@ -16,6 +17,7 @@ export const routes = {
     '/tickets': TicketsView,
     '/history': HistoryView,
     '/settings': SettingsView,
+    '/enlaces': EnlacesView,
     // Catch-all route last
     '*': DashboardView
 };

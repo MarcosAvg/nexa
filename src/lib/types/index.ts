@@ -1,4 +1,12 @@
 
+export interface Enlace {
+    id: string;
+    person_id: string;
+    extension: string;
+    created_at: string;
+    personnel?: Person;
+}
+
 export interface Person {
     id: string;
     first_name: string;

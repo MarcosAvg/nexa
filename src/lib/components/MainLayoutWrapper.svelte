@@ -10,6 +10,7 @@
         ClipboardList,
         History,
         Settings,
+        Contact,
     } from "lucide-svelte";
     import { onMount } from "svelte";
 
@@ -20,6 +21,7 @@
             { label: "Personal", href: "/personal", icon: Users },
             { label: "Tarjetas", href: "/cards", icon: CreditCard },
             { label: "Pendientes", href: "/tickets", icon: ClipboardList },
+            { label: "Enlaces", href: "/enlaces", icon: Contact },
             { label: "Historial", href: "/history", icon: History },
         ];
 
@@ -58,6 +60,7 @@
         else if (path.includes("personal")) uiState.setActivePage("Personal");
         else if (path.includes("cards")) uiState.setActivePage("Tarjetas");
         else if (path.includes("tickets")) uiState.setActivePage("Pendientes");
+        else if (path.includes("enlaces")) uiState.setActivePage("Enlaces");
         else if (path.includes("history")) uiState.setActivePage("Historial");
         else if (path.includes("settings"))
             uiState.setActivePage("Configuración");
