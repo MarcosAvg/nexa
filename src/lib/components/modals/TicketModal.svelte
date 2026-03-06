@@ -120,13 +120,13 @@
         }
     });
 
+    let allPersonnel = $derived(personnelState.personnelOptions);
+
     // Search Logic
     function handleSearch(e: Event) {
         const val = (e.target as HTMLInputElement).value;
         const term = val.toLowerCase();
         searchTerm = val;
-
-        clearTimeout(searchDebounce);
 
         if (term.length < 2) {
             searchResults = [];
@@ -134,21 +134,15 @@
             return;
         }
 
-        searchDebounce = setTimeout(async () => {
-            try {
-                let searchResultData: any[] = [];
-                // If it looks like an employee number (mostly digits/letters with no spaces), use fetchAll
-                const { data } = await personnelService.fetchAll(1, 5, term);
+        searchResults = allPersonnel
+            .filter(
+                (p) =>
+                    (p.name || "").toLowerCase().includes(term) ||
+                    (p.employee_no || "").toLowerCase().includes(term),
+            )
+            .slice(0, 5);
 
-                // Avoid race conditions if user cleared input
-                if (searchTerm === val) {
-                    searchResults = data;
-                    showSearchResults = true;
-                }
-            } catch (err) {
-                console.error("Search failed:", err);
-            }
-        }, 300);
+        showSearchResults = true;
     }
 
     function selectPerson(person: any) {

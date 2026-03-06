@@ -2,7 +2,7 @@
     import Modal from "../Modal.svelte";
     import Button from "../Button.svelte";
     import Input from "../Input.svelte";
-    import { personnelService } from "../../services/personnel";
+    import { personnelState } from "../../stores";
     import { enlaceService } from "../../services/enlaces";
     import { Search, UserPlus } from "lucide-svelte";
     import { toast } from "svelte-sonner";
@@ -20,43 +20,23 @@
     let extension = $state("");
     let isSubmitting = $state(false);
 
-    let searchResults = $state<any[]>([]);
-    let searchDebounce: ReturnType<typeof setTimeout>;
-
-    function handleSearchInput(e: Event) {
-        const val = (e.target as HTMLInputElement).value;
-        searchQuery = val;
-
-        clearTimeout(searchDebounce);
-
-        if (!val.trim()) {
-            searchResults = [];
-            return;
-        }
-
-        searchDebounce = setTimeout(async () => {
-            try {
-                const { data } = await personnelService.fetchAll(
-                    1,
-                    5,
-                    val,
-                    "Activo/a",
-                );
-                // Avoid race conditions if user cleared input
-                if (searchQuery.trim() === val) {
-                    searchResults = data;
-                }
-            } catch (err) {
-                console.error("Search failed:", err);
-            }
-        }, 300);
-    }
+    let allPersonnel = $derived(personnelState.personnelOptions);
+    let searchResults = $derived.by(() => {
+        if (!searchQuery.trim() || selectedPersonId) return [];
+        const term = searchQuery.toLowerCase();
+        return allPersonnel
+            .filter(
+                (p) =>
+                    (p.name || "").toLowerCase().includes(term) ||
+                    (p.employee_no || "").toLowerCase().includes(term),
+            )
+            .slice(0, 5);
+    });
 
     function selectPerson(p: any) {
         selectedPersonId = p.id;
-        selectedPersonName = `${p.first_name} ${p.last_name}`;
+        selectedPersonName = p.name;
         searchQuery = "";
-        searchResults = [];
     }
 
     function reset() {
@@ -133,8 +113,7 @@
                     id="search-person"
                     name="search-person"
                     placeholder="Buscar por nombre o número de empleado..."
-                    value={searchQuery}
-                    oninput={handleSearchInput}
+                    bind:value={searchQuery}
                     class="pl-10 h-10 w-full"
                 />
 
@@ -149,14 +128,12 @@
                                 onclick={() => selectPerson(p)}
                             >
                                 <div class="font-bold text-sm text-slate-800">
-                                    {p.first_name}
-                                    {p.last_name}
+                                    {p.name}
                                 </div>
                                 <div class="text-[10px] text-slate-400">
                                     {p.employee_no
                                         ? `#${p.employee_no}`
-                                        : "Sin número"} · {p.building ||
-                                        "Sin edificio"}
+                                        : "Sin número"}
                                 </div>
                             </button>
                         {/each}
