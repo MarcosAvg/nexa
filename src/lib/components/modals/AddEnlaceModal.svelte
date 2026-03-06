@@ -2,7 +2,7 @@
     import Modal from "../Modal.svelte";
     import Button from "../Button.svelte";
     import Input from "../Input.svelte";
-    import { personnelState } from "../../stores";
+    import { personnelService } from "../../services/personnel";
     import { enlaceService } from "../../services/enlaces";
     import { Search, UserPlus } from "lucide-svelte";
     import { toast } from "svelte-sonner";
@@ -20,22 +20,37 @@
     let extension = $state("");
     let isSubmitting = $state(false);
 
-    let allPersonnel = $derived(personnelState.personnelOptions);
-    let searchResults = $derived.by(() => {
-        if (!searchQuery.trim() || selectedPersonId) return [];
-        const term = searchQuery.toLowerCase();
-        return allPersonnel
-            .filter(
-                (p) =>
-                    (p.name || "").toLowerCase().includes(term) ||
-                    (p.employee_no || "").toLowerCase().includes(term),
-            )
-            .slice(0, 5);
-    });
+    let searchResults = $state<any[]>([]);
+    let searchDebounce: ReturnType<typeof setTimeout>;
+
+    function handleSearchInput(e: Event) {
+        const val = (e.target as HTMLInputElement).value;
+        searchQuery = val;
+
+        clearTimeout(searchDebounce);
+
+        if (val.trim().length > 2) {
+            searchDebounce = setTimeout(async () => {
+                try {
+                    const results = await personnelService.searchByName(
+                        "",
+                        val,
+                    );
+                    if (searchQuery.trim() === val) {
+                        searchResults = results.slice(0, 5);
+                    }
+                } catch (err) {
+                    console.error("Search failed:", err);
+                }
+            }, 300);
+        } else {
+            searchResults = [];
+        }
+    }
 
     function selectPerson(p: any) {
         selectedPersonId = p.id;
-        selectedPersonName = p.name;
+        selectedPersonName = `${p.first_name} ${p.last_name}`;
         searchQuery = "";
     }
 
@@ -113,7 +128,8 @@
                     id="search-person"
                     name="search-person"
                     placeholder="Buscar por nombre o número de empleado..."
-                    bind:value={searchQuery}
+                    value={searchQuery}
+                    oninput={handleSearchInput}
                     class="pl-10 h-10 w-full"
                 />
 
@@ -128,7 +144,8 @@
                                 onclick={() => selectPerson(p)}
                             >
                                 <div class="font-bold text-sm text-slate-800">
-                                    {p.name}
+                                    {p.first_name}
+                                    {p.last_name}
                                 </div>
                                 <div class="text-[10px] text-slate-400">
                                     {p.employee_no

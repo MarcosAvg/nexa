@@ -125,24 +125,34 @@
     // Search Logic
     function handleSearch(e: Event) {
         const val = (e.target as HTMLInputElement).value;
-        const term = val.toLowerCase();
         searchTerm = val;
 
-        if (term.length < 2) {
+        clearTimeout(searchDebounce);
+
+        if (val.trim().length > 2) {
+            searchDebounce = setTimeout(async () => {
+                try {
+                    const results = await personnelService.searchByName(
+                        "",
+                        val,
+                    );
+                    if (searchTerm === val) {
+                        searchResults = results
+                            .map((p) => ({
+                                ...p,
+                                name: `${p.first_name} ${p.last_name}`.trim(),
+                            }))
+                            .slice(0, 5);
+                        showSearchResults = true;
+                    }
+                } catch (err) {
+                    console.error("Search failed:", err);
+                }
+            }, 300);
+        } else {
             searchResults = [];
             showSearchResults = false;
-            return;
         }
-
-        searchResults = allPersonnel
-            .filter(
-                (p) =>
-                    (p.name || "").toLowerCase().includes(term) ||
-                    (p.employee_no || "").toLowerCase().includes(term),
-            )
-            .slice(0, 5);
-
-        showSearchResults = true;
     }
 
     function selectPerson(person: any) {
