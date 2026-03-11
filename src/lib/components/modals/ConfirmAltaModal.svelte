@@ -20,6 +20,7 @@
         XCircle,
     } from "lucide-svelte";
     import Button from "../Button.svelte";
+    import { parseFloors } from "../../utils/xlsxImporter";
 
     let {
         isOpen = $bindable(false),
@@ -53,18 +54,8 @@
             horaEntrada: p.hora_entrada,
             horaSalida: p.hora_salida,
             correo: p.correo?.replace(/^mailto:\s*/i, "").trim(),
-            pisosP2000: p.pisos_p2000
-                ? p.pisos_p2000
-                      .split(",")
-                      .map((s: string) => s.trim())
-                      .filter(Boolean)
-                : [],
-            pisosKone: p.pisos_kone
-                ? p.pisos_kone
-                      .split(",")
-                      .map((s: string) => s.trim())
-                      .filter(Boolean)
-                : [],
+            pisosP2000: parseFloors(p.pisos_p2000),
+            pisosKone: parseFloors(p.pisos_kone),
             specialAccesses: [p.acceso1, p.acceso2, p.acceso3]
                 .map((s: string) => s?.trim())
                 .filter(Boolean),

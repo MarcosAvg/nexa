@@ -25,6 +25,7 @@
         Loader2,
         AlertTriangle,
     } from "lucide-svelte";
+    import { parseFloors } from "../../utils/xlsxImporter";
 
     let {
         isOpen = $bindable(false),
@@ -159,18 +160,12 @@
         let proposedP2000 = [...(selectedPerson.floors_p2000 || [])];
         if (p.accion_p2000) {
             const action = p.accion_p2000;
-            const floorsStr = p.pisos_p2000 || "";
-            const parsedFloors = floorsStr
-                .split(",")
-                .map((s: string) => s.trim())
-                .filter(Boolean);
+            const parsedFloors = parseFloors(p.pisos_p2000);
 
             if (isAction(action, "clear")) proposedP2000 = [];
             else if (isAction(action, "replace")) proposedP2000 = parsedFloors;
             else if (isAction(action, "add"))
-                proposedP2000 = [
-                    ...new Set([...proposedP2000, ...parsedFloors]),
-                ];
+                proposedP2000 = parseFloors([...proposedP2000, ...parsedFloors].join(","));
             else if (isAction(action, "remove"))
                 proposedP2000 = proposedP2000.filter(
                     (f) => !parsedFloors.includes(f),
@@ -182,16 +177,12 @@
         let proposedKONE = [...(selectedPerson.floors_kone || [])];
         if (p.accion_kone) {
             const action = p.accion_kone;
-            const floorsStr = p.pisos_kone || "";
-            const parsedFloors = floorsStr
-                .split(",")
-                .map((s: string) => s.trim())
-                .filter(Boolean);
+            const parsedFloors = parseFloors(p.pisos_kone);
 
             if (isAction(action, "clear")) proposedKONE = [];
             else if (isAction(action, "replace")) proposedKONE = parsedFloors;
             else if (isAction(action, "add"))
-                proposedKONE = [...new Set([...proposedKONE, ...parsedFloors])];
+                proposedKONE = parseFloors([...proposedKONE, ...parsedFloors].join(","));
             else if (isAction(action, "remove"))
                 proposedKONE = proposedKONE.filter(
                     (f) => !parsedFloors.includes(f),

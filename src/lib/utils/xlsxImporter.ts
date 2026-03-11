@@ -257,6 +257,27 @@ function parseSheet(ws: ExcelJS.Worksheet, key: SheetKey): ParsedSheet {
 }
 
 // ─────────────────────────────────────────
+// Utils
+// ─────────────────────────────────────────
+
+/** Parses a string of floors into a naturally sorted array of strings. */
+export function parseFloors(floorsStr: string | null | undefined): string[] {
+    if (!floorsStr) return [];
+    
+    // Excel may convert "13,14" into a decimal number 13.14
+    // We replace the word " y " with a comma and split by natural delimiters
+    const parsed = String(floorsStr)
+        .replace(/\by\b/gi, ',')
+        .split(/[,;|.]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+        
+    return [...new Set(parsed)].sort((a, b) => 
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+    );
+}
+
+// ─────────────────────────────────────────
 // Main export
 // ─────────────────────────────────────────
 
