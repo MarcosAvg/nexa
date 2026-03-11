@@ -24,6 +24,7 @@
     HistoryService,
   } from "./lib/services";
   import GlobalOverlays from "./lib/components/GlobalOverlays.svelte";
+  import { initGlobalRealtime } from "./lib/utils/realtime";
 
   let loadingAuth = $state(true);
   let initError = $state(false);
@@ -120,6 +121,7 @@
 
           // Init Realtime subscriptions
           personnelState.initRealtime();
+          initGlobalRealtime();
         } catch (e) {
           console.warn("Error loading background data:", e);
         }
