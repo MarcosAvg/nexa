@@ -11,7 +11,7 @@
  *   // later: unsub();
  */
 
-type Listener = () => void;
+type Listener = (payload?: any) => void;
 
 class AppEvents {
     private listeners = new Map<string, Set<Listener>>();
@@ -27,9 +27,9 @@ class AppEvents {
         };
     }
 
-    emit(event: string): void {
+    emit(event: string, payload?: any): void {
         this.listeners.get(event)?.forEach(cb => {
-            try { cb(); } catch (e) { console.error(`[AppEvents] Error in listener for '${event}':`, e); }
+            try { cb(payload); } catch (e) { console.error(`[AppEvents] Error in listener for '${event}':`, e); }
         });
     }
 }
@@ -43,4 +43,5 @@ export const EVENTS = {
     TICKETS_CHANGED: 'tickets:changed',
     HISTORY_CHANGED: 'history:changed',
     CATALOGS_CHANGED: 'catalogs:changed',
+    TRIGGER_DEACTIVATE: 'trigger:deactivate',
 } as const;

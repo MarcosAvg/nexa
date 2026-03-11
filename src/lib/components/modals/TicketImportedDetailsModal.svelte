@@ -23,9 +23,10 @@
         XCircle,
         CreditCard,
         Loader2,
-        AlertTriangle,
+        AlertTriangle
     } from "lucide-svelte";
     import { parseFloors } from "../../utils/xlsxImporter";
+    import { appEvents, EVENTS } from "../../utils/appEvents";
 
     let {
         isOpen = $bindable(false),
@@ -246,24 +247,29 @@
     // ── BAJA ─────────────────────────────────────────────
     async function handleBaja() {
         if (!selectedPerson || !ticket) return;
-        isSubmitting = true;
-        try {
-            await personnelService.updateStatus(selectedPerson.id, "deleted");
-            await ticketService.delete(
-                ticket.id,
-                "Baja aplicada desde plantilla",
-            );
-            toast.success(
-                `Baja registrada para ${selectedPerson.last_name}, ${selectedPerson.first_name}.`,
-            );
-            isOpen = false;
-            onComplete?.();
-        } catch (err) {
-            console.error(err);
-            toast.error("Error al dar de baja.");
-        } finally {
-            isSubmitting = false;
-        }
+        
+        appEvents.emit(EVENTS.TRIGGER_DEACTIVATE, {
+            person: selectedPerson,
+            onSuccess: async () => {
+                isSubmitting = true;
+                try {
+                    await ticketService.delete(
+                        ticket.id,
+                        "Baja procesada y completada desde plantilla",
+                    );
+                    toast.success("Ticket de baja cerrado exitosamente.");
+                    onComplete?.();
+                } catch (err) {
+                    console.error(err);
+                    toast.error("Error al cerrar el ticket.");
+                } finally {
+                    isSubmitting = false;
+                }
+            }
+        });
+
+        // Cerramos el modal local para dar paso a la confirmación de baja
+        isOpen = false;
     }
 
     // ── REPOSICIÓN: folio validation ──────────────────────
@@ -827,7 +833,7 @@
                         onclick={handleBaja}
                     >
                         <XCircle size={15} class="mr-1.5" />
-                        Confirmar Baja
+                        Ir a gestionar baja
                     </Button>
 
                     <!-- REPOSICIÓN -->

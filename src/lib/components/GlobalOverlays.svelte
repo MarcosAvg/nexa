@@ -8,6 +8,7 @@
     import ConfirmationModal from "./modals/ConfirmationModal.svelte";
     import DeletePersonnelModal from "./modals/DeletePersonnelModal.svelte";
     import { personnelActions } from "../utils/personnelActions";
+    import { appEvents, EVENTS } from "../utils/appEvents";
 
     // Computed state from global store
     let isDetailsOpen = $derived(personnelState.isDetailsOpen);
@@ -43,6 +44,34 @@
                     .catch(console.error);
             }
         }
+    });
+
+    $effect(() => {
+        const unsub = appEvents.on(EVENTS.TRIGGER_DEACTIVATE, (payload: any) => {
+            if (payload?.person) {
+                // 1. Abrimos el panel lateral de la persona
+                personnelState.selectPerson(payload.person.id);
+                // 2. Preparamos y abrimos el modal de confirmación
+                confirmModal = {
+                    isOpen: true,
+                    title: "¿DAR DE BAJA?",
+                    description:
+                        "Esta persona dejará de tener acceso, pero sus datos se conservarán en el sistema. Las tarjetas pasarán a estar bloqueadas.",
+                    variant: "danger",
+                    confirmText: "Dar de Baja",
+                    onConfirm: async () => {
+                        await personnelActions.handleDeactivatePerson(
+                            payload.person,
+                            refreshData,
+                        );
+                        if (payload.onSuccess) {
+                            await payload.onSuccess();
+                        }
+                    },
+                };
+            }
+        });
+        return () => unsub();
     });
 
     // Local state for Global Overlays (actions triggered from here)
