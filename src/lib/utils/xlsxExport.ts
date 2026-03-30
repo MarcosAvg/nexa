@@ -1226,7 +1226,6 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
     const conteos = matchedData.map(m => m.conteo);
     const totalUsos = conteos.reduce((sum, c) => sum + c, 0);
     const promedio = total > 0 ? (totalUsos / total) : 0;
-    const maximo = total > 0 ? Math.max(...conteos) : 0;
     const mediana = (() => {
         if (total === 0) return 0;
         const sorted = [...conteos].sort((a, b) => a - b);
@@ -1243,11 +1242,8 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
         { label: '101+ usos', filter: (c: number) => c > 100 },
     ];
 
-    const bajoUsoData = matchedData.filter(m => m.conteo < usageThreshold);
-
-    // Personal que solo usó torniquete (0 usos pero con días de inactividad)
-    const soloTorniqueteData = matchedData.filter(m => m.conteo === 0 && m.diasInactividad !== null && m.diasInactividad > 0);
-    const soloTorniqueteCount = soloTorniqueteData.length;
+    const noUtilizadas = matchedData.filter(m => m.conteo === 0);
+    const bajoUsoData = matchedData.filter(m => m.conteo > 0 && m.conteo < usageThreshold);
 
     // Dependency distribution
     const depMap: Record<string, { count: number; totalUsos: number }> = {};
@@ -1313,13 +1309,8 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
     row++;
 
     ws.getRow(row).height = 28;
-    kpiCard('B', 'Máximo de usos', maximo, C.amber);
-    kpiCard('E', 'Personal bajo uso', bajoUsoData.length, bajoUsoData.length > 0 ? C.rose : C.emerald, pct(bajoUsoData.length, total));
-    row++;
-
-    ws.getRow(row).height = 28;
-    kpiCard('B', 'Solo usó torniquete', soloTorniqueteCount, soloTorniqueteCount > 0 ? C.rose : C.emerald, pct(soloTorniqueteCount, total));
-    kpiCard('E', 'Sin días de inactividad', matchedData.filter(m => m.diasInactividad === null).length, C.sky);
+    kpiCard('B', 'Tarjetas No Utilizadas', noUtilizadas.length, noUtilizadas.length > 0 ? C.rose : C.emerald, pct(noUtilizadas.length, total));
+    kpiCard('E', 'Personal bajo uso', bajoUsoData.length, bajoUsoData.length > 0 ? C.amber : C.emerald, pct(bajoUsoData.length, total));
     row++;
     row++;
 
@@ -1393,6 +1384,68 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
         });
     }
 
+    // ══════ SECTION 5: Usage by Personnel Status ══════
+    const statusMap: Record<string, { count: number; totalUsos: number; noUtilizadas: number }> = {};
+    matchedData.forEach(m => {
+        const st = m.person.status || 'Sin Estado';
+        if (!statusMap[st]) statusMap[st] = { count: 0, totalUsos: 0, noUtilizadas: 0 };
+        statusMap[st].count++;
+        statusMap[st].totalUsos += m.conteo;
+        if (m.conteo === 0) statusMap[st].noUtilizadas++;
+    });
+    const statusEntries = Object.entries(statusMap).sort((a, b) => b[1].count - a[1].count);
+
+    if (statusEntries.length > 0) {
+        sectionTitle('👤  USO POR ESTADO DEL PERSONAL');
+
+        tableHeader([
+            { col: 'B', label: 'ESTADO' },
+            { col: 'C', label: 'PERSONAS' },
+            { col: 'D', label: 'TOTAL USOS' },
+            { col: 'E', label: 'PROMEDIO' },
+            { col: 'F', label: 'NO UTILIZADAS' },
+        ], C.amber);
+
+        statusEntries.forEach(([status, stats]) => {
+            const avg = stats.count > 0 ? (stats.totalUsos / stats.count).toFixed(1) : '0';
+            tableRow([
+                { col: 'B', value: status },
+                { col: 'C', value: stats.count },
+                { col: 'D', value: stats.totalUsos },
+                { col: 'E', value: avg },
+                { col: 'F', value: stats.noUtilizadas },
+            ], C.amber);
+        });
+        row++;
+    }
+
+    // ══════ SECTION 6: Distribution by Days Without Use ══════
+    const inactivityRanges = [
+        { label: '0 – 7 días', filter: (d: number | null) => d !== null && d >= 0 && d <= 7 },
+        { label: '8 – 30 días', filter: (d: number | null) => d !== null && d >= 8 && d <= 30 },
+        { label: '31 – 60 días', filter: (d: number | null) => d !== null && d >= 31 && d <= 60 },
+        { label: '61 – 90 días', filter: (d: number | null) => d !== null && d >= 61 && d <= 90 },
+        { label: '90+ días', filter: (d: number | null) => d !== null && d > 90 },
+        { label: 'Sin registro de uso', filter: (d: number | null) => d === null },
+    ];
+
+    sectionTitle('🕐  DISTRIBUCIÓN POR DÍAS SIN USO');
+
+    tableHeader([
+        { col: 'B', label: 'RANGO INACTIVIDAD' },
+        { col: 'C', label: 'PERSONAS' },
+        { col: 'D', label: '% DEL TOTAL' },
+    ], C.rose);
+
+    inactivityRanges.forEach(range => {
+        const personas = matchedData.filter(m => range.filter(m.diasInactividad));
+        tableRow([
+            { col: 'B', value: range.label },
+            { col: 'C', value: personas.length },
+            { col: 'D', value: pct(personas.length, total) },
+        ], C.rose);
+    });
+
     ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 3 }];
     ws.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1 };
 }
@@ -1435,7 +1488,7 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
     const headerLabels = [
         'APELLIDOS', 'NOMBRES', 'NO. EMPLEADO',
         'EDIFICIO', 'DEPENDENCIA', 'EQUIPO', 'PUESTO', 'PISO BASE',
-        'FOLIO KONE', 'USOS REGISTRADOS', 'DÍAS INACTIVIDAD'
+        'FOLIO KONE', 'USOS REGISTRADOS', 'DÍAS SIN USO'
     ];
 
     // ══════════════════════════════════════════════════════════════
@@ -1444,12 +1497,147 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
     await addKoneSummarySheet(workbook, matchedData, 'Resumen — Uso KONE', 'REPORTE DE USO DE TARJETAS KONE — NEXA', usageThreshold);
 
     const bajoUsoData = matchedData.filter(m => m.conteo < usageThreshold);
+    const noUtilizadasData = matchedData.filter(m => m.conteo === 0);
 
     // ══════════════════════════════════════════════════════════════
-    // SHEET 2: Executive Summary — Low Usage Metrics
+    // SHEET 2: Tarjetas No Utilizadas Directory
     // ══════════════════════════════════════════════════════════════
-    if (bajoUsoData.length > 0) {
-        await addKoneSummarySheet(workbook, bajoUsoData, 'Resumen — Bajo Uso', `PERSONAL CON BAJO USO DE TARJETA (< ${usageThreshold})`, usageThreshold);
+    if (noUtilizadasData.length > 0) {
+        const noUseSheet = workbook.addWorksheet('Tarjetas No Utilizadas');
+        noUseSheet.columns = [
+            { key: 'last_name', width: 25 }, { key: 'first_name', width: 25 }, { key: 'employee_no', width: 15 },
+            { key: 'building', width: 22 }, { key: 'dependency', width: 28 }, { key: 'area', width: 22 },
+            { key: 'position', width: 28 }, { key: 'floor', width: 12 },
+            { key: 'folioKone', width: 18 }, { key: 'status', width: 16 }, { key: 'diasInactividad', width: 18 }
+        ];
+
+        noUseSheet.mergeCells('A1:K1');
+        const nuTitle = noUseSheet.getCell('A1');
+        nuTitle.value = `       TARJETAS KONE NO UTILIZADAS — NEXA`;
+        nuTitle.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
+        nuTitle.alignment = { vertical: 'middle', horizontal: 'left' };
+        noUseSheet.getRow(1).height = 40;
+
+        try {
+            const response = await fetch('/favicon.svg');
+            if (response.ok) {
+                const blob = await response.blob();
+                const buffer = await blob.arrayBuffer();
+                const imageId = workbook.addImage({ buffer, extension: 'svg' as any });
+                noUseSheet.addImage(imageId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 32, height: 32 } });
+            }
+        } catch { /* logo optional */ }
+
+        noUseSheet.mergeCells('A2:K2');
+        const nuMeta = noUseSheet.getCell('A2');
+        nuMeta.value = `Reporte generado: ${dateStr}  |  Tarjetas sin uso: ${noUtilizadasData.length} de ${total} (${((noUtilizadasData.length / total) * 100).toFixed(1)}%)`;
+        nuMeta.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
+        nuMeta.alignment = { vertical: 'middle', horizontal: 'left' };
+        noUseSheet.getRow(2).height = 20;
+
+        // Super-headers
+        const nuGroups = [
+            { label: 'DATOS PERSONALES', range: 'A3:C3', colors: COLORS.personal },
+            { label: 'UBICACIÓN Y PUESTO', range: 'D3:H3', colors: COLORS.location },
+            { label: 'TARJETA KONE', range: 'I3:K3', colors: COLORS.rose },
+        ];
+        nuGroups.forEach(group => {
+            noUseSheet.mergeCells(group.range);
+            const cell = noUseSheet.getCell(group.range.split(':')[0]);
+            cell.value = group.label;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.head } };
+            cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: group.colors.sub } };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.border = {
+                top: thin('FFCBD5E1'), left: thin('FFCBD5E1'),
+                bottom: thin('FFCBD5E1'), right: { style: 'medium', color: { argb: COLORS.separator } }
+            };
+        });
+
+        const nuSubRow = noUseSheet.getRow(4);
+        nuSubRow.height = 30;
+        const nuLabels = ['APELLIDOS', 'NOMBRES', 'NO. EMPLEADO', 'EDIFICIO', 'DEPENDENCIA', 'EQUIPO', 'PUESTO', 'PISO BASE', 'FOLIO KONE', 'ESTADO', 'DÍAS SIN USO'];
+        nuLabels.forEach((label, i) => {
+            const cell = nuSubRow.getCell(i + 1);
+            cell.value = label;
+            const colLetter = String.fromCharCode(65 + i);
+            const group = nuGroups.find(g => {
+                const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
+                return colLetter >= (start || 'A') && colLetter <= (end || start || 'A');
+            }) || nuGroups[0];
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
+            cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            const isGroupEnd = [3, 8, 11].includes(i + 1);
+            cell.border = {
+                bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
+                right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFFFFFFF' } }
+            };
+        });
+
+        noUtilizadasData.forEach(entry => {
+            const person = entry.person;
+            const dataRow = noUseSheet.addRow({
+                last_name: person.last_name || '-',
+                first_name: person.first_name || '-',
+                employee_no: person.employee_no || '-',
+                building: person.building || '-',
+                dependency: person.dependency || '-',
+                area: person.area || '-',
+                position: person.position || '-',
+                floor: person.floor || '-',
+                folioKone: entry.folio,
+                status: person.status || '-',
+                diasInactividad: entry.diasInactividad !== null ? entry.diasInactividad : 'Sin registro'
+            });
+            dataRow.height = 24;
+
+            const isInactive = person.status === 'Baja' || person.status === 'Bloqueado/a';
+            dataRow.eachCell((cell, colNumber) => {
+                const colLetter = String.fromCharCode(64 + colNumber);
+                const group = nuGroups.find(g => {
+                    const parts = g.range.replace(/[0-9]/g, '').split(':');
+                    return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
+                }) || nuGroups[0];
+
+                cell.font = { name: 'Arial', size: 9, color: { argb: isInactive ? 'FF64748B' : 'FF111827' }, italic: isInactive };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                const isGroupEnd = [3, 8, 11].includes(colNumber);
+                setBorder(cell, isGroupEnd ? COLORS.separator : 'FFCBD5E1');
+
+                if (isInactive) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+                } else {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
+                }
+
+                // Status column coloring
+                if (colNumber === 10) {
+                    if (person.status === 'Activo/a') {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+                        cell.font = { color: { argb: 'FF166534' }, bold: true, name: 'Arial', size: 9 };
+                    } else if (person.status === 'Parcial') {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+                        cell.font = { color: { argb: 'FF92400E' }, bold: true, name: 'Arial', size: 9 };
+                    } else if (person.status === 'Bloqueado/a') {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+                        cell.font = { color: { argb: 'FF991B1B' }, bold: true, name: 'Arial', size: 9 };
+                    } else if (person.status === 'Baja' || person.status === 'Sin Acceso') {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+                        cell.font = { color: { argb: 'FF475569' }, italic: true, name: 'Arial', size: 9 };
+                    }
+                }
+
+                if (colNumber !== 10 && colNumber !== 11 && (cell.value === '-' || cell.value === 'N/A' || !cell.value)) {
+                    cell.value = '[SIN DATO]';
+                    cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, italic: true };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+                }
+            });
+        });
+
+        noUseSheet.autoFilter = 'A4:K4';
+        noUseSheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 4 }];
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -1585,7 +1773,6 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
                         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
                         cell.font = { ...cell.font, bold: true, color: { argb: 'FF075985' } };
                     } else if (conteoVal === 0) {
-                        cell.value = 'Sin registro';
                         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
                         cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, bold: true };
                     } else if (conteoVal < usageThreshold) {
@@ -1672,7 +1859,7 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
 
         const subHeaderRow = unmatchedSheet.getRow(3);
         subHeaderRow.height = 30;
-        const unfLabels = ['FOLIO', 'USOS REGISTRADOS', 'DÍAS INACTIVIDAD'];
+        const unfLabels = ['FOLIO', 'USOS REGISTRADOS', 'DÍAS SIN USO'];
         unfLabels.forEach((label, i) => {
             const cell = subHeaderRow.getCell(i + 1);
             cell.value = label;
