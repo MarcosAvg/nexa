@@ -38,6 +38,7 @@
     let creationLimitDate = $state<string>("");
     let inactivityLimitDate = $state<string>("");
     let fileInput = $state<HTMLInputElement>();
+    let selectedDependency = $state<string>('');
 
     function reset() {
         step = "idle";
@@ -46,6 +47,7 @@
         duplicates = [];
         showDuplicates = false;
         isExporting = false;
+        selectedDependency = '';
     }
 
     function closeModal() {
@@ -100,11 +102,11 @@
     }
 
     async function handleExport() {
-        if (!matchResult) return;
+        if (!filteredResult) return;
 
         isExporting = true;
         try {
-            await exportKoneUsageToExcel(matchResult, usageThreshold);
+            await exportKoneUsageToExcel(filteredResult, usageThreshold, selectedDependency || undefined);
             toast.success("Exportación completada");
         } catch (err) {
             console.error("Export Error:", err);
@@ -114,26 +116,48 @@
         }
     }
 
-    // Derived stats
-    let stats = $derived.by(() => {
+    // Derived unique dependencies from matched results
+    let availableDependencies = $derived.by(() => {
+        if (!matchResult) return [];
+        const deps = new Set(matchResult.matched.map(m => m.person.dependency || 'Sin Dependencia'));
+        return Array.from(deps).sort();
+    });
+
+    // Filtered match result based on selected dependency
+    let filteredResult = $derived.by(() => {
         if (!matchResult) return null;
-        const totalUsos = matchResult.matched.reduce(
+        if (!selectedDependency) return matchResult;
+
+        const filteredMatched = matchResult.matched.filter(
+            m => (m.person.dependency || 'Sin Dependencia') === selectedDependency
+        );
+        return {
+            matched: filteredMatched,
+            unmatched: matchResult.unmatched,
+            totalImported: matchResult.totalImported,
+        };
+    });
+
+    // Derived stats (uses filtered data)
+    let stats = $derived.by(() => {
+        if (!filteredResult) return null;
+        const totalUsos = filteredResult.matched.reduce(
             (sum, m) => sum + m.conteo,
             0,
         );
         const promedio =
-            matchResult.matched.length > 0
-                ? (totalUsos / matchResult.matched.length).toFixed(1)
+            filteredResult.matched.length > 0
+                ? (totalUsos / filteredResult.matched.length).toFixed(1)
                 : "0";
         return {
-            totalImported: matchResult.totalImported,
-            found: matchResult.matched.length,
-            notFound: matchResult.unmatched.length,
+            totalImported: filteredResult.totalImported,
+            found: filteredResult.matched.length,
+            notFound: filteredResult.unmatched.length,
             pctMatch:
-                matchResult.totalImported > 0
+                filteredResult.totalImported > 0
                     ? (
-                          (matchResult.matched.length /
-                              matchResult.totalImported) *
+                          (filteredResult.matched.length /
+                              filteredResult.totalImported) *
                           100
                       ).toFixed(1)
                     : "0",
@@ -398,6 +422,36 @@
                             {/each}
                         </div>
                     {/if}
+                </div>
+            {/if}
+
+            <!-- Dependency Filter -->
+            {#if availableDependencies.length > 1}
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <div class="flex items-center justify-between mb-3">
+                        <p
+                            class="text-xs font-bold text-slate-700 uppercase tracking-wider"
+                        >
+                            Filtrar por dependencia
+                        </p>
+                        {#if selectedDependency}
+                            <button
+                                class="text-[10px] font-medium text-sky-600 hover:text-sky-800 transition-colors"
+                                onclick={() => selectedDependency = ''}
+                            >
+                                Mostrar todas
+                            </button>
+                        {/if}
+                    </div>
+                    <select
+                        bind:value={selectedDependency}
+                        class="w-full h-9 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 text-sm outline-none bg-white cursor-pointer"
+                    >
+                        <option value="">Todas las dependencias</option>
+                        {#each availableDependencies as dep}
+                            <option value={dep}>{dep}</option>
+                        {/each}
+                    </select>
                 </div>
             {/if}
 

@@ -1450,7 +1450,7 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
     ws.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1 };
 }
 
-export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, usageThreshold: number = 10) {
+export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, usageThreshold: number = 10, dependencyFilter?: string) {
     const matchedData = matchResult.matched;
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
@@ -1893,7 +1893,8 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
     }
 
     // ── Save ──
-    const finalFileName = `Conteo_Uso_KONE_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const depSuffix = dependencyFilter ? `_${dependencyFilter.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ ]/g, '').replace(/\s+/g, '_')}` : '';
+    const finalFileName = `Conteo_Uso_KONE${depSuffix}_${new Date().toISOString().split('T')[0]}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
     saveAsFunction(new Blob([buffer]), finalFileName);
 }
