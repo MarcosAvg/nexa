@@ -1492,6 +1492,169 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
     ];
 
     // ══════════════════════════════════════════════════════════════
+    // SHEET 0: Guide — How to read this report
+    // ══════════════════════════════════════════════════════════════
+    const guideSheet = workbook.addWorksheet('Guía');
+    guideSheet.columns = [
+        { width: 4 },   // A spacer
+        { width: 28 },  // B term/label
+        { width: 65 },  // C description
+    ];
+
+    const C_GUIDE = {
+        title: 'FF1E293B',
+        meta: 'FF64748B',
+        separator: 'FF94A3B8',
+        white: 'FFFFFFFF',
+        sectionHead: 'FF0F172A',
+        blue: { bg: 'FFDBEAFE', fg: 'FF1E40AF' },
+        sky: { bg: 'FFE0F2FE', fg: 'FF075985' },
+        emerald: { bg: 'FFD1FAE5', fg: 'FF065F46' },
+        amber: { bg: 'FFFEF3C7', fg: 'FF92400E' },
+        rose: { bg: 'FFFEE2E2', fg: 'FF991B1B' },
+        slate: { bg: 'FFF1F5F9', fg: 'FF334155' },
+        violet: { bg: 'FFEDE9FE', fg: 'FF5B21B6' },
+    };
+
+    let gr = 1;
+
+    // Title
+    guideSheet.mergeCells('A1:C1');
+    const guideTitle = guideSheet.getCell('A1');
+    guideTitle.value = '       GUÍA DE INTERPRETACIÓN — REPORTE DE USO KONE';
+    guideTitle.font = { name: 'Arial', bold: true, size: 16, color: { argb: C_GUIDE.title } };
+    guideTitle.alignment = { vertical: 'middle', horizontal: 'left' };
+    guideSheet.getRow(1).height = 40;
+
+    try {
+        const response = await fetch('/favicon.svg');
+        if (response.ok) {
+            const blob = await response.blob();
+            const buffer = await blob.arrayBuffer();
+            const imageId = workbook.addImage({ buffer, extension: 'svg' as any });
+            guideSheet.addImage(imageId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 32, height: 32 } });
+        }
+    } catch { /* logo optional */ }
+
+    guideSheet.mergeCells('A2:C2');
+    const guideMeta = guideSheet.getCell('A2');
+    guideMeta.value = `Este documento explica el contenido de cada hoja y cada indicador del reporte.`;
+    guideMeta.font = { name: 'Arial', size: 9, color: { argb: C_GUIDE.meta } };
+    guideMeta.alignment = { vertical: 'middle', horizontal: 'left' };
+    guideSheet.getRow(2).height = 20;
+
+    gr = 4;
+
+    const guideSectionTitle = (text: string) => {
+        guideSheet.mergeCells(`B${gr}:C${gr}`);
+        const cell = guideSheet.getCell(`B${gr}`);
+        cell.value = text;
+        cell.font = { name: 'Arial', bold: true, size: 12, color: { argb: C_GUIDE.sectionHead } };
+        cell.alignment = { vertical: 'middle' };
+        guideSheet.getRow(gr).height = 28;
+        gr++;
+        guideSheet.mergeCells(`B${gr}:C${gr}`);
+        guideSheet.getCell(`B${gr}`).border = { top: { style: 'medium', color: { argb: C_GUIDE.separator } } };
+        guideSheet.getRow(gr).height = 6;
+        gr++;
+    };
+
+    const guideTableHeader = (col1: string, col2: string, colors: { bg: string; fg: string }) => {
+        const c1 = guideSheet.getCell(`B${gr}`);
+        c1.value = col1;
+        c1.font = { name: 'Arial', bold: true, size: 9, color: { argb: C_GUIDE.white } };
+        c1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.fg } };
+        c1.alignment = { vertical: 'middle', horizontal: 'center' };
+        c1.border = { top: thin(colors.fg), bottom: thin(colors.fg), left: thin(colors.fg), right: thin(colors.fg) };
+
+        const c2 = guideSheet.getCell(`C${gr}`);
+        c2.value = col2;
+        c2.font = { name: 'Arial', bold: true, size: 9, color: { argb: C_GUIDE.white } };
+        c2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.fg } };
+        c2.alignment = { vertical: 'middle', horizontal: 'center' };
+        c2.border = { top: thin(colors.fg), bottom: thin(colors.fg), left: thin(colors.fg), right: thin(colors.fg) };
+        guideSheet.getRow(gr).height = 24;
+        gr++;
+    };
+
+    const guideRow = (term: string, desc: string, colors: { bg: string; fg: string }) => {
+        const c1 = guideSheet.getCell(`B${gr}`);
+        c1.value = term;
+        c1.font = { name: 'Arial', bold: true, size: 9, color: { argb: colors.fg } };
+        c1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.bg } };
+        c1.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true };
+        c1.border = { top: thin('FFCBD5E1'), bottom: thin('FFCBD5E1'), left: thin('FFCBD5E1'), right: thin('FFCBD5E1') };
+
+        const c2 = guideSheet.getCell(`C${gr}`);
+        c2.value = desc;
+        c2.font = { name: 'Arial', size: 9, color: { argb: C_GUIDE.sectionHead } };
+        c2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C_GUIDE.white } };
+        c2.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true };
+        c2.border = { top: thin('FFCBD5E1'), bottom: thin('FFCBD5E1'), left: thin('FFCBD5E1'), right: thin('FFCBD5E1') };
+        guideSheet.getRow(gr).height = 36;
+        gr++;
+    };
+
+    const guideNote = (text: string) => {
+        guideSheet.mergeCells(`B${gr}:C${gr}`);
+        const cell = guideSheet.getCell(`B${gr}`);
+        cell.value = text;
+        cell.font = { name: 'Arial', size: 9, italic: true, color: { argb: C_GUIDE.meta } };
+        cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true };
+        guideSheet.getRow(gr).height = 34;
+        gr++;
+    };
+
+    // ── KPIs ──
+    guideSectionTitle('📊  INDICADORES CLAVE DE USO (KPIs)');
+    guideTableHeader('INDICADOR', 'DESCRIPCIÓN', C_GUIDE.blue);
+    guideRow('Personal Registrado', 'Cantidad total de personas cuyas tarjetas KONE fueron identificadas y cruzadas con el directorio de personal.', C_GUIDE.blue);
+    guideRow('Total de Usos', 'Suma total de todos los usos registrados de tarjetas KONE en el periodo analizado (incluye torniquetes y elevadores).', C_GUIDE.sky);
+    guideRow('Promedio de usos', 'Número promedio de usos por persona. Puede verse inflado por usuarios con uso muy alto.', C_GUIDE.emerald);
+    guideRow('Mediana de usos', 'Valor central de usos. Representa el uso típico y es más representativo que el promedio cuando hay valores extremos.', C_GUIDE.emerald);
+    guideRow('Tarjetas No Utilizadas', 'Cantidad de tarjetas con 0 usos en el periodo. Están asignadas pero no fueron utilizadas. Se muestra el porcentaje respecto al total.', C_GUIDE.rose);
+    guideRow('Personal bajo uso', 'Personas que sí utilizaron su tarjeta pero por debajo del umbral definido (excluyendo las de 0 usos). Indica uso esporádico.', C_GUIDE.amber);
+    gr++;
+
+    // ── Sections ──
+    guideSectionTitle('📈  SECCIONES DEL RESUMEN EJECUTIVO');
+    guideTableHeader('SECCIÓN', 'DESCRIPCIÓN', C_GUIDE.violet);
+    guideRow('Distribución por Rango de Uso', 'Clasifica al personal según la cantidad de usos registrados en rangos: 0, 1–10, 11–50, 51–100, 101+. Muestra personas, porcentaje y usos acumulados por rango.', C_GUIDE.violet);
+    guideRow('Distribución por Dependencias', 'Desglosa los datos por dependencia/organización. Incluye personas, usos totales, promedio y porcentaje de contribución.', C_GUIDE.violet);
+    guideRow('Distribución por Edificio', 'Misma estructura que por dependencias pero agrupada por el edificio asignado.', C_GUIDE.violet);
+    guideRow('Uso por Estado del Personal', 'Cruza el estado de la persona (Activo, Parcial, Bloqueado, Baja) con métricas de uso. Permite ver cuántas tarjetas sin uso pertenecen a personal activo vs. baja.', C_GUIDE.amber);
+    guideRow('Distribución por Días Sin Uso', 'Clasifica según días desde el último uso: 0–7, 8–30, 31–60, 61–90, 90+, Sin registro. Identifica tarjetas que dejaron de usarse.', C_GUIDE.rose);
+    gr++;
+
+    // ── Sheets ──
+    guideSectionTitle('📋  HOJAS DEL ARCHIVO');
+    guideTableHeader('HOJA', 'CONTENIDO', C_GUIDE.sky);
+    guideRow('Resumen — Uso KONE', 'Resumen ejecutivo con todos los indicadores clave, tablas de distribución por rango de uso, dependencia, edificio, estado del personal y días sin uso.', C_GUIDE.sky);
+    guideRow('Tarjetas No Utilizadas', 'Listado de personal con tarjetas KONE de 0 usos. Incluye el estado de la persona (coloreado) para priorizar acciones.', C_GUIDE.rose);
+    guideRow('Directorio con Conteo', 'Listado completo de todo el personal con su folio KONE, usos registrados y días sin uso. Celdas coloreadas según nivel de uso.', C_GUIDE.blue);
+    guideRow('Personal Bajo Uso', 'Subconjunto del directorio filtrado a personas con usos por debajo del umbral configurado.', C_GUIDE.amber);
+    gr++;
+
+    // ── Notes ──
+    guideSectionTitle('📌  NOTAS GENERALES');
+    guideNote('• Los datos corresponden al periodo cubierto por el archivo de reporte KONE importado.');
+    guideNote('• "Días sin uso" = fecha límite seleccionada − fecha del último registro de uso en el reporte KONE.');
+    guideNote('• Se excluyen automáticamente tarjetas creadas/modificadas después de la fecha de cortesía, para no penalizar tarjetas recién creadas.');
+    guideNote('• Si un folio aparece más de una vez en el reporte KONE, sus conteos se suman automáticamente.');
+
+    // ── Colors ──
+    gr++;
+    guideSectionTitle('🎨  CÓDIGO DE COLORES EN DIRECTORIO');
+    guideTableHeader('COLOR', 'SIGNIFICADO', C_GUIDE.emerald);
+    guideRow('🟢 Verde', 'Más de 100 usos — uso alto.', C_GUIDE.emerald);
+    guideRow('🔵 Azul', 'Entre 51 y 100 usos — uso moderado.', C_GUIDE.sky);
+    guideRow('🟡 Rojo claro', 'Por debajo del umbral de bajo uso.', C_GUIDE.amber);
+    guideRow('🔴 Rojo fuerte', '0 usos — tarjeta no utilizada.', C_GUIDE.rose);
+
+    guideSheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 3 }];
+    guideSheet.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1 };
+
+    // ══════════════════════════════════════════════════════════════
     // SHEET 1: Executive Summary — Usage Metrics (All)
     // ══════════════════════════════════════════════════════════════
     await addKoneSummarySheet(workbook, matchedData, 'Resumen — Uso KONE', 'REPORTE DE USO DE TARJETAS KONE — NEXA', usageThreshold);
@@ -1890,6 +2053,7 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
 
         unmatchedSheet.autoFilter = 'A3:C3';
         unmatchedSheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 3 }];
+        unmatchedSheet.state = 'hidden';
     }
 
     // ── Save ──
