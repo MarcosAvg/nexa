@@ -1051,9 +1051,13 @@ export async function exportHistoryToExcel(data: any[], options?: ExportOptions)
         let cleanMessage = (message || '').replace(/\sID:?\s?[a-f0-9-]{8,}/gi, '').replace(/\s(de|ID)\s?[a-f0-9-]{8,}/gi, '');
         cleanMessage = translateText(cleanMessage);
 
+        const fallbackName = (message || '').match(/(?:Actualización de|Registro de|para tarjeta \w+ folio|con folio)\s+([^,.(]+)/i)?.[1]?.trim();
+        const displayName = log.entity_name || log.resolvedName || fallbackName || `${log.entity_type} (${(log.entity_id || '').slice(0, 8)}...)`;
+        const entityLabel = log.entity_type === "PERSONNEL" || log.entity_type === "PERSON" ? "PERSONAL" : log.entity_type === "CARD" ? "TARJETA" : log.entity_type;
+
         const rowData = {
             date: new Date(log.timestamp).toLocaleString('es-MX'),
-            entity: log.resolvedName || `${log.entity_type}: ${log.entity_id}`,
+            entity: displayName,
             actionLabel: actionNames[log.action] || log.action,
             description: cleanMessage
         };
@@ -2062,3 +2066,220 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
     const buffer = await workbook.xlsx.writeBuffer();
     saveAsFunction(new Blob([buffer]), finalFileName);
 }
+
+export async function exportMissingCardsToExcel(
+    missingData: { folio: string, status: string, observation: string, date: string, personName: string }[],
+    type: string, start: number, end: number
+) {
+    const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
+        import('exceljs'),
+        import('file-saver')
+    ]);
+    const workbook = new (ExcelJSModule.default || ExcelJSModule).Workbook();
+    const worksheet = workbook.addWorksheet('Análisis de Folios');
+
+    const C = {
+        title: 'FF1E293B',
+        meta: 'FF64748B',
+        white: 'FFFFFFFF',
+        sectionHead: 'FF0F172A',
+        // Category colors
+        amber: { bg: 'FFFEF3C7', fg: 'FF92400E' },    // Reposición
+        rose: { bg: 'FFFEE2E2', fg: 'FF991B1B' },      // Tarjeta no devuelta
+        slate: { bg: 'FFF1F5F9', fg: 'FF334155' },      // Sin registro
+        blue: { bg: 'FFDBEAFE', fg: 'FF1E40AF' },       // KONE header
+        sky: { bg: 'FFE0F2FE', fg: 'FF075985' },        // KPI
+        emerald: { bg: 'FFD1FAE5', fg: 'FF065F46' },    // KPI
+    };
+
+    const thin = (argb: string): ExcelJSTypes.Border => ({ style: 'thin', color: { argb } });
+    const setBorder = (cell: ExcelJSTypes.Cell, color = 'FFCBD5E1') => {
+        cell.border = { top: thin(color), bottom: thin(color), left: thin(color), right: thin(color) };
+    };
+
+    worksheet.columns = [
+        { key: 'folio', width: 16 },
+        { key: 'status', width: 20 },
+        { key: 'observation', width: 30 },
+        { key: 'date', width: 22 },
+        { key: 'personName', width: 35 },
+    ];
+
+    const headerColor = type === 'KONE' ? C.blue : C.amber;
+
+    // ══════ ROW 1: Title ══════
+    worksheet.mergeCells('A1:E1');
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = `       ANÁLISIS DE FOLIOS FALTANTES — ${type}`;
+    titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: C.title } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    worksheet.getRow(1).height = 40;
+
+    try {
+        const response = await fetch('/favicon.svg');
+        if (response.ok) {
+            const blob = await response.blob();
+            const buffer = await blob.arrayBuffer();
+            const imageId = workbook.addImage({ buffer, extension: 'svg' as any });
+            worksheet.addImage(imageId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 32, height: 32 } });
+        }
+    } catch { /* logo optional */ }
+
+    // ══════ ROW 2: Meta ══════
+    worksheet.mergeCells('A2:E2');
+    const metaCell = worksheet.getCell('A2');
+    const dateStr = new Date().toLocaleDateString('es-MX', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    metaCell.value = `Reporte generado: ${dateStr}  |  Rango: ${start} al ${end}  |  Total incidencias: ${missingData.length}`;
+    metaCell.font = { name: 'Arial', size: 9, color: { argb: C.meta } };
+    metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    worksheet.getRow(2).height = 20;
+
+    // ══════ ROW 4-6: Summary KPIs ══════
+    const countReposicion = missingData.filter(d => d.observation === 'Reposición').length;
+    const countNoDevuelta = missingData.filter(d => d.observation === 'Tarjeta no devuelta').length;
+    const countSinRegistro = missingData.filter(d => d.observation === 'Sin registro en sistema').length;
+    const countOther = missingData.length - countReposicion - countNoDevuelta - countSinRegistro;
+
+    let row = 4;
+
+    // Section Title
+    worksheet.mergeCells(`A${row}:E${row}`);
+    const secTitle = worksheet.getCell(`A${row}`);
+    secTitle.value = '📊  RESUMEN POR CATEGORÍA';
+    secTitle.font = { name: 'Arial', bold: true, size: 12, color: { argb: C.sectionHead } };
+    secTitle.alignment = { vertical: 'middle' };
+    worksheet.getRow(row).height = 28;
+    row++;
+
+    // KPI cards in a row
+    const kpis = [
+        { label: 'Reposición', count: countReposicion, colors: C.amber },
+        { label: 'No Devuelta', count: countNoDevuelta, colors: C.rose },
+        { label: 'Sin Registro', count: countSinRegistro, colors: C.slate },
+    ];
+
+    if (countOther > 0) {
+        kpis.push({ label: 'Otros', count: countOther, colors: C.sky });
+    }
+
+    // KPI Labels Row
+    kpis.forEach((kpi, i) => {
+        const col = String.fromCharCode(65 + i); // A, B, C, D
+        const lCell = worksheet.getCell(`${col}${row}`);
+        lCell.value = kpi.label;
+        lCell.font = { name: 'Arial', bold: true, size: 9, color: { argb: kpi.colors.fg } };
+        lCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpi.colors.bg } };
+        lCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        setBorder(lCell);
+    });
+    worksheet.getRow(row).height = 22;
+    row++;
+
+    // KPI Values Row
+    kpis.forEach((kpi, i) => {
+        const col = String.fromCharCode(65 + i);
+        const vCell = worksheet.getCell(`${col}${row}`);
+        vCell.value = kpi.count;
+        vCell.font = { name: 'Arial', bold: true, size: 18, color: { argb: kpi.colors.fg } };
+        vCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpi.colors.bg } };
+        vCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        setBorder(vCell);
+    });
+    worksheet.getRow(row).height = 36;
+    row++;
+
+    // Total
+    const totalCell = worksheet.getCell(`A${row}`);
+    totalCell.value = 'TOTAL INCIDENCIAS';
+    totalCell.font = { name: 'Arial', bold: true, size: 9, color: { argb: C.sectionHead } };
+    totalCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    setBorder(totalCell);
+    const totalValCell = worksheet.getCell(`B${row}`);
+    totalValCell.value = missingData.length;
+    totalValCell.font = { name: 'Arial', bold: true, size: 14, color: { argb: C.sectionHead } };
+    totalValCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    setBorder(totalValCell);
+    worksheet.getRow(row).height = 28;
+    row++;
+    row++; // spacer
+
+    // ══════ DATA TABLE ══════
+    worksheet.mergeCells(`A${row}:E${row}`);
+    const dataTitle = worksheet.getCell(`A${row}`);
+    dataTitle.value = '📋  DETALLE DE INCIDENCIAS';
+    dataTitle.font = { name: 'Arial', bold: true, size: 12, color: { argb: C.sectionHead } };
+    dataTitle.alignment = { vertical: 'middle' };
+    worksheet.getRow(row).height = 28;
+    row++;
+
+    // Header Row
+    const dataHeaderRow = row;
+    const labels = ['FOLIO', 'ESTADO', 'OBSERVACIÓN', 'FECHA', 'ÚLTIMA PERSONA'];
+    labels.forEach((label, i) => {
+        const cell = worksheet.getRow(row).getCell(i + 1);
+        cell.value = label;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerColor.fg } };
+        cell.font = { name: 'Arial', bold: true, color: { argb: C.white }, size: 9 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+            bottom: { style: 'medium', color: { argb: C.white } },
+            right: { style: 'thin', color: { argb: C.white } }
+        };
+    });
+    worksheet.getRow(row).height = 26;
+    row++;
+
+    // Data Rows with color coding
+    missingData.forEach(item => {
+        const dataRow = worksheet.addRow({
+            folio: item.folio,
+            status: item.status,
+            observation: item.observation,
+            date: item.date,
+            personName: item.personName
+        });
+        dataRow.height = 22;
+
+        // Determine row color based on observation
+        let rowColors = C.slate; // default: Sin registro
+        if (item.observation === 'Reposición') {
+            rowColors = C.amber;
+        } else if (item.observation === 'Tarjeta no devuelta') {
+            rowColors = C.rose;
+        }
+
+        dataRow.eachCell((cell, colNumber) => {
+            cell.font = { name: 'Arial', size: 9, color: { argb: '111827' } };
+            cell.alignment = {
+                vertical: 'middle',
+                horizontal: colNumber === 5 ? 'left' : 'center',
+                indent: colNumber === 5 ? 1 : 0
+            };
+            cell.border = {
+                bottom: thin('FFCBD5E1'),
+                right: thin('FFCBD5E1'),
+                left: thin('FFCBD5E1'),
+                top: thin('FFCBD5E1')
+            };
+
+            // Color the observation column with the category color
+            if (colNumber === 3) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowColors.bg } };
+                cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: rowColors.fg } };
+            }
+        });
+    });
+
+    // Auto-filter on the data header
+    worksheet.autoFilter = `A${dataHeaderRow}:E${dataHeaderRow}`;
+
+    // Freeze rows above the data
+    worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: dataHeaderRow }];
+
+    const finalFileName = `Analisis_Folios_${type}_${start}_a_${end}.xlsx`;
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAsFunction(new Blob([buffer]), finalFileName);
+}
+

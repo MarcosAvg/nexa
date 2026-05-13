@@ -50,19 +50,46 @@
     });
 
     let filteredEnlaces = $derived.by(() => {
-        if (!searchQuery.trim()) return enlaces;
-        const term = searchQuery.toLowerCase();
-        return enlaces.filter((e) => {
-            const name =
-                `${e.personnel?.first_name || ""} ${e.personnel?.last_name || ""}`.toLowerCase();
-            const email = (e.personnel?.email || "").toLowerCase();
-            const ext = (e.extension || "").toLowerCase();
-            return (
-                name.includes(term) ||
-                email.includes(term) ||
-                ext.includes(term)
-            );
+        let list = enlaces.map((e) => {
+            const depId = (e.personnel as any)?.dependency_id;
+            const dep = dependencies.find((d) => d.id === depId);
+            const dependencyName = dep ? dep.name : "N/A";
+
+            return {
+                ...e,
+                name: `${e.personnel?.first_name || ""} ${e.personnel?.last_name || ""}`.trim() || "Desconocido",
+                dependency: dependencyName,
+                floor: e.personnel?.floor || "N/A",
+                email: e.personnel?.email || "N/A",
+            };
         });
+
+        if (searchQuery.trim()) {
+            const term = searchQuery.toLowerCase();
+            list = list.filter((e) => {
+                const name = e.name.toLowerCase();
+                const email = e.email.toLowerCase();
+                const ext = (e.extension || "").toLowerCase();
+                const depName = e.dependency.toLowerCase();
+                return (
+                    name.includes(term) ||
+                    email.includes(term) ||
+                    ext.includes(term) ||
+                    depName.includes(term)
+                );
+            });
+        }
+
+        // Default sort by "Piso base"
+        list.sort((a, b) => {
+            const aVal = a.floor;
+            const bVal = b.floor;
+            if (aVal === "N/A" && bVal !== "N/A") return 1;
+            if (bVal === "N/A" && aVal !== "N/A") return -1;
+            return aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+        return list;
     });
 
     const columns = [
@@ -192,7 +219,7 @@
                 />
                 <Input
                     id="enlaces-search"
-                    placeholder="Buscar por nombre, correo o extensión..."
+                    placeholder="Buscar por nombre, dependencia, correo o extensión..."
                     class="pl-10 h-9 text-xs font-bold"
                     bind:value={searchQuery}
                 />

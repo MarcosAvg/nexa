@@ -18,9 +18,11 @@
         Ban,
         Plus,
         FileSpreadsheet,
+        FileSearch,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import AddCardModal from "../components/modals/AddCardModal.svelte";
+    import DetectMissingCardsModal from "../components/modals/DetectMissingCardsModal.svelte";
     import { cardService } from "../services/cards";
     import { toast } from "svelte-sonner";
     import { personnelService } from "../services/personnel";
@@ -39,6 +41,7 @@
     let isModalOpen = $state(false);
     let editingCard = $state<any>(null);
     let replacingCard = $state<any>(null);
+    let isDetectModalOpen = $state(false);
 
     let confirmModal = $state({
         isOpen: false,
@@ -385,6 +388,18 @@
                 />
                 Exportar Excel
             </Button>
+            <Button
+                variant="outline"
+                class="flex items-center gap-2.5 h-10 px-4 group border-blue-200 text-blue-700 hover:bg-blue-50"
+                disabled={!networkStore.isOnline}
+                onclick={() => (isDetectModalOpen = true)}
+            >
+                <FileSearch
+                    size={16}
+                    class="text-blue-500 transition-transform group-hover:scale-110"
+                />
+                Detectar Faltantes
+            </Button>
             <PermissionGuard requireEdit>
                 <Button
                     variant="primary"
@@ -609,6 +624,8 @@
         isModalOpen = false;
     }}
 />
+
+<DetectMissingCardsModal bind:isOpen={isDetectModalOpen} />
 
 <ConfirmationModal
     bind:isOpen={confirmModal.isOpen}

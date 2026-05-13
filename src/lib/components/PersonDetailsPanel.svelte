@@ -238,6 +238,15 @@
             toast.error("Error al cargar datos actualizados");
         }
     }
+    async function copyToClipboard(text: string, label: string) {
+        if (!text) return;
+        try {
+            await navigator.clipboard.writeText(text);
+            toast.success(`${label} copiado`);
+        } catch (err) {
+            toast.error("Error al copiar");
+        }
+    }
 </script>
 
 <SidePanel
@@ -259,14 +268,32 @@
                 </h3>
 
                 <div class="grid gap-3">
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs text-slate-500"
-                            >Nombre completo</span
+                    <button 
+                        type="button"
+                        class="flex justify-between items-center w-full text-left group transition-colors cursor-pointer"
+                        onclick={() => copyToClipboard(person?.first_name || '', 'Nombres')}
+                        title="Copiar nombres"
+                    >
+                        <span class="text-xs text-slate-500 group-hover:text-blue-500 transition-colors"
+                            >Nombres</span
                         >
-                        <span class="text-sm font-bold text-slate-800"
-                            >{person.name}</span
+                        <span class="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors"
+                            >{person.first_name}</span
                         >
-                    </div>
+                    </button>
+                    <button 
+                        type="button"
+                        class="flex justify-between items-center w-full text-left group transition-colors cursor-pointer"
+                        onclick={() => copyToClipboard(person?.last_name || '', 'Apellidos')}
+                        title="Copiar apellidos"
+                    >
+                        <span class="text-xs text-slate-500 group-hover:text-blue-500 transition-colors"
+                            >Apellidos</span
+                        >
+                        <span class="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors"
+                            >{person.last_name}</span
+                        >
+                    </button>
                     <div class="flex justify-between items-center">
                         <span class="text-xs text-slate-500">No. Empleado</span>
                         <span class="text-sm font-bold text-slate-800"

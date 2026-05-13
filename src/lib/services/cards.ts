@@ -523,4 +523,37 @@ export const cardService = {
             throw error;
         }
     },
+
+    async fetchCardsByType(type: string): Promise<{ folio: string, status: string }[]> {
+        try {
+            const allCards: { folio: string, status: string }[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
+
+            while (hasMore) {
+                const { data, error } = await supabase
+                    .from("cards")
+                    .select("folio, status")
+                    .eq("type", type)
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    allCards.push(...data.map(c => ({ folio: c.folio, status: c.status })));
+                    page++;
+                    if (data.length < pageSize) {
+                        hasMore = false;
+                    }
+                } else {
+                    hasMore = false;
+                }
+            }
+            return allCards;
+        } catch (error) {
+            handleError(error, "Fetch Cards By Type");
+            return [];
+        }
+    }
 };

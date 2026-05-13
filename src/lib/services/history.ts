@@ -220,5 +220,39 @@ export const HistoryService = {
             // Return empty array on fetch error - non-critical functionality
             return [];
         }
+    },
+
+    async fetchCardHistoryByRange(type: string) {
+        try {
+            const allLogs: any[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
+
+            while (hasMore) {
+                const { data, error } = await supabase
+                    .from("history_logs")
+                    .select("entity_id, entity_name, action, details, timestamp")
+                    .eq("entity_type", "CARD")
+                    .ilike("entity_name", `${type}%`)
+                    .in("action", ["REPLACE_OLD", "DELETE", "BLOCK", "UNASSIGN", "UPDATE_STATUS", "CREATE"])
+                    .order("timestamp", { ascending: false })
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    allLogs.push(...data);
+                    page++;
+                    if (data.length < pageSize) hasMore = false;
+                } else {
+                    hasMore = false;
+                }
+            }
+            return allLogs;
+        } catch (error) {
+            handleError(error, "Fetch Card History By Range");
+            return [];
+        }
     }
 };
