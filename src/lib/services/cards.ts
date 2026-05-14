@@ -27,7 +27,7 @@ export const cardService = {
             const to = from + limit - 1;
 
             let query = supabase
-                .from("cards")
+                .from("cards_ordered")
                 .select("*, personnel(first_name, last_name, status)", { count: "exact" });
 
             if (search) {
@@ -66,7 +66,7 @@ export const cardService = {
             }
 
             const { data, count, error } = await query
-                .order("folio", { ascending: true })
+                .order("folio_sort", { ascending: true })
                 .range(from, to);
 
             if (error) throw error;
@@ -117,7 +117,7 @@ export const cardService = {
 
             while (hasMore) {
                 let query = supabase
-                    .from("cards")
+                    .from("cards_ordered")
                     .select("*, personnel(first_name, last_name, status)");
 
                 if (search) {
@@ -146,7 +146,7 @@ export const cardService = {
                 }
 
                 const { data, error } = await query
-                    .order("folio", { ascending: true })
+                    .order("folio_sort", { ascending: true })
                     .range(page * pageSize, (page + 1) * pageSize - 1);
 
                 if (error) throw error;
@@ -168,6 +168,9 @@ export const cardService = {
                     hasMore = false;
                 }
             }
+
+            // Sort numerically before returning
+            allData.sort((a, b) => a.folio.localeCompare(b.folio, undefined, { numeric: true }));
 
             return allData;
         } catch (error) {

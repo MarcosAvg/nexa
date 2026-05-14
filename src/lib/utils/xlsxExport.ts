@@ -2137,10 +2137,11 @@ export async function exportMissingCardsToExcel(
     worksheet.getRow(2).height = 20;
 
     // ══════ ROW 4-6: Summary KPIs ══════
-    const countReposicion = missingData.filter(d => d.observation === 'Reposición').length;
-    const countNoDevuelta = missingData.filter(d => d.observation === 'Tarjeta no devuelta').length;
-    const countSinRegistro = missingData.filter(d => d.observation === 'Sin registro en sistema').length;
-    const countOther = missingData.length - countReposicion - countNoDevuelta - countSinRegistro;
+    const countReposicion = missingData.filter(d => d.observation === 'Extravío / Reposición').length;
+    const countNoDevuelta = missingData.filter(d => d.observation.startsWith('Tarjeta no devuelta')).length;
+    const countSinRegistro = missingData.filter(d => d.observation === 'No registrada').length;
+    const countEliminada = missingData.filter(d => d.observation === 'Eliminada permanentemente').length;
+    const countOther = missingData.length - countReposicion - countNoDevuelta - countSinRegistro - countEliminada;
 
     let row = 4;
 
@@ -2155,13 +2156,14 @@ export async function exportMissingCardsToExcel(
 
     // KPI cards in a row
     const kpis = [
-        { label: 'Reposición', count: countReposicion, colors: C.amber },
+        { label: 'Extravío / Rep.', count: countReposicion, colors: C.amber },
         { label: 'No Devuelta', count: countNoDevuelta, colors: C.rose },
-        { label: 'Sin Registro', count: countSinRegistro, colors: C.slate },
+        { label: 'Eliminada Perm.', count: countEliminada, colors: C.sky },
+        { label: 'No Registrada', count: countSinRegistro, colors: C.slate },
     ];
 
     if (countOther > 0) {
-        kpis.push({ label: 'Otros', count: countOther, colors: C.sky });
+        kpis.push({ label: 'Otros', count: countOther, colors: C.emerald });
     }
 
     // KPI Labels Row
@@ -2243,11 +2245,13 @@ export async function exportMissingCardsToExcel(
         dataRow.height = 22;
 
         // Determine row color based on observation
-        let rowColors = C.slate; // default: Sin registro
-        if (item.observation === 'Reposición') {
+        let rowColors = C.slate; // default: No registrada
+        if (item.observation === 'Extravío / Reposición') {
             rowColors = C.amber;
-        } else if (item.observation === 'Tarjeta no devuelta') {
+        } else if (item.observation.startsWith('Tarjeta no devuelta')) {
             rowColors = C.rose;
+        } else if (item.observation === 'Eliminada permanentemente') {
+            rowColors = C.sky;
         }
 
         dataRow.eachCell((cell, colNumber) => {

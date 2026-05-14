@@ -105,7 +105,7 @@
     ];
 
     $effect(() => {
-        if (query.trim().length > 2) {
+        if (query.trim().length >= 1) {
             search();
         } else {
             results = [];

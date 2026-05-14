@@ -96,7 +96,7 @@
                 }
                 
                 if (wasReplacedByLoss) {
-                    historyMap.set(folio, { reason: "Reposición", date: relevantDate, personId: relevantPersonId });
+                    historyMap.set(folio, { reason: "Extravío / Reposición", date: relevantDate, personId: relevantPersonId });
                 } else if (wasReplacedAvailable) {
                     if (wasDeleted) {
                         historyMap.set(folio, { reason: "Tarjeta no devuelta", date: relevantDate, personId: relevantPersonId });
@@ -104,12 +104,13 @@
                         historyMap.set(folio, { reason: "Disponible (Ignorar)", date: null, personId: null });
                     }
                 } else if (wasDeleted) {
-                    historyMap.set(folio, { reason: "Tarjeta no devuelta", date: relevantDate, personId: relevantPersonId });
+                    historyMap.set(folio, { reason: "Eliminada permanentemente", date: relevantDate, personId: relevantPersonId });
                 }
             });
 
             // 3. Resolve person names in batch
             const personIds = new Set<string>();
+            const personContextMap = new Map<string, string>();
             historyMap.forEach(entry => {
                 if (entry.personId) personIds.add(entry.personId);
             });
@@ -118,30 +119,36 @@
             if (personIds.size > 0) {
                 const { supabase } = await import("../../supabase");
                 const ids = Array.from(personIds);
-                // Batch in chunks of 50 to avoid query limits
                 for (let i = 0; i < ids.length; i += 50) {
                     const chunk = ids.slice(i, i + 50);
                     const { data: people } = await supabase
                         .from("personnel")
-                        .select("id, first_name, last_name")
+                        .select("id, first_name, last_name, status")
                         .in("id", chunk);
                     if (people) {
-                        people.forEach(p => personNameMap.set(p.id, `${p.first_name} ${p.last_name}`));
+                        people.forEach(p => {
+                            personNameMap.set(p.id, `${p.first_name} ${p.last_name}`);
+                            if (p.status === 'inactive' || p.status === 'baja') {
+                                personContextMap.set(p.id, "Baja de personal");
+                            }
+                        });
                     }
                 }
                 
-                // For deleted personnel, try history_logs entity_name
                 for (const pid of ids) {
                     if (!personNameMap.has(pid)) {
-                        const { data: histLog } = await supabase
+                        const { data: histLogs } = await supabase
                             .from("history_logs")
-                            .select("entity_name")
-                            .eq("entity_type", "PERSONNEL")
+                            .select("entity_name, action")
                             .eq("entity_id", pid)
-                            .not("entity_name", "is", null)
-                            .limit(1);
-                        if (histLog && histLog[0]?.entity_name) {
-                            personNameMap.set(pid, histLog[0].entity_name);
+                            .order("timestamp", { ascending: false });
+                        
+                        if (histLogs && histLogs.length > 0) {
+                            const name = histLogs.find(l => l.entity_name)?.entity_name;
+                            if (name) personNameMap.set(pid, name);
+                            
+                            const isDeleted = histLogs.some(l => l.action === 'DELETE');
+                            if (isDeleted) personContextMap.set(pid, "Personal eliminado");
                         }
                     }
                 }
@@ -155,12 +162,9 @@
                 const folioStr = i.toString();
                 const status = cardMap.get(folioStr);
                 const historyEntry = historyMap.get(folioStr);
-                const reason = historyEntry?.reason || "";
+                let reason = historyEntry?.reason || "";
 
-                // EXCLUSION: Card currently active or available → it's fine
                 if (status === 'active' || status === 'available') continue;
-                
-                // EXCLUSION: History says it was replaced and left available
                 if (reason === 'Disponible (Ignorar)') continue;
 
                 let displayStatus: string;
@@ -168,10 +172,16 @@
 
                 if (status) {
                     displayStatus = status === 'blocked' ? 'BLOQUEADA' : status === 'inactive' ? 'BAJA' : status.toUpperCase();
-                    finalObservation = reason || "Tarjeta no devuelta";
+                    
+                    if (!reason || reason === "Tarjeta no devuelta") {
+                        const context = historyEntry?.personId ? personContextMap.get(historyEntry.personId) : "";
+                        finalObservation = context ? `Tarjeta no devuelta (${context})` : "Tarjeta no devuelta";
+                    } else {
+                        finalObservation = reason;
+                    }
                 } else {
                     displayStatus = "NO REGISTRADA";
-                    finalObservation = reason || "Sin registro en sistema";
+                    finalObservation = reason || "No registrada";
                 }
 
                 const dateStr = historyEntry?.date 

@@ -129,7 +129,7 @@
 
         clearTimeout(searchDebounce);
 
-        if (val.trim().length > 2) {
+        if (val.trim().length >= 1) {
             searchDebounce = setTimeout(async () => {
                 try {
                     const results = await personnelService.searchByName(
