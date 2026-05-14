@@ -165,6 +165,7 @@ export const ticketService = {
             // Refresh store
             const fresh = await ticketService.fetchAll();
             ticketState.setTickets(fresh);
+            appEvents.emit(EVENTS.TICKETS_CHANGED);
         } catch (err: any) {
             tickets.forEach((_, i) => errors.push({ index: i, message: err?.message ?? 'Error desconocido' }));
         }
@@ -220,6 +221,7 @@ export const ticketService = {
             const { error } = await query;
             if (error) throw error;
             ticketState.removeByCard(cardId, types);
+            appEvents.emit(EVENTS.TICKETS_CHANGED);
         } catch (error) {
             handleError(error, "Delete Tickets by Card");
             throw error;
@@ -246,6 +248,7 @@ export const ticketService = {
             const { error } = await supabase.from("tickets").delete().eq("person_id", personId);
             if (error) throw error;
             ticketState.removeByPerson(personId);
+            appEvents.emit(EVENTS.TICKETS_CHANGED);
         } catch (error) {
             handleError(error, "Delete Tickets by Person");
             throw error;
@@ -274,6 +277,7 @@ export const ticketService = {
             if (updatedTicket) {
                 ticketState.updateTicket(updatedTicket as Ticket);
             }
+            appEvents.emit(EVENTS.TICKETS_CHANGED);
         } catch (error) {
             handleError(error, "Update Ticket Status");
             throw error;

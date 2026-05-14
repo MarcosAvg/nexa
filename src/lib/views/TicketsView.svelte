@@ -146,6 +146,71 @@
 
     import { onMount, onDestroy } from "svelte";
     import { appEvents, EVENTS } from "../utils/appEvents";
+    import { supabase } from "../supabase";
+
+    /** Si otro usuario eliminó/atendió el ticket, cerrar modales y avisar. */
+    async function validateOpenModalsAgainstDb() {
+        type Entry = { id: number; onGone: () => void };
+        const entries: Entry[] = [];
+
+        const add = (id: unknown, onGone: () => void) => {
+            if (typeof id === "number" && !Number.isNaN(id)) {
+                entries.push({ id, onGone });
+            }
+        };
+
+        if (isManualDetailsOpen && manualTicket) {
+            add(manualTicket.id, () => {
+                isManualDetailsOpen = false;
+                manualTicket = null;
+            });
+        }
+        if (isCompareOpen && compareTicket) {
+            add(compareTicket.id, () => {
+                isCompareOpen = false;
+                compareTicket = null;
+            });
+        }
+        if (isAltaOpen && altaTicket) {
+            add(altaTicket.id, () => {
+                isAltaOpen = false;
+                altaTicket = null;
+            });
+        }
+        if (isImportedOpen && importedTicket) {
+            add(importedTicket.id, () => {
+                isImportedOpen = false;
+                importedTicket = null;
+            });
+        }
+        if (isModalOpen && editingTicket?.id != null) {
+            add(editingTicket.id, () => {
+                isModalOpen = false;
+                editingTicket = null;
+            });
+        }
+
+        const seen = new Set<number>();
+        let closedAny = false;
+        for (const { id, onGone } of entries) {
+            if (seen.has(id)) continue;
+            seen.add(id);
+            const { data } = await supabase
+                .from("tickets")
+                .select("id")
+                .eq("id", id)
+                .maybeSingle();
+            if (!data) {
+                onGone();
+                closedAny = true;
+            }
+        }
+        if (closedAny) {
+            toast.info(
+                "Un ticket que tenías abierto ya no está disponible (puede haber sido atendido por otro usuario).",
+            );
+        }
+    }
 
     async function refreshData(page: number = 1) {
         isLoading = true;
@@ -167,6 +232,7 @@
             // Also update the global store for Dashboard pending count
             ticketState.setTickets(result.data);
             personnelState.setCards(extraCards);
+            await validateOpenModalsAgainstDb();
         } finally {
             isLoading = false;
         }

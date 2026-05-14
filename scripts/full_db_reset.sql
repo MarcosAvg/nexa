@@ -1038,6 +1038,13 @@ ALTER TABLE "public"."tickets" ENABLE ROW LEVEL SECURITY;
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
 
 
+-- Replicación para Realtime (postgres_changes en el cliente). Si faltan aquí,
+-- habilita las tablas en Supabase: Database → Publications → supabase_realtime.
+ALTER PUBLICATION "supabase_realtime" ADD TABLE "public"."tickets";
+ALTER PUBLICATION "supabase_realtime" ADD TABLE "public"."cards";
+ALTER PUBLICATION "supabase_realtime" ADD TABLE "public"."history_logs";
+
+
 
 
 
