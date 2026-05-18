@@ -15,6 +15,10 @@
         cardFolio = $bindable(),
         action = $bindable(),
     }: Props = $props();
+
+    import { ACTION_NAMES } from "../constants/history";
+
+    const sortedActions = Object.entries(ACTION_NAMES).sort((a, b) => a[1].localeCompare(b[1]));
 </script>
 
 <div class="flex flex-col md:flex-row gap-4 w-full">
@@ -87,16 +91,9 @@
         >
         <Select id="filter-action" bind:value={action} placeholder="">
             <option value="Todas">Todas</option>
-            <option value="CREATE">Registro</option>
-            <option value="UPDATE">Actualización</option>
-            <option value="UPDATE_STATUS">Cambio de Estado</option>
-            <option value="ASSIGN_CARD">Asignación</option>
-            <option value="UNASSIGN">Desvinculación</option>
-            <option value="SIGN_RESPONSIVA">Firma</option>
-            <option value="BLOCK">Bloqueo</option>
-            <option value="DELETE">Eliminación</option>
-            <option value="TICKET">Ticket</option>
-            <option value="APPLY_MODIFICATION">Modificación</option>
+            {#each sortedActions as [key, label]}
+                <option value={key}>{label}</option>
+            {/each}
         </Select>
     </div>
 </div>
