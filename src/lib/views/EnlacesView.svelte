@@ -233,7 +233,7 @@
                     >
                         <button
                             type="button"
-                            class="hidden sm:flex items-center justify-center gap-2 h-10 px-4 bg-white text-slate-700 border border-slate-200 font-bold rounded-xl hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+                            class="flex items-center justify-center gap-2 h-10 px-4 bg-white text-slate-700 border border-slate-200 font-bold rounded-xl hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
                             onclick={broadcastEmail}
                         >
                             <Send size={16} class="text-slate-400" />
@@ -241,7 +241,7 @@
                         </button>
                         <button
                             type="button"
-                            class="hidden sm:flex items-center justify-center gap-2 h-10 px-6 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/10"
+                            class="flex items-center justify-center gap-2 h-10 px-6 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/10"
                             onclick={() => (isAddModalOpen = true)}
                             {disabled}
                         >

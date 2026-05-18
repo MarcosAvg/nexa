@@ -1,6 +1,6 @@
 <script lang="ts">
     import { type Snippet } from "svelte";
-    import { Search, Filter, ChevronDown, ChevronUp } from "lucide-svelte";
+    import { Search, Filter, ChevronDown, ChevronUp, MoreVertical } from "lucide-svelte";
     import { slide } from "svelte/transition";
 
     type Props = {
@@ -12,6 +12,7 @@
 
     let { title, filters, actions, onSearch }: Props = $props();
     let showFilters = $state(false);
+    let showActions = $state(false);
 </script>
 
 <div
@@ -30,6 +31,22 @@
                 </h2>
 
                 <div class="flex items-center gap-2">
+                    <!-- Mobile Actions Toggle -->
+                    {#if actions}
+                        <button
+                            type="button"
+                            class="sm:hidden flex items-center justify-center p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 active:scale-95 transition-all duration-200
+                                   {showActions ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-600'}"
+                            onclick={() => {
+                                showActions = !showActions;
+                                if (showActions) showFilters = false;
+                            }}
+                            aria-label="Acciones"
+                        >
+                            <MoreVertical size={16} strokeWidth={2.5} />
+                        </button>
+                    {/if}
+
                     <!-- Mobile Filter Toggle (visible only on mobile) -->
                     {#if filters}
                         <button
@@ -38,7 +55,10 @@
                                    {showFilters
                                 ? 'bg-slate-900 text-white shadow-lg'
                                 : 'bg-slate-100 text-slate-600'}"
-                            onclick={() => (showFilters = !showFilters)}
+                            onclick={() => {
+                                showFilters = !showFilters;
+                                if (showFilters) showActions = false;
+                            }}
                         >
                             <Filter size={14} strokeWidth={2.5} />
                             Filtros
@@ -73,6 +93,18 @@
                 </div>
             {/if}
         </div>
+
+        <!-- Mobile Collapsible Actions Container -->
+        {#if actions && showActions}
+            <div
+                class="sm:hidden pt-4 pb-2 border-t border-slate-150/60"
+                transition:slide={{ duration: 250 }}
+            >
+                <div class="flex flex-col gap-2.5 [&>*]:w-full [&>*]:justify-center">
+                    {@render actions()}
+                </div>
+            </div>
+        {/if}
 
         <!-- Filters (Collapsible on mobile) -->
         {#if filters}

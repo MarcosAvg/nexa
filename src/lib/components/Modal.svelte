@@ -57,24 +57,29 @@
 
     <!-- Modal Container -->
     <div
-        class="fixed inset-0 {zIndex} flex items-center justify-center {size ===
+        class="fixed inset-0 {zIndex} flex items-center justify-center sm:items-center max-sm:items-end {size ===
         'full'
             ? 'p-0'
-            : 'p-4'} pointer-events-none"
+            : 'p-4 max-sm:p-0'} pointer-events-none"
     >
         <div
             class="pointer-events-auto w-full {sizeClasses[size]} {size !==
             'full'
-                ? 'max-h-[95vh] rounded-[24px]'
-                : 'h-screen'} flex flex-col bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200/50 overflow-hidden ring-1 ring-black/5"
+                ? 'max-h-[95vh] max-sm:max-h-[90vh] rounded-[24px] max-sm:rounded-t-[32px] max-sm:rounded-b-none'
+                : 'h-screen'} flex flex-col bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200/50 overflow-hidden ring-1 ring-black/5 transition-all duration-300"
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-title"
         >
+            <!-- Mobile Top Drag Handle Indicator -->
+            {#if size !== "full"}
+                <div class="sm:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-1 flex-shrink-0"></div>
+            {/if}
+
             <!-- Header -->
             {#if size !== "full"}
                 <div
-                    class="flex items-start justify-between gap-4 p-8 pb-6 bg-slate-50/30 backdrop-blur-sm"
+                    class="flex items-start justify-between gap-4 p-8 pb-6 max-sm:p-6 max-sm:pt-2 bg-slate-50/30 backdrop-blur-sm"
                 >
                     <div>
                         <h2

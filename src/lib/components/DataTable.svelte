@@ -94,6 +94,24 @@
     let visibleData = $derived(sortedData.slice(startIndex, endIndex));
     let offsetY = $derived(startIndex * rowHeight);
     let totalHeight = $derived(sortedData.length * rowHeight);
+
+    // Card expand logic for mobile
+    let expandedRowIds = $state(new Set<any>());
+
+    function toggleRow(row: any) {
+        const id = row.id || row.folio || row.name || Math.random();
+        if (expandedRowIds.has(id)) {
+            expandedRowIds.delete(id);
+        } else {
+            expandedRowIds.add(id);
+        }
+        expandedRowIds = new Set(expandedRowIds);
+    }
+
+    function isRowExpanded(row: any): boolean {
+        const id = row.id || row.folio || row.name || false;
+        return id ? expandedRowIds.has(id) : false;
+    }
 </script>
 
 <!-- Desktop Table View (hidden on small/medium screens) -->
@@ -263,10 +281,6 @@
         {#if mobileCard}
             {@render mobileCard(row)}
         {:else}
-            {@const [isExpanded, setExpanded] = (() => {
-                let expanded = $state(false);
-                return [expanded, (val: boolean) => (expanded = val)];
-            })()}
             <!-- Card component with internal state logic simplified -->
             <article
                 class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5 space-y-4 relative overflow-hidden transition-all duration-200"
@@ -317,11 +331,11 @@
                     <!-- Expandable fields -->
                     <div
                         class="content-wrapper overflow-hidden transition-all duration-300"
-                        style="max-height: {row._expanded
+                        style="max-height: {isRowExpanded(row)
                             ? '500px'
-                            : '0px'}; opacity: {row._expanded
+                            : '0px'}; opacity: {isRowExpanded(row)
                             ? '1'
-                            : '0'}; visibility: {row._expanded
+                            : '0'}; visibility: {isRowExpanded(row)
                             ? 'visible'
                             : 'hidden'}"
                     >
@@ -352,9 +366,9 @@
                     {#if columns.length > 3}
                         <button
                             class="w-full pt-3 text-[11px] font-bold text-blue-600 uppercase tracking-widest hover:text-blue-700 flex items-center justify-center gap-1"
-                            onclick={() => (row._expanded = !row._expanded)}
+                            onclick={() => toggleRow(row)}
                         >
-                            {row._expanded ? "Ver menos" : "Ver más detalles"}
+                            {isRowExpanded(row) ? "Ver menos" : "Ver más detalles"}
                         </button>
                     {/if}
                 </div>

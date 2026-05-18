@@ -1,13 +1,13 @@
 <script lang="ts">
     import { link } from "svelte-spa-router";
     import active from "svelte-spa-router/active";
+    import { uiState } from "../stores";
     import {
         LayoutDashboard,
         Users,
         CreditCard,
         ClipboardList,
-        History,
-        Settings,
+        Menu,
     } from "lucide-svelte";
 
     const items = [
@@ -15,8 +15,6 @@
         { label: "Personal", href: "/personal", icon: Users },
         { label: "Tarjetas", href: "/cards", icon: CreditCard },
         { label: "Pendientes", href: "/tickets", icon: ClipboardList },
-        { label: "Historial", href: "/history", icon: History },
-        { label: "Ajustes", href: "/settings", icon: Settings },
     ];
 </script>
 
@@ -51,5 +49,28 @@
                 </span>
             </a>
         {/each}
+
+        <!-- Dynamic Menu Button -->
+        <button
+            type="button"
+            onclick={() => uiState.toggleSidebar()}
+            class="group relative flex flex-col items-center justify-center gap-0.5 flex-1 text-slate-400 transition-all duration-300 hover:text-slate-600"
+        >
+            <!-- Active indicator dot (shows when sidebar open) -->
+            <div
+                class="absolute top-1 w-1 h-1 rounded-full bg-blue-500 transition-all duration-300 {uiState.isSidebarOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0'}"
+            ></div>
+
+            <div
+                class="transition-all duration-300 {uiState.isSidebarOpen ? 'text-blue-600 scale-110' : ''}"
+            >
+                <Menu size={22} strokeWidth={2} />
+            </div>
+            <span
+                class="text-[10px] font-bold tracking-tight transition-colors duration-300 {uiState.isSidebarOpen ? 'text-blue-600 font-extrabold' : ''}"
+            >
+                Menú
+            </span>
+        </button>
     </div>
 </nav>
