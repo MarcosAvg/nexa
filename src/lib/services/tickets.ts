@@ -34,15 +34,21 @@ export const ticketService = {
         typeFilter: string = "Todos",
         priorityFilter: string = "Todas",
         search: string = "",
-        section: string = "General"
+        section: string = "General",
+        dependencyId: string = ""
     ): Promise<{ data: Ticket[]; count: number }> {
         try {
             const from = (page - 1) * limit;
             const to = from + limit - 1;
 
+            let selectString = "*, personnel(first_name, last_name, dependency_id)";
+            if (dependencyId) {
+                selectString = "*, personnel!inner(first_name, last_name, dependency_id)";
+            }
+
             let query = supabase
                 .from("tickets")
-                .select("*, personnel(first_name, last_name)", { count: "exact" })
+                .select(selectString, { count: "exact" })
                 .eq("status", "pending");
 
             if (section === "Responsivas") {
@@ -55,6 +61,9 @@ export const ticketService = {
             }
             if (priorityFilter && priorityFilter !== "Todas") {
                 query = query.ilike("priority", priorityFilter);
+            }
+            if (dependencyId) {
+                query = query.eq("personnel.dependency_id", dependencyId);
             }
             if (search) {
                 const searchTerm = `%${search}%`;
@@ -90,6 +99,52 @@ export const ticketService = {
         } catch (error) {
             handleError(error, "Fetch Tickets Paginated");
             return { data: [], count: 0 };
+        }
+    },
+
+    async fetchResponsivasForExport(
+        dependencyId: string = ""
+    ): Promise<any[]> {
+        try {
+            const allData: any[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
+
+            const personnelSelect = dependencyId
+                ? "personnel!inner(id, first_name, last_name, employee_no, dependency_id, dependencies(name))"
+                : "personnel(id, first_name, last_name, employee_no, dependency_id, dependencies(name))";
+
+            while (hasMore) {
+                let query = supabase
+                    .from("tickets")
+                    .select(`*, cards(id, folio, type), ${personnelSelect}`)
+                    .eq("status", "pending")
+                    .eq("type", "Firma Responsiva");
+
+                if (dependencyId) {
+                    query = query.eq("personnel.dependency_id", dependencyId);
+                }
+
+                const { data, error } = await query
+                    .order("created_at", { ascending: true })
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    allData.push(...data);
+                    page++;
+                    if (data.length < pageSize) hasMore = false;
+                } else {
+                    hasMore = false;
+                }
+            }
+
+            return allData;
+        } catch (error) {
+            handleError(error, "Fetch Responsivas for Export");
+            return [];
         }
     },
 

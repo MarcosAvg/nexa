@@ -22,12 +22,14 @@
         FileSpreadsheet,
         ChevronLeft,
         ChevronRight,
+        Download,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
     import { personnelService } from "../services/personnel";
     import { toast } from "svelte-sonner";
+    import { exportResponsivasToExcel } from "../utils/xlsxExport";
     import ImportPreviewModal from "../components/modals/ImportPreviewModal.svelte";
     import ConfirmAltaModal from "../components/modals/ConfirmAltaModal.svelte";
     import TicketImportedDetailsModal from "../components/modals/TicketImportedDetailsModal.svelte";
@@ -48,6 +50,7 @@
     let typeFilter = $state("Todos");
     let priorityFilter = $state("Todas");
     let searchQuery = $state("");
+    let dependencyFilter = $state("Todas");
 
     function switchSection(section: "General" | "Responsivas") {
         if (currentSection !== section) {
@@ -55,6 +58,7 @@
             typeFilter = "Todos";
             priorityFilter = "Todas";
             searchQuery = "";
+            dependencyFilter = "Todas";
             // Reset search input if it exists
             const searchInput = document.getElementById(
                 "ticket-search",
@@ -89,6 +93,7 @@
     let compareTicket = $state<any>(null);
 
     let personnel = $derived(personnelState.personnel);
+    let dependencies = $derived(catalogState.dependencies);
 
     // Server-paginated data with person name resolution
     let filteredTickets = $derived(
@@ -216,6 +221,13 @@
         isLoading = true;
         currentPage = page;
         try {
+            const depId =
+                dependencyFilter === "Todas"
+                    ? ""
+                    : catalogState.dependencies.find(
+                          (d) => d.name === dependencyFilter,
+                      )?.id || "";
+
             const [result, extraCards] = await Promise.all([
                 ticketService.fetchPaginated(
                     currentPage,
@@ -224,6 +236,7 @@
                     priorityFilter,
                     searchQuery,
                     currentSection,
+                    depId,
                 ),
                 cardService.fetchExtra(),
             ]);
@@ -364,6 +377,36 @@
             totalRecords = totalRecords + 1;
         }
     }
+
+    async function handleExportResponsivas() {
+        const loadingToast = toast.loading("Preparando exportación...");
+        try {
+            const depId =
+                dependencyFilter === "Todas"
+                    ? ""
+                    : catalogState.dependencies.find(
+                          (d) => d.name === dependencyFilter,
+                      )?.id || "";
+
+            const data =
+                await ticketService.fetchResponsivasForExport(depId);
+
+            if (data.length === 0) {
+                toast.info("No hay responsivas pendientes para exportar", {
+                    id: loadingToast,
+                });
+                return;
+            }
+
+            await exportResponsivasToExcel(data, dependencyFilter);
+            toast.success("Exportación completada", { id: loadingToast });
+        } catch (error) {
+            console.error("Export Error:", error);
+            toast.error("Error al exportar los datos", {
+                id: loadingToast,
+            });
+        }
+    }
 </script>
 
 <div class="space-y-6">
@@ -420,6 +463,18 @@
                     />
                 </div>
 
+                <!-- Dependency -->
+                {#if currentSection === "Responsivas"}
+                    <div class="w-full xl:w-auto">
+                        <FilterSelect
+                            label="Dependencia"
+                            options={["Todas", ...dependencies.map((d) => d.name)]}
+                            bind:value={dependencyFilter}
+                            onchange={onFilterChange}
+                        />
+                    </div>
+                {/if}
+
                 <!-- Search -->
                 <div class="flex-1 min-w-[200px] w-full relative">
                     <Search
@@ -438,6 +493,17 @@
         {/snippet}
 
         {#snippet actions()}
+            {#if currentSection === "Responsivas"}
+                <Button
+                    variant="soft-emerald"
+                    onclick={handleExportResponsivas}
+                    class="flex items-center gap-2 h-10 px-4"
+                    disabled={!networkStore.isOnline}
+                >
+                    <Download size={16} />
+                    Exportar Excel
+                </Button>
+            {/if}
             <PermissionGuard requireEdit>
                 <Button
                     variant="outline"

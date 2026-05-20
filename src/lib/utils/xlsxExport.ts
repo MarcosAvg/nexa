@@ -725,6 +725,252 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
     saveAsFunction(new Blob([buffer]), finalFileName);
 }
 
+export async function exportResponsivasToExcel(tickets: any[], dependencyName?: string) {
+    const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
+        import('exceljs'),
+        import('file-saver')
+    ]);
+    const workbook = new (ExcelJSModule.default || ExcelJSModule).Workbook();
+    const worksheet = workbook.addWorksheet('Responsivas Pendientes');
+
+    const COLORS = {
+        title: 'FF1E293B',
+        meta: 'FF64748B',
+        separator: 'FF94A3B8',
+        indigo: { head: 'FFE0E7FF', sub: 'FF3730A3', fill: 'FFEEF2FF' },
+        personal: { head: 'FFDBEAFE', sub: 'FF1E40AF', fill: 'FFEFF6FF' },
+        amber: { head: 'FFFEF3C7', sub: 'FF92400E', fill: 'FFFEFCE8' },
+        sky: { head: 'FFE0F2FE', sub: 'FF075985', fill: 'FFF0F9FF' },
+        emerald: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
+        rose: { head: 'FFFEE2E2', sub: 'FF991B1B', fill: 'FFFFF1F2' },
+        slate: { head: 'FFF1F5F9', sub: 'FF334155', fill: 'FFF8FAFC' },
+    };
+
+    // ── Group tickets by person ──
+    const personMap: Record<string, {
+        name: string;
+        employee_no: string;
+        dependency: string;
+        cards: { type: string; folio: string; created_at: string }[];
+    }> = {};
+
+    tickets.forEach(t => {
+        const personId = t.person_id;
+        if (!personId) return;
+
+        if (!personMap[personId]) {
+            const p = t.personnel || {};
+            personMap[personId] = {
+                name: `${p.last_name || ''}, ${p.first_name || ''}`.trim().replace(/^,\s*/, ''),
+                employee_no: p.employee_no || '-',
+                dependency: p.dependencies?.name || '-',
+                cards: [],
+            };
+        }
+
+        const card = t.cards;
+        personMap[personId].cards.push({
+            type: card?.type || t.payload?.tipo_tarjeta || '-',
+            folio: card?.folio || t.title?.replace('Firma: ', '') || '-',
+            created_at: t.created_at || '',
+        });
+    });
+
+    const personEntries = Object.values(personMap).sort((a, b) => a.name.localeCompare(b.name));
+
+    // ── Column widths ──
+    worksheet.columns = [
+        { key: 'num', width: 6 },
+        { key: 'name', width: 35 },
+        { key: 'employee_no', width: 16 },
+        { key: 'dependency', width: 30 },
+        { key: 'cards_p2000', width: 22 },
+        { key: 'cards_kone', width: 22 },
+        { key: 'total_cards', width: 14 },
+        { key: 'oldest', width: 22 },
+    ];
+
+    // ── Filter description ──
+    let filterDescription = '';
+    if (dependencyName && dependencyName !== 'Todas') {
+        filterDescription = `      -  Dependencia: ${dependencyName}`;
+    }
+
+    // ── Row 1: Title ──
+    worksheet.mergeCells('A1:H1');
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = `       PERSONAL PENDIENTE DE RECOGER ACCESOS${filterDescription}`;
+    titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    worksheet.getRow(1).height = 40;
+
+    try {
+        const response = await fetch('/favicon.svg');
+        if (response.ok) {
+            const blob = await response.blob();
+            const buffer = await blob.arrayBuffer();
+            const imageId = workbook.addImage({ buffer, extension: 'svg' as any });
+            worksheet.addImage(imageId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 32, height: 32 } });
+        }
+    } catch { /* logo optional */ }
+
+    // ── Row 2: Meta ──
+    worksheet.mergeCells('A2:H2');
+    const metaCell = worksheet.getCell('A2');
+    const dateStr = new Date().toLocaleDateString('es-MX', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    const totalCards = personEntries.reduce((sum, p) => sum + p.cards.length, 0);
+    metaCell.value = `Reporte generado: ${dateStr}  |  Personas: ${personEntries.length}  |  Tarjetas pendientes: ${totalCards}`;
+    metaCell.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
+    metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    worksheet.getRow(2).height = 20;
+
+    // ── Row 3: Super-Headers ──
+    const groups = [
+        { label: '#', range: 'A3:A3', colors: COLORS.slate },
+        { label: 'DATOS DEL PERSONAL', range: 'B3:D3', colors: COLORS.personal },
+        { label: 'TARJETAS PENDIENTES', range: 'E3:G3', colors: COLORS.indigo },
+        { label: 'ANTIGÜEDAD', range: 'H3:H3', colors: COLORS.amber },
+    ];
+
+    groups.forEach(group => {
+        worksheet.mergeCells(group.range);
+        const cell = worksheet.getCell(group.range.split(':')[0]);
+        cell.value = group.label;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.head } };
+        cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: group.colors.sub } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+            top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            right: { style: 'medium', color: { argb: COLORS.separator } }
+        };
+    });
+
+    // ── Row 4: Sub-Headers ──
+    const headerRow = worksheet.getRow(4);
+    headerRow.height = 30;
+    const headerLabels = ['NO.', 'NOMBRE COMPLETO', 'NO. EMPLEADO', 'DEPENDENCIA', 'FOLIOS P2000', 'FOLIOS KONE', 'TOTAL', 'PENDIENTE DESDE'];
+
+    const colGroupMap = [0, 1, 1, 1, 2, 2, 2, 3]; // map each column to its group index
+
+    headerLabels.forEach((label, i) => {
+        const cell = headerRow.getCell(i + 1);
+        cell.value = label;
+        const group = groups[colGroupMap[i]];
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
+        cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+        const isGroupEnd = [1, 4, 7, 8].includes(i + 1);
+        cell.border = {
+            bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
+            right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFFFFFFF' } }
+        };
+    });
+
+    // ── Data Rows ──
+    personEntries.forEach((person, idx) => {
+        const p2000Cards = person.cards.filter(c => c.type.toUpperCase() === 'P2000');
+        const koneCards = person.cards.filter(c => c.type.toUpperCase() === 'KONE');
+        const otherCards = person.cards.filter(c => c.type.toUpperCase() !== 'P2000' && c.type.toUpperCase() !== 'KONE');
+
+        const p2000Folios = p2000Cards.map(c => c.folio).join(', ') || '-';
+        const koneFolios = koneCards.map(c => c.folio).join(', ') || '-';
+        // Append other types if any
+        const koneDisplay = otherCards.length > 0
+            ? [koneFolios !== '-' ? koneFolios : '', ...otherCards.map(c => `${c.type}: ${c.folio}`)].filter(Boolean).join(', ')
+            : koneFolios;
+
+        const oldestDate = person.cards
+            .map(c => c.created_at)
+            .filter(Boolean)
+            .sort()[0];
+
+        const oldestLabel = oldestDate
+            ? new Date(oldestDate).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
+            : '-';
+
+        const rowData = {
+            num: idx + 1,
+            name: person.name,
+            employee_no: person.employee_no,
+            dependency: person.dependency,
+            cards_p2000: p2000Folios,
+            cards_kone: koneDisplay,
+            total_cards: person.cards.length,
+            oldest: oldestLabel,
+        };
+
+        const row = worksheet.addRow(rowData);
+        row.height = 26;
+
+        row.eachCell((cell, colNumber) => {
+            const group = groups[colGroupMap[colNumber - 1]];
+            cell.font = { name: 'Arial', size: 9, color: { argb: 'FF111827' } };
+            cell.alignment = { vertical: 'middle', horizontal: colNumber <= 1 || colNumber === 7 ? 'center' : 'left', wrapText: true };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
+
+            const isGroupEnd = [1, 4, 7, 8].includes(colNumber);
+            cell.border = {
+                bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFCBD5E1' } }
+            };
+
+            // Highlight high card count
+            if (colNumber === 7 && person.cards.length >= 2) {
+                cell.font = { ...cell.font, bold: true, color: { argb: COLORS.rose.sub } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.rose.head } };
+            }
+        });
+    });
+
+    // ── Summary row ──
+    const summaryRowNum = worksheet.rowCount + 1;
+    const summaryRow = worksheet.getRow(summaryRowNum);
+    summaryRow.height = 28;
+
+    const summaryData: Record<string, string | number> = {
+        num: '',
+        name: 'TOTAL',
+        employee_no: '',
+        dependency: `${personEntries.length} personas`,
+        cards_p2000: personEntries.reduce((s, p) => s + p.cards.filter(c => c.type.toUpperCase() === 'P2000').length, 0),
+        cards_kone: personEntries.reduce((s, p) => s + p.cards.filter(c => c.type.toUpperCase() !== 'P2000').length, 0),
+        total_cards: totalCards,
+        oldest: '',
+    };
+
+    ['num', 'name', 'employee_no', 'dependency', 'cards_p2000', 'cards_kone', 'total_cards', 'oldest'].forEach((key, i) => {
+        const cell = summaryRow.getCell(i + 1);
+        cell.value = summaryData[key];
+        cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: COLORS.title } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
+        cell.alignment = { vertical: 'middle', horizontal: i <= 0 || i === 6 ? 'center' : 'left' };
+        cell.border = {
+            top: { style: 'medium', color: { argb: COLORS.separator } },
+            bottom: { style: 'medium', color: { argb: COLORS.separator } },
+        };
+    });
+
+    // ── Freeze + filter ──
+    worksheet.autoFilter = 'A4:H4';
+    worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
+    worksheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1 };
+
+    // ── Save ──
+    const fileNameParts = ['Responsivas_Pendientes'];
+    if (dependencyName && dependencyName !== 'Todas') {
+        fileNameParts.push(dependencyName.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ ]/g, '').replace(/ /g, '_'));
+    }
+    const finalFileName = `${fileNameParts.join('_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAsFunction(new Blob([buffer]), finalFileName);
+}
+
 export async function exportCardsToExcel(data: any[], options?: ExportOptions) {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
