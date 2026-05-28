@@ -7,6 +7,7 @@
         Ban,
         RefreshCw,
         CheckCircle2,
+        Printer,
     } from "lucide-svelte";
     import PermissionGuard from "./PermissionGuard.svelte";
 
@@ -22,6 +23,7 @@
         onUnassign?: () => void;
         onReplace?: () => void;
         onProgram?: () => void;
+        onPrint?: () => void;
     };
 
     let {
@@ -36,6 +38,7 @@
         onUnassign,
         onReplace,
         onProgram,
+        onPrint,
     }: Props = $props();
 </script>
 
@@ -135,6 +138,17 @@
                 {/if}
 
                 <div class="flex items-center gap-1">
+                    <!-- Imprimir: Slate -->
+                    <button
+                        type="button"
+                        class="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all duration-200 disabled:opacity-50"
+                        onclick={onPrint}
+                        disabled={permissionDisabled}
+                        title="Imprimir tarjeta"
+                    >
+                        <Printer size={16} />
+                    </button>
+
                     <!-- Bloquear: Amber -->
                     <button
                         type="button"

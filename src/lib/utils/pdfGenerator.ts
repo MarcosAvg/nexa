@@ -2,6 +2,70 @@
 import type { jsPDF as jsPDFType } from "jspdf";
 import { RESPONSIVA_LEGAL_TEXT } from "../constants/legal";
 
+export async function generateCardPdf(
+    folio: string,
+    type: "P2000" | "KONE"
+) {
+    const { jsPDF } = await import("jspdf");
+
+    // CR80 standard card dimensions: 54mm x 85.6mm (portrait)
+    const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [54, 85.6]
+    });
+
+    const pageWidth = 54;
+    const pageHeight = 85.6;
+
+    try {
+        // Background - white
+        doc.setFillColor(255, 255, 255);
+        doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+        // Card type color
+        const typeColor = type === "KONE" ? [14, 165, 233] : [245, 158, 11]; // Blue for KONE, Amber for P2000
+        const typeLabel = type === "KONE" ? "Elevadores" : "Puertas";
+
+        // Type label (large, centered at top)
+        doc.setTextColor(typeColor[0], typeColor[1], typeColor[2]);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.text(type, pageWidth / 2, 15, { align: "center" });
+
+        // Subtitle (smaller, below type)
+        doc.setTextColor(100, 100, 100);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text(typeLabel, pageWidth / 2, 22, { align: "center" });
+
+        // Divider line
+        doc.setDrawColor(typeColor[0], typeColor[1], typeColor[2]);
+        doc.setLineWidth(0.5);
+        doc.line(8, 26, pageWidth - 8, 26);
+
+        // Folio label
+        doc.setTextColor(100, 100, 100);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.text("FOLIO", pageWidth / 2, 38, { align: "center" });
+
+        // Folio number (large, centered)
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(24);
+        doc.text(folio, pageWidth / 2, 52, { align: "center" });
+
+        // Open print dialog
+        doc.autoPrint();
+        window.open(doc.output('bloburl'), '_blank');
+
+        return doc;
+    } catch (e) {
+        throw e;
+    }
+}
+
 export async function generateResponsivaPdf(
     data: any,
     signature: string,

@@ -18,7 +18,7 @@
         Trash2 as TrashIcon,
         Eye,
     } from "lucide-svelte";
-    import { generateResponsivaPdf } from "../utils/pdfGenerator";
+    import { generateResponsivaPdf, generateCardPdf } from "../utils/pdfGenerator";
     import ResponsivaTemplate from "./ResponsivaTemplate.svelte";
     import ResponsivaPreviewModal from "./ResponsivaPreviewModal.svelte";
     import { toast } from "svelte-sonner";
@@ -245,6 +245,16 @@
             toast.success(`${label} copiado`);
         } catch (err) {
             toast.error("Error al copiar");
+        }
+    }
+
+    async function handlePrintCard(card: any) {
+        try {
+            await generateCardPdf(card.folio, card.type);
+            toast.success("PDF generado para impresión");
+        } catch (error) {
+            console.error("Error al generar PDF de tarjeta:", error);
+            toast.error("Error al generar PDF de tarjeta");
         }
     }
 </script>
@@ -582,6 +592,7 @@
                                 onUnassign={() => onCardUnassign?.(card)}
                                 onReplace={() => onCardReplace?.(card)}
                                 onProgram={() => onCardProgram?.(card)}
+                                onPrint={() => handlePrintCard(card)}
                             />
                         {/each}
                     </div>
