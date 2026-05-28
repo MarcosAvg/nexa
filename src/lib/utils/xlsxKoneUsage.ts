@@ -312,7 +312,11 @@ export async function matchKoneUsageToPersonnel(
     const cardByFolio = new Map<string, any>();
     for (const card of allMatchingCards) {
         if (card.personnel) {
-            cardByFolio.set(card.folio, card);
+            const existing = cardByFolio.get(card.folio);
+            // Prioritize active cards. If there is already an active card, don't overwrite it with a non-active one.
+            if (!existing || card.status === 'active' || existing.status !== 'active') {
+                cardByFolio.set(card.folio, card);
+            }
         }
     }
 

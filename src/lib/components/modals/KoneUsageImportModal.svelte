@@ -154,10 +154,10 @@
             found: filteredResult.matched.length,
             notFound: filteredResult.unmatched.length,
             pctMatch:
-                filteredResult.totalImported > 0
+                matchResult && matchResult.totalImported > 0
                     ? (
-                          (filteredResult.matched.length /
-                              filteredResult.totalImported) *
+                          (matchResult.matched.length /
+                              matchResult.totalImported) *
                           100
                       ).toFixed(1)
                     : "0",
@@ -283,7 +283,7 @@
                 </div>
             </div>
         {/if}
-
+ 
         <!-- ── STEP: RESULTS ── -->
         {#if step === "results" && stats}
             <!-- KPI Cards -->
@@ -295,7 +295,7 @@
                         {stats.totalImported}
                     </p>
                     <p class="text-xs font-medium text-slate-400 mt-1">
-                        Folios importados
+                        Folios importados (Total)
                     </p>
                 </div>
                 <div
@@ -305,7 +305,7 @@
                         {stats.found}
                     </p>
                     <p class="text-xs font-medium text-emerald-500 mt-1">
-                        Encontrados
+                        {selectedDependency ? 'Encontrados (Filtrado)' : 'Encontrados (Total)'}
                     </p>
                 </div>
                 <div
@@ -325,7 +325,7 @@
                             ? 'text-rose-500'
                             : 'text-slate-400'} mt-1"
                     >
-                        No encontrados
+                        No encontrados (Global)
                     </p>
                 </div>
                 <div
@@ -335,11 +335,11 @@
                         {stats.pctMatch}%
                     </p>
                     <p class="text-xs font-medium text-sky-500 mt-1">
-                        Coincidencia
+                        Coincidencia Global
                     </p>
                 </div>
             </div>
-
+ 
             <!-- Usage summary -->
             <div
                 class="flex items-center gap-4 p-4 rounded-xl bg-sky-50/50 border border-sky-100"
@@ -367,7 +367,17 @@
                 </div>
             </div>
 
-            <!-- Duplicates warning -->
+            <!-- Active Filter Banner -->
+            {#if selectedDependency}
+                <div class="flex items-center gap-2.5 p-3.5 rounded-xl bg-sky-50/60 border border-sky-100 text-sky-800 text-xs">
+                    <span class="flex h-2 w-2 rounded-full bg-sky-500 shrink-0 animate-pulse"></span>
+                    <span class="font-medium">
+                        Filtro activo: mostrando únicamente personal de <strong>{selectedDependency}</strong> ({stats.found} {stats.found === 1 ? 'persona' : 'personas'}).
+                    </span>
+                </div>
+            {/if}
+
+            <!-- Duplicates warning -->         <!-- Duplicates warning -->
             {#if duplicates.length > 0}
                 <div class="p-4 rounded-xl bg-amber-50 border border-amber-200">
                     <div class="flex items-center justify-between mb-3">

@@ -1894,12 +1894,19 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
 
     // ── Colors ──
     gr++;
-    guideSectionTitle('🎨  CÓDIGO DE COLORES EN DIRECTORIO');
+    guideSectionTitle('🎨  CÓDIGO DE COLORES PARA USOS REGISTRADOS');
     guideTableHeader('COLOR', 'SIGNIFICADO', C_GUIDE.emerald);
     guideRow('🟢 Verde', 'Más de 100 usos — uso alto.', C_GUIDE.emerald);
     guideRow('🔵 Azul', 'Entre 51 y 100 usos — uso moderado.', C_GUIDE.sky);
     guideRow('🟡 Rojo claro', 'Por debajo del umbral de bajo uso.', C_GUIDE.amber);
     guideRow('🔴 Rojo fuerte', '0 usos — tarjeta no utilizada.', C_GUIDE.rose);
+    gr++;
+    guideSectionTitle('🎨  CÓDIGO DE COLORES PARA DÍAS SIN USO');
+    guideTableHeader('COLOR', 'SIGNIFICADO', C_GUIDE.rose);
+    guideRow('🟢 Verde suave', 'De 0 a 3 días sin uso — uso muy activo y reciente.', C_GUIDE.emerald);
+    guideRow('🟡 Amarillo suave', 'De 4 a 7 días sin uso — uso regular reciente.', C_GUIDE.amber);
+    guideRow('🟠 Naranja suave', 'De 8 a 10 días sin uso — inactividad leve / alerta.', C_GUIDE.sky);
+    guideRow('🔴 Rojo suave', '11 o más días sin uso (o Sin registro de uso) — inactividad prolongada.', C_GUIDE.rose);
 
     guideSheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 3 }];
     guideSheet.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1 };
@@ -1907,7 +1914,10 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
     // ══════════════════════════════════════════════════════════════
     // SHEET 1: Executive Summary — Usage Metrics (All)
     // ══════════════════════════════════════════════════════════════
-    await addKoneSummarySheet(workbook, matchedData, 'Resumen — Uso KONE', 'REPORTE DE USO DE TARJETAS KONE — NEXA', usageThreshold);
+    const dynamicTitle = dependencyFilter
+        ? `REPORTE DE USO DE TARJETAS KONE — ${dependencyFilter.toUpperCase()}`
+        : 'REPORTE DE USO DE TARJETAS KONE — NEXA';
+    await addKoneSummarySheet(workbook, matchedData, 'Resumen — Uso KONE', dynamicTitle, usageThreshold);
 
     const bajoUsoData = matchedData.filter(m => m.conteo > 0 && m.conteo < usageThreshold);
     const noUtilizadasData = matchedData.filter(m => m.conteo === 0);
@@ -2054,15 +2064,25 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
                     }
                 }
 
-                // Highlight dias de inactividad column in red
+                // Semáforo dinámico de días de inactividad
                 if (colNumber === 11) {
-                    if (entry.diasInactividad === null) {
+                    const dias = entry.diasInactividad;
+                    if (dias === null) {
                         cell.value = 'Sin registro';
-                        cell.font = { ...cell.font, color: { argb: 'FFDC2626' }, bold: true };
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; // Rojo suave
+                        cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, bold: true };
+                    } else if (dias >= 11) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; // Rojo suave
+                        cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, bold: true };
+                    } else if (dias >= 8 && dias <= 10) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEDD5' } }; // Naranja suave
+                        cell.font = { ...cell.font, color: { argb: 'FFC2410C' }, bold: true };
+                    } else if (dias >= 4 && dias <= 7) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF9C3' } }; // Amarillo suave
+                        cell.font = { ...cell.font, color: { argb: 'FF854D0E' }, bold: true };
                     } else {
-                        // Mantener el valor numérico (incluyendo 0)
-                        cell.font = { ...cell.font, color: { argb: 'FFDC2626' }, bold: true };
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } }; // Verde suave
+                        cell.font = { ...cell.font, color: { argb: 'FF065F46' }, bold: true };
                     }
                 }
 
@@ -2209,6 +2229,28 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
                     } else if (person.status === 'Baja' || person.status === 'Sin Acceso') {
                         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
                         cell.font = { color: { argb: 'FF475569' }, italic: true, name: 'Arial', size: 9 };
+                    }
+                }
+
+                // Semáforo dinámico de días de inactividad
+                if (colNumber === 11) {
+                    const dias = entry.diasInactividad;
+                    if (dias === null) {
+                        cell.value = 'Sin registro';
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; // Rojo suave
+                        cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, bold: true };
+                    } else if (dias >= 11) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; // Rojo suave
+                        cell.font = { ...cell.font, color: { argb: 'FFB91C1C' }, bold: true };
+                    } else if (dias >= 8 && dias <= 10) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEDD5' } }; // Naranja suave
+                        cell.font = { ...cell.font, color: { argb: 'FFC2410C' }, bold: true };
+                    } else if (dias >= 4 && dias <= 7) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF9C3' } }; // Amarillo suave
+                        cell.font = { ...cell.font, color: { argb: 'FF854D0E' }, bold: true };
+                    } else {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } }; // Verde suave
+                        cell.font = { ...cell.font, color: { argb: 'FF065F46' }, bold: true };
                     }
                 }
 
