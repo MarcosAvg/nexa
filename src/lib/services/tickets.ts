@@ -66,14 +66,20 @@ export const ticketService = {
                 query = query.eq("personnel.dependency_id", dependencyId);
             }
             if (search) {
+                const terms = search.trim().split(/\s+/).filter(Boolean);
                 const searchTerm = `%${search}%`;
 
                 // Find matching people IDs first
-                const { data: people } = await supabase
+                let peopleQuery = supabase
                     .from("personnel")
-                    .select("id")
-                    .or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm}`);
+                    .select("id");
 
+                for (const term of terms) {
+                    const termPattern = `%${term}%`;
+                    peopleQuery = peopleQuery.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern}`);
+                }
+
+                const { data: people } = await peopleQuery;
                 const personIds = people?.map(p => p.id) || [];
 
                 if (personIds.length > 0) {
@@ -89,7 +95,7 @@ export const ticketService = {
 
             if (error) throw error;
 
-            const mapped = (data || []).map(t => ({
+            const mapped = (data as any[] || []).map(t => ({
                 ...t,
                 personId: t.person_id,
                 cardId: t.card_id,

@@ -2,7 +2,7 @@
     import Modal from "../Modal.svelte";
     import Button from "../Button.svelte";
     import { AlertTriangle, Trash2, RotateCcw } from "lucide-svelte";
-    import type { Person } from "../../services/personnel";
+    import type { Person } from "../../types";
 
     let {
         isOpen = $bindable(false),

@@ -82,8 +82,11 @@ export const personnelService = {
                 .select("*, cards(id, folio, type, status, programming_status, responsiva_status)", { count: "exact" });
 
             if (search) {
-                const searchTerm = `%${search}%`;
-                query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},employee_no.ilike.${searchTerm}`);
+                const terms = search.trim().split(/\s+/).filter(Boolean);
+                for (const term of terms) {
+                    const termPattern = `%${term}%`;
+                    query = query.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern},employee_no.ilike.${termPattern}`);
+                }
             }
 
             if (statusFilter !== "Todos") {
@@ -140,8 +143,11 @@ export const personnelService = {
             .select("*, cards(*), buildings(name), dependencies(name), schedules(*)", { count: "exact" });
 
         if (search) {
-            const searchTerm = `%${search}%`;
-            query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},employee_no.ilike.${searchTerm}`);
+            const terms = search.trim().split(/\s+/).filter(Boolean);
+            for (const term of terms) {
+                const termPattern = `%${term}%`;
+                query = query.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern},employee_no.ilike.${termPattern}`);
+            }
         }
 
         if (statusFilter !== "Todos") {
@@ -223,8 +229,11 @@ export const personnelService = {
                     .select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
 
                 if (search) {
-                    const searchTerm = `%${search}%`;
-                    query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},employee_no.ilike.${searchTerm}`);
+                    const terms = search.trim().split(/\s+/).filter(Boolean);
+                    for (const term of terms) {
+                        const termPattern = `%${term}%`;
+                        query = query.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern},employee_no.ilike.${termPattern}`);
+                    }
                 }
 
                 if (statusFilter !== "Todos") {
@@ -294,32 +303,51 @@ export const personnelService = {
 
             if (!cleanApellidos && !cleanNombres) return [];
 
-            // Call the PostgreSQL RPC function for robust fuzzy search
-            const { data, error } = await supabase.rpc('search_personnel_fuzzy', {
-                p_last_name: cleanApellidos,
-                p_first_name: cleanNombres,
-                p_limit: 20
-            });
+            let peopleQuery;
+            let rpcIds: string[] | null = null;
 
-            if (error) throw error;
+            if (!cleanApellidos || !cleanNombres) {
+                // If one of the search strings is empty, split the non-empty one into terms
+                // to support full name/combination searches.
+                const queryStr = cleanApellidos || cleanNombres;
+                const terms = queryStr.split(/\s+/).filter(Boolean);
+                if (terms.length === 0) return [];
 
-            // The RPC returns SETOF personnel, but we need the joins for mapPersonRecord.
-            // However, Supabase RPC doesn't support complex joins in the same call easily.
-            // We can fetch the full records for these IDs to get the joins, or map partially.
-            // Given the original code had joins, we'll fetch the full details for the returned IDs.
-            if (!data || data.length === 0) return [];
+                peopleQuery = supabase
+                    .from("personnel")
+                    .select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
 
-            const ids = data.map((p: any) => p.id);
-            const { data: fullPeople, error: fetchError } = await supabase
-                .from("personnel")
-                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)")
-                .in("id", ids);
+                for (const term of terms) {
+                    const termPattern = `%${term}%`;
+                    peopleQuery = peopleQuery.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern},employee_no.ilike.${termPattern}`);
+                }
+                peopleQuery = peopleQuery.order("first_name", { ascending: true }).limit(20);
+            } else {
+                // Both fields provided, use SQL RPC fuzzy search
+                const { data, error } = await supabase.rpc('search_personnel_fuzzy', {
+                    p_last_name: cleanApellidos,
+                    p_first_name: cleanNombres,
+                    p_limit: 20
+                });
 
+                if (error) throw error;
+                if (!data || data.length === 0) return [];
+
+                rpcIds = data.map((p: any) => p.id);
+                peopleQuery = supabase
+                    .from("personnel")
+                    .select("*, cards(*), buildings(name), dependencies(name), schedules(*)")
+                    .in("id", rpcIds as string[]);
+            }
+
+            const { data: fullPeople, error: fetchError } = await peopleQuery;
             if (fetchError) throw fetchError;
 
-            // Sort them back according to the order from RPC (similarity score)
-            const idToData = Object.fromEntries(fullPeople.map(p => [p.id, p]));
-            const orderedPeople = data.map((p: any) => idToData[p.id]).filter(Boolean);
+            let orderedPeople = fullPeople || [];
+            if (rpcIds) {
+                const idToData = Object.fromEntries(fullPeople.map(p => [p.id, p]));
+                orderedPeople = rpcIds.map((id: string) => idToData[id]).filter(Boolean);
+            }
 
             return (orderedPeople || []).map((p: any) => ({
                 id: p.id,

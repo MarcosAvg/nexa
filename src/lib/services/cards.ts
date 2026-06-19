@@ -31,14 +31,20 @@ export const cardService = {
                 .select("*, personnel(first_name, last_name, status)", { count: "exact" });
 
             if (search) {
+                const terms = search.trim().split(/\s+/).filter(Boolean);
                 const searchTerm = `%${search}%`;
 
                 // 1. Find matching people IDs first
-                const { data: people } = await supabase
+                let peopleQuery = supabase
                     .from("personnel")
-                    .select("id")
-                    .or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm}`);
+                    .select("id");
 
+                for (const term of terms) {
+                    const termPattern = `%${term}%`;
+                    peopleQuery = peopleQuery.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern}`);
+                }
+
+                const { data: people } = await peopleQuery;
                 const personIds = people?.map(p => p.id) || [];
 
                 // 2. Build Query: Folio match OR Person match
@@ -107,11 +113,17 @@ export const cardService = {
             // Pre-fetch person IDs if searching, to avoid doing it inside the loop
             let personIds: string[] = [];
             if (search) {
-                const searchTerm = `%${search}%`;
-                const { data: people } = await supabase
+                const terms = search.trim().split(/\s+/).filter(Boolean);
+                let peopleQuery = supabase
                     .from("personnel")
-                    .select("id")
-                    .or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm}`);
+                    .select("id");
+
+                for (const term of terms) {
+                    const termPattern = `%${term}%`;
+                    peopleQuery = peopleQuery.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern}`);
+                }
+
+                const { data: people } = await peopleQuery;
                 personIds = people?.map(p => p.id) || [];
             }
 

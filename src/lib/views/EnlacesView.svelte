@@ -65,13 +65,13 @@
         });
 
         if (searchQuery.trim()) {
-            const term = searchQuery.toLowerCase();
+            const terms = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
             list = list.filter((e) => {
                 const name = e.name.toLowerCase();
                 const email = e.email.toLowerCase();
                 const ext = (e.extension || "").toLowerCase();
                 const depName = e.dependency.toLowerCase();
-                return (
+                return terms.every((term) =>
                     name.includes(term) ||
                     email.includes(term) ||
                     ext.includes(term) ||
