@@ -22,11 +22,14 @@
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
     import Input from "../components/Input.svelte";
+    import Select from "../components/Select.svelte";
 
     let enlaces = $state<Enlace[]>([]);
     let isLoading = $state(true);
     let isAddModalOpen = $state(false);
     let searchQuery = $state("");
+    let filterDependency = $state("");
+    let filterFloor = $state("");
 
     let isConfirmOpen = $state(false);
     let selectedEnlace = $state<Enlace | null>(null);
@@ -35,6 +38,11 @@
     let selectedEnlaceForEdit = $state<Enlace | null>(null);
 
     let dependencies = $derived(catalogState.dependencies);
+
+    let availableFloors = $derived.by(() => {
+        const floors = new Set(enlaces.map(e => e.personnel?.floor).filter(Boolean).filter(f => f !== "N/A"));
+        return Array.from(floors).sort((a, b) => (a as string).localeCompare(b as string, undefined, { numeric: true, sensitivity: 'base' }));
+    });
 
     async function loadData() {
         isLoading = true;
@@ -78,6 +86,14 @@
                     depName.includes(term)
                 );
             });
+        }
+
+        if (filterDependency) {
+            list = list.filter((e) => e.dependency === filterDependency);
+        }
+
+        if (filterFloor) {
+            list = list.filter((e) => e.floor === filterFloor);
         }
 
         // Default sort by "Piso base"
@@ -212,17 +228,43 @@
 <div class="space-y-6">
     <SectionHeader title="Directorio de Enlaces">
         {#snippet filters()}
-            <div class="flex-1 min-w-[200px] w-full relative sm:max-w-xs">
-                <Search
-                    class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                    size={16}
-                />
-                <Input
-                    id="enlaces-search"
-                    placeholder="Buscar por nombre, dependencia, correo o extensión..."
-                    class="pl-10 h-9 text-xs font-bold"
-                    bind:value={searchQuery}
-                />
+            <div class="flex flex-col xl:flex-row gap-3 w-full flex-wrap xl:flex-nowrap items-end">
+                <div class="flex-1 min-w-[200px] w-full sm:max-w-xs flex flex-col gap-1.5">
+                    <label for="enlaces-search" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Buscar Enlace</label>
+                    <div class="relative w-full">
+                        <Search
+                            class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                            size={16}
+                        />
+                        <Input
+                            id="enlaces-search"
+                            placeholder="Nombre, dependencia, correo o ext..."
+                            class="pl-10 h-9 text-xs font-bold w-full"
+                            bind:value={searchQuery}
+                        />
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <div class="flex flex-col gap-1.5">
+                        <label for="filter-dependency" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dependencia</label>
+                        <Select id="filter-dependency" bind:value={filterDependency} class="w-full sm:w-auto min-w-[160px] h-9 text-xs font-bold">
+                            <option value="">Todas</option>
+                            {#each dependencies as dep}
+                                <option value={dep.name}>{dep.name}</option>
+                            {/each}
+                        </Select>
+                    </div>
+                    
+                    <div class="flex flex-col gap-1.5">
+                        <label for="filter-floor" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Piso Base</label>
+                        <Select id="filter-floor" bind:value={filterFloor} class="w-full sm:w-auto min-w-[120px] h-9 text-xs font-bold">
+                            <option value="">Todos</option>
+                            {#each availableFloors as floor}
+                                <option value={floor}>{floor}</option>
+                            {/each}
+                        </Select>
+                    </div>
+                </div>
             </div>
         {/snippet}
         {#snippet actions()}
