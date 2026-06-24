@@ -305,19 +305,37 @@
         <div class="space-y-6">
             <!-- Person Header -->
             <div
-                class="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200"
+                class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200"
             >
-                <div
-                    class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500"
-                >
-                    <User size={20} />
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 shrink-0"
+                    >
+                        <User size={20} />
+                    </div>
+                    <div>
+                        <p class="font-bold text-slate-800">{currentPerson.name}</p>
+                        <p class="text-xs text-slate-500">
+                            No. Empleado: {currentPerson.employee_no} · {currentPerson.dependency}
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <p class="font-bold text-slate-800">{currentPerson.name}</p>
-                    <p class="text-xs text-slate-500">
-                        No. Empleado: {currentPerson.employee_no} · {currentPerson.dependency}
-                    </p>
-                </div>
+
+                {#if currentPerson.cards && currentPerson.cards.length > 0}
+                    <div class="flex flex-col gap-1.5 sm:items-end">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Tarjetas Asignadas</p>
+                        <div class="flex flex-wrap gap-2">
+                            {#each currentPerson.cards as card}
+                                <div class="flex items-center gap-1.5 bg-white border border-slate-200 px-1.5 py-1 rounded-md text-xs shadow-sm transition-all hover:shadow-md">
+                                    <Badge variant={card.type === "KONE" ? "blue" : "amber"} class="px-1.5 py-0.5">
+                                        {card.type}
+                                    </Badge>
+                                    <span class="text-slate-700 font-mono font-bold text-[11px] px-0.5">{card.folio}</span>
+                                </div>
+                            {/each}
+                        </div>
+                    </div>
+                {/if}
             </div>
 
             <!-- Column Headers -->
