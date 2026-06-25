@@ -39,6 +39,7 @@
         personName: string;
         cardType?: string;
         cardFolio?: string;
+        movementType?: string;
         priority: string;
         status: string;
         created_at?: string;
@@ -148,6 +149,38 @@
         },
     };
 
+    const movementTypeConfig: Record<
+        string,
+        { color: string; bg: string; border: string }
+    > = {
+        "Alta de Personal": {
+            color: "text-emerald-700",
+            bg: "bg-emerald-50",
+            border: "border-emerald-200",
+        },
+        Reposición: {
+            color: "text-sky-700",
+            bg: "bg-sky-50",
+            border: "border-sky-200",
+        },
+        Asignación: {
+            color: "text-violet-700",
+            bg: "bg-violet-50",
+            border: "border-violet-200",
+        },
+        "Sin clasificar": {
+            color: "text-slate-600",
+            bg: "bg-slate-50",
+            border: "border-slate-200",
+        },
+    };
+
+    const movementStyle = $derived(
+        ticket.movementType
+            ? movementTypeConfig[ticket.movementType] || movementTypeConfig["Sin clasificar"]
+            : null,
+    );
+
     const config = $derived(typeConfig[ticket.type] || typeConfig["Default"]);
 
     function formatDate(dateStr?: string) {
@@ -184,6 +217,13 @@
                 >
                     {ticket.type}
                 </p>
+                {#if ticket.type === "Firma Responsiva" && ticket.movementType && movementStyle}
+                    <span
+                        class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide border {movementStyle.bg} {movementStyle.color} {movementStyle.border} mb-1"
+                    >
+                        {ticket.movementType}
+                    </span>
+                {/if}
                 <div class="flex items-center gap-1.5 text-slate-300">
                     <Hash size={10} />
                     <span class="text-[10px] font-bold"

@@ -117,6 +117,11 @@
             let cardType = t.card_type;
             let cardFolio = t.card_folio;
 
+            if (t.cards) {
+                cardType = t.cards.type || cardType;
+                cardFolio = t.cards.folio || cardFolio;
+            }
+
             if (!cardFolio && t.payload) {
                 if (t.payload.folio_p2000) {
                     cardType = "P2000";
@@ -130,7 +135,7 @@
                 }
             }
 
-            return { ...t, personName, cardType, cardFolio };
+            return { ...t, personName, cardType, cardFolio, movementType: t.movementType };
         }),
     );
 

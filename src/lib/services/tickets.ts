@@ -86,6 +86,40 @@ async function fetchCardAssignmentTypes(
     return result;
 }
 
+async function enrichWithMovementType(tickets: any[]): Promise<any[]> {
+    const cardIds = tickets.map((t) => t.card_id).filter(Boolean) as string[];
+    const personnelCreatedAt: Record<string, string> = {};
+    for (const t of tickets) {
+        if (t.person_id && t.personnel?.created_at) {
+            personnelCreatedAt[t.person_id] = t.personnel.created_at;
+        }
+    }
+
+    const assignmentMap = await fetchCardAssignmentTypes(cardIds, personnelCreatedAt);
+
+    return tickets.map((t) => {
+        const info = t.card_id ? assignmentMap[t.card_id] : undefined;
+        let movementType = info?.movementType ?? "Sin clasificar";
+        let assignmentDate = info?.registeredAt || t.created_at;
+
+        if (movementType === "Sin clasificar" && t.person_id && t.personnel?.created_at) {
+            const createDate = new Date(t.personnel.created_at);
+            const ticketDate = new Date(t.created_at);
+            const diffDays = Math.floor(
+                (ticketDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            if (diffDays >= 0 && diffDays <= 7) {
+                movementType = "Alta de Personal";
+                assignmentDate = t.personnel.created_at;
+            } else {
+                movementType = "Asignación";
+            }
+        }
+
+        return { ...t, movementType, assignmentDate };
+    });
+}
+
 export const ticketService = {
     async fetchAll(throwOnError: boolean = false): Promise<Ticket[]> {
         try {
@@ -125,6 +159,11 @@ export const ticketService = {
             let selectString = "*, personnel(first_name, last_name, dependency_id)";
             if (dependencyId) {
                 selectString = "*, personnel!inner(first_name, last_name, dependency_id)";
+            }
+            if (section === "Responsivas") {
+                selectString = dependencyId
+                    ? "*, cards(id, folio, type), personnel!inner(first_name, last_name, dependency_id, created_at)"
+                    : "*, cards(id, folio, type), personnel(first_name, last_name, dependency_id, created_at)";
             }
 
             let query = supabase
@@ -182,6 +221,11 @@ export const ticketService = {
                 cardId: t.card_id,
             } as Ticket));
 
+            if (section === "Responsivas" && mapped.length > 0) {
+                const enriched = await enrichWithMovementType(mapped);
+                return { data: enriched as Ticket[], count: count || 0 };
+            }
+
             return { data: mapped, count: count || 0 };
         } catch (error) {
             handleError(error, "Fetch Tickets Paginated");
@@ -228,41 +272,7 @@ export const ticketService = {
                 }
             }
 
-            const cardIds = allData.map((t) => t.card_id).filter(Boolean) as string[];
-            const personnelCreatedAt: Record<string, string> = {};
-            for (const t of allData) {
-                if (t.person_id && t.personnel?.created_at) {
-                    personnelCreatedAt[t.person_id] = t.personnel.created_at;
-                }
-            }
-
-            const assignmentMap = await fetchCardAssignmentTypes(cardIds, personnelCreatedAt);
-
-            return allData.map((t) => {
-                const info = t.card_id ? assignmentMap[t.card_id] : undefined;
-                let movementType = info?.movementType ?? "Sin clasificar";
-                let assignmentDate = info?.registeredAt || t.created_at;
-
-                if (movementType === "Sin clasificar" && t.person_id && t.personnel?.created_at) {
-                    const createDate = new Date(t.personnel.created_at);
-                    const ticketDate = new Date(t.created_at);
-                    const diffDays = Math.floor(
-                        (ticketDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24)
-                    );
-                    if (diffDays >= 0 && diffDays <= 7) {
-                        movementType = "Alta de Personal";
-                        assignmentDate = t.personnel.created_at;
-                    } else {
-                        movementType = "Asignación";
-                    }
-                }
-
-                return {
-                    ...t,
-                    movementType,
-                    assignmentDate,
-                };
-            });
+            return enrichWithMovementType(allData);
         } catch (error) {
             handleError(error, "Fetch Responsivas for Export");
             return [];

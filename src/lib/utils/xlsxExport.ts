@@ -736,32 +736,51 @@ function daysSince(dateStr: string, reference: Date = new Date()): number {
     return Math.max(0, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
 }
 
+function formatDaysRemaining(remaining: number): string {
+    return `${remaining} día${remaining !== 1 ? "s" : ""}`;
+}
+
+function formatPickupTrackingLabel(
+    movementType: string,
+    daysRemaining: number,
+    daysElapsed: number,
+    needsBaja: boolean
+): string {
+    if (movementType === "Reposición") {
+        return `Reposición — ${formatDaysRemaining(daysElapsed)} sin recoger`;
+    }
+
+    if (movementType === "Alta de Personal") {
+        if (needsBaja) {
+            return "Plazo vencido";
+        }
+        return `Alta — Restan ${formatDaysRemaining(daysRemaining)} para recoger`;
+    }
+
+    if (needsBaja) {
+        return "Plazo vencido";
+    }
+    return `Restan ${formatDaysRemaining(daysRemaining)} para recoger`;
+}
+
 function computeResponsivaManagement(
     movementType: string,
     referenceDate: string,
     ticketCreatedAt: string
 ) {
     const isReposicion = movementType === "Reposición";
-    const refDate = isReposicion ? referenceDate : ticketCreatedAt;
-    const daysElapsed = daysSince(refDate);
-
-    if (isReposicion) {
-        return {
-            daysElapsed,
-            controlLabel: "-",
-            deadlineLabel: `${daysElapsed} día${daysElapsed !== 1 ? "s" : ""} sin recoger`,
-            needsBaja: false,
-        };
-    }
-
-    const daysRemaining = Math.max(0, RESPONSIVA_PICKUP_DAYS - daysElapsed);
-    const needsBaja = daysElapsed > RESPONSIVA_PICKUP_DAYS;
+    const elapsedRef = isReposicion ? referenceDate : ticketCreatedAt;
+    const daysElapsed = daysSince(elapsedRef);
+    const daysRemaining = Math.max(0, RESPONSIVA_PICKUP_DAYS - daysSince(ticketCreatedAt));
+    const needsBaja = !isReposicion && daysSince(ticketCreatedAt) > RESPONSIVA_PICKUP_DAYS;
 
     return {
         daysElapsed,
         controlLabel: needsBaja ? "Baja de registro" : "-",
-        deadlineLabel: needsBaja ? "Plazo vencido" : `${daysRemaining} día${daysRemaining !== 1 ? "s" : ""}`,
+        deadlineLabel: formatPickupTrackingLabel(movementType, daysRemaining, daysElapsed, needsBaja),
         needsBaja,
+        isReposicion,
+        isAlta: movementType === "Alta de Personal",
     };
 }
 
@@ -827,7 +846,7 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
         { key: 'pendingSince', width: 16 },
         { key: 'daysElapsed', width: 14 },
         { key: 'controlLabel', width: 22 },
-        { key: 'deadlineLabel', width: 18 },
+        { key: 'deadlineLabel', width: 34 },
     ];
 
     // ── Filter description ──
@@ -895,7 +914,7 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
     const headerLabels = [
         'NO.', 'NOMBRE COMPLETO', 'NO. EMPLEADO', 'DEPENDENCIA',
         'TIPO', 'TARJETA', 'FOLIO', 'PENDIENTE DESDE',
-        'DÍAS', 'CONTROL DE GESTIÓN', 'PLAZO / DÍAS SIN RECOGER',
+        'DÍAS', 'CONTROL DE GESTIÓN', 'SEGUIMIENTO DE ENTREGA',
     ];
 
     const colGroupMap = [0, 1, 1, 1, 2, 3, 3, 4, 4, 4, 4];
@@ -954,17 +973,36 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
                 right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFCBD5E1' } }
             };
 
+            if (colNumber === 5) {
+                if (entry.isAlta) {
+                    cell.font = { ...cell.font, bold: true, color: { argb: COLORS.emerald.sub } };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.emerald.head } };
+                } else if (entry.isReposicion) {
+                    cell.font = { ...cell.font, bold: true, color: { argb: COLORS.sky.sub } };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.sky.head } };
+                }
+            }
+
             if (colNumber === 10 && entry.needsBaja) {
                 cell.font = { ...cell.font, bold: true, color: { argb: COLORS.rose.sub } };
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.rose.head } };
             }
 
-            if (colNumber === 9 && entry.daysElapsed > RESPONSIVA_PICKUP_DAYS && entry.movementType !== 'Reposición') {
+            if (colNumber === 9 && entry.daysElapsed > RESPONSIVA_PICKUP_DAYS && !entry.isReposicion) {
                 cell.font = { ...cell.font, bold: true, color: { argb: COLORS.amber.sub } };
             }
 
-            if (colNumber === 11 && (entry.deadlineLabel === 'Plazo vencido' || entry.needsBaja)) {
-                cell.font = { ...cell.font, bold: true, color: { argb: COLORS.rose.sub } };
+            if (colNumber === 11) {
+                if (entry.needsBaja) {
+                    cell.font = { ...cell.font, bold: true, color: { argb: COLORS.rose.sub } };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.rose.head } };
+                } else if (entry.isReposicion) {
+                    cell.font = { ...cell.font, color: { argb: COLORS.sky.sub } };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.sky.fill } };
+                } else if (entry.isAlta) {
+                    cell.font = { ...cell.font, color: { argb: COLORS.emerald.sub } };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.emerald.fill } };
+                }
             }
         });
     });
