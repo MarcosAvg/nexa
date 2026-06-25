@@ -725,6 +725,46 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
     saveAsFunction(new Blob([buffer]), finalFileName);
 }
 
+const RESPONSIVA_PICKUP_DAYS = 7;
+
+function daysSince(dateStr: string, reference: Date = new Date()): number {
+    if (!dateStr) return 0;
+    const start = new Date(dateStr);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(reference);
+    end.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+}
+
+function computeResponsivaManagement(
+    movementType: string,
+    referenceDate: string,
+    ticketCreatedAt: string
+) {
+    const isReposicion = movementType === "Reposición";
+    const refDate = isReposicion ? referenceDate : ticketCreatedAt;
+    const daysElapsed = daysSince(refDate);
+
+    if (isReposicion) {
+        return {
+            daysElapsed,
+            controlLabel: "-",
+            deadlineLabel: `${daysElapsed} día${daysElapsed !== 1 ? "s" : ""} sin recoger`,
+            needsBaja: false,
+        };
+    }
+
+    const daysRemaining = Math.max(0, RESPONSIVA_PICKUP_DAYS - daysElapsed);
+    const needsBaja = daysElapsed > RESPONSIVA_PICKUP_DAYS;
+
+    return {
+        daysElapsed,
+        controlLabel: needsBaja ? "Baja de registro" : "-",
+        deadlineLabel: needsBaja ? "Plazo vencido" : `${daysRemaining} día${daysRemaining !== 1 ? "s" : ""}`,
+        needsBaja,
+    };
+}
+
 export async function exportResponsivasToExcel(tickets: any[], dependencyName?: string) {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
@@ -744,50 +784,50 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
         emerald: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
         rose: { head: 'FFFEE2E2', sub: 'FF991B1B', fill: 'FFFFF1F2' },
         slate: { head: 'FFF1F5F9', sub: 'FF334155', fill: 'FFF8FAFC' },
+        violet: { head: 'FFEDE9FE', sub: 'FF5B21B6', fill: 'FFFAF5FF' },
     };
 
-    // ── Group tickets by person ──
-    const personMap: Record<string, {
-        name: string;
-        employee_no: string;
-        dependency: string;
-        cards: { type: string; folio: string; created_at: string }[];
-    }> = {};
+    const LAST_COL = 'K';
 
-    tickets.forEach(t => {
-        const personId = t.person_id;
-        if (!personId) return;
-
-        if (!personMap[personId]) {
+    // ── Build one row per pending card/ticket ──
+    const rows = tickets
+        .filter((t) => t.person_id)
+        .map((t) => {
             const p = t.personnel || {};
-            personMap[personId] = {
+            const card = t.cards;
+            const movementType = t.movementType || "Sin clasificar";
+            const referenceDate = t.assignmentDate || t.created_at;
+            const mgmt = computeResponsivaManagement(movementType, referenceDate, t.created_at);
+
+            return {
                 name: `${p.last_name || ''}, ${p.first_name || ''}`.trim().replace(/^,\s*/, ''),
                 employee_no: p.employee_no || '-',
                 dependency: p.dependencies?.name || '-',
-                cards: [],
+                movementType,
+                cardType: card?.type || t.payload?.tipo_tarjeta || '-',
+                folio: card?.folio || t.title?.replace('Firma: ', '') || '-',
+                pendingSince: t.created_at,
+                ...mgmt,
             };
-        }
+        })
+        .sort((a, b) => a.name.localeCompare(b.name) || a.folio.localeCompare(b.folio));
 
-        const card = t.cards;
-        personMap[personId].cards.push({
-            type: card?.type || t.payload?.tipo_tarjeta || '-',
-            folio: card?.folio || t.title?.replace('Firma: ', '') || '-',
-            created_at: t.created_at || '',
-        });
-    });
-
-    const personEntries = Object.values(personMap).sort((a, b) => a.name.localeCompare(b.name));
+    const uniquePersons = new Set(rows.map((r) => r.name)).size;
+    const bajaCount = rows.filter((r) => r.needsBaja).length;
 
     // ── Column widths ──
     worksheet.columns = [
         { key: 'num', width: 6 },
-        { key: 'name', width: 35 },
-        { key: 'employee_no', width: 16 },
-        { key: 'dependency', width: 30 },
-        { key: 'cards_p2000', width: 22 },
-        { key: 'cards_kone', width: 22 },
-        { key: 'total_cards', width: 14 },
-        { key: 'oldest', width: 22 },
+        { key: 'name', width: 32 },
+        { key: 'employee_no', width: 14 },
+        { key: 'dependency', width: 28 },
+        { key: 'movementType', width: 18 },
+        { key: 'cardType', width: 12 },
+        { key: 'folio', width: 18 },
+        { key: 'pendingSince', width: 16 },
+        { key: 'daysElapsed', width: 14 },
+        { key: 'controlLabel', width: 22 },
+        { key: 'deadlineLabel', width: 18 },
     ];
 
     // ── Filter description ──
@@ -797,7 +837,7 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
     }
 
     // ── Row 1: Title ──
-    worksheet.mergeCells('A1:H1');
+    worksheet.mergeCells(`A1:${LAST_COL}1`);
     const titleCell = worksheet.getCell('A1');
     titleCell.value = `       PERSONAL PENDIENTE DE RECOGER ACCESOS${filterDescription}`;
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
@@ -815,13 +855,12 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
     } catch { /* logo optional */ }
 
     // ── Row 2: Meta ──
-    worksheet.mergeCells('A2:H2');
+    worksheet.mergeCells(`A2:${LAST_COL}2`);
     const metaCell = worksheet.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
         year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
-    const totalCards = personEntries.reduce((sum, p) => sum + p.cards.length, 0);
-    metaCell.value = `Reporte generado: ${dateStr}  |  Personas: ${personEntries.length}  |  Tarjetas pendientes: ${totalCards}`;
+    metaCell.value = `Reporte generado: ${dateStr}  |  Personas: ${uniquePersons}  |  Tarjetas pendientes: ${rows.length}  |  Requieren baja de registro: ${bajaCount}`;
     metaCell.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
     metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
     worksheet.getRow(2).height = 20;
@@ -830,8 +869,9 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
     const groups = [
         { label: '#', range: 'A3:A3', colors: COLORS.slate },
         { label: 'DATOS DEL PERSONAL', range: 'B3:D3', colors: COLORS.personal },
-        { label: 'TARJETAS PENDIENTES', range: 'E3:G3', colors: COLORS.indigo },
-        { label: 'ANTIGÜEDAD', range: 'H3:H3', colors: COLORS.amber },
+        { label: 'MOVIMIENTO', range: 'E3:E3', colors: COLORS.violet },
+        { label: 'TARJETA', range: 'F3:G3', colors: COLORS.indigo },
+        { label: 'SEGUIMIENTO', range: 'H3:K3', colors: COLORS.amber },
     ];
 
     groups.forEach(group => {
@@ -851,10 +891,14 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
 
     // ── Row 4: Sub-Headers ──
     const headerRow = worksheet.getRow(4);
-    headerRow.height = 30;
-    const headerLabels = ['NO.', 'NOMBRE COMPLETO', 'NO. EMPLEADO', 'DEPENDENCIA', 'FOLIOS P2000', 'FOLIOS KONE', 'TOTAL', 'PENDIENTE DESDE'];
+    headerRow.height = 36;
+    const headerLabels = [
+        'NO.', 'NOMBRE COMPLETO', 'NO. EMPLEADO', 'DEPENDENCIA',
+        'TIPO', 'TARJETA', 'FOLIO', 'PENDIENTE DESDE',
+        'DÍAS', 'CONTROL DE GESTIÓN', 'PLAZO / DÍAS SIN RECOGER',
+    ];
 
-    const colGroupMap = [0, 1, 1, 1, 2, 2, 2, 3]; // map each column to its group index
+    const colGroupMap = [0, 1, 1, 1, 2, 3, 3, 4, 4, 4, 4];
 
     headerLabels.forEach((label, i) => {
         const cell = headerRow.getCell(i + 1);
@@ -864,7 +908,7 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
         cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
 
-        const isGroupEnd = [1, 4, 7, 8].includes(i + 1);
+        const isGroupEnd = [1, 4, 5, 7, 11].includes(i + 1);
         cell.border = {
             bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
             right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFFFFFFF' } }
@@ -872,36 +916,23 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
     });
 
     // ── Data Rows ──
-    personEntries.forEach((person, idx) => {
-        const p2000Cards = person.cards.filter(c => c.type.toUpperCase() === 'P2000');
-        const koneCards = person.cards.filter(c => c.type.toUpperCase() === 'KONE');
-        const otherCards = person.cards.filter(c => c.type.toUpperCase() !== 'P2000' && c.type.toUpperCase() !== 'KONE');
-
-        const p2000Folios = p2000Cards.map(c => c.folio).join(', ') || '-';
-        const koneFolios = koneCards.map(c => c.folio).join(', ') || '-';
-        // Append other types if any
-        const koneDisplay = otherCards.length > 0
-            ? [koneFolios !== '-' ? koneFolios : '', ...otherCards.map(c => `${c.type}: ${c.folio}`)].filter(Boolean).join(', ')
-            : koneFolios;
-
-        const oldestDate = person.cards
-            .map(c => c.created_at)
-            .filter(Boolean)
-            .sort()[0];
-
-        const oldestLabel = oldestDate
-            ? new Date(oldestDate).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
+    rows.forEach((entry, idx) => {
+        const pendingLabel = entry.pendingSince
+            ? new Date(entry.pendingSince).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
             : '-';
 
         const rowData = {
             num: idx + 1,
-            name: person.name,
-            employee_no: person.employee_no,
-            dependency: person.dependency,
-            cards_p2000: p2000Folios,
-            cards_kone: koneDisplay,
-            total_cards: person.cards.length,
-            oldest: oldestLabel,
+            name: entry.name,
+            employee_no: entry.employee_no,
+            dependency: entry.dependency,
+            movementType: entry.movementType,
+            cardType: entry.cardType,
+            folio: entry.folio,
+            pendingSince: pendingLabel,
+            daysElapsed: entry.daysElapsed,
+            controlLabel: entry.controlLabel,
+            deadlineLabel: entry.deadlineLabel,
         };
 
         const row = worksheet.addRow(rowData);
@@ -910,19 +941,30 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
         row.eachCell((cell, colNumber) => {
             const group = groups[colGroupMap[colNumber - 1]];
             cell.font = { name: 'Arial', size: 9, color: { argb: 'FF111827' } };
-            cell.alignment = { vertical: 'middle', horizontal: colNumber <= 1 || colNumber === 7 ? 'center' : 'left', wrapText: true };
+            cell.alignment = {
+                vertical: 'middle',
+                horizontal: colNumber <= 1 || colNumber === 9 ? 'center' : 'left',
+                wrapText: true,
+            };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
 
-            const isGroupEnd = [1, 4, 7, 8].includes(colNumber);
+            const isGroupEnd = [1, 4, 5, 7, 11].includes(colNumber);
             cell.border = {
                 bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
                 right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFCBD5E1' } }
             };
 
-            // Highlight high card count
-            if (colNumber === 7 && person.cards.length >= 2) {
+            if (colNumber === 10 && entry.needsBaja) {
                 cell.font = { ...cell.font, bold: true, color: { argb: COLORS.rose.sub } };
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.rose.head } };
+            }
+
+            if (colNumber === 9 && entry.daysElapsed > RESPONSIVA_PICKUP_DAYS && entry.movementType !== 'Reposición') {
+                cell.font = { ...cell.font, bold: true, color: { argb: COLORS.amber.sub } };
+            }
+
+            if (colNumber === 11 && (entry.deadlineLabel === 'Plazo vencido' || entry.needsBaja)) {
+                cell.font = { ...cell.font, bold: true, color: { argb: COLORS.rose.sub } };
             }
         });
     });
@@ -932,23 +974,18 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
     const summaryRow = worksheet.getRow(summaryRowNum);
     summaryRow.height = 28;
 
-    const summaryData: Record<string, string | number> = {
-        num: '',
-        name: 'TOTAL',
-        employee_no: '',
-        dependency: `${personEntries.length} personas`,
-        cards_p2000: personEntries.reduce((s, p) => s + p.cards.filter(c => c.type.toUpperCase() === 'P2000').length, 0),
-        cards_kone: personEntries.reduce((s, p) => s + p.cards.filter(c => c.type.toUpperCase() !== 'P2000').length, 0),
-        total_cards: totalCards,
-        oldest: '',
-    };
+    const summaryValues: (string | number)[] = [
+        '', 'TOTAL', '', `${uniquePersons} personas`,
+        '', '', `${rows.length} tarjetas`, '',
+        '', `${bajaCount} requieren baja`, '',
+    ];
 
-    ['num', 'name', 'employee_no', 'dependency', 'cards_p2000', 'cards_kone', 'total_cards', 'oldest'].forEach((key, i) => {
+    summaryValues.forEach((value, i) => {
         const cell = summaryRow.getCell(i + 1);
-        cell.value = summaryData[key];
+        cell.value = value;
         cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: COLORS.title } };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
-        cell.alignment = { vertical: 'middle', horizontal: i <= 0 || i === 6 ? 'center' : 'left' };
+        cell.alignment = { vertical: 'middle', horizontal: i <= 0 ? 'center' : 'left' };
         cell.border = {
             top: { style: 'medium', color: { argb: COLORS.separator } },
             bottom: { style: 'medium', color: { argb: COLORS.separator } },
@@ -956,7 +993,7 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
     });
 
     // ── Freeze + filter ──
-    worksheet.autoFilter = 'A4:H4';
+    worksheet.autoFilter = `A4:${LAST_COL}4`;
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
     worksheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1 };
 

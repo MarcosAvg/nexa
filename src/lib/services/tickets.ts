@@ -5,6 +5,87 @@ import { handleError } from "../utils/error";
 import { ticketState } from "../stores";
 import { appEvents, EVENTS } from "../utils/appEvents";
 
+type CardAssignmentInfo = {
+    movementType: string;
+    registeredAt: string;
+};
+
+async function fetchCardAssignmentTypes(
+    cardIds: string[],
+    personnelCreatedAt: Record<string, string>
+): Promise<Record<string, CardAssignmentInfo>> {
+    const result: Record<string, CardAssignmentInfo> = {};
+    if (cardIds.length === 0) return result;
+
+    const uniqueIds = [...new Set(cardIds)];
+    const logs: { action: string; details: any; timestamp: string }[] = [];
+
+    const chunkSize = 40;
+    for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+        const chunk = uniqueIds.slice(i, i + chunkSize);
+        const orFilter = chunk
+            .map((id) => `details->>related_card_id.eq.${id}`)
+            .join(",");
+
+        const { data, error } = await supabase
+            .from("history_logs")
+            .select("action, details, timestamp, entity_id")
+            .eq("entity_type", "PERSON")
+            .in("action", ["REPLACE_CARD", "ASSIGN_CARD"])
+            .or(orFilter);
+
+        if (error) {
+            handleError(error, "Fetch Card Assignment Types");
+            continue;
+        }
+        if (data) logs.push(...data);
+    }
+
+    const byCard: Record<string, { action: string; timestamp: string; personId?: string }> = {};
+    for (const log of logs) {
+        const cardId = log.details?.related_card_id;
+        if (!cardId) continue;
+        const existing = byCard[cardId];
+        if (!existing || log.timestamp > existing.timestamp) {
+            byCard[cardId] = {
+                action: log.action,
+                timestamp: log.timestamp,
+                personId: log.entity_id || log.details?.related_person_id,
+            };
+        }
+    }
+
+    for (const cardId of uniqueIds) {
+        const entry = byCard[cardId];
+        if (!entry) {
+            result[cardId] = { movementType: "Sin clasificar", registeredAt: "" };
+            continue;
+        }
+
+        if (entry.action === "REPLACE_CARD") {
+            result[cardId] = { movementType: "Reposición", registeredAt: entry.timestamp };
+            continue;
+        }
+
+        const personCreated = entry.personId ? personnelCreatedAt[entry.personId] : null;
+        let movementType = "Asignación";
+        if (personCreated) {
+            const assignDate = new Date(entry.timestamp);
+            const createDate = new Date(personCreated);
+            const diffDays = Math.floor(
+                (assignDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            if (diffDays >= 0 && diffDays <= 7) {
+                movementType = "Alta de Personal";
+            }
+        }
+
+        result[cardId] = { movementType, registeredAt: entry.timestamp };
+    }
+
+    return result;
+}
+
 export const ticketService = {
     async fetchAll(throwOnError: boolean = false): Promise<Ticket[]> {
         try {
@@ -118,8 +199,8 @@ export const ticketService = {
             let hasMore = true;
 
             const personnelSelect = dependencyId
-                ? "personnel!inner(id, first_name, last_name, employee_no, dependency_id, dependencies(name))"
-                : "personnel(id, first_name, last_name, employee_no, dependency_id, dependencies(name))";
+                ? "personnel!inner(id, first_name, last_name, employee_no, dependency_id, created_at, dependencies(name))"
+                : "personnel(id, first_name, last_name, employee_no, dependency_id, created_at, dependencies(name))";
 
             while (hasMore) {
                 let query = supabase
@@ -147,7 +228,41 @@ export const ticketService = {
                 }
             }
 
-            return allData;
+            const cardIds = allData.map((t) => t.card_id).filter(Boolean) as string[];
+            const personnelCreatedAt: Record<string, string> = {};
+            for (const t of allData) {
+                if (t.person_id && t.personnel?.created_at) {
+                    personnelCreatedAt[t.person_id] = t.personnel.created_at;
+                }
+            }
+
+            const assignmentMap = await fetchCardAssignmentTypes(cardIds, personnelCreatedAt);
+
+            return allData.map((t) => {
+                const info = t.card_id ? assignmentMap[t.card_id] : undefined;
+                let movementType = info?.movementType ?? "Sin clasificar";
+                let assignmentDate = info?.registeredAt || t.created_at;
+
+                if (movementType === "Sin clasificar" && t.person_id && t.personnel?.created_at) {
+                    const createDate = new Date(t.personnel.created_at);
+                    const ticketDate = new Date(t.created_at);
+                    const diffDays = Math.floor(
+                        (ticketDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24)
+                    );
+                    if (diffDays >= 0 && diffDays <= 7) {
+                        movementType = "Alta de Personal";
+                        assignmentDate = t.personnel.created_at;
+                    } else {
+                        movementType = "Asignación";
+                    }
+                }
+
+                return {
+                    ...t,
+                    movementType,
+                    assignmentDate,
+                };
+            });
         } catch (error) {
             handleError(error, "Fetch Responsivas for Export");
             return [];
