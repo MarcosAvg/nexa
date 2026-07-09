@@ -28,7 +28,7 @@
     import Select from "../components/Select.svelte";
 
     import { catalogState, userState } from "../stores";
-    import { generateRequestTemplate } from "../utils/xlsxTemplate";
+    import { generateRequestTemplate, generateKoneUsageTemplate } from "../utils/xlsxTemplate";
     import { networkStore } from "../stores/network.svelte";
 
     let activeTab = $state<"catalogos" | "usuarios">("catalogos");
@@ -365,6 +365,24 @@
             isGeneratingTemplate = false;
         }
     }
+
+    let isGeneratingKoneTemplate = $state(false);
+
+    async function handleGenerateKoneTemplate() {
+        isGeneratingKoneTemplate = true;
+        const loadingToast = toast.loading("Generando plantilla de KONE...");
+        try {
+            await generateKoneUsageTemplate();
+            toast.success("Plantilla generada correctamente", {
+                id: loadingToast,
+            });
+        } catch (e) {
+            console.error(e);
+            toast.error("Error al generar la plantilla", { id: loadingToast });
+        } finally {
+            isGeneratingKoneTemplate = false;
+        }
+    }
 </script>
 
 <div class="space-y-6">
@@ -441,6 +459,20 @@
                     {isGeneratingTemplate
                         ? "Generando..."
                         : "Plantilla de Solicitudes"}
+                </button>
+                <button
+                    class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                    onclick={handleGenerateKoneTemplate}
+                    disabled={isGeneratingKoneTemplate || !networkStore.isOnline}
+                >
+                    <FileDown
+                        size={18}
+                        strokeWidth={2.5}
+                        class="text-sky-500"
+                    />
+                    {isGeneratingKoneTemplate
+                        ? "Generando..."
+                        : "Plantilla de Uso KONE"}
                 </button>
             </div>
         </Card>

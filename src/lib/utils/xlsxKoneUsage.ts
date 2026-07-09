@@ -48,20 +48,39 @@ function parseExcelDate(value: any): Date | null {
         const utcValue = utcDays * 86400;
         return new Date(utcValue * 1000);
     }
+    
+    let strValue = '';
     if (typeof value === 'string') {
-        const parsed = new Date(value);
-        if (!isNaN(parsed.getTime())) return parsed;
-
-        const parts = value.split(/[/: -]/);
-        if (parts.length >= 3) {
-            let d = parseInt(parts[0], 10);
-            let m = parseInt(parts[1], 10) - 1;
-            let y = parseInt(parts[2], 10);
-            if (y < 100) y += 2000;
-            const maybeDate = new Date(y, m, d);
-            if (!isNaN(maybeDate.getTime())) return maybeDate;
+        strValue = value;
+    } else if (typeof value === 'object') {
+        if (value.result !== undefined) {
+            strValue = String(value.result);
+        } else if (value.richText) {
+            strValue = value.richText.map((t: any) => t.text).join('');
+        } else {
+            strValue = String(value);
         }
+    } else {
+        strValue = String(value);
     }
+
+    strValue = strValue.trim();
+    if (!strValue) return null;
+
+    const parsed = new Date(strValue);
+    if (!isNaN(parsed.getTime())) return parsed;
+
+    // Splits by /, :, -, ., space
+    const parts = strValue.split(/[/: .\-]/).filter(Boolean);
+    if (parts.length >= 3) {
+        let d = parseInt(parts[0], 10);
+        let m = parseInt(parts[1], 10) - 1;
+        let y = parseInt(parts[2], 10);
+        if (y < 100) y += 2000;
+        const maybeDate = new Date(y, m, d);
+        if (!isNaN(maybeDate.getTime())) return maybeDate;
+    }
+    
     return null;
 }
 
@@ -99,10 +118,10 @@ export async function parseKoneUsageFile(
             if (valNorm === 'conteo') {
                 conteoCol = colNumber;
             }
-            if (valNorm.includes('ultima modificacion')) {
+            if (valNorm.includes('ultima modificacion') || valNorm.includes('creacion')) {
                 ultimaModCol = colNumber;
             }
-            if (valNorm.includes('ultimo registro')) {
+            if (valNorm.includes('ultimo registro') || valNorm.includes('ultimo evento') || valNorm.includes('ultimo acceso') || valNorm.includes('fecha y hora del evento')) {
                 ultimoRegCol = colNumber;
             }
         });

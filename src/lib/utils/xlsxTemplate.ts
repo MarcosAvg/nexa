@@ -710,3 +710,38 @@ export async function generateRequestTemplate(catalogs: TemplateCatalogs) {
     const buffer = await wb.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), 'Plantilla_Solicitudes_Acceso.xlsx');
 }
+
+export async function generateKoneUsageTemplate() {
+    const wb = new ExcelJS.Workbook();
+    wb.created = new Date();
+
+    const ws = wb.addWorksheet('Uso KONE');
+
+    ws.columns = [
+        { key: 'folio', width: 20 },
+        { key: 'conteo', width: 15 },
+        { key: 'ultima_mod', width: 25 },
+        { key: 'ultimo_reg', width: 25 },
+    ];
+
+    addSheetTitle(ws, 'PLANTILLA DE CONTEO DE USO KONE', 4);
+
+    ws.mergeCells('A2:D2');
+    const banner = ws.getCell('A2');
+    banner.value = 'Instrucciones: Ingrese el folio de la tarjeta y la cantidad de usos (conteo). Las columnas de fecha son opcionales pero altamente recomendadas para filtrar tarjetas inactivas correctamente.';
+    styleCell(banner, { size: 9, fontColor: C.metaText, fillColor: C.groupSky.fill, align: 'center', wrap: true });
+    ws.getRow(2).height = 36;
+
+    addColumnHeaders(ws, 3, [
+        { label: 'Folio', mandatory: true },
+        { label: 'Conteo', mandatory: true },
+        { label: 'Última modificación', recommended: true },
+        { label: 'Último registro', recommended: true },
+    ]);
+
+    const ROWS = 100;
+    paintDataRows(ws, 4, 4 + ROWS, 4, [1, 2], [3, 4]);
+
+    const buffer = await wb.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), 'Plantilla_Conteo_KONE.xlsx');
+}
