@@ -25,6 +25,7 @@
     import { cardService } from "../services/cards";
     import { responsivaService } from "../services/responsiva";
     import { personnelState } from "../stores";
+    import { uiState } from "../stores/ui.svelte";
     import type { Person } from "../types";
 
     type Props = {
@@ -255,6 +256,31 @@
         } catch (error) {
             console.error("Error al generar PDF de tarjeta:", error);
             toast.error("Error al generar PDF de tarjeta");
+        }
+    }
+
+    async function handleDirectCardStatusChange(
+        card: any,
+        field: "responsiva_status" | "programming_status",
+        value: string | null
+    ) {
+        try {
+            const { supabase } = await import("../supabase");
+            const { error } = await supabase
+                .from("cards")
+                .update({ [field]: value })
+                .eq("id", card.id);
+            if (error) throw error;
+
+            const fieldLabel = field === "responsiva_status" ? "Responsiva" : "Programación";
+            const valueLabel = field === "responsiva_status"
+                ? (value === "signed" ? "Firmada" : value === "legacy" ? "Legacy" : "Sin Firmar")
+                : (value === "done" ? "Programada" : "Sin Programar");
+            toast.success(`${fieldLabel} → ${valueLabel}`);
+            await onRefresh?.();
+        } catch (e) {
+            console.error(e);
+            toast.error("Error al actualizar estado");
         }
     }
 </script>
@@ -593,6 +619,9 @@
                                 onReplace={() => onCardReplace?.(card)}
                                 onProgram={() => onCardProgram?.(card)}
                                 onPrint={() => handlePrintCard(card)}
+                                onDirectStatusChange={uiState.isDirectEditMode
+                                    ? (field, value) => handleDirectCardStatusChange(card, field, value)
+                                    : undefined}
                             />
                         {/each}
                     </div>

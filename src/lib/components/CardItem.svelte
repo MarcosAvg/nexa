@@ -8,8 +8,10 @@
         RefreshCw,
         CheckCircle2,
         Printer,
+        Wrench,
     } from "lucide-svelte";
     import PermissionGuard from "./PermissionGuard.svelte";
+    import { uiState } from "../stores/ui.svelte";
 
     type Props = {
         type: "P2000" | "KONE";
@@ -24,6 +26,7 @@
         onReplace?: () => void;
         onProgram?: () => void;
         onPrint?: () => void;
+        onDirectStatusChange?: (field: "responsiva_status" | "programming_status", value: string | null) => void;
     };
 
     let {
@@ -39,7 +42,19 @@
         onReplace,
         onProgram,
         onPrint,
+        onDirectStatusChange,
     }: Props = $props();
+
+    const RESPONSIVA_OPTIONS = [
+        { value: null,      label: "Sin Firmar",  badge: "rose" },
+        { value: "legacy",  label: "Legacy",      badge: "slate" },
+        { value: "signed",  label: "Firmada",     badge: "emerald" },
+    ] as const;
+
+    const PROGRAM_OPTIONS = [
+        { value: "pending", label: "Sin Programar", badge: "blue" },
+        { value: "done",    label: "Programada",    badge: "emerald" },
+    ] as const;
 </script>
 
 <div
@@ -185,4 +200,46 @@
             {/snippet}
         </PermissionGuard>
     </div>
+
+    <!-- God Mode: Direct Status Editor -->
+    {#if uiState.isDirectEditMode && onDirectStatusChange}
+        <div class="pt-3 border-t border-amber-200 bg-amber-50/60 -mx-4 -mb-4 px-4 pb-4 rounded-b-xl">
+            <div class="flex items-center gap-1.5 mb-2.5">
+                <Wrench size={11} class="text-amber-600 animate-pulse" />
+                <span class="text-[9px] font-extrabold uppercase tracking-[0.2em] text-amber-600">Modo Dios — Edición Directa</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <!-- Responsiva Status -->
+                <div class="space-y-1">
+                    <p class="text-[9px] font-bold text-amber-700 uppercase tracking-wider">Responsiva</p>
+                    <div class="flex flex-col gap-1">
+                        {#each RESPONSIVA_OPTIONS as opt}
+                            <button
+                                type="button"
+                                class="text-left px-2 py-1 rounded-lg text-[10px] font-bold transition-all border {(responsiva_status ?? null) === opt.value ? 'bg-amber-500 text-white border-amber-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-700'}"
+                                onclick={() => onDirectStatusChange?.('responsiva_status', opt.value)}
+                            >
+                                {opt.label}
+                            </button>
+                        {/each}
+                    </div>
+                </div>
+                <!-- Programming Status -->
+                <div class="space-y-1">
+                    <p class="text-[9px] font-bold text-amber-700 uppercase tracking-wider">Programación</p>
+                    <div class="flex flex-col gap-1">
+                        {#each PROGRAM_OPTIONS as opt}
+                            <button
+                                type="button"
+                                class="text-left px-2 py-1 rounded-lg text-[10px] font-bold transition-all border {(programming_status ?? 'pending') === opt.value ? 'bg-amber-500 text-white border-amber-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-700'}"
+                                onclick={() => onDirectStatusChange?.('programming_status', opt.value)}
+                            >
+                                {opt.label}
+                            </button>
+                        {/each}
+                    </div>
+                </div>
+            </div>
+        </div>
+    {/if}
 </div>
