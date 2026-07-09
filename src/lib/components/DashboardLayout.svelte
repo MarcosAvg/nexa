@@ -28,7 +28,7 @@
     <Sidebar items={sidebarItems} {user} {onLogout} />
 
     <div
-        class="flex flex-1 flex-col overflow-hidden transition-all duration-500 lg:pl-72"
+        class="flex flex-1 flex-col overflow-hidden transition-all duration-300 {uiState.isSidebarCondensed ? 'lg:pl-20' : 'lg:pl-72'}"
     >
         <!-- Mobile WCO safe area -->
         <div

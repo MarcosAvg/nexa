@@ -9,6 +9,7 @@
     import DeletePersonnelModal from "./modals/DeletePersonnelModal.svelte";
     import { personnelActions } from "../utils/personnelActions";
     import { appEvents, EVENTS } from "../utils/appEvents";
+    import { uiState } from "../stores/ui.svelte";
 
     // Computed state from global store
     let isDetailsOpen = $derived(personnelState.isDetailsOpen);
@@ -254,6 +255,7 @@
 <PersonModal
     isOpen={personnelState.isEditModalOpen}
     editingPerson={personnelState.editingPerson}
+    forceDirectSave={uiState.isDirectEditMode}
     onclose={() => personnelState.closeEditModal()}
 />
 
