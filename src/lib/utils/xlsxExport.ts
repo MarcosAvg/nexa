@@ -1434,6 +1434,686 @@ export async function exportHistoryToExcel(data: any[], options?: ExportOptions)
     saveAsFunction(new Blob([buffer]), finalFileName);
 }
 
+export type CardlessRegistryExportRow = {
+    first_name?: string | null;
+    last_name?: string | null;
+    employee_no?: string | null;
+    dependencyName?: string | null;
+    buildingName?: string | null;
+    floor?: string | null;
+    reason: string;
+    comments?: string | null;
+    recorded_at: string;
+    recordedByName?: string | null;
+    personName?: string | null;
+};
+
+export type CardlessRegistryExportFilters = {
+    startDate?: string;
+    endDate?: string;
+    reason?: string;
+    dependency?: string;
+    building?: string;
+};
+
+function cardlessPersonKey(reg: CardlessRegistryExportRow): string {
+    const emp = (reg.employee_no || '').trim().toLowerCase();
+    if (emp) return `emp:${emp}`;
+    const name = (
+        reg.personName ||
+        [reg.first_name, reg.last_name].filter(Boolean).join(' ') ||
+        'sin nombre'
+    )
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+    return `name:${name}`;
+}
+
+function cardlessPersonLabel(reg: CardlessRegistryExportRow): { name: string; firstName: string; lastName: string; employeeNo: string } {
+    const firstName = reg.first_name || (reg.personName ? reg.personName.split(' ').slice(0, -1).join(' ') : '') || '';
+    const lastName = reg.last_name || (reg.personName ? reg.personName.split(' ').slice(-1).join(' ') : '') || '';
+    const name = reg.personName || [firstName, lastName].filter(Boolean).join(' ') || 'Sin nombre';
+    return { name, firstName, lastName, employeeNo: reg.employee_no || '' };
+}
+
+async function addCardlessEvidenceSheet(
+    workbook: ExcelJSTypes.Workbook,
+    data: CardlessRegistryExportRow[],
+    filterDescription: string
+) {
+    const ws = workbook.addWorksheet('Evidencia');
+
+    const C = {
+        title: 'FF1E293B',
+        meta: 'FF64748B',
+        separator: 'FF94A3B8',
+        white: 'FFFFFFFF',
+        sectionHead: 'FF0F172A',
+        emerald: { bg: 'FFD1FAE5', fg: 'FF065F46' },
+        rose: { bg: 'FFFEE2E2', fg: 'FF991B1B' },
+        amber: { bg: 'FFFEF3C7', fg: 'FF92400E' },
+        sky: { bg: 'FFE0F2FE', fg: 'FF075985' },
+        violet: { bg: 'FFEDE9FE', fg: 'FF5B21B6' },
+        slate: { bg: 'FFF1F5F9', fg: 'FF334155' },
+        blue: { bg: 'FFDBEAFE', fg: 'FF1E40AF' },
+    };
+
+    ws.columns = [
+        { width: 4 },
+        { width: 28 },
+        { width: 14 },
+        { width: 14 },
+        { width: 26 },
+        { width: 16 },
+        { width: 16 },
+        { width: 14 },
+        { width: 42 },
+        { width: 20 },
+        { width: 20 },
+    ];
+
+    let row = 1;
+    const thin = (argb: string): ExcelJSTypes.Border => ({ style: 'thin', color: { argb } });
+    const setBorder = (cell: ExcelJSTypes.Cell, color = 'FFCBD5E1') => {
+        cell.border = { top: thin(color), bottom: thin(color), left: thin(color), right: thin(color) };
+    };
+
+    const sectionTitle = (text: string) => {
+        ws.mergeCells(`B${row}:K${row}`);
+        const cell = ws.getCell(`B${row}`);
+        cell.value = text;
+        cell.font = { name: 'Arial', bold: true, size: 12, color: { argb: C.sectionHead } };
+        cell.alignment = { vertical: 'middle' };
+        ws.getRow(row).height = 28;
+        row++;
+        ws.mergeCells(`B${row}:K${row}`);
+        ws.getCell(`B${row}`).border = { top: { style: 'medium', color: { argb: C.separator } } };
+        ws.getRow(row).height = 6;
+        row++;
+    };
+
+    const kpi = (col: string, label: string, value: number | string, colors: { bg: string; fg: string }) => {
+        const lCell = ws.getCell(`${col}${row}`);
+        lCell.value = label;
+        lCell.font = { name: 'Arial', bold: true, size: 9, color: { argb: colors.fg } };
+        lCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.bg } };
+        lCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        setBorder(lCell);
+
+        const valCol = String.fromCharCode(col.charCodeAt(0) + 1);
+        const vCell = ws.getCell(`${valCol}${row}`);
+        vCell.value = value;
+        vCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: colors.fg } };
+        vCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.bg } };
+        vCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        setBorder(vCell);
+    };
+
+    const pct = (n: number, total: number) => (total > 0 ? `${((n / total) * 100).toFixed(1)}%` : '0%');
+
+    // ── Aggregate ──
+    type PersonAgg = {
+        key: string;
+        name: string;
+        employeeNo: string;
+        dependency: string;
+        building: string;
+        count: number;
+        reasons: Record<string, number>;
+        dates: number[];
+        operators: Set<string>;
+    };
+
+    const personMap = new Map<string, PersonAgg>();
+    const reasonMap: Record<string, number> = {};
+    const depMap: Record<string, { registros: number; personas: Set<string> }> = {};
+    const buildingMap: Record<string, { registros: number; personas: Set<string> }> = {};
+    const operatorMap: Record<string, number> = {};
+
+    data.forEach((reg) => {
+        const key = cardlessPersonKey(reg);
+        const label = cardlessPersonLabel(reg);
+        const ts = new Date(reg.recorded_at).getTime();
+        const dep = reg.dependencyName || 'Sin dependencia';
+        const bldg = reg.buildingName || 'Sin edificio';
+        const op = reg.recordedByName || 'Sin operador';
+
+        reasonMap[reg.reason] = (reasonMap[reg.reason] || 0) + 1;
+        operatorMap[op] = (operatorMap[op] || 0) + 1;
+
+        if (!depMap[dep]) depMap[dep] = { registros: 0, personas: new Set() };
+        depMap[dep].registros++;
+        depMap[dep].personas.add(key);
+
+        if (!buildingMap[bldg]) buildingMap[bldg] = { registros: 0, personas: new Set() };
+        buildingMap[bldg].registros++;
+        buildingMap[bldg].personas.add(key);
+
+        let agg = personMap.get(key);
+        if (!agg) {
+            agg = {
+                key,
+                name: label.name,
+                employeeNo: label.employeeNo,
+                dependency: dep,
+                building: bldg,
+                count: 0,
+                reasons: {},
+                dates: [],
+                operators: new Set(),
+            };
+            personMap.set(key, agg);
+        }
+        agg.count++;
+        agg.reasons[reg.reason] = (agg.reasons[reg.reason] || 0) + 1;
+        if (!Number.isNaN(ts)) agg.dates.push(ts);
+        if (reg.recordedByName) agg.operators.add(reg.recordedByName);
+        if (!agg.employeeNo && label.employeeNo) agg.employeeNo = label.employeeNo;
+        if (agg.dependency === 'Sin dependencia' && reg.dependencyName) agg.dependency = reg.dependencyName;
+        if (agg.building === 'Sin edificio' && reg.buildingName) agg.building = reg.buildingName;
+    });
+
+    const people = [...personMap.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es'));
+    const total = data.length;
+    const uniquePeople = people.length;
+    const reincidentes = people.filter((p) => p.count >= 2).length;
+    const frecuentes = people.filter((p) => p.count >= 3).length;
+    const avg = uniquePeople > 0 ? total / uniquePeople : 0;
+    const reasonEntries = Object.entries(reasonMap).sort((a, b) => b[1] - a[1]);
+    const topReason = reasonEntries[0];
+    const depEntries = Object.entries(depMap).sort((a, b) => b[1].registros - a[1].registros);
+    const buildingEntries = Object.entries(buildingMap).sort((a, b) => b[1].registros - a[1].registros);
+    const operatorEntries = Object.entries(operatorMap).sort((a, b) => b[1] - a[1]);
+
+    const formatDate = (ms: number) =>
+        new Date(ms).toLocaleString('es-MX', {
+            year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+        });
+
+    // ── Title ──
+    ws.mergeCells('A1:K1');
+    const titleCell = ws.getCell('A1');
+    titleCell.value = '       EVIDENCIA — REGISTRO SIN TARJETA';
+    titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: C.title } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    ws.getRow(1).height = 40;
+
+    try {
+        const response = await fetch('/favicon.svg');
+        if (response.ok) {
+            const blob = await response.blob();
+            const buffer = await blob.arrayBuffer();
+            const imageId = workbook.addImage({ buffer, extension: 'svg' as any });
+            ws.addImage(imageId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 32, height: 32 } });
+        }
+    } catch { /* logo optional */ }
+
+    row = 2;
+    ws.mergeCells('A2:K2');
+    const metaCell = ws.getCell('A2');
+    const dateStr = new Date().toLocaleDateString('es-MX', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    metaCell.value = `Reporte generado: ${dateStr}  |  Total registros: ${total}  |  Personas únicas: ${uniquePeople}${filterDescription}`;
+    metaCell.font = { name: 'Arial', size: 9, color: { argb: C.meta } };
+    metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    ws.getRow(2).height = 20;
+    row = 4;
+
+    // ── KPIs ──
+    sectionTitle('1. INDICADORES DE EVIDENCIA');
+    kpi('B', 'Total registros', total, C.blue);
+    kpi('D', 'Personas únicas', uniquePeople, C.emerald);
+    kpi('F', 'Promedio / persona', avg.toFixed(2), C.sky);
+    kpi('H', 'Reincidentes (≥2)', reincidentes, C.amber);
+    row++;
+    kpi('B', 'Frecuentes (≥3)', frecuentes, C.rose);
+    kpi('D', 'Motivos distintos', reasonEntries.length, C.violet);
+    kpi('F', 'Motivo principal', topReason ? topReason[1] : 0, C.amber);
+    kpi('H', 'Operadores', operatorEntries.length, C.slate);
+    ws.getRow(row).height = 32;
+    if (topReason) {
+        row++;
+        ws.mergeCells(`B${row}:K${row}`);
+        const note = ws.getCell(`B${row}`);
+        note.value = `Motivo principal: "${topReason[0]}" (${topReason[1]} registros, ${pct(topReason[1], total)} del total)`;
+        note.font = { name: 'Arial', size: 9, italic: true, color: { argb: C.meta } };
+    }
+    row += 2;
+
+    // ── Reasons ──
+    sectionTitle('2. DESGLOSE POR MOTIVO');
+    ['MOTIVO', 'REGISTROS', '% DEL TOTAL'].forEach((label, i) => {
+        const cell = ws.getCell(row, i + 2);
+        cell.value = label;
+        cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: C.white } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.rose.fg } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        setBorder(cell, C.rose.fg);
+    });
+    ws.getRow(row).height = 24;
+    row++;
+
+    reasonEntries.forEach(([reason, count]) => {
+        const values = [reason, count, pct(count, total)];
+        values.forEach((value, i) => {
+            const cell = ws.getCell(row, i + 2);
+            cell.value = value;
+            cell.font = { name: 'Arial', size: 9, bold: i === 0, color: { argb: C.sectionHead } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i === 0 ? C.rose.bg : C.white } };
+            cell.alignment = { vertical: 'middle', horizontal: i === 0 ? 'left' : 'center', indent: i === 0 ? 1 : 0 };
+            setBorder(cell);
+        });
+        ws.getRow(row).height = 22;
+        row++;
+    });
+    if (reasonEntries.length === 0) {
+        ws.getCell(`B${row}`).value = 'Sin datos';
+        row++;
+    }
+    row += 2;
+
+    // ── People recurrence ──
+    sectionTitle('3. CONTEO POR PERSONA (REINCIDENCIA)');
+    ws.mergeCells(`B${row}:K${row}`);
+    ws.getCell(`B${row}`).value =
+        'Personas ordenadas por mayor cantidad de registros. ≥2 = reincidente (ámbar), ≥3 = frecuente (rojo).';
+    ws.getCell(`B${row}`).font = { name: 'Arial', size: 9, italic: true, color: { argb: C.meta } };
+    row++;
+
+    const personHeaders = [
+        'PERSONA',
+        '# EMPLEADO',
+        'DEPENDENCIA',
+        'EDIFICIO',
+        'TOTAL REGISTROS',
+        'MOTIVOS DISTINTOS',
+        'DESGLOSE DE MOTIVOS',
+        'PRIMER REGISTRO',
+        'ÚLTIMO REGISTRO',
+        'OPERADORES',
+    ];
+    const personHeaderRow = row;
+    personHeaders.forEach((label, i) => {
+        const cell = ws.getCell(row, i + 2);
+        cell.value = label;
+        cell.font = { name: 'Arial', bold: true, size: 8, color: { argb: C.white } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.blue.fg } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        setBorder(cell, C.blue.fg);
+    });
+    ws.getRow(row).height = 30;
+    row++;
+
+    people.forEach((person) => {
+        const reasonBreakdown = Object.entries(person.reasons)
+            .sort((a, b) => b[1] - a[1])
+            .map(([r, c]) => `${r} (${c})`)
+            .join('; ');
+        const minDate = person.dates.length ? Math.min(...person.dates) : NaN;
+        const maxDate = person.dates.length ? Math.max(...person.dates) : NaN;
+        const severity = person.count >= 3 ? C.rose : person.count >= 2 ? C.amber : C.slate;
+
+        const values: (string | number)[] = [
+            person.name,
+            person.employeeNo || '—',
+            person.dependency,
+            person.building,
+            person.count,
+            Object.keys(person.reasons).length,
+            reasonBreakdown,
+            Number.isNaN(minDate) ? '—' : formatDate(minDate),
+            Number.isNaN(maxDate) ? '—' : formatDate(maxDate),
+            [...person.operators].join(', ') || '—',
+        ];
+
+        values.forEach((value, i) => {
+            const cell = ws.getCell(row, i + 2);
+            cell.value = value;
+            cell.font = {
+                name: 'Arial',
+                size: 9,
+                bold: i === 0 || i === 4,
+                color: { argb: i === 4 ? severity.fg : C.sectionHead }
+            };
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: i === 4 ? severity.bg : i === 0 ? C.blue.bg : C.white }
+            };
+            cell.alignment = {
+                vertical: 'middle',
+                horizontal: [1, 4, 5].includes(i) ? 'center' : 'left',
+                indent: [0, 2, 3, 6, 9].includes(i) ? 1 : 0,
+                wrapText: i === 6 || i === 9
+            };
+            setBorder(cell);
+        });
+        ws.getRow(row).height = person.count >= 2 ? 28 : 22;
+        row++;
+    });
+
+    if (people.length === 0) {
+        ws.getCell(`B${row}`).value = 'Sin datos';
+        row++;
+    }
+    ws.autoFilter = {
+        from: { row: personHeaderRow, column: 2 },
+        to: { row: Math.max(personHeaderRow, row - 1), column: 11 }
+    };
+    row += 2;
+
+    // ── Dependency / Building ──
+    sectionTitle('4. DISTRIBUCIÓN POR DEPENDENCIA Y EDIFICIO');
+
+    ['DEPENDENCIA', 'REGISTROS', 'PERSONAS', '% REG.'].forEach((label, i) => {
+        const cell = ws.getCell(row, i + 2);
+        cell.value = label;
+        cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: C.white } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.emerald.fg } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        setBorder(cell, C.emerald.fg);
+    });
+    ['EDIFICIO', 'REGISTROS', 'PERSONAS', '% REG.'].forEach((label, i) => {
+        const cell = ws.getCell(row, i + 7);
+        cell.value = label;
+        cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: C.white } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.amber.fg } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        setBorder(cell, C.amber.fg);
+    });
+    ws.getRow(row).height = 24;
+    row++;
+
+    const maxDistRows = Math.max(depEntries.length, buildingEntries.length, 1);
+    for (let i = 0; i < maxDistRows; i++) {
+        const dep = depEntries[i];
+        const bldg = buildingEntries[i];
+
+        if (dep) {
+            const values = [dep[0], dep[1].registros, dep[1].personas.size, pct(dep[1].registros, total)];
+            values.forEach((value, colIdx) => {
+                const cell = ws.getCell(row, colIdx + 2);
+                cell.value = value;
+                cell.font = { name: 'Arial', size: 9, bold: colIdx === 0, color: { argb: C.sectionHead } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colIdx === 0 ? C.emerald.bg : C.white } };
+                cell.alignment = { vertical: 'middle', horizontal: colIdx === 0 ? 'left' : 'center', indent: colIdx === 0 ? 1 : 0 };
+                setBorder(cell);
+            });
+        }
+
+        if (bldg) {
+            const values = [bldg[0], bldg[1].registros, bldg[1].personas.size, pct(bldg[1].registros, total)];
+            values.forEach((value, colIdx) => {
+                const cell = ws.getCell(row, colIdx + 7);
+                cell.value = value;
+                cell.font = { name: 'Arial', size: 9, bold: colIdx === 0, color: { argb: C.sectionHead } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colIdx === 0 ? C.amber.bg : C.white } };
+                cell.alignment = { vertical: 'middle', horizontal: colIdx === 0 ? 'left' : 'center', indent: colIdx === 0 ? 1 : 0 };
+                setBorder(cell);
+            });
+        }
+
+        ws.getRow(row).height = 22;
+        row++;
+    }
+    row += 2;
+
+    // ── Operators ──
+    sectionTitle('5. REGISTROS POR OPERADOR');
+    ['OPERADOR', 'REGISTROS', '% DEL TOTAL'].forEach((label, i) => {
+        const cell = ws.getCell(row, i + 2);
+        cell.value = label;
+        cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: C.white } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.slate.fg } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        setBorder(cell, C.slate.fg);
+    });
+    ws.getRow(row).height = 24;
+    row++;
+
+    operatorEntries.forEach(([op, count]) => {
+        const values = [op, count, pct(count, total)];
+        values.forEach((value, i) => {
+            const cell = ws.getCell(row, i + 2);
+            cell.value = value;
+            cell.font = { name: 'Arial', size: 9, bold: i === 0, color: { argb: C.sectionHead } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i === 0 ? C.slate.bg : C.white } };
+            cell.alignment = { vertical: 'middle', horizontal: i === 0 ? 'left' : 'center', indent: i === 0 ? 1 : 0 };
+            setBorder(cell);
+        });
+        ws.getRow(row).height = 22;
+        row++;
+    });
+
+    row += 2;
+    ws.mergeCells(`B${row}:K${row}`);
+    const footer = ws.getCell(`B${row}`);
+    footer.value =
+        'Nota: Esta hoja resume la evidencia del periodo exportado. El detalle de cada registro está en la hoja "Detalle".';
+    footer.font = { name: 'Arial', size: 8, italic: true, color: { argb: C.meta } };
+
+    ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 2 }];
+}
+
+export async function exportCardlessRegistryToExcel(
+    data: CardlessRegistryExportRow[],
+    filters?: CardlessRegistryExportFilters
+) {
+    const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
+        import('exceljs'),
+        import('file-saver')
+    ]);
+    const workbook = new (ExcelJSModule.default || ExcelJSModule).Workbook();
+
+    const COLORS = {
+        title: 'FF1E293B',
+        meta: 'FF64748B',
+        separator: 'FF94A3B8',
+        personal: { head: 'FFDBEAFE', sub: 'FF1E40AF', fill: 'FFEFF6FF' },
+        amber: { head: 'FFFEF3C7', sub: 'FF92400E', fill: 'FFFEFCE8' },
+        sky: { head: 'FFE0F2FE', sub: 'FF075985', fill: 'FFF0F9FF' },
+        emerald: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
+        rose: { head: 'FFFEE2E2', sub: 'FF991B1B', fill: 'FFFFF1F2' },
+        violet: { head: 'FFEDE9FE', sub: 'FF5B21B6', fill: 'FFFAF5FF' },
+        slate: { head: 'FFF1F5F9', sub: 'FF334155', fill: 'FFF8FAFC' }
+    };
+
+    const filterParts: string[] = [];
+    if (filters?.startDate) filterParts.push(`Desde: ${filters.startDate}`);
+    if (filters?.endDate) filterParts.push(`Hasta: ${filters.endDate}`);
+    if (filters?.reason) filterParts.push(`Motivo: ${filters.reason}`);
+    if (filters?.dependency) filterParts.push(`Dependencia: ${filters.dependency}`);
+    if (filters?.building) filterParts.push(`Edificio: ${filters.building}`);
+    const filterDescription = filterParts.length ? `  |  ${filterParts.join('  |  ')}` : '';
+
+    // Sheet 1: Evidence / summary (first tab)
+    await addCardlessEvidenceSheet(workbook, data, filterDescription);
+
+    // Sheet 2: Detail
+    const worksheet = workbook.addWorksheet('Detalle');
+
+    worksheet.columns = [
+        { key: 'first_name', width: 18 },
+        { key: 'last_name', width: 20 },
+        { key: 'employee_no', width: 14 },
+        { key: 'dependency', width: 28 },
+        { key: 'building', width: 20 },
+        { key: 'floor', width: 12 },
+        { key: 'reason', width: 32 },
+        { key: 'comments', width: 30 },
+        { key: 'recorded_at', width: 20 },
+        { key: 'recorded_by', width: 22 },
+    ];
+
+    worksheet.mergeCells('A1:J1');
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = '       DETALLE — REGISTRO SIN TARJETA - NEXA';
+    titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    worksheet.getRow(1).height = 40;
+
+    try {
+        const response = await fetch('/favicon.svg');
+        if (response.ok) {
+            const blob = await response.blob();
+            const buffer = await blob.arrayBuffer();
+            const imageId = workbook.addImage({ buffer, extension: 'svg' as any });
+            worksheet.addImage(imageId, {
+                tl: { col: 0.15, row: 0.2 },
+                ext: { width: 32, height: 32 }
+            });
+        }
+    } catch {
+        console.warn('Logo load failed');
+    }
+
+    worksheet.mergeCells('A2:J2');
+    const metaCell = worksheet.getCell('A2');
+    const dateStr = new Date().toLocaleDateString('es-MX', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    metaCell.value = `Reporte generado: ${dateStr}  |  Registros: ${data.length}${filterDescription}`;
+    metaCell.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
+    metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    worksheet.getRow(2).height = 20;
+
+    const groups = [
+        { label: 'PERSONA', range: 'A3:C3', colors: COLORS.personal, endCol: 3 },
+        { label: 'ORGANIZACIÓN', range: 'D3:D3', colors: COLORS.emerald, endCol: 4 },
+        { label: 'UBICACIÓN', range: 'E3:F3', colors: COLORS.amber, endCol: 6 },
+        { label: 'MOTIVO DEL REGISTRO', range: 'G3:H3', colors: COLORS.rose, endCol: 8 },
+        { label: 'CONTROL', range: 'I3:J3', colors: COLORS.slate, endCol: 10 },
+    ];
+
+    groups.forEach((group) => {
+        worksheet.mergeCells(group.range);
+        const cell = worksheet.getCell(group.range.split(':')[0]);
+        cell.value = group.label;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.head } };
+        cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: group.colors.sub } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+            top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            right: { style: 'medium', color: { argb: COLORS.separator } }
+        };
+    });
+
+    const headerRow = worksheet.getRow(4);
+    headerRow.height = 30;
+    const headerLabels = [
+        'NOMBRES',
+        'APELLIDOS',
+        '# EMPLEADO',
+        'DEPENDENCIA',
+        'EDIFICIO',
+        'PISO BASE',
+        'MOTIVO',
+        'COMENTARIOS',
+        'FECHA / HORA',
+        'REGISTRADO POR',
+    ];
+
+    const groupEnds = new Set(groups.map((g) => g.endCol));
+
+    headerLabels.forEach((label, i) => {
+        const cell = headerRow.getCell(i + 1);
+        cell.value = label;
+        const group = groups.find((g) => {
+            const col = String.fromCharCode(65 + i);
+            const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
+            return col >= (start || 'A') && col <= (end || start || 'A');
+        }) || groups[0];
+
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
+        cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+            bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
+            right: {
+                style: groupEnds.has(i + 1) ? 'medium' : 'thin',
+                color: { argb: groupEnds.has(i + 1) ? COLORS.separator : 'FFFFFFFF' }
+            }
+        };
+    });
+
+    worksheet.autoFilter = 'A4:J4';
+
+    data.forEach((reg) => {
+        const { firstName, lastName } = cardlessPersonLabel(reg);
+
+        const excelRow = worksheet.addRow({
+            first_name: firstName,
+            last_name: lastName,
+            employee_no: reg.employee_no || '',
+            dependency: reg.dependencyName || '',
+            building: reg.buildingName || '',
+            floor: reg.floor || '',
+            reason: reg.reason,
+            comments: reg.comments || '',
+            recorded_at: new Date(reg.recorded_at).toLocaleString('es-MX'),
+            recorded_by: reg.recordedByName || '',
+        });
+        excelRow.height = 24;
+
+        excelRow.eachCell((cell, colNumber) => {
+            const colLetter = String.fromCharCode(64 + colNumber);
+            const group = groups.find((g) => {
+                const parts = g.range.replace(/[0-9]/g, '').split(':');
+                return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
+            }) || groups[0];
+
+            cell.font = { name: 'Arial', size: 9 };
+            cell.alignment = {
+                vertical: 'middle',
+                horizontal: [3, 6, 9].includes(colNumber) ? 'center' : 'left',
+                indent: [3, 6, 9].includes(colNumber) ? 0 : 1,
+                wrapText: colNumber === 7 || colNumber === 8
+            };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
+            cell.border = {
+                bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                right: {
+                    style: groupEnds.has(colNumber) ? 'medium' : 'thin',
+                    color: { argb: groupEnds.has(colNumber) ? COLORS.separator : 'FFCBD5E1' }
+                }
+            };
+
+            if (!cell.value || cell.value === '') {
+                cell.value = '—';
+                cell.font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF94A3B8' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            }
+
+            if (colNumber === 7 && reg.reason) {
+                cell.value = reg.reason;
+                let badge = COLORS.slate;
+                if (reg.reason.includes('Olvidada') || reg.reason === 'No la porta') badge = COLORS.amber;
+                else if (reg.reason === 'Extraviada' || reg.reason === 'Robada') badge = COLORS.rose;
+                else if (
+                    reg.reason === 'No se le ha entregado' ||
+                    reg.reason.includes('proceso') ||
+                    reg.reason.includes('ingreso') ||
+                    reg.reason.includes('Reposición')
+                ) {
+                    badge = COLORS.sky;
+                }
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: badge.head } };
+                cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: badge.sub } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            }
+        });
+    });
+
+    worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
+    const finalFileName = `Registro_Sin_Tarjeta_Nexa_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAsFunction(new Blob([buffer]), finalFileName);
+}
+
 // ─── KONE Usage Export ─────────────────────────────────────────────────
 
 import type { KoneUsageMatchResult, KoneUsageMatchedEntry } from './xlsxKoneUsage';

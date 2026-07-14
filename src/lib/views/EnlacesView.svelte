@@ -247,8 +247,7 @@
                 <div class="flex flex-wrap gap-3">
                     <div class="flex flex-col gap-1.5">
                         <label for="filter-dependency" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dependencia</label>
-                        <Select id="filter-dependency" bind:value={filterDependency} class="w-full sm:w-auto min-w-[160px] h-9 text-xs font-bold">
-                            <option value="">Todas</option>
+                        <Select id="filter-dependency" bind:value={filterDependency} placeholder="Todas" class="w-full sm:w-auto min-w-[160px] h-9 text-xs font-bold">
                             {#each dependencies as dep}
                                 <option value={dep.name}>{dep.name}</option>
                             {/each}
@@ -257,8 +256,7 @@
                     
                     <div class="flex flex-col gap-1.5">
                         <label for="filter-floor" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Piso Base</label>
-                        <Select id="filter-floor" bind:value={filterFloor} class="w-full sm:w-auto min-w-[120px] h-9 text-xs font-bold">
-                            <option value="">Todos</option>
+                        <Select id="filter-floor" bind:value={filterFloor} placeholder="Todos" class="w-full sm:w-auto min-w-[120px] h-9 text-xs font-bold">
                             {#each availableFloors as floor}
                                 <option value={floor}>{floor}</option>
                             {/each}

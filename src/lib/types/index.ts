@@ -130,3 +130,23 @@ export interface DashboardMetrics {
         total: number;
     };
 }
+
+export interface CardlessRegistry {
+    id: number;
+    person_id: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    employee_no: string | null;
+    building_id: number | null;
+    dependency_id: number | null;
+    floor: string | null;
+    reason: string;
+    comments: string | null;
+    recorded_at: string;
+    recorded_by: string;
+    // Computed/Joined properties
+    personName?: string;
+    buildingName?: string;
+    dependencyName?: string;
+    recordedByName?: string;
+}

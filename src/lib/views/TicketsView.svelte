@@ -452,6 +452,7 @@
                         <FilterSelect
                             label="Tipo"
                             options={ticketTypes}
+                            placeholder=""
                             bind:value={typeFilter}
                             onchange={onFilterChange}
                         />
@@ -463,6 +464,7 @@
                     <FilterSelect
                         label="Prioridad"
                         options={["Todas", "Alta", "Media", "Baja"]}
+                        placeholder=""
                         bind:value={priorityFilter}
                         onchange={onFilterChange}
                     />
@@ -474,6 +476,7 @@
                         <FilterSelect
                             label="Dependencia"
                             options={["Todas", ...dependencies.map((d) => d.name)]}
+                            placeholder=""
                             bind:value={dependencyFilter}
                             onchange={onFilterChange}
                         />

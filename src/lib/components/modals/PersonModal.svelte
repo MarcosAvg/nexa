@@ -674,7 +674,6 @@
                                 ? "border-red-500 ring-red-200"
                                 : "")}
                     >
-                        <option value="">Seleccionar...</option>
                         {#each dependencies as dep}
                             <option value={dep.name}>{dep.name}</option>
                         {/each}
@@ -772,7 +771,6 @@
                             ? "border-red-500 ring-red-200"
                             : ""}
                     >
-                        <option value="">Seleccionar...</option>
                         {#each buildings as b}
                             <option value={b.name}>{b.name}</option>
                         {/each}
@@ -797,7 +795,6 @@
                             ? "border-red-500 ring-red-200"
                             : ""}
                     >
-                        <option value="">Seleccionar...</option>
                         {#each availableFloors as f}
                             <option value={f}>{f}</option>
                         {/each}
@@ -848,7 +845,6 @@
                         ? "border-red-500 ring-red-200"
                         : ""}
                 >
-                    <option value="">Seleccionar...</option>
                     {#each schedules as s}
                         <option value={s.name}>{s.name}</option>
                     {/each}

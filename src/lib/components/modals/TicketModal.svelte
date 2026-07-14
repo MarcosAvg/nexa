@@ -392,8 +392,8 @@
                             <Select
                                 id="notListedPersonDependency"
                                 bind:value={formData.notListedPersonDependency}
+                                placeholder="Seleccione..."
                             >
-                                <option value="">Seleccione...</option>
                                 {#each dependencies as d}
                                     <option value={d.name}>{d.name}</option>
                                 {/each}
