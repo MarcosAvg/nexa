@@ -33,7 +33,7 @@ export type CardlessRegistryFilters = {
     startDate?: string;
     endDate?: string;
     reason?: string;
-    buildingId?: string | number;
+    search?: string;
     dependencyId?: string | number;
 };
 
@@ -104,8 +104,11 @@ function applyFilters(query: any, filters: CardlessRegistryFilters) {
         query = query.eq("reason", filters.reason);
     }
 
-    if (filters.buildingId !== undefined && filters.buildingId !== "" && filters.buildingId !== null) {
-        query = query.eq("building_id", filters.buildingId);
+    if (filters.search && filters.search.trim()) {
+        const term = `%${filters.search.trim()}%`;
+        query = query.or(
+            `first_name.ilike.${term},last_name.ilike.${term},employee_no.ilike.${term}`
+        );
     }
 
     if (filters.dependencyId !== undefined && filters.dependencyId !== "" && filters.dependencyId !== null) {

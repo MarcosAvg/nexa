@@ -15,6 +15,7 @@
         Plus,
         Loader2,
         Trash2,
+        Search,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import { cardlessRegistryService } from "../services/cardlessRegistry";
@@ -34,15 +35,16 @@
     let startDate = $state("");
     let endDate = $state("");
     let reasonFilter = $state("");
-    let buildingFilter = $state("");
+    let searchFilter = $state("");
     let dependencyFilter = $state("");
     let dateRangeError = $state("");
 
     let buildings = $derived(catalogState.buildings);
-    let buildingNames = $derived(buildings.map((b) => b.name));
     let dependencies = $derived(catalogState.dependencies);
     let dependencyNames = $derived(dependencies.map((d) => d.name));
     let reasons = $derived(cardlessRegistryService.REASONS);
+
+    let searchTimeout: ReturnType<typeof setTimeout> | undefined;
 
     let isModalOpen = $state(false);
     let editingRegistry = $state<CardlessRegistry | null>(null);
@@ -56,11 +58,6 @@
     onMount(() => {
         refreshData();
     });
-
-    function buildingIdFromName(name: string): string {
-        if (!name) return "";
-        return String(buildings.find((b) => b.name === name)?.id ?? "");
-    }
 
     function dependencyIdFromName(name: string): string {
         if (!name) return "";
@@ -93,10 +90,16 @@
             startDate,
             endDate,
             reason: reasonFilter,
-            buildingId: buildingIdFromName(buildingFilter),
+            search: searchFilter,
             dependencyId: dependencyIdFromName(dependencyFilter),
         });
         refreshData();
+    }
+
+    function handleSearchInput(e: Event) {
+        searchFilter = (e.target as HTMLInputElement).value;
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(applyFiltersAndRefresh, 350);
     }
 
     async function refreshData() {
@@ -177,7 +180,7 @@
                 endDate: endDate || undefined,
                 reason: reasonFilter || undefined,
                 dependency: dependencyFilter || undefined,
-                building: buildingFilter || undefined,
+                search: searchFilter || undefined,
             });
             toast.success(`Reporte exportado (${rows.length} registros)`);
         } catch {
@@ -252,11 +255,22 @@
 </script>
 
 {#snippet renderPersonName(row: CardlessRegistry)}
-    <div class="flex flex-col">
-        <span class="font-bold text-slate-900">
+    <div class="flex flex-col gap-0.5">
+        <span class="font-bold text-slate-900 truncate">
             {row.personName || [row.first_name, row.last_name].filter(Boolean).join(" ") || "Sin nombre"}
         </span>
         <span class="text-xs text-slate-500">{row.employee_no || "Sin # empleado"}</span>
+        {#if row.person_id}
+            <span class="inline-flex w-fit items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 leading-none">
+                <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Registrado
+            </span>
+        {:else}
+            <span class="inline-flex w-fit items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 leading-none">
+                <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                No Registrado
+            </span>
+        {/if}
     </div>
 {/snippet}
 
@@ -329,7 +343,7 @@
 {/snippet}
 
 <div class="space-y-6">
-    <SectionHeader title="Registro Sin Tarjeta">
+    <SectionHeader title="Sin Tarjeta">
         {#snippet filters()}
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha Inicio</span>
@@ -352,13 +366,6 @@
                 />
             </div>
             <FilterSelect
-                label="Motivo"
-                options={reasons}
-                placeholder="Todos"
-                bind:value={reasonFilter}
-                onchange={applyFiltersAndRefresh}
-            />
-            <FilterSelect
                 label="Dependencia"
                 options={dependencyNames}
                 placeholder="Todas"
@@ -366,12 +373,25 @@
                 onchange={applyFiltersAndRefresh}
             />
             <FilterSelect
-                label="Edificio"
-                options={buildingNames}
+                label="Motivo"
+                options={reasons}
                 placeholder="Todos"
-                bind:value={buildingFilter}
+                bind:value={reasonFilter}
                 onchange={applyFiltersAndRefresh}
             />
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Búsqueda</span>
+                <div class="relative">
+                    <Search size={14} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                        type="text"
+                        placeholder="Nombre o # empleado..."
+                        bind:value={searchFilter}
+                        oninput={handleSearchInput}
+                        class="h-9 pl-8 pr-3 rounded-lg border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:bg-white focus:border-slate-900 transition-all outline-none w-48"
+                    />
+                </div>
+            </div>
         {/snippet}
 
         {#snippet actions()}
@@ -438,7 +458,7 @@
                         key: "reason",
                         label: "Motivo",
                         render: renderReason,
-                        width: "150px",
+                        width: "220px",
                     },
                     {
                         key: "recorded_at",

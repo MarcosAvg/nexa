@@ -21,6 +21,7 @@
         actions?: TopSnippet;
         mobileCard?: TopSnippet;
         actionsWidth?: string;
+        rowClass?: (row: any) => string;
     };
     let {
         data,
@@ -28,6 +29,7 @@
         actions,
         mobileCard,
         actionsWidth = "140px",
+        rowClass,
     }: Props = $props();
 
     // Sort state
@@ -215,7 +217,7 @@
 
                     {#each visibleData as row (row.id || Math.random())}
                         <tr
-                            class="group transition-all duration-300 hover:bg-blue-50/30"
+                            class="group transition-all duration-300 hover:bg-blue-50/30 {rowClass ? rowClass(row) : ''}"
                         >
                             {#each columns as column}
                                 <td

@@ -1435,6 +1435,7 @@ export async function exportHistoryToExcel(data: any[], options?: ExportOptions)
 }
 
 export type CardlessRegistryExportRow = {
+    person_id?: string | null;   // null = registro manual sin vínculo a personal
     first_name?: string | null;
     last_name?: string | null;
     employee_no?: string | null;
@@ -1453,7 +1454,7 @@ export type CardlessRegistryExportFilters = {
     endDate?: string;
     reason?: string;
     dependency?: string;
-    building?: string;
+    search?: string;
 };
 
 function cardlessPersonKey(reg: CardlessRegistryExportRow): string {
@@ -1475,6 +1476,71 @@ function cardlessPersonLabel(reg: CardlessRegistryExportRow): { name: string; fi
     const lastName = reg.last_name || (reg.personName ? reg.personName.split(' ').slice(-1).join(' ') : '') || '';
     const name = reg.personName || [firstName, lastName].filter(Boolean).join(' ') || 'Sin nombre';
     return { name, firstName, lastName, employeeNo: reg.employee_no || '' };
+}
+
+// ─── Shared aggregation type & helper ──────────────────────────────────
+type CardlessPersonAgg = {
+    key: string;
+    name: string;
+    firstName: string;
+    lastName: string;
+    employeeNo: string;
+    dependency: string;
+    building: string;
+    count: number;
+    reasons: Record<string, number>;
+    dates: number[];
+    operators: Set<string>;
+    isLinked: boolean;  // true if at least one record has person_id
+};
+
+function aggregateCardlessData(data: CardlessRegistryExportRow[]) {
+    const personMap = new Map<string, CardlessPersonAgg>();
+    const reasonMap: Record<string, number> = {};
+    const depMap: Record<string, { registros: number; personas: Set<string> }> = {};
+    const buildingMap: Record<string, { registros: number; personas: Set<string> }> = {};
+    const operatorMap: Record<string, number> = {};
+
+    data.forEach((reg) => {
+        const key = cardlessPersonKey(reg);
+        const label = cardlessPersonLabel(reg);
+        const ts = new Date(reg.recorded_at).getTime();
+        const dep = reg.dependencyName || 'Sin dependencia';
+        const bldg = reg.buildingName || 'Sin edificio';
+        const op = reg.recordedByName || 'Sin operador';
+
+        reasonMap[reg.reason] = (reasonMap[reg.reason] || 0) + 1;
+        operatorMap[op] = (operatorMap[op] || 0) + 1;
+
+        if (!depMap[dep]) depMap[dep] = { registros: 0, personas: new Set() };
+        depMap[dep].registros++;
+        depMap[dep].personas.add(key);
+
+        if (!buildingMap[bldg]) buildingMap[bldg] = { registros: 0, personas: new Set() };
+        buildingMap[bldg].registros++;
+        buildingMap[bldg].personas.add(key);
+
+        let agg = personMap.get(key);
+        if (!agg) {
+            agg = { key, name: label.name, firstName: label.firstName, lastName: label.lastName,
+                employeeNo: label.employeeNo, dependency: dep, building: bldg,
+                count: 0, reasons: {}, dates: [], operators: new Set(), isLinked: false };
+            personMap.set(key, agg);
+        }
+        agg.count++;
+        agg.reasons[reg.reason] = (agg.reasons[reg.reason] || 0) + 1;
+        if (!Number.isNaN(ts)) agg.dates.push(ts);
+        if (reg.recordedByName) agg.operators.add(reg.recordedByName);
+        if (!agg.employeeNo && label.employeeNo) agg.employeeNo = label.employeeNo;
+        if (!agg.firstName && label.firstName) agg.firstName = label.firstName;
+        if (!agg.lastName && label.lastName) agg.lastName = label.lastName;
+        if (agg.dependency === 'Sin dependencia' && reg.dependencyName) agg.dependency = reg.dependencyName;
+        if (agg.building === 'Sin edificio' && reg.buildingName) agg.building = reg.buildingName;
+        if (reg.person_id) agg.isLinked = true;
+    });
+
+    const people = [...personMap.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es'));
+    return { people, reasonMap, depMap, buildingMap, operatorMap };
 }
 
 async function addCardlessEvidenceSheet(
@@ -1552,69 +1618,8 @@ async function addCardlessEvidenceSheet(
 
     const pct = (n: number, total: number) => (total > 0 ? `${((n / total) * 100).toFixed(1)}%` : '0%');
 
-    // ── Aggregate ──
-    type PersonAgg = {
-        key: string;
-        name: string;
-        employeeNo: string;
-        dependency: string;
-        building: string;
-        count: number;
-        reasons: Record<string, number>;
-        dates: number[];
-        operators: Set<string>;
-    };
-
-    const personMap = new Map<string, PersonAgg>();
-    const reasonMap: Record<string, number> = {};
-    const depMap: Record<string, { registros: number; personas: Set<string> }> = {};
-    const buildingMap: Record<string, { registros: number; personas: Set<string> }> = {};
-    const operatorMap: Record<string, number> = {};
-
-    data.forEach((reg) => {
-        const key = cardlessPersonKey(reg);
-        const label = cardlessPersonLabel(reg);
-        const ts = new Date(reg.recorded_at).getTime();
-        const dep = reg.dependencyName || 'Sin dependencia';
-        const bldg = reg.buildingName || 'Sin edificio';
-        const op = reg.recordedByName || 'Sin operador';
-
-        reasonMap[reg.reason] = (reasonMap[reg.reason] || 0) + 1;
-        operatorMap[op] = (operatorMap[op] || 0) + 1;
-
-        if (!depMap[dep]) depMap[dep] = { registros: 0, personas: new Set() };
-        depMap[dep].registros++;
-        depMap[dep].personas.add(key);
-
-        if (!buildingMap[bldg]) buildingMap[bldg] = { registros: 0, personas: new Set() };
-        buildingMap[bldg].registros++;
-        buildingMap[bldg].personas.add(key);
-
-        let agg = personMap.get(key);
-        if (!agg) {
-            agg = {
-                key,
-                name: label.name,
-                employeeNo: label.employeeNo,
-                dependency: dep,
-                building: bldg,
-                count: 0,
-                reasons: {},
-                dates: [],
-                operators: new Set(),
-            };
-            personMap.set(key, agg);
-        }
-        agg.count++;
-        agg.reasons[reg.reason] = (agg.reasons[reg.reason] || 0) + 1;
-        if (!Number.isNaN(ts)) agg.dates.push(ts);
-        if (reg.recordedByName) agg.operators.add(reg.recordedByName);
-        if (!agg.employeeNo && label.employeeNo) agg.employeeNo = label.employeeNo;
-        if (agg.dependency === 'Sin dependencia' && reg.dependencyName) agg.dependency = reg.dependencyName;
-        if (agg.building === 'Sin edificio' && reg.buildingName) agg.building = reg.buildingName;
-    });
-
-    const people = [...personMap.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es'));
+    // ── Aggregate (shared helper) ──
+    const { people, reasonMap, depMap, buildingMap, operatorMap } = aggregateCardlessData(data);
     const total = data.length;
     const uniquePeople = people.length;
     const reincidentes = people.filter((p) => p.count >= 2).length;
@@ -1714,98 +1719,8 @@ async function addCardlessEvidenceSheet(
     }
     row += 2;
 
-    // ── People recurrence ──
-    sectionTitle('3. CONTEO POR PERSONA (REINCIDENCIA)');
-    ws.mergeCells(`B${row}:K${row}`);
-    ws.getCell(`B${row}`).value =
-        'Personas ordenadas por mayor cantidad de registros. ≥2 = reincidente (ámbar), ≥3 = frecuente (rojo).';
-    ws.getCell(`B${row}`).font = { name: 'Arial', size: 9, italic: true, color: { argb: C.meta } };
-    row++;
-
-    const personHeaders = [
-        'PERSONA',
-        '# EMPLEADO',
-        'DEPENDENCIA',
-        'EDIFICIO',
-        'TOTAL REGISTROS',
-        'MOTIVOS DISTINTOS',
-        'DESGLOSE DE MOTIVOS',
-        'PRIMER REGISTRO',
-        'ÚLTIMO REGISTRO',
-        'OPERADORES',
-    ];
-    const personHeaderRow = row;
-    personHeaders.forEach((label, i) => {
-        const cell = ws.getCell(row, i + 2);
-        cell.value = label;
-        cell.font = { name: 'Arial', bold: true, size: 8, color: { argb: C.white } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.blue.fg } };
-        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        setBorder(cell, C.blue.fg);
-    });
-    ws.getRow(row).height = 30;
-    row++;
-
-    people.forEach((person) => {
-        const reasonBreakdown = Object.entries(person.reasons)
-            .sort((a, b) => b[1] - a[1])
-            .map(([r, c]) => `${r} (${c})`)
-            .join('; ');
-        const minDate = person.dates.length ? Math.min(...person.dates) : NaN;
-        const maxDate = person.dates.length ? Math.max(...person.dates) : NaN;
-        const severity = person.count >= 3 ? C.rose : person.count >= 2 ? C.amber : C.slate;
-
-        const values: (string | number)[] = [
-            person.name,
-            person.employeeNo || '—',
-            person.dependency,
-            person.building,
-            person.count,
-            Object.keys(person.reasons).length,
-            reasonBreakdown,
-            Number.isNaN(minDate) ? '—' : formatDate(minDate),
-            Number.isNaN(maxDate) ? '—' : formatDate(maxDate),
-            [...person.operators].join(', ') || '—',
-        ];
-
-        values.forEach((value, i) => {
-            const cell = ws.getCell(row, i + 2);
-            cell.value = value;
-            cell.font = {
-                name: 'Arial',
-                size: 9,
-                bold: i === 0 || i === 4,
-                color: { argb: i === 4 ? severity.fg : C.sectionHead }
-            };
-            cell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: i === 4 ? severity.bg : i === 0 ? C.blue.bg : C.white }
-            };
-            cell.alignment = {
-                vertical: 'middle',
-                horizontal: [1, 4, 5].includes(i) ? 'center' : 'left',
-                indent: [0, 2, 3, 6, 9].includes(i) ? 1 : 0,
-                wrapText: i === 6 || i === 9
-            };
-            setBorder(cell);
-        });
-        ws.getRow(row).height = person.count >= 2 ? 28 : 22;
-        row++;
-    });
-
-    if (people.length === 0) {
-        ws.getCell(`B${row}`).value = 'Sin datos';
-        row++;
-    }
-    ws.autoFilter = {
-        from: { row: personHeaderRow, column: 2 },
-        to: { row: Math.max(personHeaderRow, row - 1), column: 11 }
-    };
-    row += 2;
-
     // ── Dependency / Building ──
-    sectionTitle('4. DISTRIBUCIÓN POR DEPENDENCIA Y EDIFICIO');
+    sectionTitle('3. DISTRIBUCIÓN POR DEPENDENCIA Y EDIFICIO');
 
     ['DEPENDENCIA', 'REGISTROS', 'PERSONAS', '% REG.'].forEach((label, i) => {
         const cell = ws.getCell(row, i + 2);
@@ -1861,7 +1776,7 @@ async function addCardlessEvidenceSheet(
     row += 2;
 
     // ── Operators ──
-    sectionTitle('5. REGISTROS POR OPERADOR');
+    sectionTitle('4. REGISTROS POR OPERADOR');
     ['OPERADOR', 'REGISTROS', '% DEL TOTAL'].forEach((label, i) => {
         const cell = ws.getCell(row, i + 2);
         cell.value = label;
@@ -1891,10 +1806,268 @@ async function addCardlessEvidenceSheet(
     ws.mergeCells(`B${row}:K${row}`);
     const footer = ws.getCell(`B${row}`);
     footer.value =
-        'Nota: Esta hoja resume la evidencia del periodo exportado. El detalle de cada registro está en la hoja "Detalle".';
+        'Nota: Esta hoja resume la evidencia del periodo exportado. El detalle de reincidencia por persona está en "Reincidencia" y el detalle completo en "Detalle".';
     footer.font = { name: 'Arial', size: 8, italic: true, color: { argb: C.meta } };
 
     ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 2 }];
+}
+
+// ─── Reincidence Sheet ─────────────────────────────────────────────────
+async function addCardlessReincidenceSheet(
+    workbook: ExcelJSTypes.Workbook,
+    data: CardlessRegistryExportRow[],
+    filterDescription: string
+) {
+    const ws = workbook.addWorksheet('Reincidencia');
+
+    const COLORS = {
+        title: 'FF1E293B',
+        meta: 'FF64748B',
+        separator: 'FF94A3B8',
+        personal: { head: 'FFDBEAFE', sub: 'FF1E40AF', fill: 'FFEFF6FF' },
+        amber: { head: 'FFFEF3C7', sub: 'FF92400E', fill: 'FFFEFCE8' },
+        sky: { head: 'FFE0F2FE', sub: 'FF075985', fill: 'FFF0F9FF' },
+        emerald: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
+        rose: { head: 'FFFEE2E2', sub: 'FF991B1B', fill: 'FFFFF1F2' },
+        violet: { head: 'FFEDE9FE', sub: 'FF5B21B6', fill: 'FFFAF5FF' },
+        slate: { head: 'FFF1F5F9', sub: 'FF334155', fill: 'FFF8FAFC' },
+    };
+
+    const { people } = aggregateCardlessData(data);
+    const total = data.length;
+    const uniquePeople = people.length;
+    const reincidentes = people.filter((p) => p.count >= 2).length;
+    const frecuentes = people.filter((p) => p.count >= 3).length;
+    const linkedPeople = people.filter((p) => p.isLinked).length;
+    const manualPeople = uniquePeople - linkedPeople;
+
+    const formatDate = (ms: number) =>
+        new Date(ms).toLocaleString('es-MX', {
+            year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+        });
+
+    ws.columns = [
+        { key: 'num',             width: 6  },  // A  #
+        { key: 'linked',          width: 13 },  // B  Vínculo
+        { key: 'last_name',       width: 24 },  // C  Apellidos
+        { key: 'first_name',      width: 22 },  // D  Nombres
+        { key: 'employee_no',     width: 14 },  // E  # Empleado
+        { key: 'dependency',      width: 28 },  // F  Dependencia
+        { key: 'building',        width: 20 },  // G  Edificio
+        { key: 'count',           width: 14 },  // H  Total registros
+        { key: 'distinctReasons', width: 12 },  // I  Motivos distintos
+        { key: 'reasonBreakdown', width: 42 },  // J  Desglose
+        { key: 'firstDate',       width: 20 },  // K  Primer registro
+        { key: 'lastDate',        width: 20 },  // L  Último registro
+        { key: 'operators',       width: 28 },  // M  Operadores
+    ];
+
+    // ── Row 1: Title ──
+    ws.mergeCells('A1:M1');
+    const titleCell = ws.getCell('A1');
+    titleCell.value = `       REINCIDENCIA POR PERSONA — REGISTRO SIN TARJETA${filterDescription}`;
+    titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    ws.getRow(1).height = 40;
+
+    try {
+        const response = await fetch('/favicon.svg');
+        if (response.ok) {
+            const blob = await response.blob();
+            const buffer = await blob.arrayBuffer();
+            const imageId = workbook.addImage({ buffer, extension: 'svg' as any });
+            ws.addImage(imageId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 32, height: 32 } });
+        }
+    } catch { /* logo optional */ }
+
+    // ── Row 2: Meta ──
+    ws.mergeCells('A2:M2');
+    const metaCell = ws.getCell('A2');
+    const dateStr = new Date().toLocaleDateString('es-MX', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    metaCell.value = [
+        `Reporte generado: ${dateStr}`,
+        `Total registros: ${total}`,
+        `Personas únicas: ${uniquePeople}`,
+        `Reincidentes (≥2): ${reincidentes}`,
+        `Frecuentes (≥3): ${frecuentes}`,
+        `Vinculados: ${linkedPeople}`,
+        `Manuales: ${manualPeople}`,
+    ].join('  |  ');
+    metaCell.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
+    metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    ws.getRow(2).height = 20;
+
+    // ── Row 3: Legend note ──
+    ws.mergeCells('A3:M3');
+    const legendCell = ws.getCell('A3');
+    legendCell.value = '  Vínculo: ✔ Registrado = persona en sistema  |  ✗ No Registrado = ingresado sin vínculo    Severidad: Normal  |  Reincidente ≥2 (ámbar)  |  Frecuente ≥3 (rojo)';
+    legendCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: COLORS.meta } };
+    legendCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
+    legendCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    ws.getRow(3).height = 18;
+
+    // ── Row 4: Super-headers ──
+    // cols: A=#, B=Vínculo, C-G=Personal, H-J=Reincidencia, K-L=Historial, M=Operadores
+    const groups = [
+        { label: '#',                  range: 'A4:A4', colors: COLORS.slate,    endCols: [1]  },
+        { label: 'VÍNCULO',            range: 'B4:B4', colors: COLORS.emerald,  endCols: [2]  },
+        { label: 'DATOS DEL PERSONAL', range: 'C4:G4', colors: COLORS.personal, endCols: [7]  },
+        { label: 'REINCIDENCIA',       range: 'H4:J4', colors: COLORS.rose,     endCols: [10] },
+        { label: 'HISTORIAL',          range: 'K4:L4', colors: COLORS.sky,      endCols: [12] },
+        { label: 'OPERADORES',         range: 'M4:M4', colors: COLORS.violet,   endCols: [13] },
+    ];
+
+    groups.forEach((group) => {
+        ws.mergeCells(group.range);
+        const cell = ws.getCell(group.range.split(':')[0]);
+        cell.value = group.label;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.head } };
+        cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: group.colors.sub } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+            top:    { style: 'thin',   color: { argb: 'FFCBD5E1' } },
+            left:   { style: 'thin',   color: { argb: 'FFCBD5E1' } },
+            bottom: { style: 'thin',   color: { argb: 'FFCBD5E1' } },
+            right:  { style: 'medium', color: { argb: COLORS.separator } },
+        };
+    });
+    ws.getRow(4).height = 24;
+
+    // ── Row 5: Sub-headers ──
+    const subHeaders = [
+        { label: 'NO.',              group: groups[0], col: 1  },
+        { label: 'VÍNCULO',          group: groups[1], col: 2  },
+        { label: 'APELLIDOS',        group: groups[2], col: 3  },
+        { label: 'NOMBRES',          group: groups[2], col: 4  },
+        { label: '# EMPLEADO',       group: groups[2], col: 5  },
+        { label: 'DEPENDENCIA',      group: groups[2], col: 6  },
+        { label: 'EDIFICIO',         group: groups[2], col: 7  },
+        { label: 'TOTAL REGISTROS',  group: groups[3], col: 8  },
+        { label: 'MOTIVOS',          group: groups[3], col: 9  },
+        { label: 'DESGLOSE',         group: groups[3], col: 10 },
+        { label: 'PRIMER REGISTRO',  group: groups[4], col: 11 },
+        { label: 'ÚLTIMO REGISTRO',  group: groups[4], col: 12 },
+        { label: 'OPERADORES',       group: groups[5], col: 13 },
+    ];
+    const groupEndCols = new Set(groups.flatMap((g) => g.endCols));
+
+    const subHeaderRow = ws.getRow(5);
+    subHeaderRow.height = 32;
+    subHeaders.forEach(({ label, group, col }) => {
+        const cell = subHeaderRow.getCell(col);
+        cell.value = label;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
+        cell.font = { name: 'Arial', bold: true, size: 8, color: { argb: 'FFFFFFFF' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+            bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
+            right: {
+                style: groupEndCols.has(col) ? 'medium' : 'thin',
+                color: { argb: groupEndCols.has(col) ? COLORS.separator : 'FFFFFFFF' },
+            },
+        };
+    });
+
+    ws.autoFilter = 'A5:M5';
+
+    // ── Data rows ──
+    people.forEach((person, idx) => {
+        const reasonBreakdown = Object.entries(person.reasons)
+            .sort((a, b) => b[1] - a[1])
+            .map(([r, c]) => `${r} (${c})`)
+            .join('; ');
+        const minDate = person.dates.length ? Math.min(...person.dates) : NaN;
+        const maxDate = person.dates.length ? Math.max(...person.dates) : NaN;
+
+        // Severity: ≥3 = rose, ≥2 = amber, else slate
+        const severity =
+            person.count >= 3 ? COLORS.rose :
+            person.count >= 2 ? COLORS.amber :
+            COLORS.slate;
+
+        const rowData = {
+            num:             idx + 1,
+            linked:          person.isLinked ? '✔ Registrado' : '✗ No Registrado',
+            last_name:       person.lastName || '—',
+            first_name:      person.firstName || '—',
+            employee_no:     person.employeeNo || '—',
+            dependency:      person.dependency,
+            building:        person.building,
+            count:           person.count,
+            distinctReasons: Object.keys(person.reasons).length,
+            reasonBreakdown,
+            firstDate:       Number.isNaN(minDate) ? '—' : formatDate(minDate),
+            lastDate:        Number.isNaN(maxDate) ? '—' : formatDate(maxDate),
+            operators:       [...person.operators].join(', ') || '—',
+        };
+
+        const dataRow = ws.addRow(rowData);
+        dataRow.height = person.count >= 2 ? 28 : 22;
+
+        dataRow.eachCell((cell, colNumber) => {
+            const subHeader = subHeaders.find((s) => s.col === colNumber);
+            const group = subHeader?.group ?? groups[0];
+
+            // Base style
+            cell.font = { name: 'Arial', size: 9, color: { argb: 'FF111827' } };
+            cell.alignment = {
+                vertical: 'middle',
+                // center: #(1), vínculo(2), emp_no(5), count(8), distinct(9)
+                horizontal: [1, 2, 5, 8, 9].includes(colNumber) ? 'center' : 'left',
+                indent: [3, 4, 6, 7, 10, 13].includes(colNumber) ? 1 : 0,
+                wrapText: colNumber === 10 || colNumber === 13,
+            };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
+            cell.border = {
+                bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                right: {
+                    style: groupEndCols.has(colNumber) ? 'medium' : 'thin',
+                    color: { argb: groupEndCols.has(colNumber) ? COLORS.separator : 'FFCBD5E1' },
+                },
+            };
+
+            // Vínculo badge (col 2)
+            if (colNumber === 2) {
+                if (person.isLinked) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.emerald.head } };
+                    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.emerald.sub } };
+                } else {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.amber.head } };
+                    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.amber.sub } };
+                }
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            }
+
+            // Count column — severity badge (col 8)
+            if (colNumber === 8) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: severity.head } };
+                cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: severity.sub } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            }
+
+            // Last name — bold + severity tint when reincident (col 3)
+            if (colNumber === 3 && person.count >= 2) {
+                cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF111827' } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: severity.head } };
+            }
+
+            // Reason breakdown — subtle violet tint (col 10)
+            if (colNumber === 10) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.violet.fill } };
+                cell.font = { name: 'Arial', size: 8, color: { argb: COLORS.violet.sub } };
+            }
+        });
+    });
+
+    if (people.length === 0) {
+        const emptyRow = ws.addRow({ name: 'Sin datos' });
+        emptyRow.height = 22;
+    }
+
+    ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 5 }];
+    ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1 };
 }
 
 export async function exportCardlessRegistryToExcel(
@@ -1925,29 +2098,33 @@ export async function exportCardlessRegistryToExcel(
     if (filters?.endDate) filterParts.push(`Hasta: ${filters.endDate}`);
     if (filters?.reason) filterParts.push(`Motivo: ${filters.reason}`);
     if (filters?.dependency) filterParts.push(`Dependencia: ${filters.dependency}`);
-    if (filters?.building) filterParts.push(`Edificio: ${filters.building}`);
+    if (filters?.search) filterParts.push(`Búsqueda: "${filters.search}"`);
     const filterDescription = filterParts.length ? `  |  ${filterParts.join('  |  ')}` : '';
 
-    // Sheet 1: Evidence / summary (first tab)
+    // Sheet 1: Evidence / summary
     await addCardlessEvidenceSheet(workbook, data, filterDescription);
 
-    // Sheet 2: Detail
+    // Sheet 2: Reincidence by person
+    await addCardlessReincidenceSheet(workbook, data, filterDescription);
+
+    // Sheet 3: Detail
     const worksheet = workbook.addWorksheet('Detalle');
 
     worksheet.columns = [
-        { key: 'first_name', width: 18 },
-        { key: 'last_name', width: 20 },
-        { key: 'employee_no', width: 14 },
-        { key: 'dependency', width: 28 },
-        { key: 'building', width: 20 },
-        { key: 'floor', width: 12 },
-        { key: 'reason', width: 32 },
-        { key: 'comments', width: 30 },
-        { key: 'recorded_at', width: 20 },
-        { key: 'recorded_by', width: 22 },
+        { key: 'linked',       width: 14 },  // A  Vínculo
+        { key: 'first_name',   width: 18 },  // B
+        { key: 'last_name',    width: 20 },  // C
+        { key: 'employee_no',  width: 14 },  // D
+        { key: 'dependency',   width: 28 },  // E
+        { key: 'building',     width: 20 },  // F
+        { key: 'floor',        width: 12 },  // G
+        { key: 'reason',       width: 32 },  // H
+        { key: 'comments',     width: 30 },  // I
+        { key: 'recorded_at',  width: 20 },  // J
+        { key: 'recorded_by',  width: 22 },  // K
     ];
 
-    worksheet.mergeCells('A1:J1');
+    worksheet.mergeCells('A1:K1');
     const titleCell = worksheet.getCell('A1');
     titleCell.value = '       DETALLE — REGISTRO SIN TARJETA - NEXA';
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
@@ -1969,7 +2146,7 @@ export async function exportCardlessRegistryToExcel(
         console.warn('Logo load failed');
     }
 
-    worksheet.mergeCells('A2:J2');
+    worksheet.mergeCells('A2:K2');
     const metaCell = worksheet.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
         year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -1980,11 +2157,12 @@ export async function exportCardlessRegistryToExcel(
     worksheet.getRow(2).height = 20;
 
     const groups = [
-        { label: 'PERSONA', range: 'A3:C3', colors: COLORS.personal, endCol: 3 },
-        { label: 'ORGANIZACIÓN', range: 'D3:D3', colors: COLORS.emerald, endCol: 4 },
-        { label: 'UBICACIÓN', range: 'E3:F3', colors: COLORS.amber, endCol: 6 },
-        { label: 'MOTIVO DEL REGISTRO', range: 'G3:H3', colors: COLORS.rose, endCol: 8 },
-        { label: 'CONTROL', range: 'I3:J3', colors: COLORS.slate, endCol: 10 },
+        { label: 'VÍNCULO',              range: 'A3:A3', colors: COLORS.emerald, endCol: 1  },
+        { label: 'PERSONA',              range: 'B3:D3', colors: COLORS.personal, endCol: 4 },
+        { label: 'ORGANIZACIÓN',         range: 'E3:E3', colors: COLORS.emerald,  endCol: 5 },
+        { label: 'UBICACIÓN',            range: 'F3:G3', colors: COLORS.amber,    endCol: 7 },
+        { label: 'MOTIVO DEL REGISTRO',  range: 'H3:I3', colors: COLORS.rose,     endCol: 9 },
+        { label: 'CONTROL',              range: 'J3:K3', colors: COLORS.slate,    endCol: 11 },
     ];
 
     groups.forEach((group) => {
@@ -2005,6 +2183,7 @@ export async function exportCardlessRegistryToExcel(
     const headerRow = worksheet.getRow(4);
     headerRow.height = 30;
     const headerLabels = [
+        'VÍNCULO',
         'NOMBRES',
         'APELLIDOS',
         '# EMPLEADO',
@@ -2040,22 +2219,24 @@ export async function exportCardlessRegistryToExcel(
         };
     });
 
-    worksheet.autoFilter = 'A4:J4';
+    worksheet.autoFilter = 'A4:K4';
 
     data.forEach((reg) => {
         const { firstName, lastName } = cardlessPersonLabel(reg);
+        const isLinked = !!reg.person_id;
 
         const excelRow = worksheet.addRow({
-            first_name: firstName,
-            last_name: lastName,
-            employee_no: reg.employee_no || '',
-            dependency: reg.dependencyName || '',
-            building: reg.buildingName || '',
-            floor: reg.floor || '',
-            reason: reg.reason,
-            comments: reg.comments || '',
-            recorded_at: new Date(reg.recorded_at).toLocaleString('es-MX'),
-            recorded_by: reg.recordedByName || '',
+            linked:       isLinked ? '✔ Registrado' : '✗ No Registrado',
+            first_name:   firstName,
+            last_name:    lastName,
+            employee_no:  reg.employee_no || '',
+            dependency:   reg.dependencyName || '',
+            building:     reg.buildingName || '',
+            floor:        reg.floor || '',
+            reason:       reg.reason,
+            comments:     reg.comments || '',
+            recorded_at:  new Date(reg.recorded_at).toLocaleString('es-MX'),
+            recorded_by:  reg.recordedByName || '',
         });
         excelRow.height = 24;
 
@@ -2069,9 +2250,10 @@ export async function exportCardlessRegistryToExcel(
             cell.font = { name: 'Arial', size: 9 };
             cell.alignment = {
                 vertical: 'middle',
-                horizontal: [3, 6, 9].includes(colNumber) ? 'center' : 'left',
-                indent: [3, 6, 9].includes(colNumber) ? 0 : 1,
-                wrapText: colNumber === 7 || colNumber === 8
+                // col 1=linked, 4=emp_no, 7=floor, 10=date → center
+                horizontal: [1, 4, 7, 10].includes(colNumber) ? 'center' : 'left',
+                indent: [1, 4, 7, 10].includes(colNumber) ? 0 : 1,
+                wrapText: colNumber === 8 || colNumber === 9
             };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
             cell.border = {
@@ -2082,13 +2264,26 @@ export async function exportCardlessRegistryToExcel(
                 }
             };
 
+            // Linked/Manual badge (col 1)
+            if (colNumber === 1) {
+                if (isLinked) {
+                    cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.emerald.head } };
+                    cell.font  = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.emerald.sub } };
+                } else {
+                    cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.amber.head } };
+                    cell.font  = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.amber.sub } };
+                }
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            }
+
             if (!cell.value || cell.value === '') {
                 cell.value = '—';
                 cell.font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF94A3B8' } };
                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
             }
 
-            if (colNumber === 7 && reg.reason) {
+            // Reason badge (col 8)
+            if (colNumber === 8 && reg.reason) {
                 cell.value = reg.reason;
                 let badge = COLORS.slate;
                 if (reg.reason.includes('Olvidada') || reg.reason === 'No la porta') badge = COLORS.amber;

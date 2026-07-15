@@ -4,7 +4,7 @@ export type CardlessRegistryFilters = {
     startDate: string;
     endDate: string;
     reason: string;
-    buildingId: string;
+    search: string;
     dependencyId: string;
 };
 
@@ -18,7 +18,7 @@ export class CardlessRegistryState {
     startDate = $state("");
     endDate = $state("");
     reasonFilter = $state("");
-    buildingIdFilter = $state("");
+    searchFilter = $state("");
     dependencyIdFilter = $state("");
 
     setRegistries(data: CardlessRegistry[], count: number) {
@@ -50,8 +50,8 @@ export class CardlessRegistryState {
             this.reasonFilter = filters.reason;
             changed = true;
         }
-        if (filters.buildingId !== undefined && filters.buildingId !== this.buildingIdFilter) {
-            this.buildingIdFilter = filters.buildingId;
+        if (filters.search !== undefined && filters.search !== this.searchFilter) {
+            this.searchFilter = filters.search;
             changed = true;
         }
         if (filters.dependencyId !== undefined && filters.dependencyId !== this.dependencyIdFilter) {
@@ -71,7 +71,7 @@ export class CardlessRegistryState {
             startDate: this.startDate,
             endDate: this.endDate,
             reason: this.reasonFilter,
-            buildingId: this.buildingIdFilter,
+            search: this.searchFilter,
             dependencyId: this.dependencyIdFilter
         };
     }

@@ -23,7 +23,7 @@
             { label: "Tarjetas", href: "/cards", icon: CreditCard },
             { label: "Pendientes", href: "/tickets", icon: ClipboardList },
             { label: "Enlaces", href: "/enlaces", icon: Contact },
-            { label: "Registro sin tarjeta", href: "/registro-sin-tarjeta", icon: FileX },
+            { label: "Sin Tarjeta", href: "/registro-sin-tarjeta", icon: FileX },
             { label: "Historial", href: "/history", icon: History },
         ];
 
@@ -63,7 +63,7 @@
         else if (path.includes("cards")) uiState.setActivePage("Tarjetas");
         else if (path.includes("tickets")) uiState.setActivePage("Pendientes");
         else if (path.includes("enlaces")) uiState.setActivePage("Enlaces");
-        else if (path.includes("registro-sin-tarjeta")) uiState.setActivePage("Registro sin tarjeta");
+        else if (path.includes("registro-sin-tarjeta")) uiState.setActivePage("Sin Tarjeta");
         else if (path.includes("history")) uiState.setActivePage("Historial");
         else if (path.includes("settings"))
             uiState.setActivePage("Configuración");
