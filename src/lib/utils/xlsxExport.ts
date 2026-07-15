@@ -2304,7 +2304,15 @@ export async function exportCardlessRegistryToExcel(
     });
 
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
-    const finalFileName = `Registro_Sin_Tarjeta_Nexa_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    // Build filename with dependency filter if present
+    let fileNameParts = ['Registro_Sin_Tarjeta_Nexa'];
+    if (filters?.dependency) {
+        fileNameParts.push(filters.dependency.replace(/\s+/g, '_'));
+    }
+    fileNameParts.push(new Date().toISOString().split('T')[0]);
+    const finalFileName = `${fileNameParts.join('_')}.xlsx`;
+    
     const buffer = await workbook.xlsx.writeBuffer();
     saveAsFunction(new Blob([buffer]), finalFileName);
 }
