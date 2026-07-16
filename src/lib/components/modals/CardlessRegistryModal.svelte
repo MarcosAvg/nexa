@@ -182,6 +182,16 @@
         return buildings.find((b) => b.name === manualBuilding)?.floors || [];
     });
 
+    let hasPendingKone = $derived.by(() => {
+        if (!selectedPerson) return false;
+        if (editingRegistry && selectedPerson.id === editingRegistry.person_id) {
+            return !!editingRegistry.pendingKoneResponsiva;
+        }
+        const koneCard = selectedPerson.cards?.find(c => c.type === "KONE");
+        return !!(koneCard && koneCard.responsiva_status !== "signed" && koneCard.responsiva_status !== "legacy");
+    });
+
+
     function resolveBuildingId(): number | null {
         return buildings.find((b) => b.name === manualBuilding)?.id ?? null;
     }
@@ -357,7 +367,20 @@
                                 <User class="text-emerald-600" size={16} />
                             </div>
                             <div>
-                                <p class="text-emerald-800 font-semibold text-sm">{selectedPerson.name}</p>
+                                <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
+                                    <p class="text-emerald-800 font-semibold text-sm">{selectedPerson.name}</p>
+                                    {#if hasPendingKone}
+                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 leading-none whitespace-nowrap">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                            Pendiente de recoger KONE
+                                        </span>
+                                    {:else}
+                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 leading-none whitespace-nowrap">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                            Tarjeta KONE Entregada
+                                        </span>
+                                    {/if}
+                                </div>
                                 <p class="text-emerald-600 text-xs">
                                     #{selectedPerson.employee_no || "—"} · {selectedPerson.building || "Sin edificio"} · {selectedPerson.dependency || "Sin dependencia"}
                                 </p>

@@ -1447,6 +1447,7 @@ export type CardlessRegistryExportRow = {
     recorded_at: string;
     recordedByName?: string | null;
     personName?: string | null;
+    pendingKoneResponsiva?: boolean;
 };
 
 export type CardlessRegistryExportFilters = {
@@ -2122,9 +2123,10 @@ export async function exportCardlessRegistryToExcel(
         { key: 'comments',     width: 30 },  // I
         { key: 'recorded_at',  width: 20 },  // J
         { key: 'recorded_by',  width: 22 },  // K
+        { key: 'pending_kone', width: 22 },  // L
     ];
 
-    worksheet.mergeCells('A1:K1');
+    worksheet.mergeCells('A1:L1');
     const titleCell = worksheet.getCell('A1');
     titleCell.value = '       DETALLE — REGISTRO SIN TARJETA - NEXA';
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
@@ -2146,7 +2148,7 @@ export async function exportCardlessRegistryToExcel(
         console.warn('Logo load failed');
     }
 
-    worksheet.mergeCells('A2:K2');
+    worksheet.mergeCells('A2:L2');
     const metaCell = worksheet.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
         year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -2162,7 +2164,7 @@ export async function exportCardlessRegistryToExcel(
         { label: 'ORGANIZACIÓN',         range: 'E3:E3', colors: COLORS.emerald,  endCol: 5 },
         { label: 'UBICACIÓN',            range: 'F3:G3', colors: COLORS.amber,    endCol: 7 },
         { label: 'MOTIVO DEL REGISTRO',  range: 'H3:I3', colors: COLORS.rose,     endCol: 9 },
-        { label: 'CONTROL',              range: 'J3:K3', colors: COLORS.slate,    endCol: 11 },
+        { label: 'CONTROL',              range: 'J3:L3', colors: COLORS.slate,    endCol: 12 },
     ];
 
     groups.forEach((group) => {
@@ -2194,6 +2196,7 @@ export async function exportCardlessRegistryToExcel(
         'COMENTARIOS',
         'FECHA / HORA',
         'REGISTRADO POR',
+        'TARJETA KONE',
     ];
 
     const groupEnds = new Set(groups.map((g) => g.endCol));
@@ -2219,7 +2222,7 @@ export async function exportCardlessRegistryToExcel(
         };
     });
 
-    worksheet.autoFilter = 'A4:K4';
+    worksheet.autoFilter = 'A4:L4';
 
     data.forEach((reg) => {
         const { firstName, lastName } = cardlessPersonLabel(reg);
@@ -2237,6 +2240,7 @@ export async function exportCardlessRegistryToExcel(
             comments:     reg.comments || '',
             recorded_at:  new Date(reg.recorded_at).toLocaleString('es-MX'),
             recorded_by:  reg.recordedByName || '',
+            pending_kone: !isLinked ? 'N/A' : (reg.pendingKoneResponsiva ? 'PENDIENTE DE RECOGER' : 'ENTREGADA'),
         });
         excelRow.height = 24;
 
@@ -2250,9 +2254,9 @@ export async function exportCardlessRegistryToExcel(
             cell.font = { name: 'Arial', size: 9 };
             cell.alignment = {
                 vertical: 'middle',
-                // col 1=linked, 4=emp_no, 7=floor, 10=date → center
-                horizontal: [1, 4, 7, 10].includes(colNumber) ? 'center' : 'left',
-                indent: [1, 4, 7, 10].includes(colNumber) ? 0 : 1,
+                // col 1=linked, 4=emp_no, 7=floor, 10=date, 12=pending_kone → center
+                horizontal: [1, 4, 7, 10, 12].includes(colNumber) ? 'center' : 'left',
+                indent: [1, 4, 7, 10, 12].includes(colNumber) ? 0 : 1,
                 wrapText: colNumber === 8 || colNumber === 9
             };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
@@ -2299,6 +2303,21 @@ export async function exportCardlessRegistryToExcel(
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: badge.head } };
                 cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: badge.sub } };
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            }
+
+            // Responsiva KONE badge (col 12)
+            if (colNumber === 12) {
+                if (!isLinked) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
+                    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.slate.sub } };
+                } else if (reg.pendingKoneResponsiva) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.rose.head } };
+                    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.rose.sub } };
+                } else {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.emerald.head } };
+                    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.emerald.sub } };
+                }
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
             }
         });
     });

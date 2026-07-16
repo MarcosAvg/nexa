@@ -58,6 +58,31 @@ const SELECT_WITH_RELATIONS = `
     profiles!recorded_by(full_name)
 `;
 
+/**
+ * Returns the set of person IDs that have at least one pending "Firma Responsiva"
+ * ticket linked to a KONE card.
+ */
+async function fetchPendingKoneResponsivaSet(personIds: string[]): Promise<Set<string>> {
+    const unique = [...new Set(personIds.filter(Boolean))];
+    if (unique.length === 0) return new Set();
+
+    const { data, error } = await supabase
+        .from("tickets")
+        .select("person_id, cards!card_id(type)")
+        .eq("type", "Firma Responsiva")
+        .eq("status", "pending")
+        .in("person_id", unique);
+
+    if (error || !data) return new Set();
+
+    return new Set(
+        data
+            .filter((t: any) => t.cards?.type === "KONE")
+            .map((t: any) => t.person_id as string)
+    );
+}
+
+
 const mapCardlessRegistryRecord = (r: any): CardlessRegistry => {
     const personName = r.personnel
         ? `${r.personnel.first_name} ${r.personnel.last_name}`
@@ -82,6 +107,19 @@ const mapCardlessRegistryRecord = (r: any): CardlessRegistry => {
         recordedByName: r.profiles?.full_name || undefined
     };
 };
+
+async function enrichWithKoneResponsiva(registries: CardlessRegistry[]): Promise<CardlessRegistry[]> {
+    const personIds = registries
+        .map(r => r.person_id)
+        .filter((id): id is string => Boolean(id));
+
+    const koneSet = await fetchPendingKoneResponsivaSet(personIds);
+
+    return registries.map(r => ({
+        ...r,
+        pendingKoneResponsiva: r.person_id ? koneSet.has(r.person_id) : false,
+    }));
+}
 
 function applyFilters(query: any, filters: CardlessRegistryFilters) {
     const start = filters.startDate;
@@ -147,9 +185,10 @@ export const cardlessRegistryService = {
             if (error) throw error;
 
             return {
-                data: data ? data.map(mapCardlessRegistryRecord) : [],
+                data: data ? await enrichWithKoneResponsiva(data.map(mapCardlessRegistryRecord)) : [],
                 count: count || 0
             };
+
         } catch (error) {
             handleError(error);
             throw error;

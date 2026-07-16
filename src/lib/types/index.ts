@@ -149,4 +149,5 @@ export interface CardlessRegistry {
     buildingName?: string;
     dependencyName?: string;
     recordedByName?: string;
+    pendingKoneResponsiva?: boolean;
 }
