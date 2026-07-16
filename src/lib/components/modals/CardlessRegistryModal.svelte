@@ -202,9 +202,24 @@
 
     async function handleSubmit() {
         if (!networkStore.isOnline) { toast.error("Sin conexión a internet"); return; }
-        if (!selectedReason) { toast.error("Selecciona un motivo"); return; }
         if (!manualFirstName.trim() || !manualLastName.trim()) {
             toast.error("Ingresa nombre y apellidos");
+            return;
+        }
+        if (!manualDependency.trim()) {
+            toast.error("Selecciona una dependencia");
+            return;
+        }
+        if (!manualBuilding.trim()) {
+            toast.error("Selecciona un edificio");
+            return;
+        }
+        if (!manualFloor.trim()) {
+            toast.error("Selecciona un piso");
+            return;
+        }
+        if (!selectedReason) {
+            toast.error("Selecciona un motivo");
             return;
         }
 
@@ -247,7 +262,12 @@
     function handleClose() { isOpen = false; resetForm(); }
 
     let canSubmit = $derived(
-        !!selectedReason && !!manualFirstName.trim() && !!manualLastName.trim()
+        !!selectedReason &&
+        !!manualFirstName.trim() &&
+        !!manualLastName.trim() &&
+        !!manualDependency.trim() &&
+        !!manualBuilding.trim() &&
+        !!manualFloor.trim()
     );
 </script>
 
@@ -313,7 +333,7 @@
                     />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Dependencia</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Dependencia <span class="text-rose-500">*</span></label>
                     <Select
                         options={dependencyNames}
                         bind:value={manualDependency}
@@ -402,11 +422,11 @@
         <!-- ── Location ──────────────────────────────────────────── -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Edificio</label>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Edificio <span class="text-rose-500">*</span></label>
                 <Select options={buildingNames} bind:value={manualBuilding} placeholder="Seleccionar edificio" disabled={!!selectedPerson} />
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Piso Base</label>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Piso Base <span class="text-rose-500">*</span></label>
                 <Select options={availableFloors} bind:value={manualFloor} placeholder="Seleccionar piso" disabled={!manualBuilding || !!selectedPerson} />
             </div>
         </div>
