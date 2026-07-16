@@ -1448,6 +1448,8 @@ export type CardlessRegistryExportRow = {
     recordedByName?: string | null;
     personName?: string | null;
     pendingKoneResponsiva?: boolean;
+    /** ISO timestamp of when the KONE responsiva was signed. Null = not yet signed or unknown. */
+    koneResponsivaSignedAt?: string | null;
 };
 
 export type CardlessRegistryExportFilters = {
@@ -1479,6 +1481,50 @@ function cardlessPersonLabel(reg: CardlessRegistryExportRow): { name: string; fi
     return { name, firstName, lastName, employeeNo: reg.employee_no || '' };
 }
 
+// ─── KONE responsiva sign-date lookup ──────────────────────────────────
+/**
+ * Returns a Map<person_id, signedAt> with the most recent date a KONE
+ * responsiva was signed, queried directly from the `signed_responsivas` table.
+ */
+async function fetchKoneResponsivaSignDates(): Promise<Map<string, string>> {
+    const { supabase } = await import('../supabase');
+    const signMap = new Map<string, string>();
+
+    try {
+        const allRows: { person_id: string; created_at: string }[] = [];
+        let page = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+            const { data, error } = await supabase
+                .from('signed_responsivas')
+                .select('person_id, created_at')
+                .eq('card_type', 'KONE')
+                .order('created_at', { ascending: false })
+                .range(page * pageSize, (page + 1) * pageSize - 1);
+
+            if (error || !data) break;
+            allRows.push(...data);
+            page++;
+            if (data.length < pageSize) hasMore = false;
+        }
+
+        // Keep only the most recent signature per person
+        for (const row of allRows) {
+            if (!row.person_id) continue;
+            const existing = signMap.get(row.person_id);
+            if (!existing || row.created_at > existing) {
+                signMap.set(row.person_id, row.created_at);
+            }
+        }
+    } catch {
+        // Non-critical — export continues without sign dates
+    }
+
+    return signMap;
+}
+
 // ─── Shared aggregation type & helper ──────────────────────────────────
 type CardlessPersonAgg = {
     key: string;
@@ -1493,6 +1539,8 @@ type CardlessPersonAgg = {
     dates: number[];
     operators: Set<string>;
     isLinked: boolean;  // true if at least one record has person_id
+    pendingKoneResponsiva?: boolean;
+    koneSignedAt?: string | null;  // most recent KONE responsiva sign date
 };
 
 function aggregateCardlessData(data: CardlessRegistryExportRow[]) {
@@ -1538,6 +1586,14 @@ function aggregateCardlessData(data: CardlessRegistryExportRow[]) {
         if (agg.dependency === 'Sin dependencia' && reg.dependencyName) agg.dependency = reg.dependencyName;
         if (agg.building === 'Sin edificio' && reg.buildingName) agg.building = reg.buildingName;
         if (reg.person_id) agg.isLinked = true;
+        // Take the KONE status from any row — it reflects the current state at report time
+        if (reg.pendingKoneResponsiva !== undefined) agg.pendingKoneResponsiva = reg.pendingKoneResponsiva;
+        // Keep the most recent sign date across all rows for this person
+        if (reg.koneResponsivaSignedAt) {
+            if (!agg.koneSignedAt || reg.koneResponsivaSignedAt > agg.koneSignedAt) {
+                agg.koneSignedAt = reg.koneResponsivaSignedAt;
+            }
+        }
     });
 
     const people = [...personMap.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es'));
@@ -1861,10 +1917,12 @@ async function addCardlessReincidenceSheet(
         { key: 'firstDate',       width: 20 },  // K  Primer registro
         { key: 'lastDate',        width: 20 },  // L  Último registro
         { key: 'operators',       width: 28 },  // M  Operadores
+        { key: 'pending_kone',    width: 22 },  // N  Tarjeta KONE
+        { key: 'signed_at',       width: 22 },  // O  Fecha entrega  ← nueva
     ];
 
     // ── Row 1: Title ──
-    ws.mergeCells('A1:M1');
+    ws.mergeCells('A1:O1');
     const titleCell = ws.getCell('A1');
     titleCell.value = `       REINCIDENCIA POR PERSONA — REGISTRO SIN TARJETA${filterDescription}`;
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
@@ -1882,7 +1940,7 @@ async function addCardlessReincidenceSheet(
     } catch { /* logo optional */ }
 
     // ── Row 2: Meta ──
-    ws.mergeCells('A2:M2');
+    ws.mergeCells('A2:O2');
     const metaCell = ws.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
         year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -1901,7 +1959,7 @@ async function addCardlessReincidenceSheet(
     ws.getRow(2).height = 20;
 
     // ── Row 3: Legend note ──
-    ws.mergeCells('A3:M3');
+    ws.mergeCells('A3:O3');
     const legendCell = ws.getCell('A3');
     legendCell.value = '  Vínculo: ✔ Registrado = persona en sistema  |  ✗ No Registrado = ingresado sin vínculo    Severidad: Normal  |  Reincidente ≥2 (ámbar)  |  Frecuente ≥3 (rojo)';
     legendCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: COLORS.meta } };
@@ -1910,7 +1968,7 @@ async function addCardlessReincidenceSheet(
     ws.getRow(3).height = 18;
 
     // ── Row 4: Super-headers ──
-    // cols: A=#, B=Vínculo, C-G=Personal, H-J=Reincidencia, K-L=Historial, M=Operadores
+    // cols: A=#, B=Vínculo, C-G=Personal, H-J=Reincidencia, K-L=Historial, M=Operadores, N=Tarjeta KONE, O=Fecha Entrega
     const groups = [
         { label: '#',                  range: 'A4:A4', colors: COLORS.slate,    endCols: [1]  },
         { label: 'VÍNCULO',            range: 'B4:B4', colors: COLORS.emerald,  endCols: [2]  },
@@ -1918,6 +1976,7 @@ async function addCardlessReincidenceSheet(
         { label: 'REINCIDENCIA',       range: 'H4:J4', colors: COLORS.rose,     endCols: [10] },
         { label: 'HISTORIAL',          range: 'K4:L4', colors: COLORS.sky,      endCols: [12] },
         { label: 'OPERADORES',         range: 'M4:M4', colors: COLORS.violet,   endCols: [13] },
+        { label: 'TARJETA KONE',       range: 'N4:O4', colors: COLORS.emerald,  endCols: [15] },
     ];
 
     groups.forEach((group) => {
@@ -1951,6 +2010,8 @@ async function addCardlessReincidenceSheet(
         { label: 'PRIMER REGISTRO',  group: groups[4], col: 11 },
         { label: 'ÚLTIMO REGISTRO',  group: groups[4], col: 12 },
         { label: 'OPERADORES',       group: groups[5], col: 13 },
+        { label: 'TARJETA KONE',     group: groups[6], col: 14 },
+        { label: 'FECHA ENTREGA',    group: groups[6], col: 15 },
     ];
     const groupEndCols = new Set(groups.flatMap((g) => g.endCols));
 
@@ -1971,7 +2032,7 @@ async function addCardlessReincidenceSheet(
         };
     });
 
-    ws.autoFilter = 'A5:M5';
+    ws.autoFilter = 'A5:O5';
 
     // ── Data rows ──
     people.forEach((person, idx) => {
@@ -1988,6 +2049,19 @@ async function addCardlessReincidenceSheet(
             person.count >= 2 ? COLORS.amber :
             COLORS.slate;
 
+        const koneLabel = !person.isLinked
+            ? 'N/A'
+            : person.pendingKoneResponsiva ? 'PENDIENTE DE RECOGER' : 'ENTREGADA';
+
+        const signedAtLabel = !person.isLinked
+            ? ''
+            : person.koneSignedAt
+                ? new Date(person.koneSignedAt).toLocaleString('es-MX', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit'
+                  })
+                : '';
+
         const rowData = {
             num:             idx + 1,
             linked:          person.isLinked ? '✔ Registrado' : '✗ No Registrado',
@@ -2002,6 +2076,8 @@ async function addCardlessReincidenceSheet(
             firstDate:       Number.isNaN(minDate) ? '—' : formatDate(minDate),
             lastDate:        Number.isNaN(maxDate) ? '—' : formatDate(maxDate),
             operators:       [...person.operators].join(', ') || '—',
+            pending_kone:    koneLabel,
+            signed_at:       signedAtLabel,
         };
 
         const dataRow = ws.addRow(rowData);
@@ -2015,8 +2091,8 @@ async function addCardlessReincidenceSheet(
             cell.font = { name: 'Arial', size: 9, color: { argb: 'FF111827' } };
             cell.alignment = {
                 vertical: 'middle',
-                // center: #(1), vínculo(2), emp_no(5), count(8), distinct(9)
-                horizontal: [1, 2, 5, 8, 9].includes(colNumber) ? 'center' : 'left',
+                // center: #(1), vínculo(2), emp_no(5), count(8), distinct(9), kone(14), signed_at(15)
+                horizontal: [1, 2, 5, 8, 9, 14, 15].includes(colNumber) ? 'center' : 'left',
                 indent: [3, 4, 6, 7, 10, 13].includes(colNumber) ? 1 : 0,
                 wrapText: colNumber === 10 || colNumber === 13,
             };
@@ -2058,6 +2134,44 @@ async function addCardlessReincidenceSheet(
             if (colNumber === 10) {
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.violet.fill } };
                 cell.font = { name: 'Arial', size: 8, color: { argb: COLORS.violet.sub } };
+            }
+
+            // Tarjeta KONE badge (col 14)
+            if (colNumber === 14) {
+                if (!person.isLinked) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
+                    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.slate.sub } };
+                } else if (person.pendingKoneResponsiva) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.rose.head } };
+                    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.rose.sub } };
+                } else {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.emerald.head } };
+                    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.emerald.sub } };
+                }
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            }
+
+            // Fecha entrega KONE (col 15)
+            if (colNumber === 15) {
+                if (!person.isLinked) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
+                    cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: COLORS.slate.sub } };
+                    cell.value = 'N/A';
+                } else if (person.koneSignedAt) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.emerald.head } };
+                    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.emerald.sub } };
+                } else if (!person.pendingKoneResponsiva) {
+                    // Entregada pero sin firma digital registrada → entrega anterior al sistema
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.sky.head } };
+                    cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: COLORS.sky.sub } };
+                    cell.value = 'Entrega previa al sistema';
+                } else {
+                    // Pendiente de firma
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.rose.head } };
+                    cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: COLORS.rose.sub } };
+                    cell.value = 'Pendiente';
+                }
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
             }
         });
     });
@@ -2102,31 +2216,39 @@ export async function exportCardlessRegistryToExcel(
     if (filters?.search) filterParts.push(`Búsqueda: "${filters.search}"`);
     const filterDescription = filterParts.length ? `  |  ${filterParts.join('  |  ')}` : '';
 
+    // Enrich rows with KONE responsiva sign dates
+    const signDateMap = await fetchKoneResponsivaSignDates();
+    const enrichedData: CardlessRegistryExportRow[] = data.map(row => ({
+        ...row,
+        koneResponsivaSignedAt: row.person_id ? (signDateMap.get(row.person_id) ?? null) : null,
+    }));
+
     // Sheet 1: Evidence / summary
-    await addCardlessEvidenceSheet(workbook, data, filterDescription);
+    await addCardlessEvidenceSheet(workbook, enrichedData, filterDescription);
 
     // Sheet 2: Reincidence by person
-    await addCardlessReincidenceSheet(workbook, data, filterDescription);
+    await addCardlessReincidenceSheet(workbook, enrichedData, filterDescription);
 
     // Sheet 3: Detail
     const worksheet = workbook.addWorksheet('Detalle');
 
     worksheet.columns = [
-        { key: 'linked',       width: 14 },  // A  Vínculo
-        { key: 'first_name',   width: 18 },  // B
-        { key: 'last_name',    width: 20 },  // C
-        { key: 'employee_no',  width: 14 },  // D
-        { key: 'dependency',   width: 28 },  // E
-        { key: 'building',     width: 20 },  // F
-        { key: 'floor',        width: 12 },  // G
-        { key: 'reason',       width: 32 },  // H
-        { key: 'comments',     width: 30 },  // I
-        { key: 'recorded_at',  width: 20 },  // J
-        { key: 'recorded_by',  width: 22 },  // K
-        { key: 'pending_kone', width: 22 },  // L
+        { key: 'linked',        width: 14 },  // A  Vínculo
+        { key: 'first_name',    width: 18 },  // B
+        { key: 'last_name',     width: 20 },  // C
+        { key: 'employee_no',   width: 14 },  // D
+        { key: 'dependency',    width: 28 },  // E
+        { key: 'building',      width: 20 },  // F
+        { key: 'floor',         width: 12 },  // G
+        { key: 'reason',        width: 32 },  // H
+        { key: 'comments',      width: 30 },  // I
+        { key: 'recorded_at',   width: 20 },  // J
+        { key: 'recorded_by',   width: 22 },  // K
+        { key: 'pending_kone',  width: 22 },  // L
+        { key: 'signed_at',     width: 22 },  // M  ← nueva
     ];
 
-    worksheet.mergeCells('A1:L1');
+    worksheet.mergeCells('A1:M1');
     const titleCell = worksheet.getCell('A1');
     titleCell.value = '       DETALLE — REGISTRO SIN TARJETA - NEXA';
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
@@ -2148,23 +2270,23 @@ export async function exportCardlessRegistryToExcel(
         console.warn('Logo load failed');
     }
 
-    worksheet.mergeCells('A2:L2');
+    worksheet.mergeCells('A2:M2');
     const metaCell = worksheet.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
         year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
-    metaCell.value = `Reporte generado: ${dateStr}  |  Registros: ${data.length}${filterDescription}`;
+    metaCell.value = `Reporte generado: ${dateStr}  |  Registros: ${enrichedData.length}${filterDescription}`;
     metaCell.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
     metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
     worksheet.getRow(2).height = 20;
 
     const groups = [
-        { label: 'VÍNCULO',              range: 'A3:A3', colors: COLORS.emerald, endCol: 1  },
-        { label: 'PERSONA',              range: 'B3:D3', colors: COLORS.personal, endCol: 4 },
-        { label: 'ORGANIZACIÓN',         range: 'E3:E3', colors: COLORS.emerald,  endCol: 5 },
-        { label: 'UBICACIÓN',            range: 'F3:G3', colors: COLORS.amber,    endCol: 7 },
-        { label: 'MOTIVO DEL REGISTRO',  range: 'H3:I3', colors: COLORS.rose,     endCol: 9 },
-        { label: 'CONTROL',              range: 'J3:L3', colors: COLORS.slate,    endCol: 12 },
+        { label: 'VÍNCULO',              range: 'A3:A3', colors: COLORS.emerald,  endCol: 1  },
+        { label: 'PERSONA',              range: 'B3:D3', colors: COLORS.personal,  endCol: 4  },
+        { label: 'ORGANIZACIÓN',         range: 'E3:E3', colors: COLORS.emerald,   endCol: 5  },
+        { label: 'UBICACIÓN',            range: 'F3:G3', colors: COLORS.amber,     endCol: 7  },
+        { label: 'MOTIVO DEL REGISTRO',  range: 'H3:I3', colors: COLORS.rose,      endCol: 9  },
+        { label: 'CONTROL',              range: 'J3:M3', colors: COLORS.slate,     endCol: 13 },
     ];
 
     groups.forEach((group) => {
@@ -2197,6 +2319,7 @@ export async function exportCardlessRegistryToExcel(
         'FECHA / HORA',
         'REGISTRADO POR',
         'TARJETA KONE',
+        'FECHA ENTREGA',
     ];
 
     const groupEnds = new Set(groups.map((g) => g.endCol));
@@ -2222,11 +2345,17 @@ export async function exportCardlessRegistryToExcel(
         };
     });
 
-    worksheet.autoFilter = 'A4:L4';
+    worksheet.autoFilter = 'A4:M4';
 
-    data.forEach((reg) => {
+    enrichedData.forEach((reg) => {
         const { firstName, lastName } = cardlessPersonLabel(reg);
         const isLinked = !!reg.person_id;
+        const signedAt = reg.koneResponsivaSignedAt
+            ? new Date(reg.koneResponsivaSignedAt).toLocaleString('es-MX', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+              })
+            : null;
 
         const excelRow = worksheet.addRow({
             linked:       isLinked ? '✔ Registrado' : '✗ No Registrado',
@@ -2241,6 +2370,7 @@ export async function exportCardlessRegistryToExcel(
             recorded_at:  new Date(reg.recorded_at).toLocaleString('es-MX'),
             recorded_by:  reg.recordedByName || '',
             pending_kone: !isLinked ? 'N/A' : (reg.pendingKoneResponsiva ? 'PENDIENTE DE RECOGER' : 'ENTREGADA'),
+            signed_at:    !isLinked ? '' : (signedAt || ''),
         });
         excelRow.height = 24;
 
@@ -2254,9 +2384,9 @@ export async function exportCardlessRegistryToExcel(
             cell.font = { name: 'Arial', size: 9 };
             cell.alignment = {
                 vertical: 'middle',
-                // col 1=linked, 4=emp_no, 7=floor, 10=date, 12=pending_kone → center
-                horizontal: [1, 4, 7, 10, 12].includes(colNumber) ? 'center' : 'left',
-                indent: [1, 4, 7, 10, 12].includes(colNumber) ? 0 : 1,
+                // col 1=linked, 4=emp_no, 7=floor, 10=date, 12=pending_kone, 13=signed_at → center
+                horizontal: [1, 4, 7, 10, 12, 13].includes(colNumber) ? 'center' : 'left',
+                indent: [1, 4, 7, 10, 12, 13].includes(colNumber) ? 0 : 1,
                 wrapText: colNumber === 8 || colNumber === 9
             };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
@@ -2316,6 +2446,29 @@ export async function exportCardlessRegistryToExcel(
                 } else {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.emerald.head } };
                     cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.emerald.sub } };
+                }
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            }
+
+            // Fecha entrega KONE (col 13)
+            if (colNumber === 13) {
+                if (!isLinked) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
+                    cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: COLORS.slate.sub } };
+                    cell.value = 'N/A';
+                } else if (reg.koneResponsivaSignedAt) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.emerald.head } };
+                    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.emerald.sub } };
+                } else if (!reg.pendingKoneResponsiva) {
+                    // Entregada pero sin firma digital registrada → entrega anterior al sistema
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.sky.head } };
+                    cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: COLORS.sky.sub } };
+                    cell.value = 'Entrega previa al sistema';
+                } else {
+                    // Pendiente de firma
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.rose.head } };
+                    cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: COLORS.rose.sub } };
+                    cell.value = 'Pendiente';
                 }
                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
             }

@@ -144,10 +144,17 @@ export interface CardlessRegistry {
     comments: string | null;
     recorded_at: string;
     recorded_by: string;
+    /**
+     * Snapshot of whether the person had a pending KONE "Firma Responsiva"
+     * ticket at the moment this record was created. Null means the record
+     * pre-dates this feature (backfilled by migration).
+     */
+    kone_status_at_registration: boolean | null;
     // Computed/Joined properties
     personName?: string;
     buildingName?: string;
     dependencyName?: string;
     recordedByName?: string;
+    /** @deprecated Use kone_status_at_registration for historical accuracy */
     pendingKoneResponsiva?: boolean;
 }

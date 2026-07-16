@@ -191,6 +191,26 @@
         return !!(koneCard && koneCard.responsiva_status !== "signed" && koneCard.responsiva_status !== "legacy");
     });
 
+    /**
+     * Three-value snapshot for kone_status_at_registration:
+     *   true  → tiene tarjeta KONE asignada y pendiente de firma
+     *   false → tiene tarjeta KONE asignada y ya firmada (digital o legacy)
+     *   null  → no tiene tarjeta KONE asignada (o persona no vinculada)
+     */
+    let koneStatusSnapshot = $derived.by((): boolean | null => {
+        if (!selectedPerson) return null;
+        // When editing, reuse the stored snapshot if the person hasn't changed
+        if (editingRegistry && selectedPerson.id === editingRegistry.person_id) {
+            return editingRegistry.kone_status_at_registration ?? null;
+        }
+        const koneCard = selectedPerson.cards?.find(c => c.type === "KONE");
+        // No KONE card assigned at all
+        if (!koneCard) return null;
+        // Has KONE card — check if responsiva is still pending
+        const isPending = koneCard.responsiva_status !== "signed" && koneCard.responsiva_status !== "legacy";
+        return isPending;
+    });
+
 
     function resolveBuildingId(): number | null {
         return buildings.find((b) => b.name === manualBuilding)?.id ?? null;
@@ -240,6 +260,10 @@
                 first_name:    manualFirstName.trim(),
                 last_name:     manualLastName.trim(),
                 employee_no:   manualEmployeeNo.trim() || null,
+                // Snapshot: null = no linked person or no KONE card assigned.
+                // true = KONE card assigned but responsiva still pending.
+                // false = KONE card assigned and already signed (digital or legacy).
+                kone_status_at_registration: koneStatusSnapshot,
             };
 
             let result: CardlessRegistry | null;
@@ -389,15 +413,19 @@
                             <div>
                                 <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
                                     <p class="text-emerald-800 font-semibold text-sm">{selectedPerson.name}</p>
-                                    {#if hasPendingKone}
+                                    {#if koneStatusSnapshot === true}
                                         <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 leading-none whitespace-nowrap">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                                             Pendiente de recoger KONE
                                         </span>
-                                    {:else}
+                                    {:else if koneStatusSnapshot === false}
                                         <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 leading-none whitespace-nowrap">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                             Tarjeta KONE Entregada
+                                        </span>
+                                    {:else}
+                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 leading-none whitespace-nowrap">
+                                            Sin tarjeta KONE
                                         </span>
                                     {/if}
                                 </div>

@@ -48,6 +48,13 @@ export type CardlessRegistryInput = {
     reason: string;
     comments?: string | null;
     recorded_at?: string;
+    /**
+     * Snapshot of the KONE responsiva status at the moment of registration.
+     * true  = had a pending "Firma Responsiva" ticket for a KONE card.
+     * false = no pending ticket (card already delivered or no KONE card).
+     * null  = unknown / pre-migration record.
+     */
+    kone_status_at_registration?: boolean | null;
 };
 
 const SELECT_WITH_RELATIONS = `
@@ -101,6 +108,7 @@ const mapCardlessRegistryRecord = (r: any): CardlessRegistry => {
         comments: r.comments,
         recorded_at: r.recorded_at,
         recorded_by: r.recorded_by,
+        kone_status_at_registration: r.kone_status_at_registration ?? null,
         personName,
         buildingName: r.buildings?.name || undefined,
         dependencyName: r.dependencies?.name || undefined,
@@ -109,16 +117,28 @@ const mapCardlessRegistryRecord = (r: any): CardlessRegistry => {
 };
 
 async function enrichWithKoneResponsiva(registries: CardlessRegistry[]): Promise<CardlessRegistry[]> {
-    const personIds = registries
-        .map(r => r.person_id)
-        .filter((id): id is string => Boolean(id));
+    // Only query current ticket status for records that don't have a stored snapshot
+    // (i.e. pre-migration records where kone_status_at_registration is null).
+    const legacyIds = registries
+        .filter(r => r.person_id && r.kone_status_at_registration === null)
+        .map(r => r.person_id as string);
 
-    const koneSet = await fetchPendingKoneResponsivaSet(personIds);
+    let koneSet = new Set<string>();
+    if (legacyIds.length > 0) {
+        koneSet = await fetchPendingKoneResponsivaSet(legacyIds);
+    }
 
-    return registries.map(r => ({
-        ...r,
-        pendingKoneResponsiva: r.person_id ? koneSet.has(r.person_id) : false,
-    }));
+    return registries.map(r => {
+        // If snapshot is already stored, use it directly.
+        if (r.kone_status_at_registration !== null) {
+            return { ...r, pendingKoneResponsiva: r.kone_status_at_registration ?? false };
+        }
+        // Legacy record: fall back to live lookup.
+        return {
+            ...r,
+            pendingKoneResponsiva: r.person_id ? koneSet.has(r.person_id) : false,
+        };
+    });
 }
 
 function applyFilters(query: any, filters: CardlessRegistryFilters) {
