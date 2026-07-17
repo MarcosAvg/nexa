@@ -17,6 +17,7 @@
         Trash2,
         Search,
         FolderArchive,
+        ChevronDown,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import { cardlessRegistryService } from "../services/cardlessRegistry";
@@ -52,6 +53,7 @@
     let editingRegistry = $state<CardlessRegistry | null>(null);
     let isExporting = $state(false);
     let isZipExporting = $state(false);
+    let showExportMenu = $state(false);
 
     let isConfirmDeleteOpen = $state(false);
     let registryToDelete = $state<CardlessRegistry | null>(null);
@@ -169,6 +171,7 @@
     }
 
     async function handleExport() {
+        showExportMenu = false;
         isExporting = true;
         try {
             const rows = await cardlessRegistryService.fetchAllMatching(
@@ -194,6 +197,7 @@
     }
 
     async function handleExportAllDepsZip() {
+        showExportMenu = false;
         if (dependencies.length === 0) {
             toast.error("No hay dependencias registradas");
             return;
@@ -458,28 +462,57 @@
         {/snippet}
 
         {#snippet actions()}
-            <Button
-                variant="soft-emerald"
-                onclick={handleExport}
-                class="flex items-center gap-2.5 h-10 px-5"
-                disabled={totalCount === 0 || !networkStore.isOnline || isExporting}
-                loading={isExporting}
-            >
-                <FileSpreadsheet size={18} strokeWidth={2.5} class="text-emerald-600/80" />
-                Exportar Excel
-            </Button>
+            <div class="relative">
+                <Button
+                    variant="soft-emerald"
+                    onclick={() => (showExportMenu = !showExportMenu)}
+                    class="flex items-center gap-2.5 h-10 px-5"
+                    disabled={totalCount === 0 || !networkStore.isOnline || isExporting || isZipExporting}
+                >
+                    <FileSpreadsheet size={18} strokeWidth={2.5} class="text-emerald-600/80" />
+                    Exportar Excel
+                    <ChevronDown
+                        size={14}
+                        class="ml-1 opacity-50 transition-transform {showExportMenu ? 'rotate-180' : ''}"
+                    />
+                </Button>
 
-            <Button
-                variant="soft-slate"
-                onclick={handleExportAllDepsZip}
-                class="flex items-center gap-2.5 h-10 px-5 !bg-violet-50/70 !text-violet-700 !border-violet-100/60 hover:!bg-violet-100 hover:!text-violet-800"
-                disabled={!networkStore.isOnline || isZipExporting}
-                loading={isZipExporting}
-                title="Descargar un archivo por cada dependencia, comprimidos en un ZIP"
-            >
-                <FolderArchive size={18} strokeWidth={2.5} class="text-violet-600/80" />
-                Todas (ZIP)
-            </Button>
+                {#if showExportMenu}
+                    <div
+                        class="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 z-50 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300"
+                    >
+                        <button
+                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
+                            onclick={handleExport}
+                            disabled={isExporting}
+                        >
+                            <span class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                <FileSpreadsheet size={16} />
+                            </span>
+                            {#if isExporting}
+                                <span class="flex items-center gap-2"><Loader2 size={14} class="animate-spin" /> Exportando...</span>
+                            {:else}
+                                Exportar (Filtro actual)
+                            {/if}
+                        </button>
+                        <div class="mx-3 my-1 border-t border-slate-100"></div>
+                        <button
+                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
+                            onclick={handleExportAllDepsZip}
+                            disabled={isZipExporting || dependencies.length === 0}
+                        >
+                            <span class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600">
+                                <FolderArchive size={16} />
+                            </span>
+                            {#if isZipExporting}
+                                <span class="flex items-center gap-2"><Loader2 size={14} class="animate-spin" /> Generando ZIP...</span>
+                            {:else}
+                                Todas las Dependencias (ZIP)
+                            {/if}
+                        </button>
+                    </div>
+                {/if}
+            </div>
 
             <PermissionGuard allowedRoles={["admin", "operator"]}>
                 <Button

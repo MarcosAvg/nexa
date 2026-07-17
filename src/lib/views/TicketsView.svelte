@@ -24,6 +24,7 @@
         ChevronRight,
         Download,
         FolderArchive,
+        ChevronDown,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import { ticketService } from "../services/tickets";
@@ -45,6 +46,7 @@
     let totalPages = $derived(Math.max(1, Math.ceil(totalRecords / pageSize)));
     let isLoading = $state(false);
     let isZipExporting = $state(false);
+    let showExportMenu = $state(false);
 
     // Sections
     let currentSection = $state<"General" | "Responsivas">("General");
@@ -62,6 +64,7 @@
             priorityFilter = "Todas";
             searchQuery = "";
             dependencyFilter = "Todas";
+            showExportMenu = false;
             // Reset search input if it exists
             const searchInput = document.getElementById(
                 "ticket-search",
@@ -387,6 +390,7 @@
     }
 
     async function handleExportResponsivas() {
+        showExportMenu = false;
         const loadingToast = toast.loading("Preparando exportación...");
         try {
             const depId =
@@ -417,6 +421,7 @@
     }
 
     async function handleExportResponsivasAllDepsZip() {
+        showExportMenu = false;
         const deps = catalogState.dependencies;
         if (deps.length === 0) {
             toast.error("No hay dependencias registradas");
@@ -529,26 +534,48 @@
 
         {#snippet actions()}
             {#if currentSection === "Responsivas"}
-                <Button
-                    variant="soft-emerald"
-                    onclick={handleExportResponsivas}
-                    class="flex items-center gap-2 h-10 px-4"
-                    disabled={!networkStore.isOnline}
-                >
-                    <Download size={16} />
-                    Exportar Excel
-                </Button>
-                <Button
-                    variant="soft-slate"
-                    onclick={handleExportResponsivasAllDepsZip}
-                    class="flex items-center gap-2 h-10 px-4 !bg-violet-50/70 !text-violet-700 !border-violet-100/60 hover:!bg-violet-100 hover:!text-violet-800"
-                    disabled={!networkStore.isOnline || isZipExporting}
-                    loading={isZipExporting}
-                    title="Descargar un archivo por cada dependencia, comprimidos en un ZIP"
-                >
-                    <FolderArchive size={16} />
-                    Todas (ZIP)
-                </Button>
+                <div class="relative">
+                    <Button
+                        variant="soft-emerald"
+                        onclick={() => (showExportMenu = !showExportMenu)}
+                        class="flex items-center gap-2 h-10 px-4"
+                        disabled={!networkStore.isOnline || isZipExporting}
+                    >
+                        <Download size={16} />
+                        Exportar Excel
+                        <ChevronDown
+                            size={14}
+                            class="ml-1 opacity-50 transition-transform {showExportMenu ? 'rotate-180' : ''}"
+                        />
+                    </Button>
+
+                    {#if showExportMenu}
+                        <div
+                            class="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 z-50 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300"
+                        >
+                            <button
+                                class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                                onclick={handleExportResponsivas}
+                            >
+                                <span class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                    <FileSpreadsheet size={16} />
+                                </span>
+                                Exportar (Filtro actual)
+                            </button>
+                            <div class="mx-3 my-1 border-t border-slate-100"></div>
+                            <button
+                                class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
+                                onclick={handleExportResponsivasAllDepsZip}
+                                disabled={isZipExporting}
+                            >
+                                <span class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600">
+                                    <FolderArchive size={16} />
+                                </span>
+                                Todas las Dependencias (ZIP)
+                            </button>
+                        </div>
+                    {/if}
+                </div>
             {/if}
             <PermissionGuard requireEdit>
                 <Button
