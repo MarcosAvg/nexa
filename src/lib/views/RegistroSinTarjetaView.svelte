@@ -16,9 +16,11 @@
         Loader2,
         Trash2,
         Search,
+        FolderArchive,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import { cardlessRegistryService } from "../services/cardlessRegistry";
+    import { exportCardlessRegistryAllDependenciesAsZip } from "../utils/zipExport";
     import type { CardlessRegistry } from "../types";
     import { toast } from "svelte-sonner";
     import { networkStore } from "../stores/network.svelte";
@@ -49,6 +51,7 @@
     let isModalOpen = $state(false);
     let editingRegistry = $state<CardlessRegistry | null>(null);
     let isExporting = $state(false);
+    let isZipExporting = $state(false);
 
     let isConfirmDeleteOpen = $state(false);
     let registryToDelete = $state<CardlessRegistry | null>(null);
@@ -187,6 +190,35 @@
             toast.error("Error al exportar");
         } finally {
             isExporting = false;
+        }
+    }
+
+    async function handleExportAllDepsZip() {
+        if (dependencies.length === 0) {
+            toast.error("No hay dependencias registradas");
+            return;
+        }
+        isZipExporting = true;
+        const loadingToast = toast.loading("Preparando ZIP...");
+        try {
+            await exportCardlessRegistryAllDependenciesAsZip(
+                dependencies,
+                {
+                    startDate: startDate || undefined,
+                    endDate: endDate || undefined,
+                    reason: reasonFilter || undefined,
+                    search: searchFilter || undefined,
+                },
+                (_current, _total, label) => {
+                    toast.loading(`Procesando: ${label}`, { id: loadingToast });
+                },
+            );
+            toast.success("ZIP descargado", { id: loadingToast });
+        } catch (error) {
+            console.error("ZIP Export Error:", error);
+            toast.error("Error al generar el ZIP", { id: loadingToast });
+        } finally {
+            isZipExporting = false;
         }
     }
 
@@ -435,6 +467,18 @@
             >
                 <FileSpreadsheet size={18} strokeWidth={2.5} class="text-emerald-600/80" />
                 Exportar Excel
+            </Button>
+
+            <Button
+                variant="soft-slate"
+                onclick={handleExportAllDepsZip}
+                class="flex items-center gap-2.5 h-10 px-5 !bg-violet-50/70 !text-violet-700 !border-violet-100/60 hover:!bg-violet-100 hover:!text-violet-800"
+                disabled={!networkStore.isOnline || isZipExporting}
+                loading={isZipExporting}
+                title="Descargar un archivo por cada dependencia, comprimidos en un ZIP"
+            >
+                <FolderArchive size={18} strokeWidth={2.5} class="text-violet-600/80" />
+                Todas (ZIP)
             </Button>
 
             <PermissionGuard allowedRoles={["admin", "operator"]}>

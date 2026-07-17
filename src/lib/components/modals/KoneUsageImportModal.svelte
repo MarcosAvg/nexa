@@ -11,6 +11,7 @@
         XCircle,
         Loader2,
         AlertTriangle,
+        FolderArchive,
     } from "lucide-svelte";
     import {
         parseKoneUsageFile,
@@ -21,6 +22,7 @@
         type DuplicateFolioInfo,
     } from "../../utils/xlsxKoneUsage";
     import { exportKoneUsageToExcel } from "../../utils/xlsxExport";
+    import { exportKoneUsageAllDependenciesAsZip } from "../../utils/zipExport";
 
     type Props = {
         isOpen: boolean;
@@ -34,6 +36,7 @@
     let duplicates = $state<DuplicateFolioInfo[]>([]);
     let showDuplicates = $state(false);
     let isExporting = $state(false);
+    let isZipExporting = $state(false);
     let usageThreshold = $state(10);
     let creationLimitDate = $state<string>("");
     let inactivityLimitDate = $state<string>("");
@@ -47,6 +50,7 @@
         duplicates = [];
         showDuplicates = false;
         isExporting = false;
+        isZipExporting = false;
         selectedDependency = '';
     }
 
@@ -113,6 +117,28 @@
             toast.error("Error al exportar los datos");
         } finally {
             isExporting = false;
+        }
+    }
+
+    async function handleExportAllDepsZip() {
+        if (!matchResult) return;
+
+        isZipExporting = true;
+        const loadingToast = toast.loading("Preparando ZIP...");
+        try {
+            await exportKoneUsageAllDependenciesAsZip(
+                matchResult,
+                usageThreshold,
+                (_current, _total, label) => {
+                    toast.loading(`Procesando: ${label}`, { id: loadingToast });
+                },
+            );
+            toast.success("ZIP descargado", { id: loadingToast });
+        } catch (err) {
+            console.error("ZIP Export Error:", err);
+            toast.error("Error al generar el ZIP", { id: loadingToast });
+        } finally {
+            isZipExporting = false;
         }
     }
 
@@ -551,10 +577,21 @@
             </Button>
             {#if stats && stats.found > 0}
                 <Button
+                    variant="soft-slate"
+                    class="h-10 px-5 flex items-center gap-2 !bg-violet-50/70 !text-violet-700 !border-violet-100/60 hover:!bg-violet-100 hover:!text-violet-800"
+                    onclick={handleExportAllDepsZip}
+                    disabled={isZipExporting || isExporting}
+                    loading={isZipExporting}
+                    title="Genera un archivo por cada dependencia y los descarga en un ZIP"
+                >
+                    <FolderArchive size={16} />
+                    Todas las Dependencias (ZIP)
+                </Button>
+                <Button
                     variant="primary"
                     class="h-10 px-6 flex items-center gap-2 shadow-lg shadow-blue-500/20"
                     onclick={handleExport}
-                    disabled={isExporting}
+                    disabled={isExporting || isZipExporting}
                 >
                     {#if isExporting}
                         <Loader2 size={16} class="animate-spin" />

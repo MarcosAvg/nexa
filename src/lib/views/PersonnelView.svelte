@@ -20,12 +20,14 @@
         ChevronDown,
         FileStack,
         Upload,
+        FolderArchive,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import KoneUsageImportModal from "../components/modals/KoneUsageImportModal.svelte";
     import { personnelService } from "../services/personnel";
     import { cardService } from "../services/cards";
     import { exportPersonnelToExcel } from "../utils/xlsxExport";
+    import { exportPersonnelAllDependenciesAsZip } from "../utils/zipExport";
     import { toast } from "svelte-sonner";
     import { networkStore } from "../stores/network.svelte";
 
@@ -159,6 +161,7 @@
 
     let showExportMenu = $state(false);
     let showKoneUsageModal = $state(false);
+    let isZipExporting = $state(false);
 
     async function handleExportExcel(splitByDependency: boolean = false) {
         showExportMenu = false;
@@ -184,6 +187,31 @@
         } catch (error) {
             console.error("Export Error:", error);
             toast.error("Error al exportar los datos", { id: loadingToast });
+        }
+    }
+
+    async function handleExportAllDepsZip() {
+        showExportMenu = false;
+        if (dependencies.length === 0) {
+            toast.error("No hay dependencias registradas");
+            return;
+        }
+        isZipExporting = true;
+        const loadingToast = toast.loading("Preparando ZIP...");
+        try {
+            await exportPersonnelAllDependenciesAsZip(
+                dependencies,
+                { status: statusFilter, search: personSearch },
+                (_current, _total, label) => {
+                    toast.loading(`Procesando: ${label}`, { id: loadingToast });
+                },
+            );
+            toast.success("ZIP descargado", { id: loadingToast });
+        } catch (error) {
+            console.error("ZIP Export Error:", error);
+            toast.error("Error al generar el ZIP", { id: loadingToast });
+        } finally {
+            isZipExporting = false;
         }
     }
 
@@ -391,6 +419,19 @@
                                 <FileStack size={16} />
                             </span>
                             Separado por Dependencia
+                        </button>
+                        <div class="mx-3 my-1 border-t border-slate-100"></div>
+                        <button
+                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
+                            onclick={handleExportAllDepsZip}
+                            disabled={isZipExporting || dependencies.length === 0}
+                        >
+                            <span
+                                class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600"
+                            >
+                                <FolderArchive size={16} />
+                            </span>
+                            Todas las Dependencias (ZIP)
                         </button>
                     </div>
                 {/if}

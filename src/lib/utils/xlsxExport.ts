@@ -442,7 +442,9 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     ws.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1 };
 }
 
-export async function exportPersonnelToExcel(data: ExportPersonnelData[], options?: ExportOptions) {
+export async function exportPersonnelToExcel(data: ExportPersonnelData[], options?: ExportOptions, returnBuffer?: false): Promise<void>;
+export async function exportPersonnelToExcel(data: ExportPersonnelData[], options: ExportOptions | undefined, returnBuffer: true): Promise<{ buffer: ArrayBuffer; filename: string }>;
+export async function exportPersonnelToExcel(data: ExportPersonnelData[], options?: ExportOptions, returnBuffer?: boolean): Promise<void | { buffer: ArrayBuffer; filename: string }> {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
         import('file-saver')
@@ -722,6 +724,9 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
     const finalFileName = `${fileNameParts.join('_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
 
     const buffer = await workbook.xlsx.writeBuffer();
+    if (returnBuffer) {
+        return { buffer: buffer as ArrayBuffer, filename: finalFileName };
+    }
     saveAsFunction(new Blob([buffer]), finalFileName);
 }
 
@@ -784,7 +789,9 @@ function computeResponsivaManagement(
     };
 }
 
-export async function exportResponsivasToExcel(tickets: any[], dependencyName?: string) {
+export async function exportResponsivasToExcel(tickets: any[], dependencyName?: string, returnBuffer?: false): Promise<void>;
+export async function exportResponsivasToExcel(tickets: any[], dependencyName: string | undefined, returnBuffer: true): Promise<{ buffer: ArrayBuffer; filename: string }>;
+export async function exportResponsivasToExcel(tickets: any[], dependencyName?: string, returnBuffer?: boolean): Promise<void | { buffer: ArrayBuffer; filename: string }> {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
         import('file-saver')
@@ -1043,6 +1050,9 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
     const finalFileName = `${fileNameParts.join('_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
 
     const buffer = await workbook.xlsx.writeBuffer();
+    if (returnBuffer) {
+        return { buffer: buffer as ArrayBuffer, filename: finalFileName };
+    }
     saveAsFunction(new Blob([buffer]), finalFileName);
 }
 
@@ -2187,8 +2197,19 @@ async function addCardlessReincidenceSheet(
 
 export async function exportCardlessRegistryToExcel(
     data: CardlessRegistryExportRow[],
-    filters?: CardlessRegistryExportFilters
-) {
+    filters?: CardlessRegistryExportFilters,
+    returnBuffer?: false
+): Promise<void>;
+export async function exportCardlessRegistryToExcel(
+    data: CardlessRegistryExportRow[],
+    filters: CardlessRegistryExportFilters | undefined,
+    returnBuffer: true
+): Promise<{ buffer: ArrayBuffer; filename: string }>;
+export async function exportCardlessRegistryToExcel(
+    data: CardlessRegistryExportRow[],
+    filters?: CardlessRegistryExportFilters,
+    returnBuffer?: boolean
+): Promise<void | { buffer: ArrayBuffer; filename: string }> {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
         import('file-saver')
@@ -2486,6 +2507,9 @@ export async function exportCardlessRegistryToExcel(
     const finalFileName = `${fileNameParts.join('_')}.xlsx`;
     
     const buffer = await workbook.xlsx.writeBuffer();
+    if (returnBuffer) {
+        return { buffer: buffer as ArrayBuffer, filename: finalFileName };
+    }
     saveAsFunction(new Blob([buffer]), finalFileName);
 }
 
@@ -2830,7 +2854,9 @@ async function addKoneSummarySheet(workbook: ExcelJSTypes.Workbook, matchedData:
     ws.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1 };
 }
 
-export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, usageThreshold: number = 10, dependencyFilter?: string) {
+export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, usageThreshold?: number, dependencyFilter?: string, returnBuffer?: false): Promise<void>;
+export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, usageThreshold: number | undefined, dependencyFilter: string | undefined, returnBuffer: true): Promise<{ buffer: ArrayBuffer; filename: string }>;
+export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, usageThreshold: number = 10, dependencyFilter?: string, returnBuffer?: boolean): Promise<void | { buffer: ArrayBuffer; filename: string }> {
     const matchedData = matchResult.matched;
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
@@ -3482,6 +3508,9 @@ export async function exportKoneUsageToExcel(matchResult: KoneUsageMatchResult, 
     const depSuffix = dependencyFilter ? `_${dependencyFilter.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ ]/g, '').replace(/\s+/g, '_')}` : '';
     const finalFileName = `Conteo_Uso_KONE${depSuffix}_${new Date().toISOString().split('T')[0]}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
+    if (returnBuffer) {
+        return { buffer: buffer as ArrayBuffer, filename: finalFileName };
+    }
     saveAsFunction(new Blob([buffer]), finalFileName);
 }
 

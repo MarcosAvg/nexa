@@ -23,6 +23,7 @@
         ChevronLeft,
         ChevronRight,
         Download,
+        FolderArchive,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import { ticketService } from "../services/tickets";
@@ -30,6 +31,7 @@
     import { personnelService } from "../services/personnel";
     import { toast } from "svelte-sonner";
     import { exportResponsivasToExcel } from "../utils/xlsxExport";
+    import { exportResponsivasAllDependenciesAsZip } from "../utils/zipExport";
     import ImportPreviewModal from "../components/modals/ImportPreviewModal.svelte";
     import ConfirmAltaModal from "../components/modals/ConfirmAltaModal.svelte";
     import TicketImportedDetailsModal from "../components/modals/TicketImportedDetailsModal.svelte";
@@ -42,6 +44,7 @@
     let totalRecords = $state(0);
     let totalPages = $derived(Math.max(1, Math.ceil(totalRecords / pageSize)));
     let isLoading = $state(false);
+    let isZipExporting = $state(false);
 
     // Sections
     let currentSection = $state<"General" | "Responsivas">("General");
@@ -412,6 +415,30 @@
             });
         }
     }
+
+    async function handleExportResponsivasAllDepsZip() {
+        const deps = catalogState.dependencies;
+        if (deps.length === 0) {
+            toast.error("No hay dependencias registradas");
+            return;
+        }
+        isZipExporting = true;
+        const loadingToast = toast.loading("Preparando ZIP...");
+        try {
+            await exportResponsivasAllDependenciesAsZip(
+                deps,
+                (_current, _total, label) => {
+                    toast.loading(`Procesando: ${label}`, { id: loadingToast });
+                },
+            );
+            toast.success("ZIP descargado", { id: loadingToast });
+        } catch (error) {
+            console.error("ZIP Export Error:", error);
+            toast.error("Error al generar el ZIP", { id: loadingToast });
+        } finally {
+            isZipExporting = false;
+        }
+    }
 </script>
 
 <div class="space-y-6">
@@ -510,6 +537,17 @@
                 >
                     <Download size={16} />
                     Exportar Excel
+                </Button>
+                <Button
+                    variant="soft-slate"
+                    onclick={handleExportResponsivasAllDepsZip}
+                    class="flex items-center gap-2 h-10 px-4 !bg-violet-50/70 !text-violet-700 !border-violet-100/60 hover:!bg-violet-100 hover:!text-violet-800"
+                    disabled={!networkStore.isOnline || isZipExporting}
+                    loading={isZipExporting}
+                    title="Descargar un archivo por cada dependencia, comprimidos en un ZIP"
+                >
+                    <FolderArchive size={16} />
+                    Todas (ZIP)
                 </Button>
             {/if}
             <PermissionGuard requireEdit>
