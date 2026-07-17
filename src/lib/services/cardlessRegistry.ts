@@ -1,5 +1,4 @@
 import { supabase } from "../supabase";
-import { HistoryService } from "./history";
 import { handleError } from "../utils/error";
 import type { CardlessRegistry } from "../types";
 import { networkStore } from "../stores/network.svelte";
@@ -255,13 +254,6 @@ export const cardlessRegistryService = {
 
             const mapped = mapCardlessRegistryRecord(result);
 
-            await HistoryService.log(
-                "cardless_registry",
-                mapped.id,
-                "create",
-                { reason: data.reason, entityName: mapped.personName || `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim() }
-            );
-
             return mapped;
         } catch (error) {
             handleError(error);
@@ -286,13 +278,6 @@ export const cardlessRegistryService = {
 
             const mapped = mapCardlessRegistryRecord(result);
 
-            await HistoryService.log(
-                "cardless_registry",
-                mapped.id,
-                "update",
-                { ...data, entityName: mapped.personName || `${mapped.first_name ?? ""} ${mapped.last_name ?? ""}`.trim() }
-            );
-
             return mapped;
         } catch (error) {
             handleError(error);
@@ -306,32 +291,12 @@ export const cardlessRegistryService = {
                 throw new Error("Sin conexión a internet");
             }
 
-            const { data: existing } = await supabase
-                .from("cardless_registry")
-                .select("*, personnel!person_id(first_name, last_name)")
-                .eq("id", id)
-                .single();
-
             const { error } = await supabase
                 .from("cardless_registry")
                 .delete()
                 .eq("id", id);
 
             if (error) throw error;
-
-            if (existing) {
-                await HistoryService.log(
-                    "cardless_registry",
-                    id,
-                    "delete",
-                    {
-                        reason: existing.reason,
-                        entityName: existing.personnel
-                            ? `${existing.personnel.first_name} ${existing.personnel.last_name}`
-                            : `${existing.first_name ?? ""} ${existing.last_name ?? ""}`.trim()
-                    }
-                );
-            }
 
             return true;
         } catch (error) {
