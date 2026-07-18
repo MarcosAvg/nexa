@@ -39,8 +39,8 @@
                     if (searchQuery.trim() === val) {
                         searchResults = results.slice(0, 5);
                     }
-                } catch (err) {
-                    console.error("Search failed:", err);
+                } catch {
+                    // Silently handle search errors (non-critical)
                 }
             }, 300);
         } else {

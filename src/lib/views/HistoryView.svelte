@@ -13,6 +13,7 @@
         RotateCw,
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
+    import { handleError } from "../utils";
     import { HistoryService } from "../services/history";
     import { networkStore } from "../stores/network.svelte";
 
@@ -168,8 +169,8 @@
                             id: loadingToast,
                         });
                     } catch (e) {
-                        console.error(e);
-                        toast.error("Error al exportar", { id: loadingToast });
+                        toast.dismiss(loadingToast);
+                        handleError(e, "Exportar Historial");
                     }
                 }}
             >

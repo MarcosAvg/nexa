@@ -1,5 +1,5 @@
 import { supabase } from "../supabase";
-import { handleError } from "../utils/error";
+import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, batchPaginate } from "../utils";
 
 // Module-level userId cache — avoids calling getSession() on every log
 let _cachedUserId: string | undefined;
@@ -18,7 +18,7 @@ export const HistoryService = {
      * @param details - Object or string with details. If details.entityName is set, it's used as the entity_name.
      * @param performedBy - Optional user UUID (cached after first call)
      */
-    async log(entityType: string, entityId: string | number | undefined, action: string, details: any, performedBy?: string) {
+    async log(entityType: string, entityId: string | number | undefined, action: string, details: Record<string, unknown> | string, performedBy?: string) {
         if (!entityId) {
             console.warn("HistoryService: No entityId provided for log", { entityType, action });
         }
@@ -75,43 +75,24 @@ export const HistoryService = {
         } = {},
         throwOnError: boolean = false
     ) {
-        try {
+        return withErrorHandlingConditional(async () => {
             const from = (page - 1) * limit;
-            const to = from + limit - 1;
-
-            // Only select columns actually used by the UI
             let query = supabase
                 .from("history_logs")
                 .select("id, timestamp, entity_type, entity_id, entity_name, action, details, performed_by", { count: "exact" });
 
-            // Apply Filters
-            if (filters.person) {
-                query = query.ilike("entity_name", `%${filters.person}%`);
-            }
-
-            if (filters.cardType && filters.cardType !== "Todos") {
-                query = query.ilike("entity_name", `%${filters.cardType}%`);
-            }
-
-            if (filters.folio) {
-                query = query.ilike("entity_name", `%${filters.folio}%`);
-            }
-
-            if (filters.action && filters.action !== "Todas") {
-                query = query.eq("action", filters.action);
-            }
+            if (filters.person) query = query.ilike("entity_name", `%${filters.person}%`);
+            if (filters.cardType && filters.cardType !== "Todos") query = query.ilike("entity_name", `%${filters.cardType}%`);
+            if (filters.folio) query = query.ilike("entity_name", `%${filters.folio}%`);
+            if (filters.action && filters.action !== "Todas") query = query.eq("action", filters.action);
 
             const { data, count, error } = await query
                 .order("timestamp", { ascending: false })
-                .range(from, to);
+                .range(from, from + limit - 1);
 
             if (error) throw error;
             return { data: data || [], count: count || 0 };
-        } catch (error) {
-            handleError(error, "Fetch History");
-            if (throwOnError) throw error;
-            return { data: [], count: 0 };
-        }
+        }, "Fetch History", throwOnError, { data: [], count: 0 });
     },
 
     async fetchForExport(
@@ -122,137 +103,59 @@ export const HistoryService = {
             action?: string;
         } = {}
     ) {
-        try {
-            const allData: any[] = [];
-            let page = 0;
-            const pageSize = 1000;
-            let hasMore = true;
-
-            while (hasMore) {
-                let query = supabase
-                    .from("history_logs")
-                    .select("*");
-
-                // Apply Filters
-                if (filters.person) {
-                    query = query.ilike("entity_name", `%${filters.person}%`);
-                }
-
-                if (filters.cardType && filters.cardType !== "Todos") {
-                    query = query.ilike("entity_name", `%${filters.cardType}%`);
-                }
-
-                if (filters.folio) {
-                    query = query.ilike("entity_name", `%${filters.folio}%`);
-                }
-
-                if (filters.action && filters.action !== "Todas") {
-                    query = query.eq("action", filters.action);
-                }
-
-                const { data, error } = await query
-                    .order("timestamp", { ascending: false })
-                    .range(page * pageSize, (page + 1) * pageSize - 1);
-
-                if (error) throw error;
-
-                if (data && data.length > 0) {
-                    allData.push(...data);
-                    page++;
-                    if (data.length < pageSize) {
-                        hasMore = false;
-                    }
-                } else {
-                    hasMore = false;
-                }
-            }
-
-            return allData;
-        } catch (error) {
-            handleError(error, "Fetch History for Export");
-            return [];
-        }
+        return withErrorHandlingSafe(async () => {
+            return await batchPaginate<any>(async (from, to) => {
+                let q = supabase.from("history_logs").select("*");
+                if (filters.person) q = q.ilike("entity_name", `%${filters.person}%`);
+                if (filters.cardType && filters.cardType !== "Todos") q = q.ilike("entity_name", `%${filters.cardType}%`);
+                if (filters.folio) q = q.ilike("entity_name", `%${filters.folio}%`);
+                if (filters.action && filters.action !== "Todas") q = q.eq("action", filters.action);
+                return q.order("timestamp", { ascending: false }).range(from, to);
+            });
+        }, "Fetch History for Export", []);
     },
 
     async fetchMore(offset: number, limit: number = 200) {
-        try {
+        return withErrorHandlingSafe(async () => {
             const { data, error } = await supabase
                 .from("history_logs")
-                .select("*")
-                .order("timestamp", { ascending: false })
+                .select("*").order("timestamp", { ascending: false })
                 .range(offset, offset + limit - 1);
-
             if (error) throw error;
             return data || [];
-        } catch (error) {
-            handleError(error, "Fetch More History");
-            return [];
-        }
+        }, "Fetch More History", []);
     },
 
     async deleteByEntity(entityType: string, entityId: string) {
-        try {
+        return withErrorHandling(async () => {
             const { error } = await supabase
-                .from("history_logs")
-                .delete()
+                .from("history_logs").delete()
                 .eq("entity_type", entityType)
                 .eq("entity_id", entityId);
-
             if (error) throw error;
-        } catch (error) {
-            handleError(error, "Delete History By Entity");
-            throw error;
-        }
+        }, "Delete History By Entity");
     },
 
     async fetchByEntity(entityType: string, entityId: string) {
-        try {
+        return withErrorHandlingSafe(async () => {
             const { data, error } = await supabase
-                .from("history_logs")
-                .select("*")
-                .eq("entity_type", entityType)
-                .eq("entity_id", entityId)
+                .from("history_logs").select("*")
+                .eq("entity_type", entityType).eq("entity_id", entityId)
                 .order("timestamp", { ascending: false });
-
             if (error) throw error;
             return data || [];
-        } catch (error) {
-            // Return empty array on fetch error - non-critical functionality
-            return [];
-        }
+        }, "Fetch History By Entity", []);
     },
 
     async fetchCardHistoryByRange(type: string) {
-        try {
-            const allLogs: any[] = [];
-            let page = 0;
-            const pageSize = 1000;
-            let hasMore = true;
-
-            while (hasMore) {
-                const { data, error } = await supabase
-                    .from("history_logs")
+        return withErrorHandlingSafe(async () => {
+            return await batchPaginate<any>(async (from, to) => {
+                return supabase.from("history_logs")
                     .select("entity_id, entity_name, action, details, timestamp")
-                    .eq("entity_type", "CARD")
-                    .ilike("entity_name", `${type}%`)
+                    .eq("entity_type", "CARD").ilike("entity_name", `${type}%`)
                     .in("action", ["REPLACE_OLD", "DELETE", "BLOCK", "UNASSIGN", "UPDATE_STATUS", "CREATE"])
-                    .order("timestamp", { ascending: false })
-                    .range(page * pageSize, (page + 1) * pageSize - 1);
-
-                if (error) throw error;
-
-                if (data && data.length > 0) {
-                    allLogs.push(...data);
-                    page++;
-                    if (data.length < pageSize) hasMore = false;
-                } else {
-                    hasMore = false;
-                }
-            }
-            return allLogs;
-        } catch (error) {
-            handleError(error, "Fetch Card History By Range");
-            return [];
-        }
+                    .order("timestamp", { ascending: false }).range(from, to);
+            });
+        }, "Fetch Card History By Range", []);
     }
 };

@@ -13,6 +13,7 @@
     import { personnelState, catalogState, userState } from "../../stores";
     import PermissionGuard from "../PermissionGuard.svelte";
     import { toast } from "svelte-sonner";
+    import { handleError } from "../../utils";
     import type { Person } from "../../types";
     import { personnelSchema } from "../../schemas";
 
@@ -152,8 +153,8 @@
                     .replace(/[\u0300-\u036f]/g, "");
                 return n1.includes(n2) || n2.includes(n1);
             });
-        } catch (e) {
-            console.error(e);
+        } catch {
+            // Silently handle duplicate check errors (non-critical)
         } finally {
             isCheckingDuplicates = false;
         }
@@ -399,10 +400,7 @@
             oncomplete?.();
             resetAndClose();
         } catch (e) {
-            console.error(e);
-            toast.error("Error", {
-                description: "Ocurrió un error al guardar.",
-            });
+            handleError(e, "Guardar Personal");
         } finally {
             isSubmitting = false;
         }

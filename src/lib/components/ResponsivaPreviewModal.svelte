@@ -4,7 +4,7 @@
     import Button from "./Button.svelte";
     import ResponsivaTemplate from "./ResponsivaTemplate.svelte";
     import SignatureModal from "./modals/SignatureModal.svelte";
-    import { generateResponsivaPdf } from "../utils/pdfGenerator";
+    import { generateResponsivaPdf, handleError, generateLegalHash } from "../utils";
     import {
         FileSignature,
         Download,
@@ -16,9 +16,10 @@
         FileType,
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
+
     import { responsivaService } from "../services/responsiva";
     import { supabase } from "../supabase";
-    import { generateLegalHash } from "../utils/crypto";
+
     import { RESPONSIVA_LEGAL_TEXTS } from "../constants/legal";
     import bgImage from "../../assets/responsiva_bg.png";
 
@@ -96,7 +97,7 @@
             verificationStatus =
                 computed === data.legal_hash ? "valid" : "invalid";
         } catch (e) {
-            console.error("Error en verificación:", e);
+            handleError(e, "Verificar Integridad");
             verificationStatus = "none";
         }
     }
@@ -144,8 +145,7 @@
             );
             toast.success("Descarga completada");
         } catch (error) {
-            console.error(error);
-            toast.error("Error al generar PDF");
+            handleError(error, "Generar PDF Responsiva");
         } finally {
             isDownloading = false;
         }
@@ -201,14 +201,8 @@
             showSignatureModal = false;
 
             toast.success("Responsiva firmada y sellada digitalmente");
-        } catch (error: any) {
-            console.error(
-                "[ResponsivaPreviewModal] Error in signature flow:",
-                error,
-            );
-            toast.error(
-                `Error al guardar responsiva: ${error.message || "Error desconocido"}`,
-            );
+        } catch (error) {
+            handleError(error, "Firmar Responsiva");
         } finally {
             isSigning = false;
         }
@@ -293,7 +287,7 @@ Control de Accesos - Nexa`;
                 type: "application/pdf",
             });
         } catch (e) {
-            console.error("Error preparing PDF for email:", e);
+            handleError(e, "Preparar PDF para Email");
         }
 
         // 1. Try Web Share API with Files (Prioritized for Mobile)
@@ -332,7 +326,7 @@ Control de Accesos - Nexa`;
 
                 if (error) throw error;
             } catch (e) {
-                console.error("Error saving email:", e);
+                handleError(e, "Guardar Correo");
             } finally {
                 isSavingEmail = false;
             }

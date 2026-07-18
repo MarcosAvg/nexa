@@ -1,7 +1,19 @@
 import { HistoryService } from "../services/history";
 
+/** A single log entry from the history_logs table */
+export interface HistoryLog {
+    id: number;
+    timestamp: string;
+    entity_type: string;
+    entity_id: string | null;
+    entity_name: string | null;
+    action: string;
+    details: Record<string, unknown>;
+    performed_by: string | null;
+}
+
 export class HistoryState {
-    historyLogs = $state<any[]>([]);
+    historyLogs = $state<HistoryLog[]>([]);
     isLoading = $state(false);
     currentPage = $state(1);
     pageSize = $state(50);
@@ -14,12 +26,12 @@ export class HistoryState {
         action: "Todas"
     });
 
-    setHistory(data: any[], count: number) {
+    setHistory(data: HistoryLog[], count: number) {
         this.historyLogs = data;
         this.totalRecords = count;
     }
 
-    addLog(log: any) {
+    addLog(log: HistoryLog) {
         // Optimistically add to top, but real source of truth is server
         this.historyLogs.unshift(log);
         this.totalRecords++;

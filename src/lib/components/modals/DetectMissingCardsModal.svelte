@@ -4,7 +4,7 @@
     import Input from "../Input.svelte";
     import { cardService } from "../../services/cards";
     import { HistoryService } from "../../services/history";
-    import { exportMissingCardsToExcel } from "../../utils/xlsxExport";
+    import { exportMissingCardsToExcel, handleError } from "../../utils";
     import { toast } from "svelte-sonner";
     import { FileSearch, AlertCircle } from "lucide-svelte";
 
@@ -211,8 +211,8 @@
             toast.success(`Análisis completado. Reporte generado.`, { id: toastId });
             isOpen = false;
         } catch (error) {
-            console.error(error);
-            toast.error("Error al procesar el análisis", { id: toastId });
+            toast.dismiss(toastId);
+            handleError(error, "Detectar Folios Faltantes");
         } finally {
             isProcessing = false;
         }

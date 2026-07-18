@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import { supabase } from '../supabase';
 import type { ExportPersonnelData } from './xlsxExport';
+import { batchPaginate } from './batchPaginate';
 
 // ─────────────────────────────────────────
 // Types
@@ -288,42 +289,29 @@ export async function matchKoneUsageToPersonnel(
     const CHUNK_SIZE = 500;
     for (let i = 0; i < folios.length; i += CHUNK_SIZE) {
         const chunk = folios.slice(i, i + CHUNK_SIZE);
-        let hasMore = true;
-        let page = 0;
-        const PAGE_SIZE = 1000;
-
-        while (hasMore) {
-            const { data: cards, error } = await supabase
-                .from('cards')
-                .select(`
-                    id, folio, type, status, person_id,
-                    personnel (
-                        id, first_name, last_name, employee_no, email, area, position, floor, status,
-                        buildings ( name ),
-                        dependencies ( name ),
-                        schedules ( name, default_entry, default_exit ),
-                        cards ( id, folio, type, status, programming_status, responsiva_status ),
-                        floors_p2000, floors_kone, special_accesses, entry_time, exit_time
-                    )
-                `)
-                .eq('type', 'KONE')
-                .in('folio', chunk)
-                .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-            if (error) {
-                throw new Error(`Error al buscar tarjetas (chunk ${i}): ${error.message}`);
-            }
-
-            if (cards && cards.length > 0) {
-                allMatchingCards.push(...cards);
-                if (cards.length < PAGE_SIZE) {
-                    hasMore = false;
-                } else {
-                    page++;
-                }
-            } else {
-                hasMore = false;
-            }
+        try {
+            const cards = await batchPaginate(
+                (from, to) => supabase
+                    .from('cards')
+                    .select(`
+                        id, folio, type, status, person_id,
+                        personnel (
+                            id, first_name, last_name, employee_no, email, area, position, floor, status,
+                            buildings ( name ),
+                            dependencies ( name ),
+                            schedules ( name, default_entry, default_exit ),
+                            cards ( id, folio, type, status, programming_status, responsiva_status ),
+                            floors_p2000, floors_kone, special_accesses, entry_time, exit_time
+                        )
+                    `)
+                    .eq('type', 'KONE')
+                    .in('folio', chunk)
+                    .range(from, to),
+                1000
+            );
+            allMatchingCards.push(...cards);
+        } catch (error: any) {
+            throw new Error(`Error al buscar tarjetas (chunk ${i}): ${error.message}`);
         }
     }
 

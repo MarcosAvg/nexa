@@ -7,8 +7,7 @@
     import AddCardModal from "./modals/AddCardModal.svelte";
     import ConfirmationModal from "./modals/ConfirmationModal.svelte";
     import DeletePersonnelModal from "./modals/DeletePersonnelModal.svelte";
-    import { personnelActions } from "../utils/personnelActions";
-    import { appEvents, EVENTS } from "../utils/appEvents";
+    import { personnelActions, appEvents, EVENTS } from "../utils";
     import { uiState } from "../stores/ui.svelte";
 
     // Computed state from global store

@@ -1,4 +1,5 @@
 import type { Person, Card, DashboardMetrics } from "../types";
+import { handleError } from "../utils";
 
 export class PersonnelState {
     personnel = $state<Person[]>([]);
@@ -151,7 +152,7 @@ export class PersonnelState {
     async initRealtime() {
         try {
             const { personnelService } = await import("../services/personnel");
-            personnelService.subscribeToChanges((payload: any) => {
+            personnelService.subscribeToChanges((payload) => {
                 // Always refresh metrics on any change
                 this.refreshDashboardMetrics();
                 this.refreshDashboardStats();
@@ -188,7 +189,7 @@ export class PersonnelState {
                 }
             });
         } catch (error) {
-            console.error("Failed to initialize Realtime:", error);
+            console.warn("Failed to initialize Realtime:", error);
         }
     }
 

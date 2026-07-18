@@ -1,9 +1,7 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import type { Card } from "../types";
-import { handleError, withTimeout } from "../utils/error";
-import { appEvents, EVENTS } from "../utils/appEvents";
-import { dbCache } from "../utils/dbCache";
+import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, appEvents, EVENTS, dbCache, batchPaginate } from "../utils";
 import { networkStore } from "../stores/network.svelte";
 
 export const cardService = {
@@ -14,10 +12,9 @@ export const cardService = {
         typeFilter: string = "Todos",
         statusFilter: string = "Todas"
     ): Promise<{ data: Card[]; count: number }> {
-        try {
-            // Offline fallback
+        return withErrorHandlingSafe(async () => {
+            const cacheKey = `cards_page_${page}_${typeFilter}_${statusFilter}_${search}`;
             if (!networkStore.isOnline) {
-                const cacheKey = `cards_page_${page}_${typeFilter}_${statusFilter}_${search}`;
                 const cachedData = await dbCache.load<{ data: Card[], count: number }>(cacheKey);
                 if (cachedData) return cachedData;
                 return { data: [], count: 0 };
@@ -34,7 +31,6 @@ export const cardService = {
                 const terms = search.trim().split(/\s+/).filter(Boolean);
                 const searchTerm = `%${search}%`;
 
-                // 1. Find matching people IDs first
                 let peopleQuery = supabase
                     .from("personnel")
                     .select("id");
@@ -47,7 +43,6 @@ export const cardService = {
                 const { data: people } = await peopleQuery;
                 const personIds = people?.map(p => p.id) || [];
 
-                // 2. Build Query: Folio match OR Person match
                 if (personIds.length > 0) {
                     query = query.or(`folio.ilike.${searchTerm},person_id.in.(${personIds.join(',')})`);
                 } else {
@@ -79,7 +74,6 @@ export const cardService = {
 
             const mappedData = (data || []).map((c) => ({
                 ...c,
-                personId: c.person_id,
                 personName: c.personnel
                     ? `${c.personnel.first_name} ${c.personnel.last_name}`
                     : "Sin asignar",
@@ -87,16 +81,9 @@ export const cardService = {
             }));
 
             const result = { data: mappedData, count: count || 0 };
-
-            // Save to cache
-            const cacheKey = `cards_page_${page}_${typeFilter}_${statusFilter}_${search}`;
             await dbCache.save(cacheKey, result);
-
             return result;
-        } catch (error) {
-            handleError(error, "Fetch All Cards");
-            return { data: [], count: 0 };
-        }
+        }, "Fetch All Cards", { data: [], count: 0 });
     },
 
     async fetchForExport(
@@ -104,115 +91,59 @@ export const cardService = {
         typeFilter: string = "Todos",
         statusFilter: string = "Todas"
     ): Promise<Card[]> {
-        try {
-            const allData: Card[] = [];
-            let page = 0;
-            const pageSize = 1000;
-            let hasMore = true;
-
-            // Pre-fetch person IDs if searching, to avoid doing it inside the loop
+        return withErrorHandlingSafe(async () => {
             let personIds: string[] = [];
             if (search) {
                 const terms = search.trim().split(/\s+/).filter(Boolean);
-                let peopleQuery = supabase
-                    .from("personnel")
-                    .select("id");
-
+                let peopleQuery = supabase.from("personnel").select("id");
                 for (const term of terms) {
-                    const termPattern = `%${term}%`;
-                    peopleQuery = peopleQuery.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern}`);
+                    peopleQuery = peopleQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
                 }
-
                 const { data: people } = await peopleQuery;
                 personIds = people?.map(p => p.id) || [];
             }
 
-            while (hasMore) {
-                let query = supabase
-                    .from("cards_ordered")
-                    .select("*, personnel(first_name, last_name, status)");
-
+            const allData = await batchPaginate<any>(async (from, to) => {
+                let q = supabase.from("cards_ordered").select("*, personnel(first_name, last_name, status)");
                 if (search) {
-                    const searchTerm = `%${search}%`;
+                    const st = `%${search}%`;
                     if (personIds.length > 0) {
-                        query = query.or(`folio.ilike.${searchTerm},person_id.in.(${personIds.join(',')})`);
+                        q = q.or(`folio.ilike.${st},person_id.in.(${personIds.join(',')})`);
                     } else {
-                        query = query.ilike("folio", searchTerm);
+                        q = q.ilike("folio", st);
                     }
                 }
-
-                if (typeFilter !== "Todos") {
-                    query = query.eq("type", typeFilter);
-                }
-
+                if (typeFilter !== "Todos") q = q.eq("type", typeFilter);
                 if (statusFilter !== "Todas") {
-                    const statusMap: Record<string, string> = {
-                        "Activa": "active",
-                        "Bloqueada": "blocked",
-                        "Baja": "inactive",
-                        "Disponible": "available"
-                    };
-                    if (statusMap[statusFilter]) {
-                        query = query.eq("status", statusMap[statusFilter]);
-                    }
+                    const sm: Record<string, string> = { "Activa": "active", "Bloqueada": "blocked", "Baja": "inactive", "Disponible": "available" };
+                    if (sm[statusFilter]) q = q.eq("status", sm[statusFilter]);
                 }
+                return q.order("folio_sort", { ascending: true }).range(from, to);
+            });
 
-                const { data, error } = await query
-                    .order("folio_sort", { ascending: true })
-                    .range(page * pageSize, (page + 1) * pageSize - 1);
-
-                if (error) throw error;
-
-                if (data && data.length > 0) {
-                    allData.push(...data.map((c) => ({
-                        ...c,
-                        personId: c.person_id,
-                        personName: c.personnel
-                            ? `${c.personnel.first_name} ${c.personnel.last_name}`
-                            : "Sin asignar",
-                        personStatus: c.personnel?.status
-                    })));
-                    page++;
-                    if (data.length < pageSize) {
-                        hasMore = false;
-                    }
-                } else {
-                    hasMore = false;
-                }
-            }
-
-            // Sort numerically before returning
-            allData.sort((a, b) => a.folio.localeCompare(b.folio, undefined, { numeric: true }));
-
-            return allData;
-        } catch (error) {
-            handleError(error, "Fetch Cards for Export");
-            return [];
-        }
+            return allData.map(c => ({
+                ...c,
+                personName: c.personnel ? `${c.personnel.first_name} ${c.personnel.last_name}` : "Sin asignar",
+                personStatus: c.personnel?.status
+            })).sort((a, b) => a.folio.localeCompare(b.folio, undefined, { numeric: true }));
+        }, "Fetch Cards for Export", []);
     },
 
     async fetchExtra(throwOnError: boolean = false): Promise<Card[]> {
-        try {
+        return withErrorHandlingConditional(async () => {
             const { data, error } = await supabase
                 .from("cards")
                 .select("*")
                 .is("person_id", null);
 
             if (error) throw error;
-            return (data || []).map((c) => ({
-                ...c,
-                personName: "Sin asignar",
-            }));
-        } catch (error) {
-            handleError(error, "Fetch Extra Cards");
-            if (throwOnError) throw error;
-            return [];
-        }
+            return (data || []).map((c) => ({ ...c, personName: "Sin asignar" }));
+        }, "Fetch Extra Cards", throwOnError, []);
     },
 
     /** Look up a card by exact folio + type, including owner info */
     async findByFolio(folio: string, type: string): Promise<{
-        card: any;
+        card: Record<string, unknown> & { id: string; folio: string; type: string; status: string; person_id: string | null };
         ownerName: string | null;
     } | null> {
         const { data, error } = await supabase
@@ -224,7 +155,7 @@ export const cardService = {
 
         if (error || !data) return null;
 
-        const person = data.personnel as any;
+        const person = data.personnel as { first_name?: string; last_name?: string } | null;
         const ownerName = person
             ? `${person.first_name || ""} ${person.last_name || ""}`.trim()
             : null;
@@ -233,8 +164,8 @@ export const cardService = {
     },
 
     /** Search cards by folio loosely */
-    async searchByFolio(folioPart: string): Promise<any[]> {
-        try {
+    async searchByFolio(folioPart: string): Promise<Card[]> {
+        return withErrorHandlingSafe(async () => {
             const cleanFolio = (folioPart || "").trim();
             if (!cleanFolio) return [];
 
@@ -246,15 +177,20 @@ export const cardService = {
 
             if (error) throw error;
             return data || [];
-        } catch (error) {
-            handleError(error, "Search Cards by Folio");
-            return [];
-        }
+        }, "Search Cards by Folio", []);
     },
 
-    async save(data: any, replacementOptions?: { oldCardStatus: string, skipTicket?: boolean }) {
-        try {
-            // Check if this is a new assignment
+    async save(data: {
+        id?: string;
+        folio: string;
+        type: string;
+        status?: string;
+        person_id?: string | null;
+        programming_status?: string | null;
+        responsiva_status?: string | null;
+        [key: string]: unknown;
+    }, replacementOptions?: { oldCardStatus: string, skipTicket?: boolean }) {
+        return withErrorHandling(async () => {
             let isNewAssignment = false;
             if (data.id && data.person_id) {
                 const { data: existing } = await supabase
@@ -270,26 +206,23 @@ export const cardService = {
                 isNewAssignment = true;
             }
 
-            // Handle Replacement Logic BEFORE creating/updating the new card
             if (replacementOptions && data.person_id) {
-                // 1. Find the currently assigned card of the same type
                 const { data: currentCards } = await supabase
                     .from("cards")
                     .select("id, folio")
                     .eq("person_id", data.person_id)
-                    .eq("type", data.type) // Ensure same type
-                    .neq("status", "inactive"); // Active cards only
+                    .eq("type", data.type)
+                    .neq("status", "inactive");
 
                 if (currentCards && currentCards.length > 0) {
                     const oldCard = currentCards[0];
-                    const newStatus = replacementOptions.oldCardStatus; // 'blocked' or 'available'
+                    const newStatus = replacementOptions.oldCardStatus;
 
-                    // 2. Update Old Card Status
                     const { error: updateError } = await withTimeout(supabase
                         .from("cards")
                         .update({
                             status: newStatus,
-                            person_id: null, // Unassign
+                            person_id: null,
                             programming_status: null,
                             responsiva_status: null,
                         })
@@ -297,10 +230,8 @@ export const cardService = {
 
                     if (updateError) throw updateError;
 
-                    // 3. Log History for Old Card
                     await HistoryService.log("CARD", oldCard.id, "REPLACE_OLD", {
-                        message: `Tarjeta ${oldCard.folio} reemplazada. Nuevo estado: ${newStatus === "blocked" ? "Baja Definitiva" : "Disponible"
-                            }`,
+                        message: `Tarjeta ${oldCard.folio} reemplazada. Nuevo estado: ${newStatus === "blocked" ? "Baja Definitiva" : "Disponible"}`,
                         related_person_id: data.person_id,
                         entityName: `${data.type} (Folio: ${oldCard.folio})`
                     });
@@ -312,27 +243,17 @@ export const cardService = {
                 type: data.type,
                 status: data.status || (data.person_id ? "active" : "available"),
                 person_id: data.person_id || null,
-                programming_status: isNewAssignment
-                    ? "pending"
-                    : data.programming_status || null,
+                programming_status: isNewAssignment ? "pending" : data.programming_status || null,
                 responsiva_status: data.responsiva_status || null,
             };
 
             let cardId = data.id;
 
             if (cardId) {
-                const { error } = await withTimeout(supabase
-                    .from("cards")
-                    .update(payload)
-                    .eq("id", cardId));
+                const { error } = await withTimeout(supabase.from("cards").update(payload).eq("id", cardId));
                 if (error) throw error;
-                // Minor updates no longer log to history to reduce noise
             } else {
-                const { data: newCard, error } = await withTimeout(supabase
-                    .from("cards")
-                    .insert([payload])
-                    .select()
-                    .single());
+                const { data: newCard, error } = await withTimeout(supabase.from("cards").insert([payload]).select().single());
                 if (error) throw error;
                 cardId = newCard.id;
                 await HistoryService.log("CARD", cardId, "CREATE", {
@@ -341,7 +262,6 @@ export const cardService = {
                 });
             }
 
-            // Trigger Automatic Ticket for Programming
             if (isNewAssignment) {
                 const { ticketService } = await import("./tickets");
                 await ticketService.create({
@@ -355,9 +275,7 @@ export const cardService = {
                     title: `Programación: ${payload.folio}`,
                 });
 
-                // Log history for card assignment/replacement
                 if (data.person_id) {
-                    // Fetch person name for the log
                     const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", data.person_id).single();
                     const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${data.person_id})`;
 
@@ -371,204 +289,108 @@ export const cardService = {
                 }
             }
             appEvents.emit(EVENTS.CARDS_CHANGED);
-        } catch (error) {
-            handleError(error, "Save Card");
-            throw error;
-        }
+        }, "Save Card");
     },
 
     async updateProgrammingStatus(cardId: string, status: string | null) {
-        try {
-            // Fetch card info for history and triggers
-            const { data: card } = await supabase
-                .from("cards")
+        return withErrorHandling(async () => {
+            const { data: card } = await supabase.from("cards")
                 .select("folio, responsiva_status, person_id, type")
-                .eq("id", cardId)
-                .single();
+                .eq("id", cardId).single();
 
-            const { error } = await supabase
-                .from("cards")
-                .update({ programming_status: status })
-                .eq("id", cardId);
-
+            const { error } = await supabase.from("cards")
+                .update({ programming_status: status }).eq("id", cardId);
             if (error) throw error;
 
-            // Trigger "Firma Responsiva" ticket if status is 'done' AND card is not signed
-            if (status === "done") {
-                if (card && card.responsiva_status !== "signed" && card.person_id) {
-                    const { ticketService } = await import("./tickets");
-                    await ticketService.create({
-                        type: "Firma Responsiva",
-                        description: `Firma de responsiva para tarjeta ${card.type || ''} folio ${card.folio}`,
-                        priority: "media",
-                        person_id: card.person_id,
-                        card_id: cardId,
-                        title: `Firma: ${card.folio}`
-                    });
-                }
+            if (status === "done" && card && card.responsiva_status !== "signed" && card.person_id) {
+                const { ticketService } = await import("./tickets");
+                await ticketService.create({
+                    type: "Firma Responsiva",
+                    description: `Firma de responsiva para tarjeta ${card.type || ''} folio ${card.folio}`,
+                    priority: "media", person_id: card.person_id, card_id: cardId,
+                    title: `Firma: ${card.folio}`
+                });
             }
-
-            // Internal logic updates no longer log to history to avoid noise during cascades
             appEvents.emit(EVENTS.CARDS_CHANGED);
-        } catch (error) {
-            handleError(error, "Update Programming Status");
-            throw error;
-        }
+        }, "Update Programming Status");
     },
 
     async updateResponsivaStatus(cardId: string, status: string) {
-        try {
-            const { error } = await supabase
-                .from("cards")
-                .update({ responsiva_status: status })
-                .eq("id", cardId);
-
+        return withErrorHandling(async () => {
+            const { error } = await supabase.from("cards")
+                .update({ responsiva_status: status }).eq("id", cardId);
             if (error) throw error;
 
-            // Delete "Firma Responsiva" tickets if signed
             if (status === "signed") {
                 const { ticketService } = await import("./tickets");
                 await ticketService.deleteByCard(cardId, ["Firma Responsiva"], "Ticket completado/atendido");
             }
 
-            // Fetch card info for history
-            const { data: card } = await supabase.from("cards").select("folio, type").eq("id", cardId).single();
-
-            // Internal logic updates no longer log to history to avoid noise during cascades
+            await supabase.from("cards").select("folio, type").eq("id", cardId).single();
             appEvents.emit(EVENTS.CARDS_CHANGED);
-        } catch (error) {
-            handleError(error, "Update Responsiva Status");
-            throw error;
-        }
+        }, "Update Responsiva Status");
     },
 
     async updateStatus(cardId: string, status: string) {
-        try {
-            // First fetch to check assignment
-            const { data: card, error: fetchError } = await supabase
-                .from("cards")
-                .select("person_id")
-                .eq("id", cardId)
-                .single();
-
+        return withErrorHandling(async () => {
+            const { data: card, error: fetchError } = await supabase.from("cards")
+                .select("person_id").eq("id", cardId).single();
             if (fetchError) throw fetchError;
 
-            let finalStatus = status;
-            // If reactivating and no person assigned, set to available
-            if (status === "active" && !card.person_id) {
-                finalStatus = "available";
-            }
+            const finalStatus = (status === "active" && !card.person_id) ? "available" : status;
 
-            const { error } = await supabase
-                .from("cards")
-                .update({ status: finalStatus })
-                .eq("id", cardId);
-
+            const { error } = await supabase.from("cards")
+                .update({ status: finalStatus }).eq("id", cardId);
             if (error) throw error;
 
-            // Fetch card info for history
-            const { data: cardInfo } = await supabase.from("cards").select("folio, type").eq("id", cardId).single();
-
-            // Status updates directly on cards should only log if they are independent actions
-            // When called from personnelService (cascades), history is already handled there.
-            // For now, we reduce the noise here as well.
+            await supabase.from("cards").select("folio, type").eq("id", cardId).single();
             appEvents.emit(EVENTS.CARDS_CHANGED);
-        } catch (error) {
-            handleError(error, "Update Card Status");
-            throw error;
-        }
+        }, "Update Card Status");
     },
 
     async unassign(cardId: string) {
-        try {
-            const { error } = await supabase
-                .from("cards")
-                .update({
-                    person_id: null,
-                    programming_status: null,
-                    responsiva_status: null,
-                    status: "available",
-                })
+        return withErrorHandling(async () => {
+            const { error } = await supabase.from("cards")
+                .update({ person_id: null, programming_status: null, responsiva_status: null, status: "available" })
                 .eq("id", cardId);
-
             if (error) throw error;
 
-            // Delete associated Programming/Responsiva tickets
             const { ticketService } = await import("./tickets");
             await ticketService.deleteByCard(cardId, ["Programación", "Firma Responsiva"], "Ticket cancelado por desvinculación de tarjeta");
 
-            // Fetch card info for history before unassigning
             const { data: card } = await supabase.from("cards").select("folio, type").eq("id", cardId).single();
-
             await HistoryService.log("CARD", cardId, "UNASSIGN", {
                 message: `Tarjeta desvinculada de la persona`,
                 entityName: card ? `${card.type} (Folio: ${card.folio})` : `Tarjeta (${cardId})`
             });
             appEvents.emit(EVENTS.CARDS_CHANGED);
-        } catch (error) {
-            handleError(error, "Unassign Card");
-            throw error;
-        }
+        }, "Unassign Card");
     },
 
     async delete(id: string) {
-        try {
-            // Fetch card info for history BEFORE deleting
+        return withErrorHandling(async () => {
             const { data: card } = await supabase.from("cards").select("folio, type").eq("id", id).single();
             const cardName = card ? `${card.type} (Folio: ${card.folio})` : `Tarjeta (${id})`;
 
-            // Log deletion BEFORE removing data so proactive snapshotting can capture the name
             await HistoryService.log("CARD", id, "DELETE", {
                 message: `Tarjeta eliminada permanentemente`,
                 entityName: cardName
             });
 
-            // Associated tickets are transient and can be deleted. 
-            // History remains readable because HistoryService captures names PROACTIVELY.
             const { ticketService } = await import("./tickets");
             await ticketService.deleteByCard(id);
 
-            // Delete the card
             const { error } = await supabase.from("cards").delete().eq("id", id);
             if (error) throw error;
             appEvents.emit(EVENTS.CARDS_CHANGED);
-
-        } catch (error) {
-            handleError(error, "Delete Card");
-            throw error;
-        }
+        }, "Delete Card");
     },
 
     async fetchCardsByType(type: string): Promise<{ folio: string, status: string }[]> {
-        try {
-            const allCards: { folio: string, status: string }[] = [];
-            let page = 0;
-            const pageSize = 1000;
-            let hasMore = true;
-
-            while (hasMore) {
-                const { data, error } = await supabase
-                    .from("cards")
-                    .select("folio, status")
-                    .eq("type", type)
-                    .range(page * pageSize, (page + 1) * pageSize - 1);
-
-                if (error) throw error;
-
-                if (data && data.length > 0) {
-                    allCards.push(...data.map(c => ({ folio: c.folio, status: c.status })));
-                    page++;
-                    if (data.length < pageSize) {
-                        hasMore = false;
-                    }
-                } else {
-                    hasMore = false;
-                }
-            }
-            return allCards;
-        } catch (error) {
-            handleError(error, "Fetch Cards By Type");
-            return [];
-        }
+        return withErrorHandlingSafe(async () => {
+            return await batchPaginate(async (from, to) => {
+                return supabase.from("cards").select("folio, status").eq("type", type).range(from, to);
+            });
+        }, "Fetch Cards By Type", []);
     }
 };

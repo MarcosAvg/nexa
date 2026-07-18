@@ -8,6 +8,7 @@
     import { personnelState, ticketState } from "../../stores";
     import { cardService } from "../../services/cards";
     import { toast } from "svelte-sonner";
+    import { handleError } from "../../utils";
     import { ArrowRight, Plus, Minus, User } from "lucide-svelte";
     import type { Ticket, Person } from "../../types";
 
@@ -53,8 +54,7 @@
                         if (p) fetchedPerson = p;
                     })
                     .catch((e) => {
-                        console.error("Error fetching person:", e);
-                        toast.error("Error al cargar datos de personal");
+                        handleError(e, "Cargar Persona para Comparación");
                     })
                     .finally(() => {
                         isLoadingPerson = false;
@@ -233,8 +233,7 @@
             isOpen = false;
             onComplete?.();
         } catch (e) {
-            console.error(e);
-            toast.error("Error al aplicar cambios");
+            handleError(e, "Aplicar Cambios de Modificación");
         } finally {
             isSubmitting = false;
         }
@@ -265,8 +264,7 @@
             isOpen = false;
             onComplete?.();
         } catch (e) {
-            console.error(e);
-            toast.error("Error al rechazar ticket");
+            handleError(e, "Rechazar Modificación");
         } finally {
             isSubmitting = false;
         }

@@ -1,20 +1,54 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
-import { handleError, withTimeout } from "../utils/error";
-import { catalogCache } from "../utils/catalogCache";
-import { appEvents, EVENTS } from "../utils/appEvents";
+import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, appEvents, EVENTS, dbCache, batchPaginate, batchCollectIds } from "../utils";
 import type { Person, Card, DashboardMetrics } from "../types";
-import { dbCache } from "../utils/dbCache";
 import { networkStore } from "../stores/network.svelte";
 
-const mapPersonRecord = (p: any): Person => {
+/** Row shape from personnel_with_status view or personnel table with joins */
+interface PersonnelRow {
+    id: string;
+    first_name: string;
+    last_name: string;
+    employee_no: string;
+    email?: string | null;
+    area?: string | null;
+    position?: string | null;
+    floor?: string | null;
+    status: string;
+    computed_status?: string;
+    entry_time?: string | null;
+    exit_time?: string | null;
+    building_id?: string | null;
+    dependency_id?: string | null;
+    building_name?: string | null;
+    dependency_name?: string | null;
+    photo_url?: string | null;
+    floors_p2000?: string[];
+    floors_kone?: string[];
+    special_accesses?: string[];
+    schedule_id?: string | null;
+    schedule_name?: string | null;
+    schedules?: { name: string; default_entry?: string; default_exit?: string } | null;
+    buildings?: { name: string } | null;
+    dependencies?: { name: string } | null;
+    cards?: {
+        id: string;
+        folio: string;
+        type: string;
+        status: string;
+        programming_status: string | null;
+        responsiva_status: string | null;
+    }[];
+}
+
+const mapPersonRecord = (p: PersonnelRow): Person => {
     const allCards = (p.cards || []);
-    const activeCards = allCards.filter((c: any) => c.status === "active");
+    const activeCards = allCards.filter((c) => c.status === "active");
     const readyCards = activeCards.filter(
-        (c: any) => c.programming_status === "done" && (c.responsiva_status === "signed" || c.responsiva_status === "legacy")
+        (c) => c.programming_status === "done" && (c.responsiva_status === "signed" || c.responsiva_status === "legacy")
     );
 
-    const readyTypes = new Set(readyCards.map((c: any) => c.type));
+    const readyTypes = new Set(readyCards.map((c) => c.type));
 
     let displayStatus = p.computed_status;
     if (!displayStatus) {
@@ -66,17 +100,14 @@ const mapPersonRecord = (p: any): Person => {
 
 export const personnelService = {
     async fetchAll(page: number = 1, limit: number = 50, search: string = "", statusFilter: string = "Todos", dependencyId: string = "", buildingId: string = ""): Promise<{ data: Person[], count: number }> {
-        try {
-            // Offline fallback
+        return withErrorHandlingSafe(async () => {
+            const cacheKey = `personnel_page_${page}_${statusFilter}_${dependencyId}_${buildingId}_${search}`;
             if (!networkStore.isOnline) {
-                const cacheKey = `personnel_page_${page}_${statusFilter}_${dependencyId}_${buildingId}_${search}`;
                 const cachedData = await dbCache.load<{ data: Person[], count: number }>(cacheKey);
                 if (cachedData) return cachedData;
                 return { data: [], count: 0 };
             }
 
-            // Use the optimized view if available (personnel_with_status includes computed_status)
-            // If the view doesn't exist yet, it will fallback to the original logic
             let query = supabase
                 .from("personnel_with_status")
                 .select("*, cards(id, folio, type, status, programming_status, responsiva_status)", { count: "exact" });
@@ -84,50 +115,28 @@ export const personnelService = {
             if (search) {
                 const terms = search.trim().split(/\s+/).filter(Boolean);
                 for (const term of terms) {
-                    const termPattern = `%${term}%`;
-                    query = query.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern},employee_no.ilike.${termPattern}`);
+                    query = query.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
                 }
             }
-
-            if (statusFilter !== "Todos") {
-                query = query.eq("computed_status", statusFilter);
-            }
-
-            if (dependencyId) {
-                query = query.eq("dependency_id", dependencyId);
-            }
-
-            if (buildingId === "__none__") {
-                query = query.is("building_id", null);
-            } else if (buildingId) {
-                query = query.eq("building_id", buildingId);
-            }
+            if (statusFilter !== "Todos") query = query.eq("computed_status", statusFilter);
+            if (dependencyId) query = query.eq("dependency_id", dependencyId);
+            if (buildingId === "__none__") query = query.is("building_id", null);
+            else if (buildingId) query = query.eq("building_id", buildingId);
 
             const from = (page - 1) * limit;
-            const to = from + limit - 1;
-
             const { data, count, error } = await query
                 .order("first_name", { ascending: true })
-                .range(from, to);
+                .range(from, from + limit - 1);
 
             if (error) {
-                // Fallback to original personnel table if view fails
                 console.warn("Falling back from personnel_with_status view:", error.message);
                 return this._fetchAllFallback(page, limit, search, statusFilter, dependencyId, buildingId);
             }
 
-            const mappedData = (data || []).map(p => mapPersonRecord(p));
-            const result = { data: mappedData, count: count || 0 };
-
-            // Save to cache
-            const cacheKey = `personnel_page_${page}_${statusFilter}_${dependencyId}_${buildingId}_${search}`;
+            const result = { data: (data || []).map(p => mapPersonRecord(p)), count: count || 0 };
             await dbCache.save(cacheKey, result);
-
             return result;
-        } catch (error) {
-            handleError(error, "Fetch Personnel");
-            return { data: [], count: 0 };
-        }
+        }, "Fetch Personnel", { data: [], count: 0 });
     },
 
     // Helper for fallback logic
@@ -138,206 +147,128 @@ export const personnelService = {
             "Baja": "inactive"
         };
 
-        let query = supabase
-            .from("personnel")
-            .select("*, cards(*), buildings(name), dependencies(name), schedules(*)", { count: "exact" });
+        // Build base query without .range() — Supabase's query builder mutates `.range()` in place,
+        // so we can build it once and chain different `.range()` per page in batchPaginate.
+        const buildBaseQuery = () => {
+            let q = supabase
+                .from("personnel")
+                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
 
-        if (search) {
-            const terms = search.trim().split(/\s+/).filter(Boolean);
-            for (const term of terms) {
-                const termPattern = `%${term}%`;
-                query = query.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern},employee_no.ilike.${termPattern}`);
+            if (search) {
+                const terms = search.trim().split(/\s+/).filter(Boolean);
+                for (const term of terms) {
+                    const termPattern = `%${term}%`;
+                    q = q.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern},employee_no.ilike.${termPattern}`);
+                }
             }
-        }
 
-        if (statusFilter !== "Todos") {
-            if (dbStatusMap[statusFilter]) {
-                query = query.eq("status", dbStatusMap[statusFilter]);
-            } else if (isComputedStatus) {
-                query = query.eq("status", "active");
+            if (statusFilter !== "Todos") {
+                if (dbStatusMap[statusFilter]) {
+                    q = q.eq("status", dbStatusMap[statusFilter]);
+                } else if (isComputedStatus) {
+                    q = q.eq("status", "active");
+                }
             }
-        }
 
-        if (dependencyId) query = query.eq("dependency_id", dependencyId);
-        if (buildingId === "__none__") query = query.is("building_id", null);
-        else if (buildingId) query = query.eq("building_id", buildingId);
+            if (dependencyId) q = q.eq("dependency_id", dependencyId);
+            if (buildingId === "__none__") q = q.is("building_id", null);
+            else if (buildingId) q = q.eq("building_id", buildingId);
+
+            return q;
+        };
 
         if (isComputedStatus) {
-            const allMapped: Person[] = [];
-            let batchPage = 0;
-            const batchSize = 1000;
-            let hasMore = true;
-            while (hasMore) {
-                const { data: batch, error } = await query.order("first_name", { ascending: true }).range(batchPage * batchSize, (batchPage + 1) * batchSize - 1);
-                if (error) throw error;
-                if (batch && batch.length > 0) {
-                    allMapped.push(...batch.map(p => mapPersonRecord(p)));
-                    if (batch.length < batchSize) hasMore = false;
-                    else batchPage++;
-                } else hasMore = false;
-            }
+            const allData = await batchPaginate<any>(async (from, to) => {
+                return buildBaseQuery()
+                    .order("first_name", { ascending: true })
+                    .range(from, to);
+            });
+
+            const allMapped = allData.map(p => mapPersonRecord(p));
             const filtered = allMapped.filter(p => p.status === statusFilter);
             const from = (page - 1) * limit;
             return { data: filtered.slice(from, from + limit), count: filtered.length };
         } else {
             const from = (page - 1) * limit;
             const to = from + limit - 1;
-            const { data, count, error } = await query.order("first_name", { ascending: true }).range(from, to);
+            const { data, count, error } = await buildBaseQuery()
+                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)", { count: "exact" })
+                .order("first_name", { ascending: true })
+                .range(from, to);
             if (error) throw error;
             return { data: (data || []).map(p => mapPersonRecord(p)), count: count || 0 };
         }
     },
 
     async fetchOptions(throwOnError: boolean = false): Promise<{ id: string, name: string, employee_no: string }[]> {
-        try {
+        return withErrorHandlingConditional(async () => {
             const { data, error } = await supabase
                 .from("personnel")
                 .select("id, first_name, last_name, employee_no")
                 .neq("status", "inactive")
                 .order("first_name", { ascending: true });
-
             if (error) throw error;
-
-            return (data || []).map(p => ({
-                id: p.id,
-                name: `${p.first_name} ${p.last_name}`,
-                employee_no: p.employee_no
-            }));
-        } catch (error) {
-            handleError(error, "Fetch Personnel Options");
-            if (throwOnError) throw error;
-            return [];
-        }
+            return (data || []).map(p => ({ id: p.id, name: `${p.first_name} ${p.last_name}`, employee_no: p.employee_no }));
+        }, "Fetch Personnel Options", throwOnError, []);
     },
 
     async fetchForExport(search: string = "", statusFilter: string = "Todos", dependencyId: string = ""): Promise<Person[]> {
-        try {
+        return withErrorHandlingSafe(async () => {
             const isComputedStatus = ["Activo/a", "Parcial", "Sin Acceso"].includes(statusFilter);
-            const dbStatusMap: Record<string, string> = {
-                "Bloqueado/a": "blocked",
-                "Baja": "inactive"
-            };
+            const dbStatusMap: Record<string, string> = { "Bloqueado/a": "blocked", "Baja": "inactive" };
 
-            const allData: Person[] = [];
-            let page = 0;
-            const pageSize = 1000;
-            let hasMore = true;
-
-            while (hasMore) {
-                let query = supabase
-                    .from("personnel")
-                    .select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
-
+            const allData = await batchPaginate<any>(async (from, to) => {
+                let q = supabase.from("personnel").select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
                 if (search) {
                     const terms = search.trim().split(/\s+/).filter(Boolean);
-                    for (const term of terms) {
-                        const termPattern = `%${term}%`;
-                        query = query.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern},employee_no.ilike.${termPattern}`);
-                    }
+                    for (const term of terms) q = q.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
                 }
+                if (statusFilter !== "Todos") q = dbStatusMap[statusFilter] ? q.eq("status", dbStatusMap[statusFilter]) : q.eq("status", "active");
+                if (dependencyId) q = q.eq("dependency_id", dependencyId);
+                return q.order("first_name", { ascending: true }).range(from, to);
+            });
 
-                if (statusFilter !== "Todos") {
-                    if (dbStatusMap[statusFilter]) {
-                        query = query.eq("status", dbStatusMap[statusFilter]);
-                    } else if (isComputedStatus) {
-                        query = query.eq("status", "active");
-                    }
-                }
-
-                if (dependencyId) {
-                    query = query.eq("dependency_id", dependencyId);
-                }
-
-                const { data, error } = await query
-                    .order("first_name", { ascending: true })
-                    .range(page * pageSize, (page + 1) * pageSize - 1);
-
-                if (error) throw error;
-
-                if (data && data.length > 0) {
-                    allData.push(...data.map(p => mapPersonRecord(p)));
-                    page++;
-                    if (data.length < pageSize) {
-                        hasMore = false;
-                    }
-                } else {
-                    hasMore = false;
-                }
-            }
-
-            // Post-filter for computed statuses
-            if (isComputedStatus) {
-                return allData.filter(p => p.status === statusFilter);
-            }
-            return allData;
-        } catch (error) {
-            handleError(error, "Fetch Personnel for Export");
-            return [];
-        }
+            const mapped = allData.map(p => mapPersonRecord(p));
+            return isComputedStatus ? mapped.filter(p => p.status === statusFilter) : mapped;
+        }, "Fetch Personnel for Export", []);
     },
 
     async fetchById(id: string): Promise<Person | null> {
-        try {
+        return withErrorHandlingSafe(async () => {
             const { data, error } = await supabase
                 .from("personnel")
                 .select("*, cards(*), buildings(name), dependencies(name), schedules(*)")
-                .eq("id", id)
-                .single();
-
+                .eq("id", id).single();
             if (error) throw error;
-            if (!data) return null;
-
-            return mapPersonRecord(data);
-        } catch (error) {
-            handleError(error, "Fetch Person By ID");
-            return null;
-        }
+            return data ? mapPersonRecord(data) : null;
+        }, "Fetch Person By ID", null);
     },
 
     /** Search personnel by apellidos and/or nombres (case-insensitive ilike).
      * Returns all candidates ordered by last_name. Caller decides how to handle 0/1/many results. */
     async searchByName(apellidos: string, nombres: string): Promise<Person[]> {
-        try {
+        return withErrorHandlingSafe(async () => {
             const cleanApellidos = (apellidos || "").trim();
             const cleanNombres = (nombres || "").trim();
-
             if (!cleanApellidos && !cleanNombres) return [];
 
             let peopleQuery;
             let rpcIds: string[] | null = null;
 
             if (!cleanApellidos || !cleanNombres) {
-                // If one of the search strings is empty, split the non-empty one into terms
-                // to support full name/combination searches.
                 const queryStr = cleanApellidos || cleanNombres;
                 const terms = queryStr.split(/\s+/).filter(Boolean);
                 if (terms.length === 0) return [];
 
-                peopleQuery = supabase
-                    .from("personnel")
-                    .select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
-
-                for (const term of terms) {
-                    const termPattern = `%${term}%`;
-                    peopleQuery = peopleQuery.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern},employee_no.ilike.${termPattern}`);
-                }
+                peopleQuery = supabase.from("personnel").select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+                for (const term of terms) peopleQuery = peopleQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
                 peopleQuery = peopleQuery.order("first_name", { ascending: true }).limit(20);
             } else {
-                // Both fields provided, use SQL RPC fuzzy search
-                const { data, error } = await supabase.rpc('search_personnel_fuzzy', {
-                    p_last_name: cleanApellidos,
-                    p_first_name: cleanNombres,
-                    p_limit: 20
-                });
-
+                const { data, error } = await supabase.rpc('search_personnel_fuzzy', { p_last_name: cleanApellidos, p_first_name: cleanNombres, p_limit: 20 });
                 if (error) throw error;
                 if (!data || data.length === 0) return [];
-
-                rpcIds = data.map((p: any) => p.id);
-                peopleQuery = supabase
-                    .from("personnel")
-                    .select("*, cards(*), buildings(name), dependencies(name), schedules(*)")
-                    .in("id", rpcIds as string[]);
+                rpcIds = data.map((p: { id: string }) => p.id);
+                peopleQuery = supabase.from("personnel").select("*, cards(*), buildings(name), dependencies(name), schedules(*)").in("id", rpcIds);
             }
 
             const { data: fullPeople, error: fetchError } = await peopleQuery;
@@ -346,68 +277,68 @@ export const personnelService = {
             let orderedPeople = fullPeople || [];
             if (rpcIds) {
                 const idToData = Object.fromEntries(fullPeople.map(p => [p.id, p]));
-                orderedPeople = rpcIds.map((id: string) => idToData[id]).filter(Boolean);
+                orderedPeople = rpcIds.map(id => idToData[id]).filter(Boolean);
             }
 
-            return (orderedPeople || []).map((p: any) => ({
-                id: p.id,
-                first_name: p.first_name,
-                last_name: p.last_name,
-                name: `${p.first_name} ${p.last_name}`,
-                employee_no: p.employee_no,
-                email: p.email,
-                area: p.area,
-                position: p.position,
-                floor: p.floor,
-                building: p.buildings?.name || "N/A",
-                dependency: p.dependencies?.name || "N/A",
-                building_id: p.building_id,
-                dependency_id: p.dependency_id,
-                schedule: p.schedules ? {
-                    days: p.schedules.name,
-                    entry: p.entry_time || p.schedules.default_entry || "09:00",
-                    exit: p.exit_time || p.schedules.default_exit || "18:00"
-                } : null,
-                status_raw: p.status,
-                status: p.status,
-                cards: p.cards || [],
-                floors_p2000: p.floors_p2000 || [],
-                floors_kone: p.floors_kone || [],
+            return orderedPeople.map(p => ({
+                id: p.id, first_name: p.first_name, last_name: p.last_name,
+                name: `${p.first_name} ${p.last_name}`, employee_no: p.employee_no,
+                email: p.email, area: p.area, position: p.position, floor: p.floor,
+                building: p.buildings?.name || "N/A", dependency: p.dependencies?.name || "N/A",
+                building_id: p.building_id, dependency_id: p.dependency_id,
+                schedule: p.schedules ? { days: p.schedules.name, entry: p.entry_time || p.schedules.default_entry || "09:00", exit: p.exit_time || p.schedules.default_exit || "18:00" } : null,
+                status_raw: p.status, status: p.status, cards: p.cards || [],
+                floors_p2000: p.floors_p2000 || [], floors_kone: p.floors_kone || [],
                 specialAccesses: p.special_accesses || []
             } as Person));
-        } catch (error) {
-            handleError(error, "Search Personnel by Name (Fuzzy)");
-            return [];
-        }
+        }, "Search Personnel by Name (Fuzzy)", []);
     },
 
-    async save(data: any) {
-        try {
-            // 1. Validation: Prevent duplicates by name for NEW records
+    /** Input shape for creating/updating a personnel record */
+    async save(data: {
+        id?: string;
+        first_name?: string;
+        last_name?: string;
+        nombres?: string;
+        apellidos?: string;
+        employee_no?: string;
+        noEmpleado?: string;
+        email?: string | null;
+        area?: string;
+        areaEquipo?: string;
+        position?: string;
+        puestoFuncion?: string;
+        dependency_id?: string;
+        dependencyId?: string;
+        building_id?: string;
+        buildingId?: string;
+        floor?: string;
+        pisoBase?: string;
+        floors_p2000?: string[];
+        floors_kone?: string[];
+        schedule_id?: string;
+        scheduleId?: string;
+        entry_time?: string | null;
+        exit_time?: string | null;
+        specialAccesses?: string[];
+        special_accesses?: string[];
+        status?: string;
+        cards?: any[];
+        [key: string]: unknown;
+    }) {
+        return withErrorHandling(async () => {
             if (!data.id) {
                 const results = await this.searchByName(
                     data.apellidos || data.last_name || "",
                     data.nombres || data.first_name || "",
                 );
-                // Compare normalized names to decide if it's a "hard" duplicate
                 const isDuplicate = results.some((r) => {
-                    const n1 = (r.first_name + " " + r.last_name)
-                        .toLowerCase()
-                        .normalize("NFD")
-                        .replace(/[\u0300-\u036f]/g, "");
-                    const n2 = ((data.nombres || data.first_name || "") + " " + (data.apellidos || data.last_name || ""))
-                        .toLowerCase()
-                        .normalize("NFD")
-                        .replace(/[\u0300-\u036f]/g, "");
-                    return n1 === n2;
+                    const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    return norm(r.first_name + " " + r.last_name) === norm((data.nombres || data.first_name || "") + " " + (data.apellidos || data.last_name || ""));
                 });
-
-                if (isDuplicate) {
-                    throw new Error(
-                        `Ya existe un registro activo con el nombre "${data.nombres || data.first_name} ${data.apellidos || data.last_name}".`,
-                    );
-                }
+                if (isDuplicate) throw new Error(`Ya existe un registro activo con el nombre "${data.nombres || data.first_name} ${data.apellidos || data.last_name}".`);
             }
+
             const payload = {
                 first_name: data.first_name || data.nombres,
                 last_name: data.last_name || data.apellidos,
@@ -428,7 +359,6 @@ export const personnelService = {
             };
 
             let personId = data.id;
-
             if (personId) {
                 const { error } = await withTimeout(supabase.from("personnel").update(payload).eq("id", personId));
                 if (error) throw error;
@@ -440,87 +370,50 @@ export const personnelService = {
                 await HistoryService.log("PERSONNEL", personId, "CREATE", { message: `Registro de ${payload.first_name}`, entityName: `${payload.first_name} ${payload.last_name}` });
             }
 
-            // Assign cards to the person
             const cards = data.cards || [];
             if (cards.length > 0) {
                 const { cardService } = await import("./cards");
-                for (const card of cards) {
-                    await cardService.save({
-                        ...card,
-                        person_id: personId,
-                    });
-                }
+                for (const card of cards) await cardService.save({ ...card, person_id: personId });
             }
-
             appEvents.emit(EVENTS.PERSONNEL_CHANGED);
-        } catch (error) {
-            handleError(error, "Save Personnel");
-            throw error;
-        }
+        }, "Save Personnel");
     },
 
     async updateStatus(id: string, status: string) {
-        try {
-            // Update Person
+        return withErrorHandling(async () => {
             const { error } = await withTimeout(supabase.from("personnel").update({ status }).eq("id", id));
             if (error) throw error;
 
-            // Cascade to Cards
-            const cardStatus = status;
-            const { error: cardError } = await withTimeout(supabase
-                .from("cards")
-                .update({ status: cardStatus })
-                .eq("person_id", id));
-
+            const { error: cardError } = await withTimeout(supabase.from("cards").update({ status }).eq("person_id", id));
             if (cardError) throw cardError;
 
-            // If status is 'baja' (inactive/baja), delete all tickets linked to this person
             if (status === "inactive" || status === "baja") {
                 const { ticketService } = await import("./tickets");
                 await ticketService.deleteByPerson(id);
             }
 
-            // Fetch person name for history before logging
             const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", id).single();
             const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${id})`;
-
-            // Consolidated Log for status change (avoids noise from cascading card updates)
             const statusLabel = status === 'active' ? 'activo' : status === 'blocked' ? 'bloqueado/a' : 'BAJA';
+
             await HistoryService.log("PERSONNEL", id, "UPDATE_STATUS", {
                 message: `Estado actualizado a ${statusLabel} (incluye tarjetas)`,
                 entityName: personName
             });
             appEvents.emit(EVENTS.PERSONNEL_CHANGED);
             appEvents.emit(EVENTS.CARDS_CHANGED);
-        } catch (error) {
-            handleError(error, "Update Personnel Status");
-            throw error;
-        }
+        }, "Update Personnel Status");
     },
 
     async delete(id: string, cardActionMap?: Record<string, "delete" | "keep">) {
-        try {
-            // Log deletion BEFORE removing data
-            // Fetch person name for history BEFORE deleting
+        return withErrorHandling(async () => {
             const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", id).single();
             const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${id})`;
 
-            // Handle card actions if provided
             if (cardActionMap) {
                 for (const [cardId, action] of Object.entries(cardActionMap)) {
-                    if (action === "delete") {
-                        await supabase.from("cards").delete().eq("id", cardId);
-                    } else if (action === "keep") {
-                        await supabase
-                            .from("cards")
-                            .update({
-                                person_id: null,
-                                status: "available",
-                                responsiva_status: "unsigned",
-                                programming_status: "pending"
-                            })
-                            .eq("id", cardId);
-                    }
+                    if (action === "delete") await supabase.from("cards").delete().eq("id", cardId);
+                    else if (action === "keep") await supabase.from("cards").update({ person_id: null, status: "available", responsiva_status: "unsigned", programming_status: "pending" }).eq("id", cardId);
                 }
             }
 
@@ -529,127 +422,56 @@ export const personnelService = {
                 entityName: personName
             });
 
-            // Delete the person
             const { error } = await supabase.from("personnel").delete().eq("id", id);
             if (error) throw error;
             appEvents.emit(EVENTS.PERSONNEL_CHANGED);
-        } catch (error) {
-            handleError(error, "Delete Personnel");
-            throw error;
-        }
+        }, "Delete Personnel");
     },
 
     async fetchDashboardStats() {
-        try {
-            // 1. Get all unique person_id from cards that meet the 'ready' criteria
-            // We batch fetch because of the 1000 row limit of PostgREST
-            const readyPersonIds = new Set<string>();
-            let hasMoreCards = true;
-            let cardPage = 0;
-            const batchSize = 1000;
+        return withErrorHandlingSafe(async () => {
+            const readyPersonIds = await batchCollectIds(async (from, to) => {
+                return supabase.from("cards")
+                    .select("person_id").eq("status", "active").eq("programming_status", "done")
+                    .in("responsiva_status", ["signed", "legacy"]).not("person_id", "is", null)
+                    .range(from, to);
+            }, "person_id");
 
-            while (hasMoreCards) {
-                const { data: cardBatch, error: cError } = await supabase
-                    .from("cards")
-                    .select("person_id")
-                    .eq("status", "active")
-                    .eq("programming_status", "done")
-                    .in("responsiva_status", ["signed", "legacy"])
-                    .not("person_id", "is", null)
-                    .range(cardPage * batchSize, (cardPage + 1) * batchSize - 1);
+            const activePersonnelIds = await batchCollectIds(async (from, to) => {
+                return supabase.from("personnel").select("id").eq("status", "active").range(from, to);
+            });
 
-                if (cError) throw cError;
-                if (!cardBatch || cardBatch.length === 0) {
-                    hasMoreCards = false;
-                } else {
-                    cardBatch.forEach(c => readyPersonIds.add(c.person_id));
-                    if (cardBatch.length < batchSize) hasMoreCards = false;
-                    else cardPage++;
-                }
-            }
-
-            // 2. Get all personnel IDs where status is active
-            const activePersonnelIds = new Set<string>();
-            let hasMorePeople = true;
-            let peoplePage = 0;
-
-            while (hasMorePeople) {
-                const { data: peopleBatch, error: pError } = await supabase
-                    .from("personnel")
-                    .select("id")
-                    .eq("status", "active")
-                    .range(peoplePage * batchSize, (peoplePage + 1) * batchSize - 1);
-
-                if (pError) throw pError;
-                if (!peopleBatch || peopleBatch.length === 0) {
-                    hasMorePeople = false;
-                } else {
-                    peopleBatch.forEach(p => activePersonnelIds.add(p.id));
-                    if (peopleBatch.length < batchSize) hasMorePeople = false;
-                    else peoplePage++;
-                }
-            }
-
-            // 3. Intersection: People who are active AND have at least one ready card
             let activePersonnelCount = 0;
-            for (const id of readyPersonIds) {
-                if (activePersonnelIds.has(id)) {
-                    activePersonnelCount++;
-                }
-            }
+            for (const id of readyPersonIds) { if (activePersonnelIds.has(id)) activePersonnelCount++; }
 
-            // 4. Card Stock Counts (head queries are NOT subject to the 1000 record delivery limit)
-            const { count: koneStock, error: kError } = await supabase
-                .from("cards")
-                .select("*", { count: "exact", head: true })
-                .is("person_id", null)
-                .eq("status", "available")
-                .eq("type", "KONE");
-
+            const { count: koneStock, error: kError } = await supabase.from("cards")
+                .select("*", { count: "exact", head: true }).is("person_id", null).eq("status", "available").eq("type", "KONE");
             if (kError) throw kError;
 
-            const { count: p2000Stock, error: p2Error } = await supabase
-                .from("cards")
-                .select("*", { count: "exact", head: true })
-                .is("person_id", null)
-                .eq("status", "available")
-                .eq("type", "P2000");
-
+            const { count: p2000Stock, error: p2Error } = await supabase.from("cards")
+                .select("*", { count: "exact", head: true }).is("person_id", null).eq("status", "available").eq("type", "P2000");
             if (p2Error) throw p2Error;
 
-            return {
-                activePersonnel: activePersonnelCount,
-                koneStock: koneStock || 0,
-                p2000Stock: p2000Stock || 0
-            };
-        } catch (error) {
-            handleError(error, "Fetch Dashboard Stats");
-            return { activePersonnel: 0, koneStock: 0, p2000Stock: 0 };
-        }
+            return { activePersonnel: activePersonnelCount, koneStock: koneStock || 0, p2000Stock: p2000Stock || 0 };
+        }, "Fetch Dashboard Stats", { activePersonnel: 0, koneStock: 0, p2000Stock: 0 });
     },
 
     async fetchDashboardMetrics(): Promise<DashboardMetrics> {
-        try {
-            // Replaced manual computation (downloading all personnel) with a single RPC call
+        return withErrorHandlingSafe(async () => {
             const { data, error } = await supabase.rpc('get_dashboard_metrics');
             if (error) throw error;
             return data as DashboardMetrics;
-        } catch (error) {
-            // Fallback: If RPC not deployed, we keep returning an empty state or we could 
-            // re-implement the heavy logic here, but RPC is the goal.
-            handleError(error, "Fetch Dashboard Metrics (RPC)");
-            return {
-                totalPersonnel: 0,
-                statusCounts: { activo: 0, parcial: 0, inactivo: 0, bloqueado: 0, baja: 0 },
-                cardCoverage: { conP2000: 0, sinP2000: 0, conKone: 0, sinKone: 0, operativos: 0 },
-                topDependencies: [],
-                topBuildings: [],
-                dataQuality: { sinEmail: 0, sinSchedule: 0, sinPosition: 0, sinArea: 0, total: 0 },
-            };
-        }
+        }, "Fetch Dashboard Metrics (RPC)", {
+            totalPersonnel: 0,
+            statusCounts: { activo: 0, parcial: 0, inactivo: 0, bloqueado: 0, baja: 0 },
+            cardCoverage: { conP2000: 0, sinP2000: 0, conKone: 0, sinKone: 0, operativos: 0 },
+            topDependencies: [],
+            topBuildings: [],
+            dataQuality: { sinEmail: 0, sinSchedule: 0, sinPosition: 0, sinArea: 0, total: 0 },
+        });
     },
 
-    subscribeToChanges(callback: (payload: any) => void) {
+    subscribeToChanges(callback: (payload: { eventType: string; new: Record<string, unknown>; old: Record<string, unknown> }) => void) {
         return supabase
             .channel('personnel-changes')
             .on(
@@ -661,178 +483,3 @@ export const personnelService = {
     }
 };
 
-
-
-export const catalogService = {
-    // --- Fetch (with localStorage 24h cache) ---
-    async fetchDependencies(throwOnError: boolean = false) {
-        const cached = catalogCache.get<any[]>('dependencies');
-        if (cached) return cached;
-        try {
-            const { data, error } = await supabase.from("dependencies").select("*");
-            if (error) throw error;
-            const result = data || [];
-            catalogCache.set('dependencies', result);
-            return result;
-        } catch (error) {
-            handleError(error, "Fetch Dependencies");
-            if (throwOnError) throw error;
-            return [];
-        }
-    },
-    async fetchBuildings(throwOnError: boolean = false) {
-        const cached = catalogCache.get<any[]>('buildings');
-        if (cached) return cached;
-        try {
-            const { data, error } = await supabase.from("buildings").select("*");
-            if (error) throw error;
-            const result = data || [];
-            catalogCache.set('buildings', result);
-            return result;
-        } catch (error) {
-            handleError(error, "Fetch Buildings");
-            if (throwOnError) throw error;
-            return [];
-        }
-    },
-    async fetchAccesses(throwOnError: boolean = false) {
-        const cached = catalogCache.get<any[]>('special_accesses');
-        if (cached) return cached;
-        try {
-            const { data, error } = await supabase.from("special_accesses").select("*");
-            if (error) throw error;
-            const result = data || [];
-            catalogCache.set('special_accesses', result);
-            return result;
-        } catch (error) {
-            handleError(error, "Fetch Accesses");
-            if (throwOnError) throw error;
-            return [];
-        }
-    },
-    async fetchSchedules(throwOnError: boolean = false) {
-        const cached = catalogCache.get<any[]>('schedules');
-        if (cached) return cached;
-        try {
-            const { data, error } = await supabase.from("schedules").select("*");
-            if (error) throw error;
-            const result = data || [];
-            catalogCache.set('schedules', result);
-            return result;
-        } catch (error) {
-            handleError(error, "Fetch Schedules");
-            if (throwOnError) throw error;
-            return [];
-        }
-    },
-
-    // --- Save (Create/Update) --- 
-    // Invalidate the relevant cache key after any mutation so stale data is never served.
-    async saveBuilding(id: number | null, payload: { name: string; floors: string[] }) {
-        try {
-            if (id) {
-                const { error } = await supabase.from("buildings").update(payload).eq("id", id);
-                if (error) throw error;
-                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Edificio actualizado: ${payload.name}` });
-            } else {
-                const { data, error } = await supabase.from("buildings").insert([payload]).select().single();
-                if (error) throw error;
-                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Edificio creado: ${payload.name}` });
-            }
-            catalogCache.invalidate('buildings');
-        } catch (error) {
-            handleError(error, "Save Building");
-            throw error;
-        }
-    },
-
-    async saveDependency(id: number | null, payload: { name: string }) {
-        try {
-            if (id) {
-                const { error } = await supabase.from("dependencies").update(payload).eq("id", id);
-                if (error) throw error;
-                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Dependencia actualizada: ${payload.name}` });
-            } else {
-                const { data, error } = await supabase.from("dependencies").insert([payload]).select().single();
-                if (error) throw error;
-                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Dependencia creada: ${payload.name}` });
-            }
-            catalogCache.invalidate('dependencies');
-        } catch (error) {
-            handleError(error, "Save Dependency");
-            throw error;
-        }
-    },
-
-    async saveAccess(id: number | null, payload: { name: string }) {
-        try {
-            if (id) {
-                const { error } = await supabase.from("special_accesses").update(payload).eq("id", id);
-                if (error) throw error;
-                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Acceso especial actualizado: ${payload.name}` });
-            } else {
-                const { data, error } = await supabase.from("special_accesses").insert([payload]).select().single();
-                if (error) throw error;
-                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Acceso especial creado: ${payload.name}` });
-            }
-            catalogCache.invalidate('special_accesses');
-        } catch (error) {
-            handleError(error, "Save Access");
-            throw error;
-        }
-    },
-
-    async saveSchedule(id: number | null, payload: { name: string; days: string[] }) {
-        try {
-            if (id) {
-                const { error } = await supabase.from("schedules").update(payload).eq("id", id);
-                if (error) throw error;
-                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Horario actualizado: ${payload.name}` });
-            } else {
-                const { data, error } = await supabase.from("schedules").insert([payload]).select().single();
-                if (error) throw error;
-                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Horario creado: ${payload.name}` });
-            }
-            catalogCache.invalidate('schedules');
-        } catch (error) {
-            handleError(error, "Save Schedule");
-            throw error;
-        }
-    },
-
-    // --- Delete ---
-    async deleteCatalogItem(table: string, id: number, itemName: string) {
-        try {
-            const { error } = await supabase.from(table).delete().eq("id", id);
-            if (error) throw error;
-            await HistoryService.log("SYSTEM", id, "DELETE_CATALOG", { message: `Eliminado de ${table}: ${itemName}` });
-            catalogCache.invalidate(table);
-        } catch (error) {
-            handleError(error, "Delete Catalog Item");
-            throw error;
-        }
-    }
-};
-
-export const profileService = {
-    async fetchAll() {
-        try {
-            const { data, error } = await supabase.from('profiles').select('*').order('email');
-            if (error) throw error;
-            return data || [];
-        } catch (error) {
-            handleError(error, "Fetch Profiles");
-            return [];
-        }
-    },
-    async updateRole(userId: string, role: string) {
-        try {
-            const { error } = await supabase.from('profiles').update({ role }).eq('id', userId);
-            if (error) throw error;
-            await HistoryService.log('SYSTEM', userId, 'UPDATE_ROLE', { message: `Rol actualizado a ${role}` });
-        } catch (error) {
-            handleError(error, "Update Role");
-            throw error;
-        }
-    }
-};

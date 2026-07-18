@@ -5,6 +5,7 @@
     import { ticketService } from "../../services/tickets";
     import { personnelService } from "../../services/personnel";
     import { toast } from "svelte-sonner";
+    import { handleError } from "../../utils";
     import {
         FileSpreadsheet,
         CheckCircle2,
@@ -26,7 +27,7 @@
         type ImportParseResult,
         type ParsedSheet,
         type ParsedRow,
-    } from "../../utils/xlsxImporter";
+    } from "../../utils";
     import type { Person } from "../../types";
 
     let {
@@ -112,10 +113,7 @@
             });
             selectedRows = initialSelected;
         } catch (err) {
-            console.error(err);
-            toast.error(
-                "No se pudo leer el archivo. Asegúrate de usar la plantilla correcta.",
-            );
+            handleError(err, "Leer Plantilla Excel");
         } finally {
             isParsing = false;
             input.value = "";
@@ -348,8 +346,7 @@
                 );
             }
         } catch (err) {
-            console.error(err);
-            toast.error("Error al importar. Intente de nuevo.");
+            handleError(err, "Importar Tickets");
             step = "review";
         } finally {
             isImporting = false;

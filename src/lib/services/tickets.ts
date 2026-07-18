@@ -1,9 +1,8 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import type { Ticket } from "../types";
-import { handleError } from "../utils/error";
+import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, appEvents, EVENTS, batchPaginate } from "../utils";
 import { ticketState } from "../stores";
-import { appEvents, EVENTS } from "../utils/appEvents";
 
 type CardAssignmentInfo = {
     movementType: string;
@@ -18,7 +17,7 @@ async function fetchCardAssignmentTypes(
     if (cardIds.length === 0) return result;
 
     const uniqueIds = [...new Set(cardIds)];
-    const logs: { action: string; details: any; timestamp: string }[] = [];
+    const logs: { action: string; details: Record<string, unknown>; timestamp: string; entity_id?: string }[] = [];
 
     const chunkSize = 40;
     for (let i = 0; i < uniqueIds.length; i += chunkSize) {
@@ -86,7 +85,7 @@ async function fetchCardAssignmentTypes(
     return result;
 }
 
-async function enrichWithMovementType(tickets: any[]): Promise<any[]> {
+async function enrichWithMovementType(tickets: Ticket[]): Promise<(Ticket & { movementType: string; assignmentDate: string })[]> {
     const cardIds = tickets.map((t) => t.card_id).filter(Boolean) as string[];
     const personnelCreatedAt: Record<string, string> = {};
     for (const t of tickets) {
@@ -97,7 +96,7 @@ async function enrichWithMovementType(tickets: any[]): Promise<any[]> {
 
     const assignmentMap = await fetchCardAssignmentTypes(cardIds, personnelCreatedAt);
 
-    return tickets.map((t) => {
+    return tickets.map((t: Ticket & { movementType?: string; assignmentDate?: string }) => {
         const info = t.card_id ? assignmentMap[t.card_id] : undefined;
         let movementType = info?.movementType ?? "Sin clasificar";
         let assignmentDate = info?.registeredAt || t.created_at;
@@ -116,31 +115,23 @@ async function enrichWithMovementType(tickets: any[]): Promise<any[]> {
             }
         }
 
-        return { ...t, movementType, assignmentDate };
+        return { ...t, movementType, assignmentDate } as Ticket & { movementType: string; assignmentDate: string };
     });
 }
 
 export const ticketService = {
     async fetchAll(throwOnError: boolean = false): Promise<Ticket[]> {
-        try {
+        return withErrorHandlingConditional(async () => {
             const { data, error } = await supabase
                 .from("tickets")
                 .select("*, personnel(first_name, last_name)")
                 .eq("status", "pending")
                 .order('created_at', { ascending: true })
-                .limit(200); // Cap at 200 to avoid overloading initial load
+                .limit(200);
 
             if (error) throw error;
-            return (data || []).map(t => ({
-                ...t,
-                personId: t.person_id,
-                cardId: t.card_id,
-            } as Ticket));
-        } catch (error) {
-            handleError(error, "Fetch Tickets");
-            if (throwOnError) throw error;
-            return [];
-        }
+            return (data || []).map(t => ({ ...t } as Ticket));
+        }, "Fetch Tickets", throwOnError, []);
     },
 
     async fetchPaginated(
@@ -152,7 +143,7 @@ export const ticketService = {
         section: string = "General",
         dependencyId: string = ""
     ): Promise<{ data: Ticket[]; count: number }> {
-        try {
+        return withErrorHandlingSafe(async () => {
             const from = (page - 1) * limit;
             const to = from + limit - 1;
 
@@ -189,7 +180,6 @@ export const ticketService = {
                 const terms = search.trim().split(/\s+/).filter(Boolean);
                 const searchTerm = `%${search}%`;
 
-                // Find matching people IDs first
                 let peopleQuery = supabase
                     .from("personnel")
                     .select("id");
@@ -215,11 +205,7 @@ export const ticketService = {
 
             if (error) throw error;
 
-            const mapped = (data as any[] || []).map(t => ({
-                ...t,
-                personId: t.person_id,
-                cardId: t.card_id,
-            } as Ticket));
+            const mapped = (data || []).map(t => ({ ...t } as Ticket));
 
             if (section === "Responsivas" && mapped.length > 0) {
                 const enriched = await enrichWithMovementType(mapped);
@@ -227,26 +213,18 @@ export const ticketService = {
             }
 
             return { data: mapped, count: count || 0 };
-        } catch (error) {
-            handleError(error, "Fetch Tickets Paginated");
-            return { data: [], count: 0 };
-        }
+        }, "Fetch Tickets Paginated", { data: [], count: 0 });
     },
 
     async fetchResponsivasForExport(
         dependencyId: string = ""
-    ): Promise<any[]> {
-        try {
-            const allData: any[] = [];
-            let page = 0;
-            const pageSize = 1000;
-            let hasMore = true;
-
+    ): Promise<(Ticket & { movementType: string; assignmentDate: string })[]> {
+        return withErrorHandlingSafe(async () => {
             const personnelSelect = dependencyId
                 ? "personnel!inner(id, first_name, last_name, employee_no, dependency_id, created_at, dependencies(name))"
                 : "personnel(id, first_name, last_name, employee_no, dependency_id, created_at, dependencies(name))";
 
-            while (hasMore) {
+            const allData = await batchPaginate<any>(async (from, to) => {
                 let query = supabase
                     .from("tickets")
                     .select(`*, cards(id, folio, type), ${personnelSelect}`)
@@ -257,30 +235,26 @@ export const ticketService = {
                     query = query.eq("personnel.dependency_id", dependencyId);
                 }
 
-                const { data, error } = await query
+                return query
                     .order("created_at", { ascending: true })
-                    .range(page * pageSize, (page + 1) * pageSize - 1);
-
-                if (error) throw error;
-
-                if (data && data.length > 0) {
-                    allData.push(...data);
-                    page++;
-                    if (data.length < pageSize) hasMore = false;
-                } else {
-                    hasMore = false;
-                }
-            }
+                    .range(from, to);
+            });
 
             return enrichWithMovementType(allData);
-        } catch (error) {
-            handleError(error, "Fetch Responsivas for Export");
-            return [];
-        }
+        }, "Fetch Responsivas for Export", []);
     },
 
-    async create(data: any) {
-        try {
+    async create(data: {
+        type: string;
+        description?: string;
+        priority: string;
+        person_id?: string | null;
+        card_id?: string | null;
+        title?: string;
+        payload?: Record<string, unknown>;
+        metadata?: Record<string, unknown>;
+    }) {
+        return withErrorHandling(async () => {
             const payload = {
                 type: data.type,
                 description: data.description,
@@ -307,10 +281,7 @@ export const ticketService = {
 
             ticketState.addTicket(newTicket as Ticket);
             appEvents.emit(EVENTS.TICKETS_CHANGED);
-        } catch (error) {
-            handleError(error, "Create Ticket");
-            throw error;
-        }
+        }, "Create Ticket");
     },
 
     async createBatch(
@@ -352,8 +323,9 @@ export const ticketService = {
             const fresh = await ticketService.fetchAll();
             ticketState.setTickets(fresh);
             appEvents.emit(EVENTS.TICKETS_CHANGED);
-        } catch (err: any) {
-            tickets.forEach((_, i) => errors.push({ index: i, message: err?.message ?? 'Error desconocido' }));
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Error desconocido';
+            tickets.forEach((_, i) => errors.push({ index: i, message: msg }));
         }
 
         return { created, errors };
@@ -361,11 +333,9 @@ export const ticketService = {
 
 
     async delete(id: number, reason?: string) {
-        try {
-            // Fetch ticket title for history BEFORE deleting
+        return withErrorHandling(async () => {
             const { data: ticket } = await supabase.from("tickets").select("title").eq("id", id).single();
 
-            // Log completion BEFORE removing data
             await HistoryService.log("TICKET", id, "COMPLETE", {
                 message: reason || `Ticket completado/atendido`,
                 entityName: ticket ? `Ticket #${id}: ${ticket.title}` : `Ticket #${id}`
@@ -375,15 +345,11 @@ export const ticketService = {
             if (error) throw error;
             ticketState.removeTicket(id);
             appEvents.emit(EVENTS.TICKETS_CHANGED);
-        } catch (error) {
-            handleError(error, "Delete Ticket");
-            throw error;
-        }
+        }, "Delete Ticket");
     },
 
     async deleteByCard(cardId: string, types?: string[], reason?: string) {
-        try {
-            // 0. Fetch tickets to log deletion
+        return withErrorHandling(async () => {
             let fetchQuery = supabase.from("tickets")
                 .select("id, title")
                 .eq("card_id", cardId);
@@ -408,15 +374,11 @@ export const ticketService = {
             if (error) throw error;
             ticketState.removeByCard(cardId, types);
             appEvents.emit(EVENTS.TICKETS_CHANGED);
-        } catch (error) {
-            handleError(error, "Delete Tickets by Card");
-            throw error;
-        }
+        }, "Delete Tickets by Card");
     },
 
     async deleteByPerson(personId: string, reason?: string) {
-        try {
-            // 0. Fetch tickets to log deletion
+        return withErrorHandling(async () => {
             const { data: tickets } = await supabase.from("tickets")
                 .select("id, title")
                 .eq("person_id", personId);
@@ -430,22 +392,18 @@ export const ticketService = {
                 }
             }
 
-            // We delete all tickets linked to this person ID
             const { error } = await supabase.from("tickets").delete().eq("person_id", personId);
             if (error) throw error;
             ticketState.removeByPerson(personId);
             appEvents.emit(EVENTS.TICKETS_CHANGED);
-        } catch (error) {
-            handleError(error, "Delete Tickets by Person");
-            throw error;
-        }
+        }, "Delete Tickets by Person");
     },
 
     async updateStatus(id: string, status: string, details?: string) {
-        try {
+        return withErrorHandling(async () => {
             const { error } = await supabase.from("tickets").update({ status }).eq("id", id);
             if (error) throw error;
-            // Fetch ticket title for history
+
             const { data: ticket } = await supabase.from("tickets").select("title").eq("id", id).single();
 
             await HistoryService.log("TICKET", id, "UPDATE_STATUS", {
@@ -453,7 +411,6 @@ export const ticketService = {
                 entityName: ticket ? `Ticket #${id}: ${ticket.title}` : `Ticket #${id}`
             });
 
-            // Fetch the updated ticket to sync with store
             const { data: updatedTicket } = await supabase
                 .from("tickets")
                 .select("*")
@@ -464,9 +421,6 @@ export const ticketService = {
                 ticketState.updateTicket(updatedTicket as Ticket);
             }
             appEvents.emit(EVENTS.TICKETS_CHANGED);
-        } catch (error) {
-            handleError(error, "Update Ticket Status");
-            throw error;
-        }
+        }, "Update Ticket Status");
     }
 };

@@ -21,9 +21,10 @@
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import { cardlessRegistryService } from "../services/cardlessRegistry";
-    import { exportCardlessRegistryAllDependenciesAsZip } from "../utils/zipExport";
+    import { exportCardlessRegistryAllDependenciesAsZip, handleError } from "../utils";
     import type { CardlessRegistry } from "../types";
     import { toast } from "svelte-sonner";
+    
     import { networkStore } from "../stores/network.svelte";
     import { onMount } from "svelte";
     import CardlessRegistryModal from "../components/modals/CardlessRegistryModal.svelte";
@@ -219,8 +220,8 @@
             );
             toast.success("ZIP descargado", { id: loadingToast });
         } catch (error) {
-            console.error("ZIP Export Error:", error);
-            toast.error("Error al generar el ZIP", { id: loadingToast });
+            toast.dismiss(loadingToast);
+            handleError(error, "Exportar ZIP Sin Tarjeta");
         } finally {
             isZipExporting = false;
         }

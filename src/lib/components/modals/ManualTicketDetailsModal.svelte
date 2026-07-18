@@ -5,6 +5,7 @@
     import { ticketService } from "../../services/tickets";
     import { cardService } from "../../services/cards";
     import { toast } from "svelte-sonner";
+    import { handleError } from "../../utils";
     import {
         Calendar,
         User,
@@ -62,7 +63,7 @@
                         if (p) fetchedPerson = p;
                     })
                     .catch((e) => {
-                        console.error("Error fetching person:", e);
+                        handleError(e, "Cargar Persona Relacionada");
                     })
                     .finally(() => {
                         isLoadingPerson = false;
@@ -140,8 +141,7 @@
             closeModal();
             onComplete?.();
         } catch (e) {
-            console.error(e);
-            toast.error("Error al rechazar el ticket");
+            handleError(e, "Rechazar Ticket");
         } finally {
             isSubmitting = false;
         }
@@ -164,8 +164,7 @@
             closeModal();
             onComplete?.();
         } catch (e) {
-            console.error(e);
-            toast.error("Error al completar el ticket");
+            handleError(e, "Completar Ticket Manual");
         } finally {
             isSubmitting = false;
         }

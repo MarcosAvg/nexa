@@ -10,6 +10,7 @@
         profileService,
     } from "../../services";
     import { toast } from "svelte-sonner";
+    import { handleError } from "../../utils";
     import {
         ticketState,
         personnelState,
@@ -145,8 +146,8 @@
                             .slice(0, 5);
                         showSearchResults = true;
                     }
-                } catch (err) {
-                    console.error("Search failed:", err);
+                } catch {
+                    // Silently handle search errors (non-critical)
                 }
             }, 300);
         } else {
@@ -224,8 +225,7 @@
 
             isOpen = false;
         } catch (e) {
-            console.error(e);
-            toast.error("Error al crear ticket");
+            handleError(e, "Crear Ticket");
         } finally {
             isLoading = false;
         }

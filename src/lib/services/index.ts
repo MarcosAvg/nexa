@@ -1,4 +1,3 @@
-
 export * from './cards';
 export * from './tickets';
 export * from './history';
@@ -6,3 +5,5 @@ export * from './personnel';
 export * from './responsiva';
 export * from './enlaces';
 export * from './cardlessRegistry';
+export * from './catalogs';
+export * from './profiles';

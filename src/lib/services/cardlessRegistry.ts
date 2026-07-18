@@ -1,11 +1,8 @@
 import { supabase } from "../supabase";
-import { handleError } from "../utils/error";
+import { withErrorHandling, withErrorHandlingSafe, exportCardlessRegistryToExcel } from "../utils";
 import type { CardlessRegistry } from "../types";
+import type { CardlessRegistryExportFilters } from "../utils";
 import { networkStore } from "../stores/network.svelte";
-import {
-    exportCardlessRegistryToExcel,
-    type CardlessRegistryExportFilters,
-} from "../utils/xlsxExport";
 
 const REASONS = [
     "No se le ha entregado",
@@ -82,14 +79,34 @@ async function fetchPendingKoneResponsivaSet(personIds: string[]): Promise<Set<s
     if (error || !data) return new Set();
 
     return new Set(
-        data
-            .filter((t: any) => t.cards?.type === "KONE")
-            .map((t: any) => t.person_id as string)
+        (data as { person_id: string; cards?: { type: string } | null }[])
+            .filter((t) => t.cards?.type === "KONE")
+            .map((t) => t.person_id)
     );
 }
 
 
-const mapCardlessRegistryRecord = (r: any): CardlessRegistry => {
+interface RegistryRow {
+    id: number;
+    person_id: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    employee_no: string | null;
+    building_id: number | null;
+    dependency_id: number | null;
+    floor: string | null;
+    reason: string;
+    comments: string | null;
+    recorded_at: string;
+    recorded_by: string;
+    kone_status_at_registration: boolean | null;
+    personnel?: { first_name: string; last_name: string; employee_no: string } | null;
+    buildings?: { name: string } | null;
+    dependencies?: { name: string } | null;
+    profiles?: { full_name: string } | null;
+}
+
+const mapCardlessRegistryRecord = (r: RegistryRow): CardlessRegistry => {
     const personName = r.personnel
         ? `${r.personnel.first_name} ${r.personnel.last_name}`
         : [r.first_name, r.last_name].filter(Boolean).join(" ") || undefined;
@@ -140,7 +157,15 @@ async function enrichWithKoneResponsiva(registries: CardlessRegistry[]): Promise
     });
 }
 
-function applyFilters(query: any, filters: CardlessRegistryFilters) {
+/** Interfaz para un query builder encadenable tipo Supabase PostgrestFilterBuilder */
+interface FilterQuery<T> {
+    gte(col: string, val: string): T;
+    lte(col: string, val: string): T;
+    eq(col: string, val: string | number): T;
+    or(filter: string): T;
+}
+
+function applyFilters<T extends FilterQuery<T>>(query: T, filters: CardlessRegistryFilters): T {
     const start = filters.startDate;
     const end = filters.endDate;
 
@@ -183,7 +208,7 @@ export const cardlessRegistryService = {
         limit: number = 50,
         filters: CardlessRegistryFilters = {}
     ): Promise<{ data: CardlessRegistry[]; count: number }> {
-        try {
+        return withErrorHandling(async () => {
             if (!networkStore.isOnline) {
                 return { data: [], count: 0 };
             }
@@ -207,11 +232,7 @@ export const cardlessRegistryService = {
                 data: data ? await enrichWithKoneResponsiva(data.map(mapCardlessRegistryRecord)) : [],
                 count: count || 0
             };
-
-        } catch (error) {
-            handleError(error);
-            throw error;
-        }
+        }, "Fetch Registry");
     },
 
     /** Todas las filas que cumplen filtros (para exportar). */
@@ -233,7 +254,7 @@ export const cardlessRegistryService = {
     },
 
     async create(data: CardlessRegistryInput): Promise<CardlessRegistry | null> {
-        try {
+        return withErrorHandlingSafe(async () => {
             if (!networkStore.isOnline) {
                 throw new Error("Sin conexión a internet");
             }
@@ -255,14 +276,11 @@ export const cardlessRegistryService = {
             const mapped = mapCardlessRegistryRecord(result);
 
             return mapped;
-        } catch (error) {
-            handleError(error);
-            return null;
-        }
+        }, "Create Registry", null);
     },
 
     async update(id: number, data: Partial<CardlessRegistryInput>): Promise<CardlessRegistry | null> {
-        try {
+        return withErrorHandlingSafe(async () => {
             if (!networkStore.isOnline) {
                 throw new Error("Sin conexión a internet");
             }
@@ -279,14 +297,11 @@ export const cardlessRegistryService = {
             const mapped = mapCardlessRegistryRecord(result);
 
             return mapped;
-        } catch (error) {
-            handleError(error);
-            return null;
-        }
+        }, "Update Registry", null);
     },
 
     async delete(id: number): Promise<boolean> {
-        try {
+        return withErrorHandlingSafe(async () => {
             if (!networkStore.isOnline) {
                 throw new Error("Sin conexión a internet");
             }
@@ -299,21 +314,15 @@ export const cardlessRegistryService = {
             if (error) throw error;
 
             return true;
-        } catch (error) {
-            handleError(error);
-            return false;
-        }
+        }, "Delete Registry", false);
     },
 
     async exportToExcel(
         registries: CardlessRegistry[],
         filters?: CardlessRegistryExportFilters
     ): Promise<void> {
-        try {
+        return withErrorHandling(async () => {
             await exportCardlessRegistryToExcel(registries, filters);
-        } catch (error) {
-            handleError(error);
-            throw error;
-        }
+        }, "Export Registry");
     }
 };

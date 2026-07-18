@@ -1,11 +1,11 @@
 import { supabase } from '../supabase';
 import { HistoryService } from './history';
-import { handleError } from '../utils/error';
+import { withErrorHandling, withErrorHandlingSafe } from '../utils';
 import type { Enlace } from '../types';
 
 export const enlaceService = {
     async fetchAll(): Promise<Enlace[]> {
-        try {
+        return withErrorHandlingSafe(async () => {
             const { data, error } = await supabase
                 .from('enlaces')
                 .select(`
@@ -28,14 +28,11 @@ export const enlaceService = {
 
             if (error) throw error;
             return data as any[];
-        } catch (error) {
-            handleError(error, 'Fetch Enlaces');
-            return [];
-        }
+        }, 'Fetch Enlaces', []);
     },
 
     async add(personId: string, extension: string): Promise<Enlace> {
-        try {
+        return withErrorHandling(async () => {
             const { data, error } = await supabase
                 .from('enlaces')
                 .insert([{ person_id: personId, extension }])
@@ -66,14 +63,11 @@ export const enlaceService = {
             });
 
             return data as any;
-        } catch (error) {
-            handleError(error, 'Add Enlace');
-            throw error;
-        }
+        }, 'Add Enlace');
     },
 
     async update(id: string, extension: string, personName: string) {
-        try {
+        return withErrorHandling(async () => {
             const { data, error } = await supabase
                 .from('enlaces')
                 .update({ extension })
@@ -89,14 +83,11 @@ export const enlaceService = {
             });
 
             return data;
-        } catch (error) {
-            handleError(error, 'Update Enlace');
-            throw error;
-        }
+        }, 'Update Enlace');
     },
 
     async remove(id: string, personName: string) {
-        try {
+        return withErrorHandling(async () => {
             const { error } = await supabase
                 .from('enlaces')
                 .delete()
@@ -108,9 +99,6 @@ export const enlaceService = {
                 message: `Enlace administrativo removido`,
                 entityName: `Enlace: ${personName}`
             });
-        } catch (error) {
-            handleError(error, 'Remove Enlace');
-            throw error;
-        }
+        }, 'Remove Enlace');
     }
 };

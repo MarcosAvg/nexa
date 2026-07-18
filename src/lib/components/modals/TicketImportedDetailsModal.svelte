@@ -16,6 +16,7 @@
     import { HistoryService } from "../../services/history";
     import { catalogState, personnelState } from "../../stores";
     import { toast } from "svelte-sonner";
+    import { handleError, parseFloors, appEvents, EVENTS } from "../../utils";
     import {
         AlertCircle,
         CheckCircle2,
@@ -25,8 +26,8 @@
         Loader2,
         AlertTriangle
     } from "lucide-svelte";
-    import { parseFloors } from "../../utils/xlsxImporter";
-    import { appEvents, EVENTS } from "../../utils/appEvents";
+
+
 
     let {
         isOpen = $bindable(false),
@@ -260,8 +261,7 @@
                     toast.success("Ticket de baja cerrado exitosamente.");
                     onComplete?.();
                 } catch (err) {
-                    console.error(err);
-                    toast.error("Error al cerrar el ticket.");
+                    handleError(err, "Cerrar Ticket de Baja");
                 } finally {
                     isSubmitting = false;
                 }
@@ -342,8 +342,7 @@
             isOpen = false;
             onComplete?.();
         } catch (err) {
-            console.error(err);
-            toast.error("Error al cerrar el ticket.");
+            handleError(err, "Cerrar Reposición");
         } finally {
             isSubmitting = false;
         }
@@ -375,8 +374,7 @@
             isOpen = false;
             onComplete?.();
         } catch (err) {
-            console.error(err);
-            toast.error("Error al completar el ticket.");
+            handleError(err, "Completar Ticket");
         } finally {
             isSubmitting = false;
         }
@@ -397,8 +395,7 @@
             });
             await handleComplete("Reposición creada desde reporte de falla");
         } catch (err) {
-            console.error(err);
-            toast.error("Error al crear ticket de reposición.");
+            handleError(err, "Crear Ticket de Reposición");
             isSubmitting = false;
         }
     }
@@ -422,8 +419,7 @@
             isOpen = false;
             onComplete?.();
         } catch (err) {
-            console.error(err);
-            toast.error("Error al rechazar.");
+            handleError(err, "Rechazar Ticket");
         } finally {
             isSubmitting = false;
         }

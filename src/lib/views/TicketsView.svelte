@@ -31,12 +31,12 @@
     import { cardService } from "../services/cards";
     import { personnelService } from "../services/personnel";
     import { toast } from "svelte-sonner";
-    import { exportResponsivasToExcel } from "../utils/xlsxExport";
-    import { exportResponsivasAllDependenciesAsZip } from "../utils/zipExport";
+    import { handleError, exportResponsivasToExcel, exportResponsivasAllDependenciesAsZip, createSimpleDebounce, appEvents, EVENTS } from "../utils";
     import ImportPreviewModal from "../components/modals/ImportPreviewModal.svelte";
     import ConfirmAltaModal from "../components/modals/ConfirmAltaModal.svelte";
     import TicketImportedDetailsModal from "../components/modals/TicketImportedDetailsModal.svelte";
     import { networkStore } from "../stores/network.svelte";
+
 
     // Server-side paginated tickets (replaces client-side filtering)
     let tickets = $state<any[]>([]);
@@ -161,7 +161,7 @@
     ];
 
     import { onMount, onDestroy } from "svelte";
-    import { appEvents, EVENTS } from "../utils/appEvents";
+
     import { supabase } from "../supabase";
 
     /** Si otro usuario eliminó/atendió el ticket, cerrar modales y avisar. */
@@ -263,12 +263,14 @@
     }
 
     // Debounced search
-    let searchTimeout: ReturnType<typeof setTimeout>;
+    const debouncedSearch = createSimpleDebounce(() => {
+        refreshData(1);
+    }, 300);
+
     function onSearch(e: Event) {
         const value = (e.target as HTMLInputElement).value;
         searchQuery = value;
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => refreshData(1), 300);
+        debouncedSearch();
     }
 
     function onFilterChange() {
@@ -381,8 +383,7 @@
             await ticketService.delete(ticket.id);
             toast.success("Ticket completado");
         } catch (e) {
-            console.error(e);
-            toast.error("Error al completar el ticket");
+            handleError(e, "Completar Ticket");
             // Rollback on error
             tickets = prevTickets;
             totalRecords = totalRecords + 1;
@@ -413,10 +414,8 @@
             await exportResponsivasToExcel(data, dependencyFilter);
             toast.success("Exportación completada", { id: loadingToast });
         } catch (error) {
-            console.error("Export Error:", error);
-            toast.error("Error al exportar los datos", {
-                id: loadingToast,
-            });
+            toast.dismiss(loadingToast);
+            handleError(error, "Exportar Responsivas");
         }
     }
 
@@ -438,8 +437,8 @@
             );
             toast.success("ZIP descargado", { id: loadingToast });
         } catch (error) {
-            console.error("ZIP Export Error:", error);
-            toast.error("Error al generar el ZIP", { id: loadingToast });
+            toast.dismiss(loadingToast);
+            handleError(error, "Exportar ZIP Responsivas");
         } finally {
             isZipExporting = false;
         }

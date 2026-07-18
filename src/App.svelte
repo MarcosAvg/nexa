@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { AlertCircle, RefreshCcw } from "lucide-svelte";
+  import { handleError, initGlobalRealtime } from "./lib/utils";
   import { supabase, auth } from "./lib/supabase";
   import {
     uiState,
@@ -24,7 +25,6 @@
     HistoryService,
   } from "./lib/services";
   import GlobalOverlays from "./lib/components/GlobalOverlays.svelte";
-  import { initGlobalRealtime } from "./lib/utils/realtime";
 
   let loadingAuth = $state(true);
   let initError = $state(false);
@@ -127,7 +127,7 @@
         }
       })();
     } catch (err) {
-      console.error("Error general en initData:", err);
+      handleError(err, "Inicializar Aplicación");
       if (!isBackground) {
         initError = true;
       }

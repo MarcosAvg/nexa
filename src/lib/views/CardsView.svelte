@@ -1,7 +1,7 @@
 <script lang="ts">
     import { personnelState, userState, uiState } from "../stores";
     import { onMount, onDestroy } from "svelte";
-    import { appEvents, EVENTS } from "../utils/appEvents";
+    import { appEvents, EVENTS, handleError, createSimpleDebounce } from "../utils";
     import SectionHeader from "../components/SectionHeader.svelte";
     import FilterGroup from "../components/FilterGroup.svelte";
     import Button from "../components/Button.svelte";
@@ -21,13 +21,17 @@
         FileSearch,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
+    import Pagination from "../components/Pagination.svelte";
     import AddCardModal from "../components/modals/AddCardModal.svelte";
     import DetectMissingCardsModal from "../components/modals/DetectMissingCardsModal.svelte";
     import { cardService } from "../services/cards";
     import { toast } from "svelte-sonner";
+
     import { personnelService } from "../services/personnel";
     import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
     import { networkStore } from "../stores/network.svelte";
+    import { getCardStatusVariant, getCardStatusLabel } from "../constants/status";
+
 
     let personnel = $derived(personnelState.personnel);
     let extraCards = $derived(personnelState.extraCards);
@@ -64,15 +68,7 @@
     // Props
     // Phase 2 Refactor: Use appState and stores instead of props
 
-    let currentUser = $derived.by(() => {
-        if (!userState.profile) return null;
-        return {
-            name: userState.profile.full_name || "Usuario",
-            email: userState.profile.email,
-            avatar: userState.profile.avatar_url,
-            role: userState.profile.role,
-        };
-    });
+    let currentUser = $derived(userState.currentUser);
 
     // Handlers
     function onOpenAddCard() {
@@ -99,14 +95,14 @@
     }
 
     // Debounced Search
-    let searchTimeout: any;
+    const debouncedSearch = createSimpleDebounce(() => {
+        refreshData(1);
+    }, 300);
+
     function onSearch(e: Event) {
         const value = (e.target as HTMLInputElement).value;
         cardSearch = value;
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            refreshData(1);
-        }, 300);
+        debouncedSearch();
     }
 
     function onFilterChange() {
@@ -199,8 +195,8 @@
     }
 
     function onViewPerson(card: any) {
-        if (!card.personId) return;
-        personnelState.selectPerson(card.personId);
+        if (!card.person_id) return;
+        personnelState.selectPerson(card.person_id);
         uiState.setActivePage("Directorio de Personal");
     }
 
@@ -209,51 +205,7 @@
         isModalOpen = true;
     }
 
-    // Snippets
-    function getStatusVariant(status: string) {
-        if (status === "active") return "emerald";
-        if (status === "blocked") return "rose";
-        if (status === "inactive") return "slate";
-        return "blue";
-    }
-
-    function getStatusLabel(status: string) {
-        if (status === "active") return "Activa";
-        if (status === "blocked") return "Bloqueada";
-        if (status === "inactive") return "Baja";
-        return "Disponible";
-    }
-
-    function getPageRange(curr: number, total: number): (number | "...")[] {
-        const delta = 2; // Number of pages valid before and after current page
-        const range: number[] = [];
-        const rangeWithDots: (number | "...")[] = [];
-
-        for (let i = 1; i <= total; i++) {
-            if (
-                i === 1 ||
-                i === total ||
-                (i >= curr - delta && i <= curr + delta)
-            ) {
-                range.push(i);
-            }
-        }
-
-        let l: number | null = null;
-        for (const i of range) {
-            if (l) {
-                if (i - l === 2) {
-                    rangeWithDots.push(l + 1);
-                } else if (i - l !== 1) {
-                    rangeWithDots.push("...");
-                }
-            }
-            rangeWithDots.push(i);
-            l = i;
-        }
-
-        return rangeWithDots;
-    }
+    // Snippets (status helpers now imported from constants/status)
 </script>
 
 {#snippet renderCardType(row: any)}
@@ -286,8 +238,8 @@
 {/snippet}
 
 {#snippet renderCardStatus(row: any)}
-    <Badge variant={getStatusVariant(row.status)}>
-        {getStatusLabel(row.status)}
+    <Badge variant={getCardStatusVariant(row.status)}>
+        {getCardStatusLabel(row.status)}
     </Badge>
 {/snippet}
 
@@ -376,8 +328,8 @@
                             id: loadingToast,
                         });
                     } catch (e) {
-                        console.error(e);
-                        toast.error("Error al exportar", { id: loadingToast });
+                        toast.dismiss(loadingToast);
+                        handleError(e, "Exportar Tarjetas");
                     }
                 }}
             >
@@ -444,7 +396,7 @@
         >
             {#snippet actions(row: any)}
                 <div class="flex items-center justify-end gap-1">
-                    {#if row.personId}
+                    {#if row.person_id}
                         <!-- Ver Dueño -->
                         <button
                             type="button"
@@ -487,7 +439,7 @@
                             </button>
                         {/if}
 
-                        {#if row.personId && row.status !== "inactive"}
+                        {#if row.person_id && row.status !== "inactive"}
                             <!-- Reposición: Indigo -->
                             <button
                                 type="button"
@@ -535,63 +487,14 @@
         </DataTable>
     </Card>
 
-    <!-- Pagination Controls -->
-    {#if totalRecords > 0}
-        <div
-            class="flex flex-col sm:flex-row justify-between items-center gap-4 py-4"
-        >
-            <div class="text-sm text-slate-500">
-                Mostrando <span class="font-medium text-slate-900"
-                    >{(currentPage - 1) * pageSize + 1}</span
-                >
-                a
-                <span class="font-medium text-slate-900"
-                    >{Math.min(currentPage * pageSize, totalRecords)}</span
-                >
-                de
-                <span class="font-medium text-slate-900">{totalRecords}</span>
-                registros
-            </div>
-
-            <div class="flex items-center gap-2">
-                <Button
-                    variant="soft-blue"
-                    size="sm"
-                    disabled={currentPage === 1}
-                    onclick={() => refreshData(currentPage - 1)}
-                >
-                    Anterior
-                </Button>
-
-                <div class="flex items-center gap-1">
-                    {#each getPageRange(currentPage, totalPages) as page}
-                        {#if page === "..."}
-                            <span class="px-2 text-slate-400">...</span>
-                        {:else}
-                            <button
-                                class="w-8 h-8 rounded-lg text-sm font-medium transition-colors {currentPage ===
-                                page
-                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                                    : 'text-slate-600 hover:bg-slate-100'}"
-                                onclick={() => refreshData(page as number)}
-                            >
-                                {page}
-                            </button>
-                        {/if}
-                    {/each}
-                </div>
-
-                <Button
-                    variant="soft-blue"
-                    size="sm"
-                    disabled={currentPage === totalPages}
-                    onclick={() => refreshData(currentPage + 1)}
-                >
-                    Siguiente
-                </Button>
-            </div>
-        </div>
-    {/if}
+    <Pagination
+        {currentPage}
+        {pageSize}
+        {totalRecords}
+        onPrevPage={() => refreshData(currentPage - 1)}
+        onNextPage={() => refreshData(currentPage + 1)}
+        onGoToPage={(page) => refreshData(page)}
+    />
 </div>
 
 <AddCardModal
@@ -603,7 +506,7 @@
             await cardService.save(
                 {
                     ...card,
-                    person_id: replacingCard?.personId,
+                    person_id: replacingCard?.person_id,
                 },
                 replacementOptions,
             );
@@ -615,7 +518,7 @@
             await refreshData();
             isModalOpen = false;
         } catch (e) {
-            console.error(e);
+            handleError(e, "Guardar Tarjeta");
             throw e;
         }
     }}

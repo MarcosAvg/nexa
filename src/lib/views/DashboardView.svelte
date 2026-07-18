@@ -15,7 +15,7 @@
         TrendingUp,
     } from "lucide-svelte";
     import { onMount, onDestroy } from "svelte";
-    import { appEvents, EVENTS } from "../utils/appEvents";
+    import { appEvents, EVENTS } from "../utils";
 
     let unsubs: (() => void)[] = [];
 
@@ -39,15 +39,7 @@
 
     let pendingItems = $derived(ticketState.pendingItems);
 
-    let currentUser = $derived.by(() => {
-        if (!userState.profile) return null;
-        return {
-            name: userState.profile.full_name || "Usuario",
-            email: userState.profile.email,
-            avatar: userState.profile.avatar_url,
-            role: userState.profile.role,
-        };
-    });
+    let currentUser = $derived(userState.currentUser);
 
     // KPI cards
     let activePersonnelCount = $derived(

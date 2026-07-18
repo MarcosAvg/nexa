@@ -3,6 +3,7 @@
     import Button from "../Button.svelte";
     import Badge from "../Badge.svelte";
     import { toast } from "svelte-sonner";
+    import { handleError, parseKoneUsageFile, matchKoneUsageToPersonnel, findDuplicateFolios, getDuplicateFoliosSummary, exportKoneUsageToExcel, exportKoneUsageAllDependenciesAsZip } from "../../utils";
     import {
         Upload,
         FileSpreadsheet,
@@ -14,16 +15,7 @@
         FolderArchive,
         ChevronDown,
     } from "lucide-svelte";
-    import {
-        parseKoneUsageFile,
-        matchKoneUsageToPersonnel,
-        findDuplicateFolios,
-        getDuplicateFoliosSummary,
-        type KoneUsageMatchResult,
-        type DuplicateFolioInfo,
-    } from "../../utils/xlsxKoneUsage";
-    import { exportKoneUsageToExcel } from "../../utils/xlsxExport";
-    import { exportKoneUsageAllDependenciesAsZip } from "../../utils/zipExport";
+    import type { KoneUsageMatchResult, DuplicateFolioInfo } from "../../utils";
 
     type Props = {
         isOpen: boolean;
@@ -98,9 +90,8 @@
             const result = await matchKoneUsageToPersonnel(entries);
             matchResult = result;
             step = "results";
-        } catch (err: any) {
-            console.error("Import Error:", err);
-            toast.error(err.message || "Error al procesar el archivo.");
+        } catch (err) {
+            handleError(err, "Importar Conteo KONE");
             step = "idle";
         }
 
@@ -116,8 +107,7 @@
             await exportKoneUsageToExcel(filteredResult, usageThreshold, selectedDependency || undefined);
             toast.success("Exportación completada");
         } catch (err) {
-            console.error("Export Error:", err);
-            toast.error("Error al exportar los datos");
+            handleError(err, "Exportar Conteo KONE");
         } finally {
             isExporting = false;
         }
@@ -138,8 +128,8 @@
             );
             toast.success("ZIP descargado", { id: loadingToast });
         } catch (err) {
-            console.error("ZIP Export Error:", err);
-            toast.error("Error al generar el ZIP", { id: loadingToast });
+            toast.dismiss(loadingToast);
+            handleError(err, "Exportar ZIP Conteo KONE");
         } finally {
             isZipExporting = false;
         }

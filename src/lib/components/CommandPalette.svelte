@@ -18,6 +18,7 @@
     } from "lucide-svelte";
     import { personnelService } from "../services/personnel";
     import { personnelState } from "../stores";
+    import { handleError } from "../utils";
     import { push } from "svelte-spa-router";
 
     let isOpen = $state(false);
@@ -161,7 +162,7 @@
 
             results = [...peopleResults, ...cardResults];
         } catch (e) {
-            console.error(e);
+            handleError(e, "Búsqueda Global");
         } finally {
             isLoading = false;
         }

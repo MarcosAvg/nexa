@@ -23,13 +23,14 @@
         FolderArchive,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
+    import Pagination from "../components/Pagination.svelte";
     import KoneUsageImportModal from "../components/modals/KoneUsageImportModal.svelte";
     import { personnelService } from "../services/personnel";
     import { cardService } from "../services/cards";
-    import { exportPersonnelToExcel } from "../utils/xlsxExport";
-    import { exportPersonnelAllDependenciesAsZip } from "../utils/zipExport";
+    import { exportPersonnelToExcel, exportPersonnelAllDependenciesAsZip, handleError, createSimpleDebounce } from "../utils";
     import { toast } from "svelte-sonner";
     import { networkStore } from "../stores/network.svelte";
+    import { getPersonnelStatusVariant } from "../constants/status";
 
     import { onMount } from "svelte";
 
@@ -83,69 +84,23 @@
         }
     });
 
-    // Search Logic (Debounced + stale-result-safe)
-    // We track the request ID so that if the user types faster than the API responds,
-    // only the latest in-flight request will update the store.
-    let searchTimeout: ReturnType<typeof setTimeout>;
-    let lastSearchId = 0;
-    async function onSearch(e: Event) {
+    // Search Logic (Debounced)
+    const debouncedSearch = createSimpleDebounce((value: string) => {
+        personnelState.search(value);
+    }, 300);
+
+    function onSearch(e: Event) {
         const value = (e.target as HTMLInputElement).value;
         personSearch = value;
-        clearTimeout(searchTimeout);
-        const thisId = ++lastSearchId;
-        searchTimeout = setTimeout(async () => {
-            await personnelState.search(value);
-            // If another request was fired while this one was in flight, discard result
-            if (thisId !== lastSearchId) return;
-        }, 300);
+        debouncedSearch(value);
     }
 
     /* Pagination Helpers */
     let currentPage = $derived(personnelState.currentPage);
     let pageSize = $derived(personnelState.pageSize);
     let totalRecords = $derived(personnelState.totalRecords);
-    let totalPages = $derived(Math.ceil(totalRecords / pageSize));
 
-    function getPageRange(curr: number, total: number): (number | "...")[] {
-        const delta = 2; // Number of pages valid before and after current page
-        const range: number[] = [];
-        const rangeWithDots: (number | "...")[] = [];
-
-        for (let i = 1; i <= total; i++) {
-            if (
-                i === 1 ||
-                i === total ||
-                (i >= curr - delta && i <= curr + delta)
-            ) {
-                range.push(i);
-            }
-        }
-
-        let l: number | null = null;
-        for (const i of range) {
-            if (l) {
-                if (i - l === 2) {
-                    rangeWithDots.push(l + 1);
-                } else if (i - l !== 1) {
-                    rangeWithDots.push("...");
-                }
-            }
-            rangeWithDots.push(i);
-            l = i;
-        }
-
-        return rangeWithDots;
-    }
-
-    let currentUser = $derived.by(() => {
-        if (!userState.profile) return null;
-        return {
-            name: userState.profile.full_name || "Usuario",
-            email: userState.profile.email,
-            avatar: userState.profile.avatar_url,
-            role: userState.profile.role,
-        };
-    });
+    let currentUser = $derived(userState.currentUser);
 
     function onOpenAddModal() {
         personnelState.openEditModal(null);
@@ -185,8 +140,8 @@
             });
             toast.success("Exportación completada", { id: loadingToast });
         } catch (error) {
-            console.error("Export Error:", error);
-            toast.error("Error al exportar los datos", { id: loadingToast });
+            toast.dismiss(loadingToast);
+            handleError(error, "Exportar Personal");
         }
     }
 
@@ -208,20 +163,11 @@
             );
             toast.success("ZIP descargado", { id: loadingToast });
         } catch (error) {
-            console.error("ZIP Export Error:", error);
-            toast.error("Error al generar el ZIP", { id: loadingToast });
+            toast.dismiss(loadingToast);
+            handleError(error, "Exportar ZIP Personal");
         } finally {
             isZipExporting = false;
         }
-    }
-
-    function getStatusVariant(status: string) {
-        if (status === "Activo/a") return "emerald";
-        if (status === "Parcial") return "amber";
-        if (status === "Sin Acceso") return "slate";
-        if (status === "Bloqueado/a") return "rose";
-        if (status === "Baja") return "slate";
-        return "slate";
     }
 </script>
 
@@ -241,12 +187,11 @@
                 MODIFICACIÓN PENDIENTE
             </Badge>
         {/if}
-    </div>
-{/snippet}
+    </div>    {/snippet}
 
 {#snippet renderStatus(row: any)}
     <div class="flex items-center gap-2">
-        <Badge variant={getStatusVariant(row.status)}>
+        <Badge variant={getPersonnelStatusVariant(row.status)}>
             {row.status}
         </Badge>
     </div>
@@ -500,64 +445,14 @@
         </DataTable>
     </Card>
 
-    <!-- Pagination Controls -->
-    {#if totalRecords > 0}
-        <div
-            class="flex flex-col sm:flex-row justify-between items-center gap-4 py-4"
-        >
-            <div class="text-sm text-slate-500">
-                Mostrando <span class="font-medium text-slate-900"
-                    >{(currentPage - 1) * pageSize + 1}</span
-                >
-                a
-                <span class="font-medium text-slate-900"
-                    >{Math.min(currentPage * pageSize, totalRecords)}</span
-                >
-                de
-                <span class="font-medium text-slate-900">{totalRecords}</span>
-                registros
-            </div>
-
-            <div class="flex items-center gap-2">
-                <Button
-                    variant="soft-blue"
-                    size="sm"
-                    disabled={currentPage === 1}
-                    onclick={() => personnelState.prevPage()}
-                >
-                    Anterior
-                </Button>
-
-                <div class="flex items-center gap-1">
-                    {#each getPageRange(currentPage, totalPages) as page}
-                        {#if page === "..."}
-                            <span class="px-2 text-slate-400">...</span>
-                        {:else}
-                            <button
-                                class="w-8 h-8 rounded-lg text-sm font-medium transition-colors {currentPage ===
-                                page
-                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                                    : 'text-slate-600 hover:bg-slate-100'}"
-                                onclick={() =>
-                                    personnelState.goToPage(page as number)}
-                            >
-                                {page}
-                            </button>
-                        {/if}
-                    {/each}
-                </div>
-
-                <Button
-                    variant="soft-blue"
-                    size="sm"
-                    disabled={currentPage === totalPages}
-                    onclick={() => personnelState.nextPage()}
-                >
-                    Siguiente
-                </Button>
-            </div>
-        </div>
-    {/if}
+    <Pagination
+        {currentPage}
+        {pageSize}
+        {totalRecords}
+        onPrevPage={() => personnelState.prevPage()}
+        onNextPage={() => personnelState.nextPage()}
+        onGoToPage={(page) => personnelState.goToPage(page)}
+    />
 </div>
 
 <PermissionGuard requireEdit>

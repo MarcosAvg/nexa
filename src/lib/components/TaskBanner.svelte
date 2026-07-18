@@ -1,16 +1,3 @@
-<script lang="ts" module>
-    export function getStatusVariant(
-        priority: string,
-    ): "rose" | "amber" | "blue" | "slate" {
-        const p = priority?.toLowerCase();
-        if (p === "urgente") return "rose";
-        if (p === "alta") return "rose";
-        if (p === "media") return "amber";
-        if (p === "baja") return "blue";
-        return "slate";
-    }
-</script>
-
 <script lang="ts">
     import Badge from "./Badge.svelte";
     import Button from "./Button.svelte";
@@ -30,6 +17,7 @@
         AlertCircle,
     } from "lucide-svelte";
     import { networkStore } from "../stores/network.svelte";
+    import { getTicketPriorityVariant } from "../constants/status";
 
     type Ticket = {
         id: number | string;
@@ -194,7 +182,7 @@
         });
     }
 
-    const priorityColor = $derived(getStatusVariant(ticket.priority));
+    const priorityColor = $derived(getTicketPriorityVariant(ticket.priority));
 </script>
 
 <article

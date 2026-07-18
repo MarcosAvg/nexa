@@ -1,11 +1,12 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { toast } from "svelte-sonner";
+    import { handleError, generateRequestTemplate, generateKoneUsageTemplate } from "../utils";
     import {
         personnelService,
         catalogService,
         profileService,
-    } from "../services/personnel";
+    } from "../services";
     import SectionHeader from "../components/SectionHeader.svelte";
     import {
         Building2,
@@ -28,7 +29,6 @@
     import Select from "../components/Select.svelte";
 
     import { catalogState, userState } from "../stores";
-    import { generateRequestTemplate, generateKoneUsageTemplate } from "../utils/xlsxTemplate";
     import { networkStore } from "../stores/network.svelte";
 
     let activeTab = $state<"catalogos" | "usuarios">("catalogos");
@@ -44,8 +44,7 @@
     let users = $state<any[]>([]); // Users still local as they are specific to this admin view
 
     let currentUser = $derived.by(() => {
-        if (!userState.profile) return { role: "viewer" }; // Fallback
-        return userState.profile;
+        return userState.currentUser ?? { name: "", email: "", avatar: null, role: "viewer" };
     });
 
     let canEdit = $derived(
@@ -299,8 +298,7 @@
             isUserModalOpen = false;
             toast.success("Permisos actualizados correctamente");
         } catch (e) {
-            console.error("Error saving user profile", e);
-            toast.error("Error al actualizar permisos");
+            handleError(e, "Guardar Perfil de Usuario");
         }
     }
 
@@ -359,8 +357,8 @@
                 id: loadingToast,
             });
         } catch (e) {
-            console.error(e);
-            toast.error("Error al generar la plantilla", { id: loadingToast });
+            toast.dismiss(loadingToast);
+            handleError(e, "Generar Plantilla de Solicitudes");
         } finally {
             isGeneratingTemplate = false;
         }
@@ -377,8 +375,8 @@
                 id: loadingToast,
             });
         } catch (e) {
-            console.error(e);
-            toast.error("Error al generar la plantilla", { id: loadingToast });
+            toast.dismiss(loadingToast);
+            handleError(e, "Generar Plantilla KONE");
         } finally {
             isGeneratingKoneTemplate = false;
         }

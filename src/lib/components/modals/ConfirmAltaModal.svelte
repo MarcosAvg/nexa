@@ -11,6 +11,7 @@
     import { personnelService } from "../../services/personnel";
     import { HistoryService } from "../../services/history";
     import { toast } from "svelte-sonner";
+    import { handleError, parseFloors } from "../../utils";
     import Badge from "../Badge.svelte";
     import {
         AlertTriangle,
@@ -20,7 +21,7 @@
         XCircle,
     } from "lucide-svelte";
     import Button from "../Button.svelte";
-    import { parseFloors } from "../../utils/xlsxImporter";
+    
 
     let {
         isOpen = $bindable(false),
@@ -86,7 +87,7 @@
             );
             onComplete?.();
         } catch (err) {
-            console.error(err);
+            handleError(err, "Eliminar Ticket de Alta");
         }
     }
 
@@ -137,8 +138,7 @@
             isOpen = false;
             onComplete?.();
         } catch (err) {
-            console.error(err);
-            toast.error("Error al rechazar.");
+            handleError(err, "Rechazar Alta");
         } finally {
             isRejecting = false;
         }

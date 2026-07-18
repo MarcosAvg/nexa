@@ -18,10 +18,11 @@
         Trash2 as TrashIcon,
         Eye,
     } from "lucide-svelte";
-    import { generateResponsivaPdf, generateCardPdf } from "../utils/pdfGenerator";
+    import { generateResponsivaPdf, generateCardPdf, handleError } from "../utils";
     import ResponsivaTemplate from "./ResponsivaTemplate.svelte";
     import ResponsivaPreviewModal from "./ResponsivaPreviewModal.svelte";
     import { toast } from "svelte-sonner";
+
     import { cardService } from "../services/cards";
     import { responsivaService } from "../services/responsiva";
     import { personnelState } from "../stores";
@@ -88,10 +89,7 @@
                 person.id.toString(),
             );
         } catch (error) {
-            console.error(
-                "[PersonDetailsPanel] Error loading responsivas:",
-                error,
-            );
+            handleError(error, "Cargar Responsivas");
         }
     }
 
@@ -136,10 +134,7 @@
                     (r) => r.folio === card.folio && r.card_type === card.type,
                 );
             } catch (e) {
-                console.error(
-                    "[PersonDetailsPanel] Error refreshing responsivas:",
-                    e,
-                );
+                handleError(e, "Refrescar Responsivas");
             }
         }
 
@@ -172,7 +167,7 @@
             if (onRefresh) await onRefresh();
             await loadResponsivas();
         } catch (error) {
-            console.error(error);
+            handleError(error, "Firmar Tarjeta");
             throw error;
         }
     }
@@ -206,8 +201,7 @@
             toast.success("Responsiva eliminada y estado actualizado");
             await loadResponsivas();
         } catch (error) {
-            console.error(error);
-            toast.error("Error al eliminar");
+            handleError(error, "Eliminar Responsiva");
         }
     }
 
@@ -232,11 +226,7 @@
             };
             isPreviewModalOpen = true;
         } catch (e) {
-            console.error(
-                "[PersonDetailsPanel] Error in handleViewHistory:",
-                e,
-            );
-            toast.error("Error al cargar datos actualizados");
+            handleError(e, "Ver Historial de Responsiva");
         }
     }
     async function copyToClipboard(text: string, label: string) {
@@ -254,8 +244,7 @@
             await generateCardPdf(card.folio, card.type);
             toast.success("PDF generado para impresión");
         } catch (error) {
-            console.error("Error al generar PDF de tarjeta:", error);
-            toast.error("Error al generar PDF de tarjeta");
+            handleError(error, "Generar PDF de Tarjeta");
         }
     }
 
@@ -279,8 +268,7 @@
             toast.success(`${fieldLabel} → ${valueLabel}`);
             await onRefresh?.();
         } catch (e) {
-            console.error(e);
-            toast.error("Error al actualizar estado");
+            handleError(e, "Actualizar Estado de Tarjeta");
         }
     }
 </script>
