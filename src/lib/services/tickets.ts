@@ -401,28 +401,5 @@ export const ticketService = {
         }, "Delete Tickets by Person");
     },
 
-    async updateStatus(id: string, status: string, details?: string) {
-        return withErrorHandling(async () => {
-            const { error } = await supabase.from("tickets").update({ status }).eq("id", id);
-            if (error) throw error;
-
-            const { data: ticket } = await supabase.from("tickets").select("title").eq("id", id).single();
-
-            await HistoryService.log("TICKET", id, "UPDATE_STATUS", {
-                message: `Estado actualizado a ${status} ${details ? `(${details})` : ''}`,
-                entityName: ticket ? `Ticket #${id}: ${ticket.title}` : `Ticket #${id}`
-            });
-
-            const { data: updatedTicket } = await supabase
-                .from("tickets")
-                .select("*")
-                .eq("id", id)
-                .single();
-
-            if (updatedTicket) {
-                ticketState.updateTicket(updatedTicket as Ticket);
-            }
-            appEvents.emit(EVENTS.TICKETS_CHANGED);
-        }, "Update Ticket Status");
-    }
 };
+

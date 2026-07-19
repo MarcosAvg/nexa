@@ -29,20 +29,44 @@
     import { uiState } from "../stores/ui.svelte";
     import type { Person } from "../types";
 
+    /**
+     * PersonDetailsPanel — Panel lateral con detalles completos de una persona.
+     *
+     * Muestra información general, ubicación, pisos asignados, horario,
+     * accesos especiales, tarjetas con sus responsivas, y acciones rápidas
+     * (editar, bloquear, desactivar, etc.).
+     *
+     * @example
+     * <PersonDetailsPanel bind:isOpen {person} onEdit={openEditModal} onclose={() => {}} />
+     */
     type Props = {
+        /** Controla la visibilidad del panel (two-way bindable). */
         isOpen: boolean;
+        /** Persona a mostrar (null mientras no haya selección). */
         person: Person | null;
+        /** Callback al editar la persona. */
         onEdit?: (person: Person) => void;
+        /** Callback al bloquear la persona. */
         onBlock?: (person: Person) => void;
+        /** Callback al desactivar la persona. */
         onDeactivate?: (person: Person) => void;
+        /** Callback al cerrar el panel. */
         onclose?: () => void;
+        /** Callback al bloquear una tarjeta. */
         onCardBlock?: (card: any) => void;
+        /** Callback al desasignar una tarjeta. */
         onCardUnassign?: (card: any) => void;
+        /** Callback al reemplazar una tarjeta. */
         onCardReplace?: (card: any) => void;
+        /** Callback al agregar una nueva tarjeta. */
         onCardAdd?: (person: Person) => void;
+        /** Callback al reactivar la persona (cambio de estado). */
         onReactivate?: (person: Person) => void;
+        /** Callback al eliminar permanentemente la persona. */
         onDeletePermanent?: (person: Person) => void;
+        /** Callback para refrescar datos después de operaciones. */
         onRefresh?: () => Promise<void>;
+        /** Callback al programar una tarjeta. */
         onCardProgram?: (card: any) => void;
     };
 

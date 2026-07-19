@@ -19,10 +19,16 @@
     } from "../../stores";
     import { Search, X, User as UserIcon } from "lucide-svelte";
     import { onMount } from "svelte";
+    import FormSection from "../FormSection.svelte";
+    import FormField from "../FormField.svelte";
+    import DependencySelect from "../DependencySelect.svelte";
 
     let {
+        /** Controla la visibilidad del modal (two-way bindable). */
         isOpen = $bindable(false),
+        /** Ticket a editar (null = modo creación). */
         editingTicket = null,
+        /** Callback al guardar el ticket. */
         onSave,
     }: {
         isOpen: boolean;
@@ -238,89 +244,45 @@
 >
     <div class="space-y-6">
         <!-- SECTION 1: Classification -->
-        <fieldset
-            class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
-        >
-            <legend
-                class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
-            >
-                Clasificación
-            </legend>
-
+        <FormSection title="Clasificación">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="space-y-1.5">
-                    <label
-                        class="text-xs font-bold text-slate-600 block"
-                        for="createdBy"
-                    >
-                        Creado Por
-                    </label>
+                <FormField label="Creado Por" for="createdBy">
                     <Select id="createdBy" bind:value={formData.createdBy}>
                         {#each users as u}
-                            <option value={u.id}
-                                >{u.full_name || u.email}</option
-                            >
+                            <option value={u.id}>{u.full_name || u.email}</option>
                         {/each}
                     </Select>
-                </div>
+                </FormField>
 
-                <div class="space-y-1.5">
-                    <label
-                        class="text-xs font-bold text-slate-600 block"
-                        for="assignedTo"
-                    >
-                        Asignado A
-                    </label>
+                <FormField label="Asignado A" for="assignedTo">
                     <Select id="assignedTo" bind:value={formData.assignedTo}>
                         {#each users as u}
-                            <option value={u.id}
-                                >{u.full_name || u.email}</option
-                            >
+                            <option value={u.id}>{u.full_name || u.email}</option>
                         {/each}
                     </Select>
-                </div>
+                </FormField>
 
-                <div class="space-y-1.5">
-                    <label
-                        class="text-xs font-bold text-slate-600 block"
-                        for="type"
-                    >
-                        Tipo de Ticket
-                    </label>
+                <FormField label="Tipo de Ticket" for="type">
                     <Select id="type" bind:value={formData.type}>
                         {#each ticketTypes as t}
                             <option value={t}>{t}</option>
                         {/each}
                     </Select>
-                </div>
+                </FormField>
 
-                <div class="space-y-1.5">
-                    <label
-                        class="text-xs font-bold text-slate-600 block"
-                        for="priority"
-                    >
-                        Prioridad
-                    </label>
+                <FormField label="Prioridad" for="priority">
                     <Select id="priority" bind:value={formData.priority}>
                         <option value="Baja">Baja</option>
                         <option value="Media">Media</option>
                         <option value="Alta">Alta</option>
                         <option value="Critica">Crítica</option>
                     </Select>
-                </div>
+                </FormField>
             </div>
-        </fieldset>
+        </FormSection>
 
         <!-- SECTION 2: Related Person (Search) -->
-        <fieldset
-            class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
-        >
-            <legend
-                class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
-            >
-                Personal Relacionado
-            </legend>
-
+        <FormSection title="Personal Relacionado">
             {#if selectedPerson}
                 <div
                     class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm relative"
@@ -356,48 +318,29 @@
                 </div>
             {:else if formData.personNotListed}
                 <div class="space-y-4">
-                    <div class="space-y-2">
-                        <label
-                            for="notListedPersonName"
-                            class="text-xs font-bold text-slate-600 block pl-1"
-                            >Nombre Completo</label
-                        >
+                    <FormField label="Nombre Completo" for="notListedPersonName">
                         <Input
                             id="notListedPersonName"
                             placeholder="Nombre de la persona..."
                             bind:value={formData.notListedPersonName}
                         />
-                    </div>
+                    </FormField>
 
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <label
-                                for="notListedPersonEmployeeNo"
-                                class="text-xs font-bold text-slate-600 block pl-1"
-                                >No. Empleado</label
-                            >
+                        <FormField label="No. Empleado" for="notListedPersonEmployeeNo">
                             <Input
                                 id="notListedPersonEmployeeNo"
                                 placeholder="Ej: 12345"
                                 bind:value={formData.notListedPersonEmployeeNo}
                             />
-                        </div>
-                        <div class="space-y-2">
-                            <label
-                                for="notListedPersonDependency"
-                                class="text-xs font-bold text-slate-600 block pl-1"
-                                >Dependencia</label
-                            >
-                            <Select
+                        </FormField>
+                        <FormField label="Dependencia" for="notListedPersonDependency">
+                            <DependencySelect
                                 id="notListedPersonDependency"
                                 bind:value={formData.notListedPersonDependency}
                                 placeholder="Seleccione..."
-                            >
-                                {#each dependencies as d}
-                                    <option value={d.name}>{d.name}</option>
-                                {/each}
-                            </Select>
-                        </div>
+                            />
+                        </FormField>
                     </div>
 
                     <p class="text-xs text-amber-600 bg-amber-50 p-2 rounded">
@@ -475,75 +418,40 @@
                     </button>
                 </div>
             {/if}
-        </fieldset>
+        </FormSection>
 
         <!-- SECTION 3: Requestor Data -->
-        <fieldset
-            class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
-        >
-            <legend
-                class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
-            >
-                Datos del Solicitante
-            </legend>
-
+        <FormSection title="Datos del Solicitante">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="space-y-1.5">
-                    <label
-                        class="text-xs font-bold text-slate-600 block mb-1"
-                        for="reqName">Nombre</label
-                    >
+                <FormField label="Nombre" for="reqName">
                     <Input id="reqName" bind:value={formData.requestor.name} />
-                </div>
-                <div class="space-y-1.5">
-                    <label
-                        class="text-xs font-bold text-slate-600 block mb-1"
-                        for="reqDep">Dependencia</label
-                    >
-                    <Select
+                </FormField>
+                <FormField label="Dependencia" for="reqDep">
+                    <DependencySelect
                         id="reqDep"
                         bind:value={formData.requestor.dependency}
-                    >
-                        {#each dependencies as d}
-                            <option value={d.name}>{d.name}</option>
-                        {/each}
-                    </Select>
-                </div>
-                <div class="space-y-1.5">
-                    <label
-                        class="text-xs font-bold text-slate-600 block mb-1"
-                        for="reqExt">Extensión</label
-                    >
+                    />
+                </FormField>
+                <FormField label="Extensión" for="reqExt">
                     <Input
                         id="reqExt"
                         bind:value={formData.requestor.extension}
                         placeholder="1234"
                     />
-                </div>
-                <div class="space-y-1.5">
-                    <label
-                        class="text-xs font-bold text-slate-600 block mb-1"
-                        for="reqEmail">Correo</label
-                    >
+                </FormField>
+                <FormField label="Correo" for="reqEmail">
                     <Input
                         id="reqEmail"
                         type="email"
                         bind:value={formData.requestor.email}
                         placeholder="usuario@correo.com"
                     />
-                </div>
+                </FormField>
             </div>
-        </fieldset>
+        </FormSection>
 
         <!-- SECTION 4: Description -->
-        <fieldset
-            class="space-y-4 p-4 rounded-xl border border-slate-200 bg-white"
-        >
-            <legend
-                class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
-            >
-                Detalles
-            </legend>
+        <FormSection title="Detalles">
             <div class="space-y-1.5">
                 <label
                     class="text-xs font-bold text-slate-600 block"
@@ -559,7 +467,7 @@
                     bind:value={formData.description}
                 ></textarea>
             </div>
-        </fieldset>
+        </FormSection>
     </div>
 
     {#snippet footer()}

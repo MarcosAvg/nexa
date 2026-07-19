@@ -1,14 +1,32 @@
 <script lang="ts">
     import { ChevronDown } from "lucide-svelte";
 
+    /**
+     * Select — Selector desplegable con snippet de opciones o prop `options`.
+     *
+     * @example
+     * <Select bind:value={dep}>
+     *     {#each deps as d}
+     *         <option value={d.name}>{d.name}</option>
+     *     {/each}
+     * </Select>
+     * <Select bind:value={priority} options={["Baja", "Media", "Alta"]} />
+     */
     type Props = {
+        /** Valor seleccionado (two-way bindable). */
         value: string | number;
+        /** Texto placeholder de la opción vacía. @default "Seleccionar..." */
         placeholder?: string;
+        /** Array de opciones: strings ú objetos { value, label }. */
         options?: { value: string | number; label: string }[] | any[];
+        /** Deshabilitar el select. */
         disabled?: boolean;
+        /** Clases CSS adicionales. */
         class?: string;
+        /** ID para asociar con <label for>. */
         id?: string;
         onchange?: (e: Event) => void;
+        /** Snippet de <option> personalizadas (sobrescribe `options`). */
         children?: import("svelte").Snippet;
     };
 

@@ -1,16 +1,36 @@
 <script lang="ts">
-    import { type Snippet, type Component } from "svelte";
+    import { type Snippet, type ComponentType } from "svelte";
     import { FilterX } from "lucide-svelte";
 
+    /**
+     * EmptyState — Estado vacío con ícono, título, descripción y acciones.
+     *
+     * Soporta modo "con filtros" (muestra texto alternativo + botón limpiar)
+     * y modo "sin filtros" (muestra children como acciones).
+     *
+     * @example
+     * <EmptyState icon={Users} title="Sin registros" description="Crea el primero.">
+     *     <Button onclick={onCreate}>Crear</Button>
+     * </EmptyState>
+     */
     type Props = {
-        icon?: Component;
+        /** Ícono central (lucide-svelte). */
+        icon?: ComponentType;
+        /** Clases bg-gradient-to-br + color del ícono. @default "from-slate-100 to-slate-200" */
         iconBgClass?: string;
+        /** Título principal. */
         title: string;
+        /** Título alternativo cuando hay filtros activos. */
         titleFiltered?: string;
+        /** Descripción principal. */
         description: string;
+        /** Descripción alternativa cuando hay filtros activos. */
         descriptionFiltered?: string;
+        /** Muestra versión "con filtros" (texto alternativo + botón limpiar). */
         hasFilters?: boolean;
+        /** Handler al hacer clic en "Limpiar filtros". */
         onClearFilters?: () => void;
+        /** Acciones (botón de crear, etc.) visibles solo si no hay filtros. */
         children?: Snippet;
     };
 

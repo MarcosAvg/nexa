@@ -8,6 +8,11 @@
     import Select from "../Select.svelte";
     import { Plus, CreditCard, Trash2, AlertTriangle } from "lucide-svelte";
     import { untrack } from "svelte";
+    import FormSection from "../FormSection.svelte";
+    import FormField from "../FormField.svelte";
+    import DependencySelect from "../DependencySelect.svelte";
+    import BuildingSelect from "../BuildingSelect.svelte";
+    import ScheduleSelect from "../ScheduleSelect.svelte";
 
     import { personnelService, ticketService } from "../../services";
     import { personnelState, catalogState, userState } from "../../stores";
@@ -31,7 +36,9 @@
         forceDirectSave = false,
         disableDuplicateCheck = false,
     }: {
+        /** Controla la visibilidad del modal (two-way bindable). */
         isOpen: boolean;
+        /** Persona a editar (null = modo creación). */
         editingPerson?: Person | null;
         /** Pre-fill form fields for a NEW person (no id) from an imported ticket */
         prefill?: {
@@ -53,9 +60,13 @@
         } | null;
         /** If set, only these card types can be added ('P2000', 'KONE') */
         allowedCardTypes?: string[] | null;
+        /** Contenido adicional en el encabezado del modal. */
         headerContent?: Snippet;
+        /** Contenido adicional en el lado izquierdo del footer. */
         leftFooterContent?: Snippet;
+        /** Callback al completar el guardado. */
         oncomplete?: () => void;
+        /** Callback al cerrar el modal (sin guardar). */
         onclose?: () => void;
         /** If true, editing an existing person will save DIRECTLY instead of creating a ticket */
         forceDirectSave?: boolean;
@@ -546,15 +557,7 @@
         {/if}
 
         <!-- SECTION: Personal Info -->
-        <fieldset
-            class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
-            disabled={!userState.canEdit}
-        >
-            <legend
-                class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
-                >Datos Personales</legend
-            >
-
+        <FormSection title="Datos Personales" disabled={!userState.canEdit}>
             {#if potentialDuplicates.length > 0}
                 <div
                     class="mx-2 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2"
@@ -592,63 +595,32 @@
             {/if}
 
             <div class="grid gap-4 md:grid-cols-2">
-                <div class="space-y-1.5">
-                    <label
-                        for="nombres"
-                        class="text-xs font-bold text-slate-600 block"
-                        >Nombres</label
-                    >
+                <FormField label="Nombres" for="nombres" error={errors.first_name}>
                     <Input
                         id="nombres"
                         bind:value={nombres}
                         placeholder="Juan Carlos"
-                        class={(isDifferent(comparisonFields[0])
-                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30 "
-                            : "") +
-                            (errors.first_name
-                                ? "border-red-500 ring-red-200"
-                                : "")}
+                        class={isDifferent(comparisonFields[0])
+                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
+                            : ""}
                     />
-                    {#if errors.first_name}
-                        <p class="text-[10px] text-red-500 font-medium">
-                            {errors.first_name}
-                        </p>
-                    {/if}
                     {@render DiffIndicator(comparisonFields[0])}
-                </div>
-                <div class="space-y-1.5">
-                    <label
-                        for="apellidos"
-                        class="text-xs font-bold text-slate-600 block"
-                        >Apellidos</label
-                    >
+                </FormField>
+                <FormField label="Apellidos" for="apellidos" error={errors.last_name}>
                     <Input
                         id="apellidos"
                         bind:value={apellidos}
                         placeholder="Pérez García"
-                        class={(isDifferent(comparisonFields[1])
-                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30 "
-                            : "") +
-                            (errors.last_name
-                                ? "border-red-500 ring-red-200"
-                                : "")}
+                        class={isDifferent(comparisonFields[1])
+                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
+                            : ""}
                     />
-                    {#if errors.last_name}
-                        <p class="text-[10px] text-red-500 font-medium">
-                            {errors.last_name}
-                        </p>
-                    {/if}
                     {@render DiffIndicator(comparisonFields[1])}
-                </div>
+                </FormField>
             </div>
 
             <div class="grid gap-4 md:grid-cols-3">
-                <div class="space-y-1.5">
-                    <label
-                        for="noEmpleado"
-                        class="text-xs font-bold text-slate-600 block"
-                        >No. Empleado</label
-                    >
+                <FormField label="No. Empleado" for="noEmpleado">
                     <Input
                         id="noEmpleado"
                         bind:value={noEmpleado}
@@ -658,43 +630,23 @@
                             : ""}
                     />
                     {@render DiffIndicator(comparisonFields[2])}
-                </div>
-                <div class="md:col-span-2 space-y-1.5">
-                    <label
-                        for="dependencia"
-                        class="text-xs font-bold text-slate-600 block"
-                        >Dependencia</label
-                    >
-                    <Select
-                        id="dependencia"
-                        bind:value={dependency}
-                        class={(isDifferent(comparisonFields[3])
-                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30 "
-                            : "") +
-                            (errors.dependency
-                                ? "border-red-500 ring-red-200"
-                                : "")}
-                    >
-                        {#each dependencies as dep}
-                            <option value={dep.name}>{dep.name}</option>
-                        {/each}
-                    </Select>
-                    {#if errors.dependency}
-                        <p class="text-[10px] text-red-500 font-medium">
-                            {errors.dependency}
-                        </p>
-                    {/if}
-                    {@render DiffIndicator(comparisonFields[3])}
+                </FormField>
+                <div class="md:col-span-2">
+                    <FormField label="Dependencia" for="dependencia" error={errors.dependency}>
+                        <DependencySelect
+                            id="dependencia"
+                            bind:value={dependency}
+                            class={isDifferent(comparisonFields[3])
+                                ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
+                                : ""}
+                        />
+                        {@render DiffIndicator(comparisonFields[3])}
+                    </FormField>
                 </div>
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
-                <div class="space-y-1.5">
-                    <label
-                        for="area"
-                        class="text-xs font-bold text-slate-600 block"
-                        >Área / Equipo</label
-                    >
+                <FormField label="Área / Equipo" for="area">
                     <Input
                         id="area"
                         bind:value={areaEquipo}
@@ -704,13 +656,8 @@
                             : ""}
                     />
                     {@render DiffIndicator(comparisonFields[4])}
-                </div>
-                <div class="space-y-1.5">
-                    <label
-                        for="puesto"
-                        class="text-xs font-bold text-slate-600 block"
-                        >Puesto / Función</label
-                    >
+                </FormField>
+                <FormField label="Puesto / Función" for="puesto">
                     <Input
                         id="puesto"
                         bind:value={puestoFuncion}
@@ -720,92 +667,45 @@
                             : ""}
                     />
                     {@render DiffIndicator(comparisonFields[5])}
-                </div>
+                </FormField>
             </div>
 
-            <div class="space-y-1.5 pt-2">
-                <label
-                    for="email"
-                    class="text-xs font-bold text-slate-600 block"
-                    >Correo Electrónico</label
-                >
+            <FormField label="Correo Electrónico" for="email" error={errors.email}>
                 <Input
                     id="email"
                     type="email"
                     bind:value={email}
                     placeholder="correo@ejemplo.com"
-                    class={(isDifferent(comparisonFields[6])
-                        ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30 "
-                        : "") +
-                        (errors.email ? "border-red-500 ring-red-200" : "")}
+                    class={isDifferent(comparisonFields[6])
+                        ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
+                        : ""}
                 />
-                {#if errors.email}
-                    <p class="text-[10px] text-red-500 font-medium">
-                        {errors.email}
-                    </p>
-                {/if}
                 {@render DiffIndicator(comparisonFields[6])}
-            </div>
-        </fieldset>
+            </FormField>
+        </FormSection>
 
         <!-- SECTION: Location -->
-        <fieldset
-            class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
-            disabled={!userState.canEdit}
-        >
-            <legend
-                class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
-                >Ubicación</legend
-            >
-
+        <FormSection title="Ubicación" disabled={!userState.canEdit}>
             <div class="grid gap-4 md:grid-cols-2">
-                <div class="space-y-1.5">
-                    <label
-                        for="edificio"
-                        class="text-xs font-bold text-slate-600 block"
-                        >Edificio</label
-                    >
-                    <Select
+                <FormField label="Edificio" for="edificio" error={errors.building}>
+                    <BuildingSelect
                         id="edificio"
                         bind:value={edificio}
-                        class={errors.building
-                            ? "border-red-500 ring-red-200"
-                            : ""}
-                    >
-                        {#each buildings as b}
-                            <option value={b.name}>{b.name}</option>
-                        {/each}
-                    </Select>
-                    {#if errors.building}
-                        <p class="text-[10px] text-red-500 font-medium">
-                            {errors.building}
-                        </p>
-                    {/if}
-                </div>
-                <div class="space-y-1.5">
-                    <label
-                        for="pisoBase"
-                        class="text-xs font-bold text-slate-600 block"
-                        >Piso Base</label
-                    >
+                        class={errors.building ? "border-red-500 ring-red-200" : ""}
+                    />
+                </FormField>
+                <FormField label="Piso Base" for="pisoBase" error={errors.floor}>
                     <Select
                         id="pisoBase"
                         bind:value={pisoBase}
                         disabled={!edificio}
-                        class={errors.floor
-                            ? "border-red-500 ring-red-200"
-                            : ""}
+                        class={errors.floor ? "border-red-500 ring-red-200" : ""}
                     >
                         {#each availableFloors as f}
                             <option value={f}>{f}</option>
                         {/each}
                     </Select>
-                    {#if errors.floor}
-                        <p class="text-[10px] text-red-500 font-medium">
-                            {errors.floor}
-                        </p>
-                    {/if}
-                </div>
+                </FormField>
             </div>
 
             {#if edificio}
@@ -824,85 +724,40 @@
                     />
                 </div>
             {/if}
-        </fieldset>
+        </FormSection>
 
         <!-- SECTION: Schedule -->
-        <fieldset
-            class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
-            disabled={!userState.canEdit}
-        >
-            <legend
-                class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
-                >Horario</legend
-            >
-            <div class="space-y-1.5">
-                <label for="dias" class="text-xs font-bold text-slate-600 block"
-                    >Días</label
-                >
-                <Select
+        <FormSection title="Horario" disabled={!userState.canEdit}>
+            <FormField label="Días" for="dias" error={errors.schedule_days}>
+                <ScheduleSelect
                     id="dias"
                     bind:value={diasHorario}
-                    class={errors.schedule_days
-                        ? "border-red-500 ring-red-200"
-                        : ""}
-                >
-                    {#each schedules as s}
-                        <option value={s.name}>{s.name}</option>
-                    {/each}
-                </Select>
-                {#if errors.schedule_days}
-                    <p class="text-[10px] text-red-500 font-medium">
-                        {errors.schedule_days}
-                    </p>
-                {/if}
-            </div>
+                    class={errors.schedule_days ? "border-red-500 ring-red-200" : ""}
+                />
+            </FormField>
 
             <div class="grid gap-4 md:grid-cols-2">
-                <div class="space-y-1.5">
-                    <label
-                        for="entrada"
-                        class="text-xs font-bold text-slate-600 block"
-                        >Entrada</label
-                    >
+                <FormField label="Entrada" for="entrada">
                     <Input id="entrada" type="time" bind:value={horaEntrada} />
-                </div>
-                <div class="space-y-1.5">
-                    <label
-                        for="salida"
-                        class="text-xs font-bold text-slate-600 block"
-                        >Salida</label
-                    >
+                </FormField>
+                <FormField label="Salida" for="salida">
                     <Input id="salida" type="time" bind:value={horaSalida} />
-                </div>
+                </FormField>
             </div>
-        </fieldset>
+        </FormSection>
 
         <!-- SECTION: Special Access -->
-        <fieldset
-            class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
-            disabled={!userState.canEdit}
-        >
-            <legend
-                class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
-                >Accesos Especiales</legend
-            >
+        <FormSection title="Accesos Especiales" disabled={!userState.canEdit}>
             <ToggleGroup
                 label=""
                 options={specialAccesses.map((a) => a.name)}
                 bind:value={accesosEspeciales}
             />
-        </fieldset>
+        </FormSection>
 
         <!-- SECTION: Cards -->
         {#if !editingPerson || prefill}
-            <fieldset
-                class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
-            >
-                <legend
-                    class="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest"
-                    >Gestión de Tarjetas</legend
-                >
-
+            <FormSection title="Gestión de Tarjetas">
                 {#if tarjetasAsignadas.length > 0}
                     <div class="space-y-2">
                         {#each tarjetasAsignadas as card, index}
@@ -950,7 +805,7 @@
                         </Button>
                     {/snippet}
                 </PermissionGuard>
-            </fieldset>
+            </FormSection>
         {/if}
     </form>
 

@@ -12,6 +12,12 @@
     import Button from "../Button.svelte";
     import { Shield } from "lucide-svelte";
 
+    /**
+     * UserManagementSection — Gestión de usuarios y permisos.
+     *
+     * @example
+     * <UserManagementSection />
+     */
     type Props = Record<string, never>;
 
     let {}: Props = $props();

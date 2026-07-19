@@ -1,17 +1,13 @@
 <script lang="ts">
     import { historyState, personnelState, ticketState } from "../stores";
-    import SectionHeader from "../components/SectionHeader.svelte";
-    import Card from "../components/Card.svelte";
-    import DataTable from "../components/DataTable.svelte";
-    import Badge from "../components/Badge.svelte";
-    import Button from "../components/Button.svelte";
-    import HistoryFilters from "../components/HistoryFilters.svelte";
-    import SkeletonTable from "../components/SkeletonTable.svelte";
     import {
-        ChevronLeft,
-        ChevronRight,
+        SectionHeader, DataTable, Badge, Button, HistoryFilters,
+        Pagination, ContentView,
+    } from "../components";
+    import {
         FileSpreadsheet,
         RotateCw,
+        History,
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
     import { handleError } from "../utils";
@@ -40,12 +36,6 @@
     let totalRecords = $derived(historyState.totalRecords);
     let currentPage = $derived(historyState.currentPage);
     let pageSize = $derived(historyState.pageSize);
-
-    let totalPages = $derived(Math.max(1, Math.ceil(totalRecords / pageSize)));
-
-    function goToPage(page: number) {
-        historyState.goToPage(page);
-    }
 
     import {
         ACTION_NAMES as actionNames,
@@ -187,10 +177,18 @@
 
     <!-- Top Pagination removed per request -->
 
-    <Card class="overflow-hidden">
-        {#if historyState.isLoading && historyLogs.length === 0}
-            <SkeletonTable columns={4} rows={5} />
-        {:else}
+    <ContentView
+        isLoading={historyState.isLoading}
+        data={historyLogs}
+        emptyTitle="No hay registros de historial"
+        emptyDescription="Los cambios realizados en el personal, tarjetas y tickets aparecerán aquí."
+        emptyIcon={History}
+        emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"
+        skeletonColumns={4}
+        skeletonRows={5}
+        cardClass="overflow-hidden"
+    >
+        {#snippet children()}
             <DataTable
                 data={historyLogs}
                 columns={[
@@ -220,56 +218,16 @@
                     },
                 ]}
             />
-        {/if}
-    </Card>
+        {/snippet}
+    </ContentView>
 
-    <!-- Pagination Controls -->
-    {#if totalRecords > 0}
-        <div class="flex items-center justify-between px-2">
-            <p class="text-xs text-slate-500">
-                Mostrando {(currentPage - 1) * pageSize + 1}–{Math.min(
-                    currentPage * pageSize,
-                    totalRecords,
-                )} de {totalRecords} registros
-            </p>
-            <div class="flex items-center gap-2">
-                <Button
-                    variant="outline"
-                    onclick={() => historyState.prevPage()}
-                    disabled={currentPage <= 1}
-                    class="flex items-center gap-1 text-xs px-3 py-1.5"
-                >
-                    <ChevronLeft size={14} />
-                    Anterior
-                </Button>
-                <div class="flex items-center gap-1">
-                    {#each Array.from({ length: totalPages }, (_, i) => i + 1) as page}
-                        {#if page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)}
-                            <button
-                                type="button"
-                                class="w-8 h-8 rounded-lg text-xs font-bold transition-colors {page ===
-                                currentPage
-                                    ? 'bg-blue-600 text-white'
-                                    : 'text-slate-600 hover:bg-slate-100'}"
-                                onclick={() => goToPage(page)}
-                            >
-                                {page}
-                            </button>
-                        {:else if page === currentPage - 2 || page === currentPage + 2}
-                            <span class="text-slate-400 text-xs px-1">…</span>
-                        {/if}
-                    {/each}
-                </div>
-                <Button
-                    variant="outline"
-                    onclick={() => historyState.nextPage()}
-                    disabled={currentPage >= totalPages}
-                    class="flex items-center gap-1 text-xs px-3 py-1.5"
-                >
-                    Siguiente
-                    <ChevronRight size={14} />
-                </Button>
-            </div>
-        </div>
-    {/if}
+    <Pagination
+        {currentPage}
+        {pageSize}
+        {totalRecords}
+        onPrevPage={() => historyState.prevPage()}
+        onNextPage={() => historyState.nextPage()}
+        onGoToPage={(page) => historyState.goToPage(page)}
+        isLoading={historyState.isLoading}
+    />
 </div>

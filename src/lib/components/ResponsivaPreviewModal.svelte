@@ -23,13 +23,29 @@
     import { RESPONSIVA_LEGAL_TEXTS } from "../constants/legal";
     import bgImage from "../../assets/responsiva_bg.png";
 
+    /**
+     * ResponsivaPreviewModal — Modal de previsualización y firma de Carta Responsiva.
+     *
+     * Permite ver, firmar digitalmente, descargar en PDF y enviar por correo
+     * la Carta Responsiva de entrega de acceso (tarjeta P2000 o KONE).
+     *
+     * @example
+     * <ResponsivaPreviewModal bind:isOpen {data} {person} {card} onSign={handleSign} onClose={handleClose} />
+     */
     type Props = {
+        /** Controla la visibilidad del modal (two-way bindable). */
         isOpen: boolean;
+        /** Datos de la responsiva (folio, nombre, numEmpleado, etc.). */
         data: any;
+        /** Datos de la persona asociada. */
         person?: any;
+        /** Tarjeta asociada a la responsiva. */
         card: any;
+        /** Firma en base64 existente (opcional, para ver firmas previas). */
         signature?: string;
+        /** Callback al firmar la responsiva. */
         onSign: (card: any, signature?: string) => Promise<void>;
+        /** Callback al cerrar el modal. */
         onClose: () => void;
     };
 

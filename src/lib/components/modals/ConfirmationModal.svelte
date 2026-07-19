@@ -4,13 +4,21 @@
     import { AlertTriangle, Info } from "lucide-svelte";
 
     let {
+        /** Controla la visibilidad (two-way bindable). @default false */
         isOpen = $bindable(false),
+        /** Título del modal. @default "¿Estás seguro?" */
         title = "¿Estás seguro?",
+        /** Descripción del modal. @default "Esta acción no se puede deshacer." */
         description = "Esta acción no se puede deshacer.",
+        /** Texto del botón de confirmación. @default "Confirmar" */
         confirmText = "Confirmar",
+        /** Texto del botón de cancelar. @default "Cancelar" */
         cancelText = "Cancelar",
+        /** Variante visual. @default "danger" */
         variant = "danger", // danger, warning, info
+        /** Callback al confirmar. */
         onConfirm,
+        /** Callback al cancelar. */
         onCancel = () => {},
     } = $props();
 

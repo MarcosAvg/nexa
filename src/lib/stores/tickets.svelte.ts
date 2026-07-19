@@ -11,13 +11,6 @@ export class TicketState {
         this.pendingItems.push(ticket);
     }
 
-    updateTicket(ticket: Ticket) {
-        const index = this.pendingItems.findIndex(t => t.id === ticket.id);
-        if (index !== -1) {
-            this.pendingItems[index] = ticket;
-        }
-    }
-
     removeTicket(id: number) {
         this.pendingItems = this.pendingItems.filter(t => t.id !== id);
     }

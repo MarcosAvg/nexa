@@ -24,8 +24,11 @@
     
 
     let {
+        /** Controla la visibilidad (two-way bindable). */
         isOpen = $bindable(false),
+        /** Ticket de alta de persona a procesar. */
         ticket = null,
+        /** Callback al completar o rechazar el alta. */
         onComplete,
     }: {
         isOpen: boolean;

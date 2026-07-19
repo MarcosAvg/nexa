@@ -13,19 +13,41 @@
     import PermissionGuard from "./PermissionGuard.svelte";
     import { uiState } from "../stores/ui.svelte";
 
+    /**
+     * CardItem — Item de tarjeta de acceso en el panel de detalles.
+     *
+     * Muestra tipo, folio, estado y botones de acción (Responsiva, Programar,
+     * Imprimir, Bloquear, Reposición, Baja).
+     *
+     * @example
+     * <CardItem type="KONE" folio="KNE-001" status="active" onBlock={handleBlock} />
+     */
     type Props = {
+        /** Tipo de tarjeta: P2000 (puertas) o KONE (elevadores). */
         type: "P2000" | "KONE";
+        /** Folio único de la tarjeta. */
         folio: string;
+        /** Estado de la tarjeta. @default "active" */
         status?: "active" | "blocked" | "inactive";
+        /** Estado de responsiva: "signed" | "legacy" | null. */
         responsiva_status?: string;
+        /** Estado de programación: "done" | "pending" | null. */
         programming_status?: string;
+        /** Si es true, resalta la tarjeta con borde violeta (ej: desde tickets). */
         isHighlighted?: boolean;
+        /** Callback para abrir modal de firma de responsiva. Solo activo si programming_status === "done". */
         onGenerateResponsiva?: () => void;
+        /** Callback para bloquear/desbloquear tarjeta. */
         onBlock?: () => void;
+        /** Callback para desvincular tarjeta (baja). */
         onUnassign?: () => void;
+        /** Callback para abrir flujo de reposición. */
         onReplace?: () => void;
+        /** Callback para marcar tarjeta como programada. */
         onProgram?: () => void;
+        /** Callback para generar PDF/impresión. */
         onPrint?: () => void;
+        /** Callback para cambiar estado directamente (Modo Dios). */
         onDirectStatusChange?: (field: "responsiva_status" | "programming_status", value: string | null) => void;
     };
 

@@ -3,25 +3,21 @@
         cardlessRegistryState,
         catalogState,
     } from "../stores";
-    import SectionHeader from "../components/SectionHeader.svelte";
-    import FilterSelect from "../components/FilterSelect.svelte";
-    import Button from "../components/Button.svelte";
-    import Card from "../components/Card.svelte";
-    import DataTable from "../components/DataTable.svelte";
-    import Badge from "../components/Badge.svelte";
-    import PermissionGuard from "../components/PermissionGuard.svelte";
-    import SkeletonTable from "../components/SkeletonTable.svelte";
+    import {
+        SectionHeader, FilterSelect, Button, Card, DataTable,
+        Badge, PermissionGuard, Pagination, FloatingActionButton,
+        ContentView, SearchInput, Input,
+        CardlessRegistryModal, ConfirmationModal,
+    } from "../components";
     import {
         FileSpreadsheet,
         Plus,
         Loader2,
         Trash2,
-        Search,
         FolderArchive,
         ChevronDown,
+        FileX,
     } from "lucide-svelte";
-    import Pagination from "../components/Pagination.svelte";
-import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import { cardlessRegistryService } from "../services/cardlessRegistry";
     import { exportCardlessRegistryAllDependenciesAsZip, handleError } from "../utils";
     import type { CardlessRegistry } from "../types";
@@ -29,8 +25,6 @@ import FloatingActionButton from "../components/FloatingActionButton.svelte";
     
     import { networkStore } from "../stores/network.svelte";
     import { onMount } from "svelte";
-    import CardlessRegistryModal from "../components/modals/CardlessRegistryModal.svelte";
-    import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
 
     let registries = $derived(cardlessRegistryState.registries);
     let totalCount = $derived(cardlessRegistryState.totalCount);
@@ -388,22 +382,22 @@ import FloatingActionButton from "../components/FloatingActionButton.svelte";
         {#snippet filters()}
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha Inicio</span>
-                <input
+                <Input
                     type="date"
                     bind:value={startDate}
                     max={endDate || undefined}
                     onchange={applyFiltersAndRefresh}
-                    class="h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:bg-white focus:border-slate-900 transition-all outline-none {dateRangeError ? 'border-rose-400' : ''}"
+                    class="h-9 text-xs font-bold {dateRangeError ? 'border-rose-400' : ''}"
                 />
             </div>
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha Fin</span>
-                <input
+                <Input
                     type="date"
                     bind:value={endDate}
                     min={startDate || undefined}
                     onchange={applyFiltersAndRefresh}
-                    class="h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:bg-white focus:border-slate-900 transition-all outline-none {dateRangeError ? 'border-rose-400' : ''}"
+                    class="h-9 text-xs font-bold {dateRangeError ? 'border-rose-400' : ''}"
                 />
             </div>
             <FilterSelect
@@ -422,16 +416,12 @@ import FloatingActionButton from "../components/FloatingActionButton.svelte";
             />
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Búsqueda</span>
-                <div class="relative">
-                    <Search size={14} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    <input
-                        type="text"
-                        placeholder="Nombre o # empleado..."
-                        bind:value={searchFilter}
-                        oninput={handleSearchInput}
-                        class="h-9 pl-8 pr-3 rounded-lg border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:bg-white focus:border-slate-900 transition-all outline-none w-48"
-                    />
-                </div>
+                <SearchInput
+                    placeholder="Nombre o # empleado..."
+                    bind:value={searchFilter}
+                    oninput={handleSearchInput}
+                    class="h-9 text-xs font-bold w-48"
+                />
             </div>
         {/snippet}
 
@@ -503,94 +493,99 @@ import FloatingActionButton from "../components/FloatingActionButton.svelte";
     </SectionHeader>
 
     <Card class="overflow-hidden relative min-h-[200px]">
-        {#if isLoading && registries.length === 0}
-            <SkeletonTable columns={7} rows={5} hasActions />
-        {:else if !isLoading && registries.length === 0}
-            <div class="flex flex-col items-center justify-center gap-2 py-16 text-slate-400">
-                <span class="text-sm font-medium">No hay registros</span>
-                <span class="text-xs">Ajusta los filtros o crea un nuevo registro</span>
+        <ContentView
+            isLoading={isLoading}
+            data={registries}
+            emptyTitle="No hay registros"
+            emptyDescription="Ajusta los filtros o crea un nuevo registro."
+            emptyIcon={FileX}
+            emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"
+            skeletonColumns={7}
+            skeletonRows={5}
+            skeletonHasActions={true}
+        >
+            {#snippet children()}
+                <DataTable
+                    data={registries}
+                    actionsWidth="140px"
+                    columns={[
+                        {
+                            key: "personName",
+                            label: "Persona",
+                            render: renderPersonName,
+                            width: "200px",
+                        },
+                        {
+                            key: "dependencyName",
+                            label: "Dependencia",
+                            render: renderDependency,
+                            width: "180px",
+                        },
+                        {
+                            key: "location",
+                            label: "Ubicación",
+                            render: renderLocation,
+                            width: "160px",
+                        },
+                        {
+                            key: "reason",
+                            label: "Motivo",
+                            render: renderReason,
+                            width: "220px",
+                        },
+                        {
+                            key: "recorded_at",
+                            label: "Fecha",
+                            render: renderDate,
+                            width: "140px",
+                        },
+                        {
+                            key: "recorded_by",
+                            label: "Registrado por",
+                            render: renderRecordedBy,
+                            width: "140px",
+                        },
+                        {
+                            key: "pendingKoneResponsiva",
+                            label: "Tarjeta KONE",
+                            render: renderKoneResponsiva,
+                            width: "160px",
+                        },
+                    ]}
+                    mobileCard={mobileCard}
+                >
+                    {#snippet actions(row: CardlessRegistry)}
+                        <PermissionGuard allowedRoles={["admin", "operator"]}>
+                            <div class="flex items-center justify-end gap-1">
+                                <Button
+                                    variant="soft-blue"
+                                    size="sm"
+                                    class="h-9 px-4 rounded-xl"
+                                    onclick={() => openEditModal(row)}
+                                    title="Editar registro"
+                                >
+                                    Editar
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    class="h-9 px-3 rounded-xl text-rose-600 hover:bg-rose-50"
+                                    onclick={() => requestDelete(row)}
+                                    disabled={!networkStore.isOnline}
+                                    title="Eliminar"
+                                >
+                                    <Trash2 size={16} />
+                                </Button>
+                            </div>
+                        </PermissionGuard>
+                    {/snippet}
+                </DataTable>
+            {/snippet}
+        </ContentView>
+        {#if isLoading}
+            <div class="absolute inset-0 bg-white/50 flex items-center justify-center pointer-events-none">
+                <Loader2 class="animate-spin text-blue-600" size={24} />
             </div>
-        {:else}
-            <DataTable
-                data={registries}
-                actionsWidth="140px"
-                columns={[
-                    {
-                        key: "personName",
-                        label: "Persona",
-                        render: renderPersonName,
-                        width: "200px",
-                    },
-                    {
-                        key: "dependencyName",
-                        label: "Dependencia",
-                        render: renderDependency,
-                        width: "180px",
-                    },
-                    {
-                        key: "location",
-                        label: "Ubicación",
-                        render: renderLocation,
-                        width: "160px",
-                    },
-                    {
-                        key: "reason",
-                        label: "Motivo",
-                        render: renderReason,
-                        width: "220px",
-                    },
-                    {
-                        key: "recorded_at",
-                        label: "Fecha",
-                        render: renderDate,
-                        width: "140px",
-                    },
-                    {
-                        key: "recorded_by",
-                        label: "Registrado por",
-                        render: renderRecordedBy,
-                        width: "140px",
-                    },
-                    {
-                        key: "pendingKoneResponsiva",
-                        label: "Tarjeta KONE",
-                        render: renderKoneResponsiva,
-                        width: "160px",
-                    },
-                ]}
-                mobileCard={mobileCard}
-            >
-                {#snippet actions(row: CardlessRegistry)}
-                    <PermissionGuard allowedRoles={["admin", "operator"]}>
-                        <div class="flex items-center justify-end gap-1">
-                            <Button
-                                variant="soft-blue"
-                                size="sm"
-                                class="h-9 px-4 rounded-xl"
-                                onclick={() => openEditModal(row)}
-                                title="Editar registro"
-                            >
-                                Editar
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                class="h-9 px-3 rounded-xl text-rose-600 hover:bg-rose-50"
-                                onclick={() => requestDelete(row)}
-                                disabled={!networkStore.isOnline}
-                                title="Eliminar"
-                            >
-                                <Trash2 size={16} />
-                            </Button>
-                        </div>
-                    </PermissionGuard>
-                {/snippet}
-            </DataTable>
-            {#if isLoading}
-                <div class="absolute inset-0 bg-white/50 flex items-center justify-center pointer-events-none">
-                    <Loader2 class="animate-spin text-blue-600" size={24} />
-                </div>
-            {/if}
         {/if}
     </Card>
 

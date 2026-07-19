@@ -1,9 +1,20 @@
 <script lang="ts">
+    /**
+     * ToggleGroup — Grupo de selección múltiple con badges clickeables.
+     *
+     * @example
+     * <ToggleGroup label="Pisos" options={["PB", "1°"]} bind:value={selected} showSelectAll />
+     */
     type Props = {
+        /** Label del grupo. */
         label: string;
+        /** Opciones disponibles. */
         options: string[];
+        /** Valores seleccionados (two-way bindable). */
         value: string[];
+        /** Callback al cambiar selección. */
         onchange?: (value: string[]) => void;
+        /** Muestra opción "Todos" al inicio. @default false */
         showSelectAll?: boolean;
     };
 

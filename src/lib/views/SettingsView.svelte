@@ -1,16 +1,10 @@
 <script lang="ts">
-    import SectionHeader from "../components/SectionHeader.svelte";
-    import Card from "../components/Card.svelte";
+    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, ScheduleCatalog, UserManagementSection } from "../components";
     import { Building2, Briefcase, Key, Calendar, Users, FileDown } from "lucide-svelte";
     import { userState, catalogState } from "../stores";
     import { networkStore } from "../stores/network.svelte";
     import { generateRequestTemplate, generateKoneUsageTemplate, handleError } from "../utils";
     import { toast } from "svelte-sonner";
-    import BuildingCatalog from "../components/catalogs/BuildingCatalog.svelte";
-    import DependencyCatalog from "../components/catalogs/DependencyCatalog.svelte";
-    import AccessCatalog from "../components/catalogs/AccessCatalog.svelte";
-    import ScheduleCatalog from "../components/catalogs/ScheduleCatalog.svelte";
-    import UserManagementSection from "../components/catalogs/UserManagementSection.svelte";
 
     let activeTab = $state<"catalogos" | "usuarios">("catalogos");
     let activeCatalog = $state<"edificios" | "dependencias" | "accesos" | "dias">("edificios");

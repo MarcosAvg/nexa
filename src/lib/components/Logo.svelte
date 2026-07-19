@@ -1,6 +1,12 @@
 <script lang="ts">
     import { Hexagon } from "lucide-svelte";
 
+    /**
+     * Logo — Logotipo Nexa (hexágono + texto).
+     *
+     * @example
+     * <Logo showText={true} class="scale-110" />
+     */
     let { class: className = "", showText = true } = $props();
 </script>
 

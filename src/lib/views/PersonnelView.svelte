@@ -5,33 +5,26 @@
         userState,
         ticketState,
     } from "../stores";
-    import SectionHeader from "../components/SectionHeader.svelte";
-    import FilterGroup from "../components/FilterGroup.svelte";
-    import FilterSelect from "../components/FilterSelect.svelte";
-    import Button from "../components/Button.svelte";
-    import Card from "../components/Card.svelte";
-    import DataTable from "../components/DataTable.svelte";
-    import Badge from "../components/Badge.svelte";
-    import PermissionGuard from "../components/PermissionGuard.svelte";
     import {
-        Search,
+        SectionHeader, FilterGroup, FilterSelect, Button, DataTable,
+        Badge, PermissionGuard, FloatingActionButton, Pagination,
+        ContentView, SearchInput, ExportDropdown,
+        KoneUsageImportModal,
+    } from "../components";
+    import {
         FileSpreadsheet,
         Plus,
         Upload,
         FileStack,
         FolderArchive,
+        Users,
     } from "lucide-svelte";
-    import FloatingActionButton from "../components/FloatingActionButton.svelte";
-    import SkeletonTable from "../components/SkeletonTable.svelte";
-    import Pagination from "../components/Pagination.svelte";
-    import KoneUsageImportModal from "../components/modals/KoneUsageImportModal.svelte";
     import { personnelService } from "../services/personnel";
     import { cardService } from "../services/cards";
     import { exportPersonnelToExcel, exportPersonnelAllDependenciesAsZip, handleError, createSimpleDebounce } from "../utils";
     import { toast } from "svelte-sonner";
     import { networkStore } from "../stores/network.svelte";
     import { getPersonnelStatusVariant } from "../constants/status";
-    import ExportDropdown from "../components/ExportDropdown.svelte";
 
     import { onMount } from "svelte";
 
@@ -278,24 +271,13 @@
                 bind:value={buildingFilter}
             />
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <span
-                    class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap"
-                    >Buscar</span
-                >
-                <div class="relative">
-                    <input
-                        type="text"
-                        placeholder="Nombre, No. Empleado..."
-                        value={personSearch}
-                        oninput={onSearch}
-                        class="h-9 pl-9 pr-4 rounded-lg border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:bg-white focus:border-slate-900 transition-all outline-none"
-                    />
-                    <div
-                        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                    >
-                        <Search size={14} />
-                    </div>
-                </div>
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
+                <SearchInput
+                    placeholder="Nombre, No. Empleado..."
+                    bind:value={personSearch}
+                    oninput={onSearch}
+                    class="h-9 text-xs font-bold"
+                />
             </div>
         {/snippet}
 
@@ -377,10 +359,19 @@
 
     <!-- Top Pagination removed per request -->
 
-    <Card class="overflow-hidden">
-        {#if personnelState.isLoading && personnel.length === 0}
-            <SkeletonTable columns={5} rows={5} hasActions />
-        {:else}
+    <ContentView
+        isLoading={personnelState.isLoading}
+        data={personnel}
+        emptyTitle="Aún no hay personal registrado"
+        emptyDescription="Comienza registrando la primera persona en el sistema."
+        emptyIcon={Users}
+        emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"
+        skeletonColumns={5}
+        skeletonRows={5}
+        skeletonHasActions={true}
+        cardClass="overflow-hidden"
+    >
+        {#snippet children()}
             <DataTable
                 data={personnel}
                 actionsWidth="130px"
@@ -413,20 +404,21 @@
                     },
                 ]}
                 mobileCard={mobilePersonnelCard}
-            >                {#snippet actions(row: any)}
-                <Button
-                    variant="soft-blue"
-                    size="sm"
-                    class="h-9 px-4 rounded-xl"
-                    onclick={() => onOpenDetails(row)}
-                    title="Ver detalles de la persona"
-                >
-                    Ver detalles
-                </Button>
-            {/snippet}
+            >
+                {#snippet actions(row: any)}
+                    <Button
+                        variant="soft-blue"
+                        size="sm"
+                        class="h-9 px-4 rounded-xl"
+                        onclick={() => onOpenDetails(row)}
+                        title="Ver detalles de la persona"
+                    >
+                        Ver detalles
+                    </Button>
+                {/snippet}
             </DataTable>
-        {/if}
-    </Card>
+        {/snippet}
+    </ContentView>
 
     <Pagination
         {currentPage}

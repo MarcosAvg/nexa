@@ -1,8 +1,9 @@
 <script lang="ts">
     import { twMerge } from "tailwind-merge";
 
+    /** Atributos nativos del elemento <input>. */
     type NativeInputAttrs = {
-        type?: "text" | "email" | "password" | "number" | "tel" | "url" | "search" | "date" | "time" | "file" | "hidden";
+        type?: "text" | "email" | "password" | "number" | "tel" | "url" | "search" | "date" | "time" | "datetime-local" | "file" | "hidden";
         name?: string;
         placeholder?: string;
         readonly?: boolean;
@@ -26,8 +27,17 @@
         "aria-describedby"?: string;
     };
 
+    /**
+     * Input — Campo de texto con todos los tipos nativos.
+     *
+     * @example
+     * <Input bind:value={name} placeholder="Nombre" />
+     * <Input type="date" bind:value={date} max={endDate || undefined} />
+     */
     type Props = NativeInputAttrs & {
+        /** Valor del input (two-way bindable). */
         value?: string;
+        /** Clases CSS adicionales (usa twMerge). */
         class?: string;
         oninput?: (e: Event) => void;
         onchange?: (e: Event) => void;

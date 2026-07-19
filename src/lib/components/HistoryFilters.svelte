@@ -2,10 +2,20 @@
     import { Search, Filter, Calendar } from "lucide-svelte";
     import Select from "./Select.svelte";
 
+    /**
+     * HistoryFilters — Filtros para la vista de Historial.
+     *
+     * @example
+     * <HistoryFilters bind:personName bind:cardType bind:cardFolio bind:action />
+     */
     type Props = {
+        /** Nombre de persona a buscar. */
         personName: string;
+        /** Tipo de tarjeta (Todos, P2000, KONE). */
         cardType: string;
+        /** Folio de tarjeta. */
         cardFolio: string;
+        /** Acción en el historial (ACTION_NAMES). */
         action: string;
     };
 

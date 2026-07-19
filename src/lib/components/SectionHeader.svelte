@@ -10,7 +10,16 @@
         onSearch?: () => void;
     };
 
-    let { title, filters, actions, onSearch }: Props = $props();
+    let {
+        /** Título de la sección. */
+        title,
+        /** Snippet de filtros (se colapsan en móvil). */
+        filters,
+        /** Snippet de botones de acción. */
+        actions,
+        /** Handler de búsqueda (deprecado, usa filters en su lugar). */
+        onSearch,
+    }: Props = $props();
     let showFilters = $state(false);
     let showActions = $state(false);
 </script>

@@ -20,13 +20,6 @@ export class UIState {
         this.isDirectEditMode = !this.isDirectEditMode;
     }
 
-    openSidebar() {
-        this.isSidebarOpen = true;
-    }
-
-    closeSidebar() {
-        this.isSidebarOpen = false;
-    }
 }
 
 export const uiState = new UIState();

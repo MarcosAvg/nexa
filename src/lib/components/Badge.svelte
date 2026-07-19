@@ -1,10 +1,20 @@
 <script lang="ts">
     import { type Snippet } from "svelte";
 
+    /**
+     * Badge — Etiqueta de estado/color con variantes.
+     *
+     * @example
+     * <Badge variant="emerald">Activo</Badge>
+     */
     type Props = {
+        /** Variante de color del badge. */
         variant?: "slate" | "amber" | "emerald" | "blue" | "rose" | "violet";
+        /** Clases CSS adicionales (twMerge). */
         class?: string;
+        /** Contenido interno del badge. */
         children?: Snippet;
+        /** Atributos nativos de <span>. */
         [key: string]: any;
     };
 

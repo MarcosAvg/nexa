@@ -8,7 +8,14 @@
     import DataTable from "../DataTable.svelte";
     import { Plus, Edit2, Trash2 } from "lucide-svelte";
 
+    /**
+     * DependencyCatalog — Gestión de dependencias (CRUD).
+     *
+     * @example
+     * <DependencyCatalog canEdit={isAdmin} />
+     */
     type Props = {
+        /** Si es true, muestra botones de crear/editar/eliminar. */
         canEdit: boolean;
     };
 

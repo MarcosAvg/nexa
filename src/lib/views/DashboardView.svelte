@@ -1,8 +1,6 @@
 <script lang="ts">
     import { uiState, personnelState, ticketState, userState } from "../stores";
-    import Card from "../components/Card.svelte";
-    import Badge from "../components/Badge.svelte";
-    import Button from "../components/Button.svelte";
+    import { Card, Badge, Button } from "../components";
     import {
         CreditCard,
         FileSignature,

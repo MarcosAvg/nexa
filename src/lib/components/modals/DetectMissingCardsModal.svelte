@@ -8,6 +8,12 @@
     import { toast } from "svelte-sonner";
     import { FileSearch, AlertCircle } from "lucide-svelte";
 
+    /**
+     * DetectMissingCardsModal — Detecta tarjetas faltantes por rango de folios.
+     *
+     * @example
+     * <DetectMissingCardsModal bind:isOpen />
+     */
     let { isOpen = $bindable(false) } = $props();
 
     let type = $state("KONE");

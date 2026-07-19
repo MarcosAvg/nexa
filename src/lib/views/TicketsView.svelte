@@ -5,46 +5,36 @@
         personnelState,
         catalogState,
     } from "../stores";
-    import SectionHeader from "../components/SectionHeader.svelte";
-    import TaskBanner from "../components/TaskBanner.svelte";
-    import Button from "../components/Button.svelte";
-    import FilterGroup from "../components/FilterGroup.svelte";
-    import FilterSelect from "../components/FilterSelect.svelte";
-    import Input from "../components/Input.svelte";
-    import TicketModal from "../components/modals/TicketModal.svelte";
-    import ModificationCompareModal from "../components/modals/ModificationCompareModal.svelte";
-    import ManualTicketDetailsModal from "../components/modals/ManualTicketDetailsModal.svelte";
-    import PermissionGuard from "../components/PermissionGuard.svelte";
+    import {
+        SectionHeader, TaskBanner, Button, FilterGroup, FilterSelect,
+        Input, PermissionGuard, ContentView, FloatingActionButton,
+        Pagination, ExportDropdown,
+        TicketModal, ModificationCompareModal, ManualTicketDetailsModal,
+    } from "../components";
     import {
         Search,
         Plus,
         FileSpreadsheet,
-        ChevronLeft,
-        ChevronRight,
         Download,
         FolderArchive,
         ClipboardList,
         FilterX,
     } from "lucide-svelte";
-    import FloatingActionButton from "../components/FloatingActionButton.svelte";
-    import EmptyState from "../components/EmptyState.svelte";
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
     import { personnelService } from "../services/personnel";
     import { toast } from "svelte-sonner";
     import { handleError, exportResponsivasToExcel, exportResponsivasAllDependenciesAsZip, createSimpleDebounce, appEvents, EVENTS } from "../utils";
-    import ImportPreviewModal from "../components/modals/ImportPreviewModal.svelte";
-    import ConfirmAltaModal from "../components/modals/ConfirmAltaModal.svelte";
-    import TicketImportedDetailsModal from "../components/modals/TicketImportedDetailsModal.svelte";
+    import {
+        ImportPreviewModal, ConfirmAltaModal, TicketImportedDetailsModal,
+    } from "../components";
     import { networkStore } from "../stores/network.svelte";
-    import ExportDropdown from "../components/ExportDropdown.svelte";
 
     // Tickets paginados del servidor (reemplaza filtrado del lado del cliente)
     let tickets = $state<any[]>([]);
     let currentPage = $state(1);
     let pageSize = $state(50);
     let totalRecords = $state(0);
-    let totalPages = $derived(Math.max(1, Math.ceil(totalRecords / pageSize)));
     let isLoading = $state(false);
     let isZipExporting = $state(false);
 
@@ -274,10 +264,6 @@
 
     function onFilterChange() {
         refreshData(1);
-    }
-
-    function goToPage(page: number) {
-        refreshData(page);
     }
 
     let unsubs: (() => void)[] = [];
@@ -587,113 +573,58 @@
 
     <!-- Top Pagination removed per request -->
 
-    <div
-        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20"
+    <ContentView
+        isLoading={isLoading}
+        data={filteredTickets}
+        emptyTitle="Todo al día"
+        emptyTitleFiltered="Sin resultados"
+        emptyDescription="No hay tickets pendientes en este momento. Todo está en orden."
+        emptyDescriptionFiltered="No encontramos tickets con los filtros actuales. Intenta ajustar tu búsqueda."
+        emptyIcon={ClipboardList}
+        emptyIconBgClass="from-amber-50 to-amber-100 ring-1 ring-amber-200/50 text-amber-400"
+        hasFilters={!!(typeFilter !== "Todos" || priorityFilter !== "Todas" || searchQuery)}
+        onClearFilters={() => {
+            typeFilter = 'Todos';
+            priorityFilter = 'Todas';
+            searchQuery = '';
+            const searchInput = document.getElementById('ticket-search') as HTMLInputElement;
+            if (searchInput) searchInput.value = '';
+            refreshData(1);
+        }}
+        skeletonColumns={4}
+        skeletonRows={6}
     >
-        {#if isLoading && filteredTickets.length === 0}
-            {#each [1, 2, 3, 4, 5, 6] as _}
-                <div class="animate-pulse bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-                    <div class="p-5 space-y-4">
-                        <!-- Priority + type badge skeleton -->
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="flex items-center gap-2 flex-1 min-w-0">
-                                <div class="h-6 w-16 bg-slate-100 rounded-full"></div>
-                                <div class="h-4 w-28 bg-slate-100 rounded"></div>
-                            </div>
-                            <div class="h-6 w-20 bg-slate-100 rounded-lg"></div>
-                        </div>
-                        <!-- Person name skeleton -->
-                        <div class="space-y-2">
-                            <div class="h-5 w-3/4 bg-slate-100 rounded"></div>
-                            <div class="h-4 w-1/2 bg-slate-100 rounded"></div>
-                        </div>
-                        <!-- Description skeleton -->
-                        <div class="space-y-1.5">
-                            <div class="h-3 w-full bg-slate-100 rounded"></div>
-                            <div class="h-3 w-5/6 bg-slate-100 rounded"></div>
-                        </div>
-                        <!-- Footer skeleton -->
-                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
-                            <div class="h-4 w-24 bg-slate-100 rounded"></div>
-                            <div class="h-8 w-24 bg-slate-100 rounded-xl"></div>
-                        </div>
-                    </div>
-                </div>
-            {/each}
-        {:else if filteredTickets.length === 0 && !isLoading}
-            <div class="col-span-full">
-                <EmptyState
-                    icon={ClipboardList}
-                    iconBgClass="from-amber-50 to-amber-100 ring-1 ring-amber-200/50 text-amber-400"
-                    title="Todo al día"
-                    titleFiltered="Sin resultados"
-                    description="No hay tickets pendientes en este momento. Todo está en orden."
-                    descriptionFiltered="No encontramos tickets con los filtros actuales. Intenta ajustar tu búsqueda."
-                    hasFilters={!!(typeFilter !== "Todos" || priorityFilter !== "Todas" || searchQuery)}
-                    onClearFilters={() => {
-                        typeFilter = 'Todos';
-                        priorityFilter = 'Todas';
-                        searchQuery = '';
-                        const searchInput = document.getElementById('ticket-search') as HTMLInputElement;
-                        if (searchInput) searchInput.value = '';
-                        refreshData(1);
-                    }}
-                >
-                    {#snippet children()}
-                        <PermissionGuard requireEdit>
-                            <Button variant="primary" size="sm" class="h-11 px-7 rounded-xl shadow-lg shadow-blue-500/20" onclick={onOpenAddTicket}>
-                                <Plus size={18} strokeWidth={3} class="mr-2" />
-                                Crear nuevo ticket
-                            </Button>
-                        </PermissionGuard>
-                    {/snippet}
-                </EmptyState>
+        {#snippet children()}
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
+                {#each filteredTickets as ticket (ticket.id)}
+                    <TaskBanner
+                        {ticket}
+                        onManage={onManageTicket}
+                        onComplete={onStartCompletion}
+                    />
+                {/each}
             </div>
-        {:else}
-            {#each filteredTickets as ticket (ticket.id)}
-                <TaskBanner
-                    {ticket}
-                    onManage={onManageTicket}
-                    onComplete={onStartCompletion}
-                />
-            {/each}
-        {/if}
-    </div>
+        {/snippet}
 
-    <!-- Pagination Controls -->
-    {#if totalRecords > pageSize}
-        <div class="flex items-center justify-between px-2">
-            <p class="text-xs text-slate-500">
-                Mostrando {(currentPage - 1) * pageSize + 1}–{Math.min(
-                    currentPage * pageSize,
-                    totalRecords,
-                )} de {totalRecords} tickets
-            </p>
-            <div class="flex items-center gap-2">
-                <button
-                    type="button"
-                    class="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-                    onclick={() => goToPage(currentPage - 1)}
-                    disabled={currentPage <= 1}
-                >
-                    <ChevronLeft size={14} />
-                    Anterior
-                </button>
-                <span class="text-xs text-slate-500 font-bold">
-                    {currentPage} / {totalPages}
-                </span>
-                <button
-                    type="button"
-                    class="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-                    onclick={() => goToPage(currentPage + 1)}
-                    disabled={currentPage >= totalPages}
-                >
-                    Siguiente
-                    <ChevronRight size={14} />
-                </button>
-            </div>
-        </div>
-    {/if}
+        {#snippet emptyActions()}
+            <PermissionGuard requireEdit>
+                <Button variant="primary" size="sm" class="h-11 px-7 rounded-xl shadow-lg shadow-blue-500/20" onclick={onOpenAddTicket}>
+                    <Plus size={18} strokeWidth={3} class="mr-2" />
+                    Crear nuevo ticket
+                </Button>
+            </PermissionGuard>
+        {/snippet}
+    </ContentView>
+
+    <Pagination
+        {currentPage}
+        {pageSize}
+        totalRecords={totalRecords}
+        onPrevPage={() => refreshData(currentPage - 1)}
+        onNextPage={() => refreshData(currentPage + 1)}
+        onGoToPage={(page) => refreshData(page)}
+        {isLoading}
+    />
 </div>
 
 <TicketModal bind:isOpen={isModalOpen} {editingTicket} />

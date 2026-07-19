@@ -1,8 +1,20 @@
 <script lang="ts">
+    /**
+     * SkeletonTable — Esqueleto de tabla para estado de carga (desktop).
+     *
+     * Muestra barras placeholder con efecto shimmer.
+     *
+     * @example
+     * <SkeletonTable columns={5} rows={5} hasActions={true} />
+     */
     type Props = {
+        /** Número de columnas. @default 4 */
         columns?: number;
+        /** Número de filas. @default 5 */
         rows?: number;
+        /** Muestra columna de acciones. @default false */
         hasActions?: boolean;
+        /** Clases CSS adicionales. */
         className?: string;
     };
 
@@ -40,7 +52,9 @@
     }
 </script>
 
-<div class="animate-pulse divide-y divide-slate-100/60 {className}">
+<div class="relative overflow-hidden divide-y divide-slate-100/60 {className}">
+    <!-- Shimmer overlay -->
+    <div class="absolute inset-0 -translate-x-full animate-shimmer bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)] pointer-events-none"></div>
     <!-- Table header skeleton -->
     <div class="flex items-center gap-6 px-6 py-5 bg-slate-50/80">
         {#each Array(columns) as _, i}

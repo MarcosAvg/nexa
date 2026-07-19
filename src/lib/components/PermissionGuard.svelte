@@ -17,11 +17,17 @@
     }
 
     let {
+        /** Roles autorizados para ver este contenido. Si está vacío, se basa en 'requireEdit' o 'requireAdmin' */
         allowedRoles = [],
+        /** Requiere permisos de edición (Admin u Operador) */
         requireEdit = false,
+        /** Requiere permisos de administrador */
         requireAdmin = false,
+        /** Si es true, el contenido se muestra pero se deshabilita (vía slot props) */
         disabledOnly = false,
+        /** Mensaje alternativo si no se tiene permiso (opcional) */
         fallback,
+        /** Render prop con { disabled }. */
         children,
     }: Props = $props();
 

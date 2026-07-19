@@ -7,8 +7,16 @@
     import { Search, UserPlus } from "lucide-svelte";
     import { toast } from "svelte-sonner";
 
+    /**
+     * AddEnlaceModal — Modal para asignar un enlace administrativo.
+     *
+     * @example
+     * <AddEnlaceModal bind:isOpen onComplete={refreshEnlaces} />
+     */
     type Props = {
+        /** Controla la visibilidad del modal (two-way bindable). */
         isOpen: boolean;
+        /** Callback al completar la asignación. */
         onComplete: () => void;
     };
 

@@ -2,19 +2,15 @@
     import { onMount } from "svelte";
     import { enlaceService } from "../services/enlaces";
     import type { Enlace } from "../types";
-    import SectionHeader from "../components/SectionHeader.svelte";
-    import FloatingActionButton from "../components/FloatingActionButton.svelte";
-    import PermissionGuard from "../components/PermissionGuard.svelte";
-    import AddEnlaceModal from "../components/modals/AddEnlaceModal.svelte";
-    import EditEnlaceModal from "../components/modals/EditEnlaceModal.svelte";
-    import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
     import { confirm } from "../utils/confirmModal.svelte";
-    import EmptyState from "../components/EmptyState.svelte";
-    import DataTable from "../components/DataTable.svelte";
+    import {
+        SectionHeader, FloatingActionButton, PermissionGuard,
+        DataTable, Select, Button, ContentView, SearchInput,
+        AddEnlaceModal, EditEnlaceModal, ConfirmationModal,
+    } from "../components";
     import { catalogState } from "../stores";
     import {
         Trash2,
-        Search,
         Contact,
         UserPlus,
         Edit,
@@ -25,8 +21,6 @@
         FilterX,
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
-    import Input from "../components/Input.svelte";
-    import Select from "../components/Select.svelte";
 
     let enlaces = $state<Enlace[]>([]);
     let isLoading = $state(true);
@@ -229,18 +223,12 @@
             <div class="flex flex-col xl:flex-row gap-3 w-full flex-wrap xl:flex-nowrap items-end">
                 <div class="flex-1 min-w-[200px] w-full sm:max-w-xs flex flex-col gap-1.5">
                     <label for="enlaces-search" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Buscar Enlace</label>
-                    <div class="relative w-full">
-                        <Search
-                            class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                            size={16}
-                        />
-                        <Input
-                            id="enlaces-search"
-                            placeholder="Nombre, dependencia, correo o ext..."
-                            class="pl-10 h-9 text-xs font-bold w-full"
-                            bind:value={searchQuery}
-                        />
-                    </div>
+                    <SearchInput
+                        id="enlaces-search"
+                        placeholder="Nombre, dependencia, correo o ext..."
+                        class="h-9 text-xs font-bold w-full"
+                        bind:value={searchQuery}
+                    />
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <div class="flex flex-col gap-1.5">
@@ -292,86 +280,86 @@
         {/snippet}
     </SectionHeader>
 
-    {#if isLoading}
-        <div class="flex justify-center p-12">
-            <div
-                class="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin"
-            ></div>
-        </div>
-    {:else if filteredEnlaces.length === 0}
-        <EmptyState
-            icon={Link2}
-            iconBgClass="from-violet-50 to-violet-100 ring-1 ring-violet-200/50 text-violet-400"
-            title="Aún no hay enlaces asignados"
-            titleFiltered="Sin resultados"
-            description="Los enlaces administrativos son los responsables de cada área. Asigna el primero para empezar."
-            descriptionFiltered="No encontramos enlaces con los filtros actuales. Intenta ajustar tu búsqueda."
-            hasFilters={!!(searchQuery || filterDependency || filterFloor)}
-            onClearFilters={() => {
-                searchQuery = '';
-                filterDependency = '';
-                filterFloor = '';
-            }}
-        >
-            {#snippet children()}
-                <PermissionGuard requireEdit>
-                    {#snippet children({ disabled })}
-                        <Button variant="primary" size="sm" class="h-11 px-7 rounded-xl shadow-lg shadow-violet-500/20" onclick={() => (isAddModalOpen = true)} {disabled}>
-                            <UserPlus size={18} strokeWidth={3} class="mr-2" />
-                            Asignar primer enlace
-                        </Button>
-                    {/snippet}
-                </PermissionGuard>
-            {/snippet}
-        </EmptyState>
-    {:else}
-        <DataTable data={filteredEnlaces} {columns}>
-            {#snippet actions(row: Enlace)}
-                <div class="flex items-center gap-1 justify-end">
-                    {#if row.personnel?.email && row.personnel?.email !== "N/A"}
-                        <button
-                            type="button"
-                            class="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
-                            onclick={() => copyEmail(row.personnel!.email!)}
-                            title="Copiar Correo"
-                        >
-                            <Copy size={16} />
-                        </button>
-                        <button
-                            type="button"
-                            class="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent hover:border-indigo-100"
-                            onclick={() => sendEmail(row.personnel!.email!)}
-                            title="Enviar Correo"
-                        >
-                            <Mail size={16} />
-                        </button>
-                    {/if}
-                    <PermissionGuard requireEdit>
-                        {#snippet children({ disabled })}
+    <ContentView
+        isLoading={isLoading}
+        data={filteredEnlaces}
+        emptyTitle="Aún no hay enlaces asignados"
+        emptyTitleFiltered="Sin resultados"
+        emptyDescription="Los enlaces administrativos son los responsables de cada área. Asigna el primero para empezar."
+        emptyDescriptionFiltered="No encontramos enlaces con los filtros actuales. Intenta ajustar tu búsqueda."
+        emptyIcon={Link2}
+        emptyIconBgClass="from-violet-50 to-violet-100 ring-1 ring-violet-200/50 text-violet-400"
+        hasFilters={!!(searchQuery || filterDependency || filterFloor)}
+        onClearFilters={() => {
+            searchQuery = '';
+            filterDependency = '';
+            filterFloor = '';
+        }}
+        skeletonColumns={5}
+        skeletonRows={5}
+        skeletonHasActions={true}
+        cardClass="overflow-hidden"
+    >
+        {#snippet children()}
+            <DataTable data={filteredEnlaces} {columns}>
+                {#snippet actions(row: Enlace)}
+                    <div class="flex items-center gap-1 justify-end">
+                        {#if row.personnel?.email && row.personnel?.email !== "N/A"}
                             <button
                                 type="button"
-                                class="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors border border-transparent hover:border-emerald-100"
-                                onclick={() => requestEdit(row)}
-                                title="Editar Extensión"
-                                {disabled}
+                                class="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+                                onclick={() => copyEmail(row.personnel!.email!)}
+                                title="Copiar Correo"
                             >
-                                <Edit size={16} />
+                                <Copy size={16} />
                             </button>
                             <button
                                 type="button"
-                                class="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
-                                onclick={() => requestRemove(row)}
-                                title="Remover"
-                                {disabled}
+                                class="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent hover:border-indigo-100"
+                                onclick={() => sendEmail(row.personnel!.email!)}
+                                title="Enviar Correo"
                             >
-                                <Trash2 size={16} />
+                                <Mail size={16} />
                             </button>
-                        {/snippet}
-                    </PermissionGuard>
-                </div>
-            {/snippet}
-        </DataTable>
-    {/if}
+                        {/if}
+                        <PermissionGuard requireEdit>
+                            {#snippet children({ disabled })}
+                                <button
+                                    type="button"
+                                    class="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors border border-transparent hover:border-emerald-100"
+                                    onclick={() => requestEdit(row)}
+                                    title="Editar Extensión"
+                                    {disabled}
+                                >
+                                    <Edit size={16} />
+                                </button>
+                                <button
+                                    type="button"
+                                    class="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
+                                    onclick={() => requestRemove(row)}
+                                    title="Remover"
+                                    {disabled}
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            {/snippet}
+                        </PermissionGuard>
+                    </div>
+                {/snippet}
+            </DataTable>
+        {/snippet}
+
+        {#snippet emptyActions()}
+            <PermissionGuard requireEdit>
+                {#snippet children({ disabled })}
+                    <Button variant="primary" size="sm" class="h-11 px-7 rounded-xl shadow-lg shadow-violet-500/20" onclick={() => (isAddModalOpen = true)} {disabled}>
+                        <UserPlus size={18} strokeWidth={3} class="mr-2" />
+                        Asignar primer enlace
+                    </Button>
+                {/snippet}
+            </PermissionGuard>
+        {/snippet}
+    </ContentView>
 </div>
 
 <AddEnlaceModal bind:isOpen={isAddModalOpen} onComplete={loadData} />

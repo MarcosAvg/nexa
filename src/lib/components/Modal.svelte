@@ -2,15 +2,35 @@
     import { type Snippet } from "svelte";
     import { X } from "lucide-svelte";
 
+    /**
+     * Modal — Modal genérico con footer, tamaños y cierre con Escape/backdrop.
+     *
+     * @example
+     * <Modal bind:isOpen title="Editar" size="xl" onclose={reset}>
+     *     <!-- contenido -->
+     *     {#snippet footer()}
+     *         <Button onclick={close}>Cancelar</Button>
+     *     {/snippet}
+     * </Modal>
+     */
     type Props = {
+        /** Controla la visibilidad del modal (two-way bindable). */
         isOpen: boolean;
+        /** Título del modal (aria-labelledby). */
         title: string;
+        /** Subtítulo/descripción del modal. */
         description?: string;
+        /** Tamaño/ancho máximo del modal. @default "md" */
         size?: "sm" | "md" | "lg" | "xl" | "full";
+        /** Muestra el botón de cerrar (X). @default true */
         showClose?: boolean;
+        /** Clase de z-index personalizada. @default "z-50" */
         zIndex?: string;
+        /** Contenido del cuerpo del modal. */
         children?: Snippet;
+        /** Contenido del pie del modal (botones de acción). */
         footer?: Snippet;
+        /** Callback al cerrar el modal. */
         onclose?: () => void;
     };
 

@@ -115,38 +115,6 @@ export const HistoryService = {
         }, "Fetch History for Export", []);
     },
 
-    async fetchMore(offset: number, limit: number = 200) {
-        return withErrorHandlingSafe(async () => {
-            const { data, error } = await supabase
-                .from("history_logs")
-                .select("*").order("timestamp", { ascending: false })
-                .range(offset, offset + limit - 1);
-            if (error) throw error;
-            return data || [];
-        }, "Fetch More History", []);
-    },
-
-    async deleteByEntity(entityType: string, entityId: string) {
-        return withErrorHandling(async () => {
-            const { error } = await supabase
-                .from("history_logs").delete()
-                .eq("entity_type", entityType)
-                .eq("entity_id", entityId);
-            if (error) throw error;
-        }, "Delete History By Entity");
-    },
-
-    async fetchByEntity(entityType: string, entityId: string) {
-        return withErrorHandlingSafe(async () => {
-            const { data, error } = await supabase
-                .from("history_logs").select("*")
-                .eq("entity_type", entityType).eq("entity_id", entityId)
-                .order("timestamp", { ascending: false });
-            if (error) throw error;
-            return data || [];
-        }, "Fetch History By Entity", []);
-    },
-
     async fetchCardHistoryByRange(type: string) {
         return withErrorHandlingSafe(async () => {
             return await batchPaginate<any>(async (from, to) => {

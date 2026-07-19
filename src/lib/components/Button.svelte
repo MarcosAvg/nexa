@@ -3,6 +3,7 @@
     import { Loader2 } from "lucide-svelte";
     import { twMerge } from "tailwind-merge";
 
+    /** Variante visual del botón. */
     type ButtonVariant =
         | "primary"
         | "secondary"
@@ -16,8 +17,10 @@
         | "soft-emerald"
         | "soft-slate";
 
+    /** Tamaño predefinido del botón. */
     type ButtonSize = "default" | "sm" | "lg";
 
+    /** Atributos nativos del elemento <button>. */
     type NativeButtonAttrs = {
         type?: "button" | "submit" | "reset";
         name?: string;
@@ -40,13 +43,28 @@
         style?: string;
     };
 
+    /**
+     * Button — Botón con variantes, tamaños y estado de carga.
+     *
+     * @example
+     * <Button variant="primary" size="sm" onclick={handleClick} loading={isSaving}>
+     *     Guardar
+     * </Button>
+     */
     type Props = NativeButtonAttrs & {
+        /** Variante visual del botón. @default "primary" */
         variant?: ButtonVariant;
+        /** Tamaño del botón. @default "default" */
         size?: ButtonSize;
+        /** Clases CSS adicionales (usa twMerge). */
         class?: string;
+        /** Contenido interno. */
         children?: Snippet;
+        /** Muestra spinner de carga y deshabilita el botón. */
         loading?: boolean;
+        /** Deshabilita el botón. */
         disabled?: boolean;
+        /** Handler de click. */
         onclick?: (e: MouseEvent) => void;
         onmouseenter?: (e: MouseEvent) => void;
         onmouseleave?: (e: MouseEvent) => void;

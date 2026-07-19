@@ -5,9 +5,13 @@
     import type { Person } from "../../types";
 
     let {
+        /** Controla la visibilidad del modal (two-way bindable). */
         isOpen = $bindable(false),
+        /** Persona a eliminar. */
         person,
+        /** Callback de confirmación con mapa de decisiones por tarjeta. */
         onConfirm,
+        /** Callback al cancelar. */
         onCancel = () => {},
     } = $props<{
         isOpen: boolean;

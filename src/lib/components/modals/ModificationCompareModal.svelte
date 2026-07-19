@@ -13,8 +13,11 @@
     import type { Ticket, Person } from "../../types";
 
     let {
+        /** Controla la visibilidad (two-way bindable). */
         isOpen = $bindable(false),
+        /** Ticket de modificación con datos propuestos. */
         ticket = null,
+        /** Callback al completar (aprobar o rechazar). */
         onComplete,
     }: {
         isOpen: boolean;

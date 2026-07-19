@@ -7,9 +7,18 @@
     import { Save } from "lucide-svelte";
     import type { Enlace } from "../../types";
 
+    /**
+     * EditEnlaceModal — Modal para editar la extensión de un enlace.
+     *
+     * @example
+     * <EditEnlaceModal bind:isOpen enlace={selectedEnlace} onComplete={refresh} />
+     */
     type Props = {
+        /** Controla la visibilidad del modal (two-way bindable). */
         isOpen: boolean;
+        /** Enlace a editar. */
         enlace: Enlace | null;
+        /** Callback al completar la edición. */
         onComplete: () => void;
     };
 

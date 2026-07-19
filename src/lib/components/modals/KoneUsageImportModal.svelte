@@ -21,6 +21,12 @@
         isOpen: boolean;
     };
 
+    /**
+     * KoneUsageImportModal — Importa archivo de uso de tarjetas KONE.
+     *
+     * @example
+     * <KoneUsageImportModal bind:isOpen />
+     */
     let { isOpen = $bindable() }: Props = $props();
 
     let step = $state<"idle" | "parsing" | "matching" | "results">("idle");

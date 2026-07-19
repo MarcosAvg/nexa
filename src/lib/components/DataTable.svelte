@@ -4,23 +4,48 @@
 
     type TopSnippet = Snippet<[any]>;
 
+    /** Columna de la tabla de datos. */
     type Column = {
+        /** Campo del objeto que se muestra en esta columna. */
         key: string;
+        /** Texto del encabezado visible. */
         label: string;
+        /** Snippet para render personalizado de celdas. */
         render?: TopSnippet;
+        /** Clases CSS adicionales para el <th>/<td>. */
         class?: string;
+        /** Oculta esta columna en vista móvil. */
         hideOnMobile?: boolean;
+        /** Permite ordenar por esta columna. @default true */
         sortable?: boolean;
+        /** Ancho fijo de la columna (ej: "200px"). */
         width?: string;
+        /** Ancho máximo de la columna. */
         maxWidth?: string;
     };
 
+    /**
+     * DataTable — Tabla de datos con scroll virtual, ordenamiento y vista móvil.
+     *
+     * @example
+     * <DataTable data={items} columns={columns}>
+     *     {#snippet actions(row)}
+     *         <Button onclick={() => onEdit(row)}>Editar</Button>
+     *     {/snippet}
+     * </DataTable>
+     */
     type Props = {
+        /** Arreglo de datos a mostrar. */
         data: any[];
+        /** Definición de columnas. */
         columns: Column[];
+        /** Snippet de acciones por fila (columna extra a la derecha). */
         actions?: TopSnippet;
+        /** Snippet para vista móvil personalizada. */
         mobileCard?: TopSnippet;
+        /** Ancho de la columna de acciones. @default "140px" */
         actionsWidth?: string;
+        /** Función que retorna clases CSS condicionales por fila. */
         rowClass?: (row: any) => string;
     };
     let {
@@ -217,7 +242,7 @@
 
                     {#each visibleData as row (row.id || Math.random())}
                         <tr
-                            class="group transition-all duration-300 hover:bg-blue-50/30 {rowClass ? rowClass(row) : ''}"
+                            class="group transition-all duration-300 hover:bg-blue-50/30 even:bg-slate-50/30 {rowClass ? rowClass(row) : ''}"
                         >
                             {#each columns as column}
                                 <td

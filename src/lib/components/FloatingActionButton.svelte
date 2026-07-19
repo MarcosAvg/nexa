@@ -1,9 +1,18 @@
 <script lang="ts">
     import { Plus } from "lucide-svelte";
 
+    /**
+     * FloatingActionButton — Botón de acción flotante (visible solo en móvil).
+     *
+     * @example
+     * <FloatingActionButton onclick={createNew} icon={Plus} label="Nuevo" />
+     */
     type Props = {
+        /** Handler de clic. */
         onclick: () => void;
+        /** Ícono del botón. @default Plus */
         icon?: any;
+        /** Label ARIA para accesibilidad. @default "Crear nuevo" */
         label?: string;
     };
 

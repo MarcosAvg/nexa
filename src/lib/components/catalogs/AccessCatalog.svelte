@@ -8,7 +8,14 @@
     import DataTable from "../DataTable.svelte";
     import { Plus, Edit2, Trash2, Key } from "lucide-svelte";
 
+    /**
+     * AccessCatalog — Gestión de accesos especiales (CRUD).
+     *
+     * @example
+     * <AccessCatalog canEdit={isAdmin} />
+     */
     type Props = {
+        /** Si es true, muestra botones de crear/editar/eliminar. */
         canEdit: boolean;
     };
 

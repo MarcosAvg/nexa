@@ -1,8 +1,18 @@
 <script lang="ts">
+    /**
+     * FilterGroup — Botones tipo pill para filtro de selección única.
+     *
+     * @example
+     * <FilterGroup label="Estado" options={["Todos", "Activo"]} bind:value={statusFilter} />
+     */
     type Props = {
+        /** Label del grupo de filtros. */
         label: string;
+        /** Opciones del filtro. */
         options: string[];
+        /** Valor seleccionado (two-way bindable). */
         value: string;
+        /** Callback al cambiar selección. */
         onchange?: (value: string) => void;
     };
 

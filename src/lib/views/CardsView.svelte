@@ -3,16 +3,13 @@
     import { confirm } from "../utils/confirmModal.svelte";
     import { onMount, onDestroy } from "svelte";
     import { appEvents, EVENTS, handleError, createSimpleDebounce } from "../utils";
-    import SectionHeader from "../components/SectionHeader.svelte";
-    import FilterGroup from "../components/FilterGroup.svelte";
-    import FilterSelect from "../components/FilterSelect.svelte";
-    import Button from "../components/Button.svelte";
-    import Card from "../components/Card.svelte";
-    import DataTable from "../components/DataTable.svelte";
-    import Badge from "../components/Badge.svelte";
-    import PermissionGuard from "../components/PermissionGuard.svelte";
     import {
-        Search,
+        SectionHeader, FilterGroup, FilterSelect, Button, Card,
+        DataTable, Badge, PermissionGuard, FloatingActionButton,
+        ContentView, SearchInput, Pagination, SkeletonTable, EmptyState,
+        AddCardModal, DetectMissingCardsModal, ConfirmationModal,
+    } from "../components";
+    import {
         User,
         Lock,
         Trash2,
@@ -24,13 +21,7 @@
         CreditCard,
         FilterX,
     } from "lucide-svelte";
-    import FloatingActionButton from "../components/FloatingActionButton.svelte";
-    import Pagination from "../components/Pagination.svelte";
-    import SkeletonTable from "../components/SkeletonTable.svelte";
-    import EmptyState from "../components/EmptyState.svelte";
-    import AddCardModal from "../components/modals/AddCardModal.svelte";
-    import DetectMissingCardsModal from "../components/modals/DetectMissingCardsModal.svelte";
-    import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
+
     import { cardService } from "../services/cards";
     import { toast } from "svelte-sonner";
     import { networkStore } from "../stores/network.svelte";
@@ -237,18 +228,12 @@
             />
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
-                <div class="relative">
-                    <input
-                        type="text"
-                        placeholder="Folio..."
-                        value={cardSearch}
-                        oninput={onSearch}
-                        class="h-9 pl-9 pr-4 rounded-lg border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:bg-white focus:border-slate-900 transition-all outline-none"
-                    />
-                    <div class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                        <Search size={14} />
-                    </div>
-                </div>
+                <SearchInput
+                    placeholder="Folio..."
+                    bind:value={cardSearch}
+                    oninput={onSearch}
+                    class="h-9 text-xs font-bold"
+                />
             </div>
         {/snippet}
 
@@ -299,38 +284,30 @@
         {/snippet}
     </SectionHeader>
 
-    <Card class="overflow-hidden">
-        {#if isLoading && cards.length === 0}
-            <SkeletonTable columns={4} rows={5} />
-        {:else if !isLoading && cards.length === 0}
-            <EmptyState
-                icon={CreditCard}
-                iconBgClass="from-slate-100 to-slate-200 text-slate-400"
-                title="Aún no hay tarjetas registradas"
-                titleFiltered="Sin resultados"
-                description="El inventario de tarjetas está vacío. Comienza registrando la primera tarjeta P2000 o KONE."
-                descriptionFiltered="No encontramos tarjetas con los filtros actuales. Intenta ajustar tu búsqueda."
-                hasFilters={!!(cardSearch || cardTypeFilter !== "Todos" || cardStatusFilter !== "Todas" || cardDependencyFilter)}
-                onClearFilters={() => {
-                    cardSearch = '';
-                    cardTypeFilter = 'Todos';
-                    cardStatusFilter = 'Todas';
-                    cardDependencyFilter = '';
-                    cardState.setSearch('');
-                    cardState.setFilters('Todos', 'Todas', '');
-                    cardState.refresh(1);
-                }}
-            >
-                {#snippet children()}
-                    <PermissionGuard requireEdit>
-                        <Button variant="primary" size="sm" class="h-11 px-7 rounded-xl shadow-lg shadow-blue-500/20" onclick={onOpenAddCard}>
-                            <Plus size={18} strokeWidth={3} class="mr-2" />
-                            Crear primera tarjeta
-                        </Button>
-                    </PermissionGuard>
-                {/snippet}
-            </EmptyState>
-        {:else}
+    <ContentView
+        isLoading={isLoading}
+        data={cards}
+        emptyTitle="Aún no hay tarjetas registradas"
+        emptyTitleFiltered="Sin resultados"
+        emptyDescription="El inventario de tarjetas está vacío. Comienza registrando la primera tarjeta P2000 o KONE."
+        emptyDescriptionFiltered="No encontramos tarjetas con los filtros actuales. Intenta ajustar tu búsqueda."
+        emptyIcon={CreditCard}
+        emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"
+        hasFilters={!!(cardSearch || cardTypeFilter !== "Todos" || cardStatusFilter !== "Todas" || cardDependencyFilter)}
+        onClearFilters={() => {
+            cardSearch = '';
+            cardTypeFilter = 'Todos';
+            cardStatusFilter = 'Todas';
+            cardDependencyFilter = '';
+            cardState.setSearch('');
+            cardState.setFilters('Todos', 'Todas', '');
+            cardState.refresh(1);
+        }}
+        skeletonColumns={4}
+        skeletonRows={5}
+        cardClass="overflow-hidden"
+    >
+        {#snippet children()}
             <DataTable
                 data={cards}
                 columns={[
@@ -411,8 +388,17 @@
                     </div>
                 {/snippet}
             </DataTable>
-        {/if}
-    </Card>
+        {/snippet}
+
+        {#snippet emptyActions()}
+            <PermissionGuard requireEdit>
+                <Button variant="primary" size="sm" class="h-11 px-7 rounded-xl shadow-lg shadow-blue-500/20" onclick={onOpenAddCard}>
+                    <Plus size={18} strokeWidth={3} class="mr-2" />
+                    Crear primera tarjeta
+                </Button>
+            </PermissionGuard>
+        {/snippet}
+    </ContentView>
 
     <Pagination
         {currentPage}

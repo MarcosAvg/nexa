@@ -1,13 +1,29 @@
 <script lang="ts">
     import Button from "./Button.svelte";
 
+    /**
+     * Pagination — Controles de paginación con botones de página y ellipsis.
+     *
+     * @example
+     * <Pagination currentPage={1} pageSize={50} totalRecords={234}
+     *     onPrevPage={() => store.prevPage()}
+     *     onNextPage={() => store.nextPage()}
+     *     onGoToPage={(p) => store.goToPage(p)} />
+     */
     type Props = {
+        /** Página actual (1-indexed). */
         currentPage: number;
+        /** Registros por página. */
         pageSize: number;
+        /** Total de registros en la consulta. */
         totalRecords: number;
+        /** Callback para ir a la página anterior. */
         onPrevPage: () => void;
+        /** Callback para ir a la página siguiente. */
         onNextPage: () => void;
+        /** Callback para ir a una página específica. */
         onGoToPage: (page: number) => void;
+        /** Deshabilita botones durante carga. */
         isLoading?: boolean;
     };
 

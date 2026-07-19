@@ -3,7 +3,18 @@
     import bgImg from "../../assets/responsiva_bg.png";
     import { RESPONSIVA_LEGAL_TEXTS } from "../constants/legal";
 
+    /**
+     * ResponsivaTemplate — Plantilla visual de la Carta Responsiva.
+     *
+     * Renderiza el formato PDF de la carta responsiva con datos de la persona,
+     * firma digital, texto legal y sello de integridad. Soporta modo oculto,
+     * previsualización y modo texto.
+     *
+     * @example
+     * <ResponsivaTemplate {data} mode="preview" {signature} cardType="KONE" />
+     */
     type Props = {
+        /** Datos de la responsiva (folio, nombre, numEmpleado, dependencia, etc.). */
         data: {
             folio: string;
             nombre: string;
@@ -12,10 +23,15 @@
             usuarioEntrega: string;
             fecha: string; // Formatted date string
         } | null;
+        /** ID para el elemento contenedor. */
         id?: string;
+        /** Modo de visualización: oculto, previsualización o solo texto. @default "preview" */
         mode?: "hidden" | "preview" | "text";
-        signature?: string; // Base64 signature
-        legalSnapshot?: string; // Snapshot from DB
+        /** Firma digital en base64. */
+        signature?: string;
+        /** Snapshot del texto legal guardado en BD. */
+        legalSnapshot?: string;
+        /** Tipo de tarjeta (determina el texto legal). */
         cardType?: "KONE" | "P2000";
     };
 

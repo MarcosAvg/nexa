@@ -38,6 +38,12 @@
         return items;
     });
 
+    /**
+     * MainLayoutWrapper — Wrapper de layout con lógica de ruta y banner offline.
+     *
+     * Envuelve DashboardLayout con: sincronización de página activa,
+     * banner de modo offline, CommandPalette global, filtro de sidebar por rol.
+     */
     let { children } = $props();
 
     async function handleLogout() {

@@ -20,9 +20,13 @@
     import { personnelService, profileService } from "../../services";
 
     let {
+        /** Controla la visibilidad (two-way bindable). */
         isOpen = $bindable(false),
+        /** Ticket manual a visualizar/completar/rechazar. */
         ticket = null,
+        /** Callback al cerrar el modal. */
         onClose,
+        /** Callback al completar el ticket. */
         onComplete,
     }: {
         isOpen: boolean;

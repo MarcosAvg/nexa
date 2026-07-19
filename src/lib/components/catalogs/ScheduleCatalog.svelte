@@ -8,7 +8,14 @@
     import DataTable from "../DataTable.svelte";
     import { Plus, Edit2, Trash2, Calendar } from "lucide-svelte";
 
+    /**
+     * ScheduleCatalog — Gestión de horarios con días laborales (CRUD).
+     *
+     * @example
+     * <ScheduleCatalog canEdit={isAdmin} />
+     */
     type Props = {
+        /** Si es true, muestra botones de crear/editar/eliminar. */
         canEdit: boolean;
     };
 

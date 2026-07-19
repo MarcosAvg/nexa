@@ -20,12 +20,6 @@ export class HistoryState {
         this.totalRecords = count;
     }
 
-    addLog(log: HistoryLog) {
-        // Añadir optimistamente al inicio, pero la fuente real es el servidor
-        this.historyLogs.unshift(log);
-        this.totalRecords++;
-    }
-
     async refresh(page: number = 1) {
         this.isLoading = true;
         this.currentPage = page;

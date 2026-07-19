@@ -10,11 +10,24 @@
         icon?: any;
     };
 
+    /**
+     * DashboardLayout — Layout principal de la app: Sidebar + main + BottomNav.
+     *
+     * @example
+     * <DashboardLayout sidebarItems={items} user={user} onLogout={handleLogout}>
+     *     <Router {routes} />
+     * </DashboardLayout>
+     */
     type Props = {
+        /** Items de navegación del sidebar. */
         sidebarItems: { label: string; href: string; icon?: any }[];
+        /** Usuario actual (nombre, email, avatar). */
         user?: { name: string; email: string; avatar?: string };
+        /** Título opcional del header. */
         headerTitle?: Snippet;
+        /** Contenido principal (router outlet). */
         children?: Snippet;
+        /** Handler de cierre de sesión. */
         onLogout?: () => void;
     };
 

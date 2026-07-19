@@ -6,9 +6,18 @@
     import Logo from "./Logo.svelte";
     import { LogOut, ChevronLeft, ChevronRight, Wrench } from "lucide-svelte";
 
+    /**
+     * Sidebar — Navegación lateral con modo expandido/condensado.
+     *
+     * @example
+     * <Sidebar items={navItems} user={currentUser} onLogout={handleLogout} />
+     */
     type Props = {
+        /** Items de navegación (label, href, icon). */
         items: { label: string; href: string; icon?: any }[];
+        /** Usuario actual (nombre, email, avatar). */
         user?: { name: string; email: string; avatar?: string };
+        /** Handler de cierre de sesión. */
         onLogout?: () => void;
     };
 

@@ -30,8 +30,11 @@
 
 
     let {
+        /** Controla la visibilidad (two-way bindable). */
         isOpen = $bindable(false),
+        /** Ticket importado a visualizar/gestionar. */
         ticket = null,
+        /** Callback al completar la gestión del ticket. */
         onComplete,
     }: {
         isOpen: boolean;

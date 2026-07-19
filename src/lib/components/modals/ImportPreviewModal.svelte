@@ -30,8 +30,19 @@
     } from "../../utils";
     import type { Person } from "../../types";
 
+    /**
+     * ImportPreviewModal — Modal de importación de personal vía Excel.
+     *
+     * Guía al usuario a través de 3 pasos: idle (selección de archivo),
+     * parsed (vista previa de datos parseados) y review (revisión final).
+     *
+     * @example
+     * <ImportPreviewModal bind:isOpen onComplete={refreshData} />
+     */
     let {
+        /** Controla la visibilidad del modal (two-way bindable). */
         isOpen = $bindable(false),
+        /** Callback al completar la importación. */
         onComplete,
     }: {
         isOpen: boolean;

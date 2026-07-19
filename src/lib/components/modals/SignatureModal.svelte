@@ -2,10 +2,20 @@
     import Modal from "../Modal.svelte";
     import SignaturePad from "../SignaturePad.svelte";
 
+    /**
+     * SignatureModal — Modal para firmar documentos con SignaturePad.
+     *
+     * @example
+     * <SignatureModal bind:isOpen onSave={handleSave} onClose={handleClose} />
+     */
     type Props = {
+        /** Controla la visibilidad (two-way bindable). */
         isOpen: boolean;
+        /** Callback con la firma en base64. */
         onSave: (signature: string) => Promise<void>;
+        /** Callback al cerrar sin guardar. */
         onClose: () => void;
+        /** Muestra spinner de carga. */
         loading?: boolean;
     };
 

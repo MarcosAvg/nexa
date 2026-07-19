@@ -7,7 +7,14 @@
     import Modal from "../Modal.svelte";
     import { Plus, Edit2, Trash2, Building2 } from "lucide-svelte";
 
+    /**
+     * BuildingCatalog — Gestión de edificios con pisos (CRUD).
+     *
+     * @example
+     * <BuildingCatalog canEdit={isAdmin} />
+     */
     type Props = {
+        /** Si es true, muestra botones de crear/editar/eliminar. */
         canEdit: boolean;
     };
 

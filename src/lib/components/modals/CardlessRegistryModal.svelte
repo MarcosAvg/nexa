@@ -12,9 +12,13 @@
     import { networkStore } from "../../stores/network.svelte";
 
     let {
+        /** Controla la visibilidad del modal (two-way bindable). */
         isOpen = $bindable(false),
+        /** Registro a editar (null = modo creación). */
         editingRegistry = null,
+        /** Callback al guardar (crear o actualizar). */
         onSave,
+        /** Callback al eliminar un registro existente. */
         onDelete,
     }: {
         isOpen: boolean;

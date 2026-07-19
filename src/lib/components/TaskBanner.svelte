@@ -35,8 +35,11 @@
     };
 
     let {
+        /** Ticket pendiente a mostrar. */
         ticket,
+        /** Callback para gestionar el ticket (abrir detalle). */
         onManage,
+        /** Callback para completar el ticket (solo Programación/Firma/Modificación). */
         onComplete,
     }: {
         ticket: Ticket;
@@ -192,7 +195,7 @@
     <div class="p-4 flex items-start justify-between gap-4">
         <div class="flex items-center gap-3">
             <div
-                class="flex h-11 w-11 items-center justify-center rounded-xl border-2 {config.bg} {config.border} {config.color} shadow-sm transition-transform duration-300 group-hover:scale-110"
+                class="flex h-11 w-11 items-center justify-center rounded-xl border-2 bg-white/80 backdrop-blur-sm {config.border} {config.color} shadow-sm transition-transform duration-300 group-hover:scale-110"
             >
                 {#if true}
                     {@const Icon = config.icon}

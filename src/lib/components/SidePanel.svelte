@@ -4,12 +4,26 @@
     import { cubicOut } from "svelte/easing";
     import { X } from "lucide-svelte";
 
+    /**
+     * SidePanel — Panel lateral deslizante (bottom sheet en móvil, side panel en desktop).
+     *
+     * @example
+     * <SidePanel bind:isOpen title="Detalles" subtitle="Nombre" onclose={handleClose}>
+     *     <!-- contenido -->
+     * </SidePanel>
+     */
     type Props = {
+        /** Controla la visibilidad (two-way bindable). */
         isOpen: boolean;
+        /** Título del panel. */
         title: string;
+        /** Subtítulo del panel. */
         subtitle?: string;
+        /** Contenido del panel. */
         children?: Snippet;
+        /** Footer con botones de acción. */
         footer?: Snippet;
+        /** Callback al cerrar el panel. */
         onclose?: () => void;
     };
 

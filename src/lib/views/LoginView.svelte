@@ -1,8 +1,6 @@
 <script lang="ts">
     import { supabase } from "../supabase";
-    import Button from "../components/Button.svelte";
-    import Input from "../components/Input.svelte";
-    import Card from "../components/Card.svelte";
+    import { Button, Input, Card } from "../components";
     import {
         LogIn,
         UserPlus,
@@ -123,12 +121,12 @@
                                 >
                                     <UserPlus size={18} />
                                 </div>
-                                <input
+                                <Input
                                     id="fullName"
                                     type="text"
                                     bind:value={fullName}
                                     placeholder="Nombre completo"
-                                    class="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-700 focus:bg-white focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all outline-none"
+                                    class="h-12 pl-11 text-sm"
                                     required={isSignUp}
                                 />
                             </div>
@@ -148,12 +146,12 @@
                             >
                                 <Mail size={18} />
                             </div>
-                            <input
+                            <Input
                                 id="email"
                                 type="email"
                                 bind:value={email}
                                 placeholder="usuario@nexa.com"
-                                class="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-700 focus:bg-white focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all outline-none"
+                                class="h-12 pl-11 text-sm"
                                 required
                             />
                         </div>
@@ -172,12 +170,12 @@
                             >
                                 <Lock size={18} />
                             </div>
-                            <input
+                            <Input
                                 id="password"
                                 type="password"
                                 bind:value={password}
                                 placeholder="••••••••"
-                                class="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-700 focus:bg-white focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all outline-none"
+                                class="h-12 pl-11 text-sm"
                                 required
                             />
                         </div>

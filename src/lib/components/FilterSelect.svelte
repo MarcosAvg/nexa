@@ -1,11 +1,22 @@
 <script lang="ts">
     import Select from "./Select.svelte";
 
+    /**
+     * FilterSelect — Select compacto con label para filtros de vista.
+     *
+     * @example
+     * <FilterSelect label="Dependencia" options={deps} bind:value={depFilter} />
+     */
     type Props = {
+        /** Label del filtro. */
         label: string;
+        /** Opciones del select. */
         options: string[];
+        /** Valor seleccionado (two-way bindable). */
         value: string;
+        /** Texto placeholder. @default "Seleccionar..." */
         placeholder?: string;
+        /** Callback al cambiar selección. */
         onchange?: (value: string) => void;
     };
 

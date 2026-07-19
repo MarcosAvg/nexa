@@ -3,9 +3,21 @@
     import { Trash2, Check, Tablet, X } from "lucide-svelte";
     import Button from "./Button.svelte";
 
+    /**
+     * SignaturePad — Pad de firma digital con canvas.
+     *
+     * Soporta mouse, touch y stylus con grosor adaptativo.
+     * Incluye modo tableta (overlay de pantalla completa).
+     *
+     * @example
+     * <SignaturePad onSave={handleSave} onCancel={handleCancel} loading={isSaving} />
+     */
     type Props = {
+        /** Callback con la firma en base64. */
         onSave: (signatureBase64: string) => void;
+        /** Callback al cancelar. */
         onCancel: () => void;
+        /** Muestra spinner de carga. */
         loading?: boolean;
     };
 

@@ -15,19 +15,34 @@
     import { toast } from "svelte-sonner";
     import { cardService } from "../../services/cards";
 
+    /**
+     * AddCardModal — Modal para asignar, crear o reponer tarjetas.
+     *
+     * Búsqueda inteligente: verifica inventario local y Supabase,
+     * detecta tarjetas ocupadas y requiere confirmación para nuevas.
+     *
+     * @example
+     * <AddCardModal bind:isOpen mode="assign" onSave={handleSave} />
+     */
     type Props = {
+        /** Controla la visibilidad del modal (two-way bindable). */
         isOpen: boolean;
+        /** Modo: "assign" (asignar a persona) | "inventory" (registrar en inventario). @default "assign" */
         mode?: "assign" | "inventory";
-        availableCards?: any[];    // Prop heredada
+        /** Tarjetas disponibles en inventario (prop heredada). */
+        availableCards?: any[];
+        /** Tarjeta siendo reemplazada (modo reposición). */
         replacingCard?: { type: string; folio: string; id: string } | null;
-        /** If set, only these card types are selectable (e.g. ['P2000']) */
+        /** Si se especifica, solo estos tipos de tarjeta son seleccionables. */
         allowedCardTypes?: string[] | null;
+        /** Callback al guardar la tarjeta. */
         onSave?: (
             card: { type: string; folio: string },
             replacementOptions?: {
                 oldCardStatus: string;
             },
         ) => void;
+        /** Callback al cerrar el modal. */
         onclose?: () => void;
     };
 
