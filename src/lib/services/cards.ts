@@ -10,10 +10,11 @@ export const cardService = {
         limit: number = 50,
         search: string = "",
         typeFilter: string = "Todos",
-        statusFilter: string = "Todas"
+        statusFilter: string = "Todas",
+        depId: string = ""
     ): Promise<{ data: Card[]; count: number }> {
         return withErrorHandlingSafe(async () => {
-            const cacheKey = `cards_page_${page}_${typeFilter}_${statusFilter}_${search}`;
+            const cacheKey = `cards_page_${page}_${typeFilter}_${statusFilter}_${search}_${depId}`;
             if (!networkStore.isOnline) {
                 const cachedData = await dbCache.load<{ data: Card[], count: number }>(cacheKey);
                 if (cachedData) return cachedData;
@@ -66,6 +67,19 @@ export const cardService = {
                 }
             }
 
+            if (depId) {
+                const { data: people } = await supabase
+                    .from("personnel")
+                    .select("id")
+                    .eq("dependency_id", depId);
+                const personIds = people?.map(p => p.id) || [];
+                if (personIds.length > 0) {
+                    query = query.in("person_id", personIds);
+                } else {
+                    return { data: [], count: 0 };
+                }
+            }
+
             const { data, count, error } = await query
                 .order("folio_sort", { ascending: true })
                 .range(from, to);
@@ -89,7 +103,8 @@ export const cardService = {
     async fetchForExport(
         search: string = "",
         typeFilter: string = "Todos",
-        statusFilter: string = "Todas"
+        statusFilter: string = "Todas",
+        depId: string = ""
     ): Promise<Card[]> {
         return withErrorHandlingSafe(async () => {
             let personIds: string[] = [];
@@ -101,6 +116,20 @@ export const cardService = {
                 }
                 const { data: people } = await peopleQuery;
                 personIds = people?.map(p => p.id) || [];
+            }
+
+            // Resolve person IDs for dependency filter once, outside the batch callback
+            let depPersonIds: string[] | null = null;
+            if (depId) {
+                const { data: people } = await supabase
+                    .from("personnel")
+                    .select("id")
+                    .eq("dependency_id", depId);
+                depPersonIds = people?.map(p => p.id) || [];
+            }
+
+            if (depPersonIds !== null && depPersonIds.length === 0) {
+                return [];
             }
 
             const allData = await batchPaginate<any>(async (from, to) => {
@@ -117,6 +146,9 @@ export const cardService = {
                 if (statusFilter !== "Todas") {
                     const sm: Record<string, string> = { "Activa": "active", "Bloqueada": "blocked", "Baja": "inactive", "Disponible": "available" };
                     if (sm[statusFilter]) q = q.eq("status", sm[statusFilter]);
+                }
+                if (depPersonIds !== null && depPersonIds.length > 0) {
+                    q = q.in("person_id", depPersonIds);
                 }
                 return q.order("folio_sort", { ascending: true }).range(from, to);
             });

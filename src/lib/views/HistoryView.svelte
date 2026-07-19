@@ -6,6 +6,7 @@
     import Badge from "../components/Badge.svelte";
     import Button from "../components/Button.svelte";
     import HistoryFilters from "../components/HistoryFilters.svelte";
+    import SkeletonTable from "../components/SkeletonTable.svelte";
     import {
         ChevronLeft,
         ChevronRight,
@@ -187,35 +188,39 @@
     <!-- Top Pagination removed per request -->
 
     <Card class="overflow-hidden">
-        <DataTable
-            data={historyLogs}
-            columns={[
-                {
-                    key: "timestamp",
-                    label: "Fecha / Hora",
-                    render: renderDate,
-                    width: "160px",
-                },
-                {
-                    key: "entity",
-                    label: "Entidad Afectada",
-                    render: renderEntity,
-                    width: "250px",
-                },
-                {
-                    key: "action",
-                    label: "Acción",
-                    render: renderHistoryAction,
-                    width: "140px",
-                },
-                {
-                    key: "details",
-                    label: "Descripción",
-                    render: renderDetails,
-                    width: "350px",
-                },
-            ]}
-        />
+        {#if historyState.isLoading && historyLogs.length === 0}
+            <SkeletonTable columns={4} rows={5} />
+        {:else}
+            <DataTable
+                data={historyLogs}
+                columns={[
+                    {
+                        key: "timestamp",
+                        label: "Fecha / Hora",
+                        render: renderDate,
+                        width: "160px",
+                    },
+                    {
+                        key: "entity",
+                        label: "Entidad Afectada",
+                        render: renderEntity,
+                        width: "250px",
+                    },
+                    {
+                        key: "action",
+                        label: "Acción",
+                        render: renderHistoryAction,
+                        width: "140px",
+                    },
+                    {
+                        key: "details",
+                        label: "Descripción",
+                        render: renderDetails,
+                        width: "350px",
+                    },
+                ]}
+            />
+        {/if}
     </Card>
 
     <!-- Pagination Controls -->

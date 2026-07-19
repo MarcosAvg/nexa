@@ -12,7 +12,6 @@
     import FilterSelect from "../components/FilterSelect.svelte";
     import Input from "../components/Input.svelte";
     import TicketModal from "../components/modals/TicketModal.svelte";
-    import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
     import ModificationCompareModal from "../components/modals/ModificationCompareModal.svelte";
     import ManualTicketDetailsModal from "../components/modals/ManualTicketDetailsModal.svelte";
     import PermissionGuard from "../components/PermissionGuard.svelte";
@@ -24,9 +23,11 @@
         ChevronRight,
         Download,
         FolderArchive,
-        ChevronDown,
+        ClipboardList,
+        FilterX,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
+    import EmptyState from "../components/EmptyState.svelte";
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
     import { personnelService } from "../services/personnel";
@@ -36,7 +37,7 @@
     import ConfirmAltaModal from "../components/modals/ConfirmAltaModal.svelte";
     import TicketImportedDetailsModal from "../components/modals/TicketImportedDetailsModal.svelte";
     import { networkStore } from "../stores/network.svelte";
-
+    import ExportDropdown from "../components/ExportDropdown.svelte";
 
     // Tickets paginados del servidor (reemplaza filtrado del lado del cliente)
     let tickets = $state<any[]>([]);
@@ -46,7 +47,6 @@
     let totalPages = $derived(Math.max(1, Math.ceil(totalRecords / pageSize)));
     let isLoading = $state(false);
     let isZipExporting = $state(false);
-    let showExportMenu = $state(false);
 
     // Secciones
     let currentSection = $state<"General" | "Responsivas">("General");
@@ -64,7 +64,6 @@
             priorityFilter = "Todas";
             searchQuery = "";
             dependencyFilter = "Todas";
-            showExportMenu = false;
             // Reiniciar campo de búsqueda si existe
             const searchInput = document.getElementById(
                 "ticket-search",
@@ -391,7 +390,6 @@
     }
 
     async function handleExportResponsivas() {
-        showExportMenu = false;
         const loadingToast = toast.loading("Preparando exportación...");
         try {
             const depId =
@@ -420,7 +418,6 @@
     }
 
     async function handleExportResponsivasAllDepsZip() {
-        showExportMenu = false;
         const deps = catalogState.dependencies;
         if (deps.length === 0) {
             toast.error("No hay dependencias registradas");
@@ -533,48 +530,35 @@
 
         {#snippet actions()}
             {#if currentSection === "Responsivas"}
-                <div class="relative">
-                    <Button
-                        variant="soft-emerald"
-                        onclick={() => (showExportMenu = !showExportMenu)}
-                        class="flex items-center gap-2 h-10 px-4"
-                        disabled={!networkStore.isOnline || isZipExporting}
-                    >
-                        <Download size={16} />
-                        Exportar Excel
-                        <ChevronDown
-                            size={14}
-                            class="ml-1 opacity-50 transition-transform {showExportMenu ? 'rotate-180' : ''}"
-                        />
-                    </Button>
-
-                    {#if showExportMenu}
-                        <div
-                            class="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 z-50 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300"
+                <ExportDropdown
+                    icon={Download}
+                    label="Exportar Excel"
+                    disabled={!networkStore.isOnline || isZipExporting}
+                    menuWidth="w-64"
+                >
+                    {#snippet items()}
+                        <button
+                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                            onclick={handleExportResponsivas}
                         >
-                            <button
-                                class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                                onclick={handleExportResponsivas}
-                            >
-                                <span class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                                    <FileSpreadsheet size={16} />
-                                </span>
-                                Exportar (Filtro actual)
-                            </button>
-                            <div class="mx-3 my-1 border-t border-slate-100"></div>
-                            <button
-                                class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
-                                onclick={handleExportResponsivasAllDepsZip}
-                                disabled={isZipExporting}
-                            >
-                                <span class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600">
-                                    <FolderArchive size={16} />
-                                </span>
-                                Todas las Dependencias (ZIP)
-                            </button>
-                        </div>
-                    {/if}
-                </div>
+                            <span class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                <FileSpreadsheet size={16} />
+                            </span>
+                            Exportar (Filtro actual)
+                        </button>
+                        <div class="mx-3 my-1 border-t border-slate-100"></div>
+                        <button
+                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
+                            onclick={handleExportResponsivasAllDepsZip}
+                            disabled={isZipExporting}
+                        >
+                            <span class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600">
+                                <FolderArchive size={16} />
+                            </span>
+                            Todas las Dependencias (ZIP)
+                        </button>
+                    {/snippet}
+                </ExportDropdown>
             {/if}
             <PermissionGuard requireEdit>
                 <Button
@@ -606,11 +590,64 @@
     <div
         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20"
     >
-        {#if filteredTickets.length === 0}
-            <div
-                class="p-8 text-center text-slate-500 bg-slate-50 rounded-lg border border-slate-200 border-dashed"
-            >
-                No hay tickets pendientes
+        {#if isLoading && filteredTickets.length === 0}
+            {#each [1, 2, 3, 4, 5, 6] as _}
+                <div class="animate-pulse bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+                    <div class="p-5 space-y-4">
+                        <!-- Priority + type badge skeleton -->
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex items-center gap-2 flex-1 min-w-0">
+                                <div class="h-6 w-16 bg-slate-100 rounded-full"></div>
+                                <div class="h-4 w-28 bg-slate-100 rounded"></div>
+                            </div>
+                            <div class="h-6 w-20 bg-slate-100 rounded-lg"></div>
+                        </div>
+                        <!-- Person name skeleton -->
+                        <div class="space-y-2">
+                            <div class="h-5 w-3/4 bg-slate-100 rounded"></div>
+                            <div class="h-4 w-1/2 bg-slate-100 rounded"></div>
+                        </div>
+                        <!-- Description skeleton -->
+                        <div class="space-y-1.5">
+                            <div class="h-3 w-full bg-slate-100 rounded"></div>
+                            <div class="h-3 w-5/6 bg-slate-100 rounded"></div>
+                        </div>
+                        <!-- Footer skeleton -->
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <div class="h-4 w-24 bg-slate-100 rounded"></div>
+                            <div class="h-8 w-24 bg-slate-100 rounded-xl"></div>
+                        </div>
+                    </div>
+                </div>
+            {/each}
+        {:else if filteredTickets.length === 0 && !isLoading}
+            <div class="col-span-full">
+                <EmptyState
+                    icon={ClipboardList}
+                    iconBgClass="from-amber-50 to-amber-100 ring-1 ring-amber-200/50 text-amber-400"
+                    title="Todo al día"
+                    titleFiltered="Sin resultados"
+                    description="No hay tickets pendientes en este momento. Todo está en orden."
+                    descriptionFiltered="No encontramos tickets con los filtros actuales. Intenta ajustar tu búsqueda."
+                    hasFilters={!!(typeFilter !== "Todos" || priorityFilter !== "Todas" || searchQuery)}
+                    onClearFilters={() => {
+                        typeFilter = 'Todos';
+                        priorityFilter = 'Todas';
+                        searchQuery = '';
+                        const searchInput = document.getElementById('ticket-search') as HTMLInputElement;
+                        if (searchInput) searchInput.value = '';
+                        refreshData(1);
+                    }}
+                >
+                    {#snippet children()}
+                        <PermissionGuard requireEdit>
+                            <Button variant="primary" size="sm" class="h-11 px-7 rounded-xl shadow-lg shadow-blue-500/20" onclick={onOpenAddTicket}>
+                                <Plus size={18} strokeWidth={3} class="mr-2" />
+                                Crear nuevo ticket
+                            </Button>
+                        </PermissionGuard>
+                    {/snippet}
+                </EmptyState>
             </div>
         {:else}
             {#each filteredTickets as ticket (ticket.id)}

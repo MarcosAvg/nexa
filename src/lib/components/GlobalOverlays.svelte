@@ -9,6 +9,7 @@
     import DeletePersonnelModal from "./modals/DeletePersonnelModal.svelte";
     import { personnelActions, appEvents, EVENTS } from "../utils";
     import { uiState } from "../stores/ui.svelte";
+    import { confirm } from "../utils/confirmModal.svelte";
 
     // Estado calculado desde el store global
     let isDetailsOpen = $derived(personnelState.isDetailsOpen);
@@ -52,8 +53,7 @@
                 // 1. Abrimos el panel lateral de la persona
                 personnelState.selectPerson(payload.person.id);
                 // 2. Preparamos y abrimos el modal de confirmación
-                confirmModal = {
-                    isOpen: true,
+                confirm.open({
                     title: "¿DAR DE BAJA?",
                     description:
                         "Esta persona dejará de tener acceso, pero sus datos se conservarán en el sistema. Las tarjetas pasarán a estar bloqueadas.",
@@ -68,7 +68,7 @@
                             await payload.onSuccess();
                         }
                     },
-                };
+                });
             }
         });
         return () => unsub();
@@ -83,15 +83,6 @@
     }>({
         isOpen: false,
         person: null,
-    });
-
-    let confirmModal = $state({
-        isOpen: false,
-        title: "",
-        description: "",
-        variant: "danger" as "danger" | "warning" | "info",
-        confirmText: "Confirmar",
-        onConfirm: async () => {},
     });
 
     // Auxiliar de actualización de datos
@@ -121,34 +112,25 @@
 
     // Envoltorios de acción que inyectan refreshData
     const onBlock = (p: any) => {
-        confirmModal = {
-            isOpen: true,
-            title:
-                p.status_raw === "blocked"
-                    ? "¿Desbloquear Persona?"
-                    : "¿Bloquear Persona?",
-            description:
-                p.status_raw === "blocked"
-                    ? "La persona volverá a tener acceso según sus tarjetas activas."
-                    : "Se denegará el acceso a todas las instalaciones.",
+        confirm.open({
+            title: p.status_raw === "blocked" ? "¿Desbloquear Persona?" : "¿Bloquear Persona?",
+            description: p.status_raw === "blocked"
+                ? "La persona volverá a tener acceso según sus tarjetas activas."
+                : "Se denegará el acceso a todas las instalaciones.",
             variant: p.status_raw === "blocked" ? "info" : "warning",
-            confirmText:
-                p.status_raw === "blocked" ? "Desbloquear" : "Bloquear",
+            confirmText: p.status_raw === "blocked" ? "Desbloquear" : "Bloquear",
             onConfirm: () => personnelActions.handleBlockPerson(p, refreshData),
-        };
+        });
     };
 
     const onDeactivate = (p: any) => {
-        confirmModal = {
-            isOpen: true,
+        confirm.open({
             title: "¿DAR DE BAJA?",
-            description:
-                "Esta persona dejará de tener acceso, pero sus datos se conservarán en el sistema. Las tarjetas pasarán a estar bloqueadas.",
+            description: "Esta persona dejará de tener acceso, pero sus datos se conservarán en el sistema. Las tarjetas pasarán a estar bloqueadas.",
             variant: "danger",
             confirmText: "Dar de Baja",
-            onConfirm: () =>
-                personnelActions.handleDeactivatePerson(p, refreshData),
-        };
+            onConfirm: () => personnelActions.handleDeactivatePerson(p, refreshData),
+        });
     };
 
     const onReactivate = (p: any) =>
@@ -162,32 +144,24 @@
     };
 
     const onCardBlock = (c: any) => {
-        const isReactivation =
-            c.status === "blocked" || c.status === "inactive";
-        confirmModal = {
-            isOpen: true,
-            title: isReactivation
-                ? "¿Reactivar tarjeta?"
-                : "¿Bloquear tarjeta?",
-            description: isReactivation
-                ? "La tarjeta volverá a estar disponible o activa."
-                : "Se denegará el acceso a esta tarjeta.",
+        const isReactivation = c.status === "blocked" || c.status === "inactive";
+        confirm.open({
+            title: isReactivation ? "¿Reactivar tarjeta?" : "¿Bloquear tarjeta?",
+            description: isReactivation ? "La tarjeta volverá a estar disponible o activa." : "Se denegará el acceso a esta tarjeta.",
             variant: isReactivation ? "info" : "warning",
             confirmText: isReactivation ? "Reactivar" : "Bloquear",
             onConfirm: () => personnelActions.handleCardBlock(c, refreshData),
-        };
+        });
     };
 
     const onCardUnassign = (c: any) => {
-        confirmModal = {
-            isOpen: true,
+        confirm.open({
             title: "¿Desvincular tarjeta?",
             description: "La tarjeta volverá al inventario como disponible.",
             variant: "warning",
             confirmText: "Desvincular",
-            onConfirm: () =>
-                personnelActions.handleCardUnassign(c, refreshData),
-        };
+            onConfirm: () => personnelActions.handleCardUnassign(c, refreshData),
+        });
     };
 
     const onCardReplace = (c: any) => {
@@ -196,15 +170,13 @@
     };
 
     const onCardProgram = (c: any) => {
-        confirmModal = {
-            isOpen: true,
+        confirm.open({
             title: "¿Confirmar Programación?",
-            description:
-                "Confirma que la tarjeta ha sido programada físicamente en el sistema externo. Esto también completará automáticamente cualquier ticket de programación pendiente asociado.",
+            description: "Confirma que la tarjeta ha sido programada físicamente en el sistema externo. Esto también completará automáticamente cualquier ticket de programación pendiente asociado.",
             variant: "info",
             confirmText: "Completar Programación",
             onConfirm: () => personnelActions.handleCardProgram(c, refreshData),
-        };
+        });
     };
 
     // Manejador de guardado de tarjeta (desde AddCardModal en contexto de Details Panel)
@@ -261,15 +233,16 @@
         replacingCard = null;
         isCardModalOpen = false;
     }}
-/>        <!-- Modal de confirmación genérico -->
+/>        <!-- Modal de confirmación genérico (singleton) -->
 <ConfirmationModal
-    bind:isOpen={confirmModal.isOpen}
-    title={confirmModal.title}
-    description={confirmModal.description}
-    variant={confirmModal.variant}
-    confirmText={confirmModal.confirmText}
-    onConfirm={confirmModal.onConfirm}
-    onCancel={() => (confirmModal.isOpen = false)}
+    bind:isOpen={confirm.isOpen}
+    title={confirm.title}
+    description={confirm.description}
+    variant={confirm.variant}
+    confirmText={confirm.confirmText}
+    cancelText={confirm.cancelText}
+    onConfirm={confirm.onConfirm}
+    onCancel={() => confirm.close()}
 />
 
 <DeletePersonnelModal

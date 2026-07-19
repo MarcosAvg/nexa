@@ -1,9 +1,11 @@
 <script lang="ts">
-    import { personnelState, userState, uiState } from "../stores";
+    import { personnelState, userState, uiState, cardState, catalogState } from "../stores";
+    import { confirm } from "../utils/confirmModal.svelte";
     import { onMount, onDestroy } from "svelte";
     import { appEvents, EVENTS, handleError, createSimpleDebounce } from "../utils";
     import SectionHeader from "../components/SectionHeader.svelte";
     import FilterGroup from "../components/FilterGroup.svelte";
+    import FilterSelect from "../components/FilterSelect.svelte";
     import Button from "../components/Button.svelte";
     import Card from "../components/Card.svelte";
     import DataTable from "../components/DataTable.svelte";
@@ -19,27 +21,29 @@
         Plus,
         FileSpreadsheet,
         FileSearch,
+        CreditCard,
+        FilterX,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import Pagination from "../components/Pagination.svelte";
+    import SkeletonTable from "../components/SkeletonTable.svelte";
+    import EmptyState from "../components/EmptyState.svelte";
     import AddCardModal from "../components/modals/AddCardModal.svelte";
     import DetectMissingCardsModal from "../components/modals/DetectMissingCardsModal.svelte";
+    import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
     import { cardService } from "../services/cards";
     import { toast } from "svelte-sonner";
-
-    import { personnelService } from "../services/personnel";
-    import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
     import { networkStore } from "../stores/network.svelte";
     import { getCardStatusVariant, getCardStatusLabel } from "../constants/status";
 
+    let dependencies = $derived(catalogState.dependencies);
+    let dependencyNames = $derived(dependencies.map((d) => d.name));
 
-    let personnel = $derived(personnelState.personnel);
-    let extraCards = $derived(personnelState.extraCards);
-
-    // Filtros
-    let cardStatusFilter = $state("Todas");
-    let cardTypeFilter = $state("Todos");
-    let cardSearch = $state("");
+    // Filtros locales de UI (vinculados al store)
+    let cardStatusFilter = $state(cardState.statusFilter);
+    let cardTypeFilter = $state(cardState.typeFilter);
+    let cardDependencyFilter = $state(cardState.dependencyFilter);
+    let cardSearch = $state(cardState.searchQuery);
 
     // Estado del modal
     let isModalOpen = $state(false);
@@ -47,28 +51,24 @@
     let replacingCard = $state<any>(null);
     let isDetectModalOpen = $state(false);
 
-    let confirmModal = $state({
-        isOpen: false,
-        title: "",
-        description: "",
-        variant: "danger" as "danger" | "warning" | "info",
-        confirmText: "Confirmar",
-        onConfirm: async () => {},
+    // Estado derivado del store
+    let cards = $derived(cardState.cards);
+    let currentPage = $derived(cardState.currentPage);
+    let pageSize = $derived(cardState.pageSize);
+    let totalRecords = $derived(cardState.totalRecords);
+    let isLoading = $derived(cardState.isLoading);
+
+    // Inicializar subscripciones
+    let cleanup: (() => void) | null = null;
+
+    onMount(() => {
+        cardState.refresh();
+        cleanup = cardState.initSubscriptions();
     });
 
-    // Estado de tarjetas (Decoupled from Personnel Store)
-    let cards = $state<any[]>([]);
-
-    let currentPage = $state(1);
-    let pageSize = $state(50);
-    let totalRecords = $state(0);
-    let totalPages = $derived(Math.ceil(totalRecords / pageSize));
-    let isLoading = $state(false);
-
-    // Propiedades
-    // Refactor Fase 2: Use appState and stores instead of props
-
-    let currentUser = $derived(userState.currentUser);
+    onDestroy(() => {
+        cleanup?.();
+    });
 
     // Manejadores
     function onOpenAddCard() {
@@ -76,27 +76,10 @@
         isModalOpen = true;
     }
 
-    async function refreshData(page: number = 1) {
-        isLoading = true;
-        currentPage = page;
-        try {
-            const result = await cardService.fetchAll(
-                currentPage,
-                pageSize,
-                cardSearch,
-                cardTypeFilter,
-                cardStatusFilter,
-            );
-            cards = result.data;
-            totalRecords = result.count;
-        } finally {
-            isLoading = false;
-        }
-    }
-
     // Búsqueda con debounce
     const debouncedSearch = createSimpleDebounce(() => {
-        refreshData(1);
+        cardState.setSearch(cardSearch);
+        cardState.refresh(1);
     }, 300);
 
     function onSearch(e: Event) {
@@ -106,33 +89,17 @@
     }
 
     function onFilterChange() {
-        refreshData(1);
+        const depId = cardDependencyFilter
+            ? String(dependencies.find((d) => d.name === cardDependencyFilter)?.id ?? "")
+            : "";
+        cardState.setFilters(cardTypeFilter, cardStatusFilter, depId);
+        cardState.refresh(1);
     }
 
-    let unsubs: (() => void)[] = [];
-
-    onMount(() => {
-        refreshData();
-
-        // Auto-actualizar cuando cambien las tarjetas from other views (e.g. PersonDetailsPanel)
-        unsubs.push(
-            appEvents.on(EVENTS.CARDS_CHANGED, () => refreshData(currentPage)),
-            appEvents.on(EVENTS.PERSONNEL_CHANGED, () =>
-                refreshData(currentPage),
-            ),
-        );
-    });
-
-    onDestroy(() => unsubs.forEach((fn) => fn()));
-
     async function onBlockCard(card: any) {
-        const isReactivation =
-            card.status === "blocked" || card.status === "inactive";
-        confirmModal = {
-            isOpen: true,
-            title: isReactivation
-                ? "¿Reactivar tarjeta?"
-                : "¿Bloquear tarjeta?",
+        const isReactivation = card.status === "blocked" || card.status === "inactive";
+        confirm.open({
+            title: isReactivation ? "¿Reactivar tarjeta?" : "¿Bloquear tarjeta?",
             description: isReactivation
                 ? "La tarjeta volverá a estar disponible o activa según su asignación."
                 : "Se denegará el acceso a esta tarjeta hasta que sea desbloqueada.",
@@ -141,46 +108,35 @@
             onConfirm: async () => {
                 const newStatus = isReactivation ? "active" : "blocked";
                 await cardService.updateStatus(card.id, newStatus);
-                toast.success(
-                    newStatus === "blocked"
-                        ? "Tarjeta Bloqueada"
-                        : "Tarjeta Reactivada",
-                );
-                await refreshData();
+                toast.success(newStatus === "blocked" ? "Tarjeta Bloqueada" : "Tarjeta Reactivada");
+                await cardState.refresh();
             },
-        };
+        });
     }
 
     async function onUnassignCard(card: any) {
-        confirmModal = {
-            isOpen: true,
+        confirm.open({
             title: "¿Desvincular tarjeta?",
-            description:
-                "La tarjeta quedará disponible en inventario y dejará de pertenecer a esta persona.",
+            description: "La tarjeta quedará disponible en inventario y dejará de pertenecer a esta persona.",
             variant: "warning",
             confirmText: "Desvincular",
             onConfirm: async () => {
                 await cardService.unassign(card.id);
                 toast.success("Tarjeta desvinculada");
-                await refreshData();
+                await cardState.refresh();
             },
-        };
+        });
     }
 
     async function onDeleteCard(card: any) {
         const isInactive = card.status === "inactive";
-        confirmModal = {
-            isOpen: true,
-            title: isInactive
-                ? "¿Eliminar permanentemente?"
-                : "¿Inactivar tarjeta?",
+        confirm.open({
+            title: isInactive ? "¿Eliminar permanentemente?" : "¿Inactivar tarjeta?",
             description: isInactive
                 ? "Esta acción no se puede deshacer. Se borrará todo registro de la tarjeta."
                 : "La tarjeta quedará en estado de BAJA y no podrá ser utilizada.",
             variant: "danger",
-            confirmText: isInactive
-                ? "Eliminar Definitivamente"
-                : "SÍ, Inactivar",
+            confirmText: isInactive ? "Eliminar Definitivamente" : "SÍ, Inactivar",
             onConfirm: async () => {
                 if (isInactive) {
                     await cardService.delete(card.id);
@@ -189,9 +145,9 @@
                     await cardService.updateStatus(card.id, "inactive");
                     toast.success("Tarjeta inactivada");
                 }
-                await refreshData();
+                await cardState.refresh();
             },
-        };
+        });
     }
 
     function onViewPerson(card: any) {
@@ -204,8 +160,6 @@
         replacingCard = card;
         isModalOpen = true;
     }
-
-    // Fragmentos (status helpers now imported from constants/status)
 </script>
 
 {#snippet renderCardType(row: any)}
@@ -248,18 +202,12 @@
         <span class="font-medium text-slate-700">{row.folio}</span>
         {#if row.personId}
             {#if row.responsiva_status === "legacy"}
-                <Badge variant="slate" class="text-[8px] px-1 py-0 h-4"
-                    >LEGACY</Badge
-                >
+                <Badge variant="slate" class="text-[8px] px-1 py-0 h-4">LEGACY</Badge>
             {:else if row.responsiva_status !== "signed"}
-                <Badge variant="rose" class="text-[8px] px-1 py-0 h-4"
-                    >SIN RESPONSIVA</Badge
-                >
+                <Badge variant="rose" class="text-[8px] px-1 py-0 h-4">SIN RESPONSIVA</Badge>
             {/if}
             {#if row.programming_status !== "done"}
-                <Badge variant="blue" class="text-[8px] px-1 py-0 h-4"
-                    >SIN PROGRAMAR</Badge
-                >
+                <Badge variant="blue" class="text-[8px] px-1 py-0 h-4">SIN PROGRAMAR</Badge>
             {/if}
         {/if}
     </div>
@@ -280,11 +228,15 @@
                 bind:value={cardStatusFilter}
                 onchange={() => onFilterChange()}
             />
+            <FilterSelect
+                label="Dependencia"
+                options={dependencyNames}
+                placeholder="Todas"
+                bind:value={cardDependencyFilter}
+                onchange={() => onFilterChange()}
+            />
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <span
-                    class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap"
-                    >Buscar</span
-                >
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
                 <div class="relative">
                     <input
                         type="text"
@@ -293,9 +245,7 @@
                         oninput={onSearch}
                         class="h-9 pl-9 pr-4 rounded-lg border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-700 focus:bg-white focus:border-slate-900 transition-all outline-none"
                     />
-                    <div
-                        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                    >
+                    <div class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
                         <Search size={14} />
                     </div>
                 </div>
@@ -308,36 +258,22 @@
                 class="flex items-center gap-2.5 h-10 px-6"
                 disabled={!networkStore.isOnline}
                 onclick={async () => {
-                    const loadingToast = toast.loading(
-                        "Preparando exportación...",
-                    );
+                    const loadingToast = toast.loading("Preparando exportación...");
                     try {
-                        const data = await cardService.fetchForExport(
-                            cardSearch,
-                            cardTypeFilter,
-                            cardStatusFilter,
-                        );
+                        const depId = cardDependencyFilter
+                        ? String(dependencies.find((d) => d.name === cardDependencyFilter)?.id ?? "")
+                        : "";
+                    const data = await cardService.fetchForExport(cardSearch, cardTypeFilter, cardStatusFilter, depId);
                         const m = await import("../utils/xlsxExport");
-                        m.exportCardsToExcel(data, {
-                            filters: {
-                                status: cardStatusFilter,
-                                search: cardSearch,
-                            },
-                        });
-                        toast.success("Exportación completada", {
-                            id: loadingToast,
-                        });
+                        m.exportCardsToExcel(data, { filters: { status: cardStatusFilter, search: cardSearch } });
+                        toast.success("Exportación completada", { id: loadingToast });
                     } catch (e) {
                         toast.dismiss(loadingToast);
                         handleError(e, "Exportar Tarjetas");
                     }
                 }}
             >
-                <FileSpreadsheet
-                    size={18}
-                    strokeWidth={2.5}
-                    class="text-emerald-600/80"
-                />
+                <FileSpreadsheet size={18} strokeWidth={2.5} class="text-emerald-600/80" />
                 Exportar Excel
             </Button>
             <Button
@@ -346,10 +282,7 @@
                 disabled={!networkStore.isOnline}
                 onclick={() => (isDetectModalOpen = true)}
             >
-                <FileSearch
-                    size={16}
-                    class="text-blue-500 transition-transform group-hover:scale-110"
-                />
+                <FileSearch size={16} class="text-blue-500 transition-transform group-hover:scale-110" />
                 Detectar Faltantes
             </Button>
             <PermissionGuard requireEdit>
@@ -364,134 +297,130 @@
                 </Button>
             </PermissionGuard>
         {/snippet}
-    </SectionHeader>        <!-- Paginación superior eliminada por solicitud -->
+    </SectionHeader>
 
     <Card class="overflow-hidden">
-        <DataTable
-            data={cards}
-            columns={[
-                {
-                    key: "type",
-                    label: "Tipo",
-                    render: renderCardType,
-                },
-                {
-                    key: "folio",
-                    label: "Folio / No. Tarjeta",
-                    render: renderCardFolio,
-                },
-                {
-                    key: "personName",
-                    label: "Asignada a",
-                    render: renderCardPerson,
-                },
-                {
-                    key: "status",
-                    label: "Estado",
-                    render: renderCardStatus,
-                },
-            ]}
-        >
-            {#snippet actions(row: any)}
-                <div class="flex items-center justify-end gap-1">
-                    {#if row.person_id}
-                
-                        <button
-                            type="button"
-                            class="p-1.5 rounded-full text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                            onclick={() => onViewPerson(row)}
-                            title="Ver Dueño"
-                        >
-                            <User size={16} />
-                        </button>
-                    {/if}
-
+        {#if isLoading && cards.length === 0}
+            <SkeletonTable columns={4} rows={5} />
+        {:else if !isLoading && cards.length === 0}
+            <EmptyState
+                icon={CreditCard}
+                iconBgClass="from-slate-100 to-slate-200 text-slate-400"
+                title="Aún no hay tarjetas registradas"
+                titleFiltered="Sin resultados"
+                description="El inventario de tarjetas está vacío. Comienza registrando la primera tarjeta P2000 o KONE."
+                descriptionFiltered="No encontramos tarjetas con los filtros actuales. Intenta ajustar tu búsqueda."
+                hasFilters={!!(cardSearch || cardTypeFilter !== "Todos" || cardStatusFilter !== "Todas" || cardDependencyFilter)}
+                onClearFilters={() => {
+                    cardSearch = '';
+                    cardTypeFilter = 'Todos';
+                    cardStatusFilter = 'Todas';
+                    cardDependencyFilter = '';
+                    cardState.setSearch('');
+                    cardState.setFilters('Todos', 'Todas', '');
+                    cardState.refresh(1);
+                }}
+            >
+                {#snippet children()}
                     <PermissionGuard requireEdit>
-                        {#if row.status === "inactive"}
-                            <!-- Reactivar: Emerald -->
-                            <button
-                                type="button"
-                                class="p-1.5 rounded-full transition-colors {networkStore.isOnline
-                                    ? 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50'
-                                    : 'text-slate-300 cursor-not-allowed opacity-50'}"
-                                onclick={() => onBlockCard(row)}
-                                disabled={!networkStore.isOnline}
-                                title="Reactivar Tarjeta"
-                            >
-                                <RefreshCw size={16} />
-                            </button>
-                        {:else}
-                            <!-- Bloquear: Amber -->
-                            <button
-                                type="button"
-                                class="p-1.5 rounded-full transition-colors {networkStore.isOnline
-                                    ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50'
-                                    : 'text-slate-300 cursor-not-allowed opacity-50'}"
-                                onclick={() => onBlockCard(row)}
-                                disabled={!networkStore.isOnline}
-                                title={row.status === "blocked"
-                                    ? "Desbloquear"
-                                    : "Bloquear"}
-                            >
-                                <Lock size={16} />
-                            </button>
-                        {/if}
-
-                        {#if row.person_id && row.status !== "inactive"}
-                            <!-- Reposición: Indigo -->
-                            <button
-                                type="button"
-                                class="p-1.5 rounded-full transition-colors {networkStore.isOnline
-                                    ? 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50'
-                                    : 'text-slate-300 cursor-not-allowed opacity-50'}"
-                                onclick={() => onReplaceCard(row)}
-                                disabled={!networkStore.isOnline}
-                                title="Reposición por extravío"
-                            >
-                                <RefreshCw size={16} />
-                            </button>
-
-                            <!-- Dar de baja/Desvincular: Rose -->
-                            <button
-                                type="button"
-                                class="p-1.5 rounded-full transition-colors {networkStore.isOnline
-                                    ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'
-                                    : 'text-slate-300 cursor-not-allowed opacity-50'}"
-                                onclick={() => onUnassignCard(row)}
-                                disabled={!networkStore.isOnline}
-                                title="Dar de baja (Desvincular)"
-                            >
-                                <Ban size={16} />
-                            </button>
-                        {/if}
-
-                        <!-- Eliminar / Baja permanente -->
-                        <button
-                            type="button"
-                            class="p-1.5 rounded-full transition-colors {networkStore.isOnline
-                                ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-100'
-                                : 'text-slate-300 cursor-not-allowed opacity-50'}"
-                            onclick={() => onDeleteCard(row)}
-                            disabled={!networkStore.isOnline}
-                            title={row.status === "inactive"
-                                ? "Eliminar permanentemente"
-                                : "Dar de baja (Inactivar)"}
-                        >
-                            <Trash2 size={16} />
-                        </button>
+                        <Button variant="primary" size="sm" class="h-11 px-7 rounded-xl shadow-lg shadow-blue-500/20" onclick={onOpenAddCard}>
+                            <Plus size={18} strokeWidth={3} class="mr-2" />
+                            Crear primera tarjeta
+                        </Button>
                     </PermissionGuard>
-                </div>
-            {/snippet}
-        </DataTable>
+                {/snippet}
+            </EmptyState>
+        {:else}
+            <DataTable
+                data={cards}
+                columns={[
+                    { key: "type", label: "Tipo", render: renderCardType },
+                    { key: "folio", label: "Folio / No. Tarjeta", render: renderCardFolio },
+                    { key: "personName", label: "Asignada a", render: renderCardPerson },
+                    { key: "status", label: "Estado", render: renderCardStatus },
+                ]}
+            >
+                {#snippet actions(row: any)}
+                    <div class="flex items-center justify-end gap-1">
+                        {#if row.person_id}
+                            <button
+                                type="button"
+                                class="p-1.5 rounded-full text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                onclick={() => onViewPerson(row)}
+                                title="Ver Dueño"
+                            >
+                                <User size={16} />
+                            </button>
+                        {/if}
+
+                        <PermissionGuard requireEdit>
+                            {#if row.status === "inactive"}
+                                <button
+                                    type="button"
+                                    class="p-1.5 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50' : 'text-slate-300 cursor-not-allowed opacity-50'}"
+                                    onclick={() => onBlockCard(row)}
+                                    disabled={!networkStore.isOnline}
+                                    title="Reactivar Tarjeta"
+                                >
+                                    <RefreshCw size={16} />
+                                </button>
+                            {:else}
+                                <button
+                                    type="button"
+                                    class="p-1.5 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50' : 'text-slate-300 cursor-not-allowed opacity-50'}"
+                                    onclick={() => onBlockCard(row)}
+                                    disabled={!networkStore.isOnline}
+                                    title={row.status === "blocked" ? "Desbloquear" : "Bloquear"}
+                                >
+                                    <Lock size={16} />
+                                </button>
+                            {/if}
+
+                            {#if row.person_id && row.status !== "inactive"}
+                                <button
+                                    type="button"
+                                    class="p-1.5 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50' : 'text-slate-300 cursor-not-allowed opacity-50'}"
+                                    onclick={() => onReplaceCard(row)}
+                                    disabled={!networkStore.isOnline}
+                                    title="Reposición por extravío"
+                                >
+                                    <RefreshCw size={16} />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="p-1.5 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-50' : 'text-slate-300 cursor-not-allowed opacity-50'}"
+                                    onclick={() => onUnassignCard(row)}
+                                    disabled={!networkStore.isOnline}
+                                    title="Dar de baja (Desvincular)"
+                                >
+                                    <Ban size={16} />
+                                </button>
+                            {/if}
+
+                            <button
+                                type="button"
+                                class="p-1.5 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-100' : 'text-slate-300 cursor-not-allowed opacity-50'}"
+                                onclick={() => onDeleteCard(row)}
+                                disabled={!networkStore.isOnline}
+                                title={row.status === "inactive" ? "Eliminar permanentemente" : "Dar de baja (Inactivar)"}
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </PermissionGuard>
+                    </div>
+                {/snippet}
+            </DataTable>
+        {/if}
     </Card>
 
     <Pagination
         {currentPage}
         {pageSize}
         {totalRecords}
-        onPrevPage={() => refreshData(currentPage - 1)}
-        onNextPage={() => refreshData(currentPage + 1)}
-        onGoToPage={(page) => refreshData(page)}
+        onPrevPage={() => cardState.prevPage()}
+        onNextPage={() => cardState.nextPage()}
+        onGoToPage={(page) => cardState.goToPage(page)}
     />
 </div>
 
@@ -502,18 +431,11 @@
     onSave={async (card, replacementOptions) => {
         try {
             await cardService.save(
-                {
-                    ...card,
-                    person_id: replacingCard?.person_id,
-                },
+                { ...card, person_id: replacingCard?.person_id },
                 replacementOptions,
             );
-            toast.success(
-                replacingCard
-                    ? "Tarjeta reemplazada exitosamente"
-                    : "Tarjeta creada en inventario",
-            );
-            await refreshData();
+            toast.success(replacingCard ? "Tarjeta reemplazada exitosamente" : "Tarjeta creada en inventario");
+            await cardState.refresh();
             isModalOpen = false;
         } catch (e) {
             handleError(e, "Guardar Tarjeta");
@@ -529,13 +451,14 @@
 <DetectMissingCardsModal bind:isOpen={isDetectModalOpen} />
 
 <ConfirmationModal
-    bind:isOpen={confirmModal.isOpen}
-    title={confirmModal.title}
-    description={confirmModal.description}
-    variant={confirmModal.variant}
-    confirmText={confirmModal.confirmText}
-    onConfirm={confirmModal.onConfirm}
-    onCancel={() => (confirmModal.isOpen = false)}
+    bind:isOpen={confirm.isOpen}
+    title={confirm.title}
+    description={confirm.description}
+    variant={confirm.variant}
+    confirmText={confirm.confirmText}
+    cancelText={confirm.cancelText}
+    onConfirm={confirm.onConfirm}
+    onCancel={() => confirm.close()}
 />
 
 <PermissionGuard requireEdit>

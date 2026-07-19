@@ -1,20 +1,107 @@
 <script lang="ts">
-    type Props = {
+    import { twMerge } from "tailwind-merge";
+
+    type NativeInputAttrs = {
+        type?: "text" | "email" | "password" | "number" | "tel" | "url" | "search" | "date" | "time" | "file" | "hidden";
+        name?: string;
+        placeholder?: string;
+        readonly?: boolean;
+        required?: boolean;
+        autocomplete?: string | null;
+        autofocus?: boolean;
+        maxlength?: number;
+        minlength?: number;
+        pattern?: string;
+        step?: number | string;
+        min?: number | string;
+        max?: number | string;
+        accept?: string;
+        multiple?: boolean;
+        disabled?: boolean;
+        tabindex?: number;
+        id?: string;
+        title?: string;
+        style?: string;
+        "aria-label"?: string;
+        "aria-describedby"?: string;
+    };
+
+    type Props = NativeInputAttrs & {
         value?: string;
         class?: string;
-        [key: string]: any;
+        oninput?: (e: Event) => void;
+        onchange?: (e: Event) => void;
+        onfocus?: (e: FocusEvent) => void;
+        onblur?: (e: FocusEvent) => void;
+        onkeydown?: (e: KeyboardEvent) => void;
     };
 
     let {
         value = $bindable(),
         class: className = "",
-        ...rest
+        oninput,
+        onchange,
+        onfocus,
+        onblur,
+        onkeydown,
+        type = "text",
+        name,
+        placeholder,
+        readonly = false,
+        required = false,
+        autocomplete,
+        autofocus = false,
+        maxlength,
+        minlength,
+        pattern,
+        step,
+        min,
+        max,
+        accept,
+        multiple = false,
+        disabled = false,
+        tabindex,
+        id,
+        title,
+        style,
+        "aria-label": ariaLabel,
+        "aria-describedby": ariaDescribedby,
     }: Props = $props();
 
     const baseStyles =
         "flex h-10 w-full rounded-xl border border-slate-200 bg-white/50 backdrop-blur-sm px-4 py-2 text-[14px] font-medium text-slate-700 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-300";
 
-    let computedClass = $derived(`${baseStyles} ${className}`);
+    let computedClass = $derived(twMerge(baseStyles, className));
 </script>
 
-<input class={computedClass} bind:value {...rest} />
+<input
+    {type}
+    {name}
+    {placeholder}
+    {readonly}
+    {required}
+    autocomplete={autocomplete as any}
+    {autofocus}
+    {maxlength}
+    {minlength}
+    {pattern}
+    {step}
+    {min}
+    {max}
+    {accept}
+    {multiple}
+    {disabled}
+    {tabindex}
+    {id}
+    {title}
+    {style}
+    class={computedClass}
+    aria-label={ariaLabel}
+    aria-describedby={ariaDescribedby}
+    bind:value
+    {oninput}
+    {onchange}
+    {onfocus}
+    {onblur}
+    {onkeydown}
+/>

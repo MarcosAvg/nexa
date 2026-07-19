@@ -29,6 +29,7 @@
         oncomplete,
         onclose,
         forceDirectSave = false,
+        disableDuplicateCheck = false,
     }: {
         isOpen: boolean;
         editingPerson?: Person | null;
@@ -58,6 +59,8 @@
         onclose?: () => void;
         /** If true, editing an existing person will save DIRECTLY instead of creating a ticket */
         forceDirectSave?: boolean;
+        /** Si true, se salta la detección automática de duplicados (útil cuando el modal padre ya la maneja) */
+        disableDuplicateCheck?: boolean;
     } = $props();
 
     // Catálogos
@@ -117,7 +120,7 @@
         if (apellidos) apellidos = apellidos.toUpperCase();
 
         // Solo verificar si estamos creando una persona NUEVA o precargando
-        if (!editingPerson || prefill) {
+        if (!disableDuplicateCheck && (!editingPerson || prefill)) {
             const fullName = `${nombres.trim()} ${apellidos.trim()}`.trim();
             if (
                 nombres.trim().length >= 3 &&

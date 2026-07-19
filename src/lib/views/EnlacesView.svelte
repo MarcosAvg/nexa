@@ -8,6 +8,8 @@
     import AddEnlaceModal from "../components/modals/AddEnlaceModal.svelte";
     import EditEnlaceModal from "../components/modals/EditEnlaceModal.svelte";
     import ConfirmationModal from "../components/modals/ConfirmationModal.svelte";
+    import { confirm } from "../utils/confirmModal.svelte";
+    import EmptyState from "../components/EmptyState.svelte";
     import DataTable from "../components/DataTable.svelte";
     import { catalogState } from "../stores";
     import {
@@ -19,6 +21,8 @@
         Copy,
         Mail,
         Send,
+        Link2,
+        FilterX,
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
     import Input from "../components/Input.svelte";
@@ -30,9 +34,6 @@
     let searchQuery = $state("");
     let filterDependency = $state("");
     let filterFloor = $state("");
-
-    let isConfirmOpen = $state(false);
-    let selectedEnlace = $state<Enlace | null>(null);
 
     let isEditOpen = $state(false);
     let selectedEnlaceForEdit = $state<Enlace | null>(null);
@@ -142,25 +143,22 @@
     ];
 
     function requestRemove(enlace: Enlace) {
-        selectedEnlace = enlace;
-        isConfirmOpen = true;
-    }
-
-    async function handleRemoveConfirm() {
-        if (!selectedEnlace) return;
-        try {
-            await enlaceService.remove(
-                selectedEnlace.id,
-                `${selectedEnlace.personnel?.first_name} ${selectedEnlace.personnel?.last_name}`,
-            );
-            toast.success("Enlace removido");
-            loadData();
-        } catch (error) {
-            toast.error("Error al remover enlace");
-        } finally {
-            isConfirmOpen = false;
-            selectedEnlace = null;
-        }
+        const name = `${enlace.personnel?.first_name || ""} ${enlace.personnel?.last_name || ""}`.trim();
+        confirm.open({
+            title: "Remover Enlace",
+            description: `¿Estás seguro de que deseas quitar a ${name} de los enlaces administrativos?`,
+            variant: "danger",
+            confirmText: "Remover",
+            onConfirm: async () => {
+                try {
+                    await enlaceService.remove(enlace.id, name);
+                    toast.success("Enlace removido");
+                    loadData();
+                } catch (e) {
+                    toast.error("Error al remover enlace");
+                }
+            },
+        });
     }
 
     function requestEdit(row: Enlace) {
@@ -300,12 +298,32 @@
                 class="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin"
             ></div>
         </div>
-    {:else if enlaces.length === 0}
-        <div
-            class="p-8 text-center text-slate-500 bg-slate-50 rounded-lg border border-slate-200 border-dashed"
+    {:else if filteredEnlaces.length === 0}
+        <EmptyState
+            icon={Link2}
+            iconBgClass="from-violet-50 to-violet-100 ring-1 ring-violet-200/50 text-violet-400"
+            title="Aún no hay enlaces asignados"
+            titleFiltered="Sin resultados"
+            description="Los enlaces administrativos son los responsables de cada área. Asigna el primero para empezar."
+            descriptionFiltered="No encontramos enlaces con los filtros actuales. Intenta ajustar tu búsqueda."
+            hasFilters={!!(searchQuery || filterDependency || filterFloor)}
+            onClearFilters={() => {
+                searchQuery = '';
+                filterDependency = '';
+                filterFloor = '';
+            }}
         >
-            No hay enlaces administrativos asignados.
-        </div>
+            {#snippet children()}
+                <PermissionGuard requireEdit>
+                    {#snippet children({ disabled })}
+                        <Button variant="primary" size="sm" class="h-11 px-7 rounded-xl shadow-lg shadow-violet-500/20" onclick={() => (isAddModalOpen = true)} {disabled}>
+                            <UserPlus size={18} strokeWidth={3} class="mr-2" />
+                            Asignar primer enlace
+                        </Button>
+                    {/snippet}
+                </PermissionGuard>
+            {/snippet}
+        </EmptyState>
     {:else}
         <DataTable data={filteredEnlaces} {columns}>
             {#snippet actions(row: Enlace)}
@@ -364,12 +382,14 @@
 />
 
 <ConfirmationModal
-    bind:isOpen={isConfirmOpen}
-    title="Remover Enlace"
-    description={`¿Estás seguro de que deseas quitar a ${selectedEnlace?.personnel?.first_name || ""} ${selectedEnlace?.personnel?.last_name || ""} de los enlaces administrativos?`}
-    confirmText="Remover"
-    variant="danger"
-    onConfirm={handleRemoveConfirm}
+    bind:isOpen={confirm.isOpen}
+    title={confirm.title}
+    description={confirm.description}
+    variant={confirm.variant}
+    confirmText={confirm.confirmText}
+    cancelText={confirm.cancelText}
+    onConfirm={confirm.onConfirm}
+    onCancel={() => confirm.close()}
 />
 
 <PermissionGuard requireEdit>

@@ -10,6 +10,7 @@
     import DataTable from "../components/DataTable.svelte";
     import Badge from "../components/Badge.svelte";
     import PermissionGuard from "../components/PermissionGuard.svelte";
+    import SkeletonTable from "../components/SkeletonTable.svelte";
     import {
         FileSpreadsheet,
         Plus,
@@ -19,7 +20,8 @@
         FolderArchive,
         ChevronDown,
     } from "lucide-svelte";
-    import FloatingActionButton from "../components/FloatingActionButton.svelte";
+    import Pagination from "../components/Pagination.svelte";
+import FloatingActionButton from "../components/FloatingActionButton.svelte";
     import { cardlessRegistryService } from "../services/cardlessRegistry";
     import { exportCardlessRegistryAllDependenciesAsZip, handleError } from "../utils";
     import type { CardlessRegistry } from "../types";
@@ -228,37 +230,9 @@
     }
 
     function changePage(page: number) {
-        const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-        if (page < 1 || page > totalPages || page === currentPage) return;
+        if (page === currentPage) return;
         cardlessRegistryState.setPage(page);
         refreshData();
-    }
-
-    function getPageRange(curr: number, total: number): (number | "...")[] {
-        const delta = 2;
-        const range: number[] = [];
-        const rangeWithDots: (number | "...")[] = [];
-
-        for (let i = 1; i <= total; i++) {
-            if (i === 1 || i === total || (i >= curr - delta && i <= curr + delta)) {
-                range.push(i);
-            }
-        }
-
-        let l: number | null = null;
-        for (const i of range) {
-            if (l !== null) {
-                if (i - l === 2) {
-                    rangeWithDots.push(l + 1);
-                } else if (i - l !== 1) {
-                    rangeWithDots.push("...");
-                }
-            }
-            rangeWithDots.push(i);
-            l = i;
-        }
-
-        return rangeWithDots;
     }
 
     function getReasonVariant(reason: string) {
@@ -288,7 +262,6 @@
         return "slate";
     }
 
-    let totalPages = $derived(Math.max(1, Math.ceil(totalCount / pageSize) || 1));
 </script>
 
 {#snippet renderPersonName(row: CardlessRegistry)}
@@ -531,10 +504,7 @@
 
     <Card class="overflow-hidden relative min-h-[200px]">
         {#if isLoading && registries.length === 0}
-            <div class="flex flex-col items-center justify-center gap-3 py-16 text-slate-400">
-                <Loader2 class="animate-spin" size={28} />
-                <span class="text-sm font-medium">Cargando registros...</span>
-            </div>
+            <SkeletonTable columns={7} rows={5} hasActions />
         {:else if !isLoading && registries.length === 0}
             <div class="flex flex-col items-center justify-center gap-2 py-16 text-slate-400">
                 <span class="text-sm font-medium">No hay registros</span>
@@ -598,6 +568,7 @@
                                 size="sm"
                                 class="h-9 px-4 rounded-xl"
                                 onclick={() => openEditModal(row)}
+                                title="Editar registro"
                             >
                                 Editar
                             </Button>
@@ -623,55 +594,15 @@
         {/if}
     </Card>
 
-    {#if totalCount > 0}
-        <div class="flex flex-col sm:flex-row justify-between items-center gap-4 py-4">
-            <div class="text-sm text-slate-500">
-                Mostrando <span class="font-medium text-slate-900">{(currentPage - 1) * pageSize + 1}</span>
-                a <span class="font-medium text-slate-900">{Math.min(currentPage * pageSize, totalCount)}</span>
-                de <span class="font-medium text-slate-900">{totalCount}</span>
-                registros
-            </div>
-
-            <div class="flex items-center gap-2">
-                <Button
-                    variant="soft-blue"
-                    size="sm"
-                    disabled={currentPage === 1 || isLoading}
-                    onclick={() => changePage(currentPage - 1)}
-                >
-                    Anterior
-                </Button>
-
-                <div class="flex items-center gap-1">
-                    {#each getPageRange(currentPage, totalPages) as page}
-                        {#if page === "..."}
-                            <span class="px-2 text-slate-400">...</span>
-                        {:else}
-                            <button
-                                type="button"
-                                class="w-8 h-8 rounded-lg text-sm font-medium transition-colors {currentPage === page
-                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                                    : 'text-slate-600 hover:bg-slate-100'}"
-                                disabled={isLoading}
-                                onclick={() => changePage(page as number)}
-                            >
-                                {page}
-                            </button>
-                        {/if}
-                    {/each}
-                </div>
-
-                <Button
-                    variant="soft-blue"
-                    size="sm"
-                    disabled={currentPage >= totalPages || isLoading}
-                    onclick={() => changePage(currentPage + 1)}
-                >
-                    Siguiente
-                </Button>
-            </div>
-        </div>
-    {/if}
+    <Pagination
+        {currentPage}
+        {pageSize}
+        totalRecords={totalCount}
+        onPrevPage={() => changePage(currentPage - 1)}
+        onNextPage={() => changePage(currentPage + 1)}
+        onGoToPage={(p) => changePage(p)}
+        {isLoading}
+    />
 </div>
 
 <PermissionGuard allowedRoles={["admin", "operator"]}>

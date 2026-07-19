@@ -148,6 +148,7 @@
     {allowedCardTypes}
     editingPerson={selectedCandidate}
     forceDirectSave={!!selectedCandidate}
+    disableDuplicateCheck={true}
     oncomplete={handlePersonSaved}
     onclose={() => {
         isOpen = false;

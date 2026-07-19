@@ -1,16 +1,5 @@
 import { HistoryService } from "../services/history";
-
-/** A single log entry from the history_logs table */
-export interface HistoryLog {
-    id: number;
-    timestamp: string;
-    entity_type: string;
-    entity_id: string | null;
-    entity_name: string | null;
-    action: string;
-    details: Record<string, unknown>;
-    performed_by: string | null;
-}
+import type { HistoryLog } from "../types";
 
 export class HistoryState {
     historyLogs = $state<HistoryLog[]>([]);

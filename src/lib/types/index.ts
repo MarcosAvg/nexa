@@ -116,6 +116,18 @@ export interface DashboardMetrics {
     };
 }
 
+/** A single log entry from the history_logs table */
+export interface HistoryLog {
+    id: number;
+    timestamp: string;
+    entity_type: string;
+    entity_id: string | null;
+    entity_name: string | null;
+    action: string;
+    details: Record<string, unknown>;
+    performed_by: string | null;
+}
+
 export interface CardlessRegistry {
     id: number;
     person_id: string | null;

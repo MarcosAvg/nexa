@@ -17,12 +17,12 @@
         Search,
         FileSpreadsheet,
         Plus,
-        ChevronDown,
-        FileStack,
         Upload,
+        FileStack,
         FolderArchive,
     } from "lucide-svelte";
     import FloatingActionButton from "../components/FloatingActionButton.svelte";
+    import SkeletonTable from "../components/SkeletonTable.svelte";
     import Pagination from "../components/Pagination.svelte";
     import KoneUsageImportModal from "../components/modals/KoneUsageImportModal.svelte";
     import { personnelService } from "../services/personnel";
@@ -31,6 +31,7 @@
     import { toast } from "svelte-sonner";
     import { networkStore } from "../stores/network.svelte";
     import { getPersonnelStatusVariant } from "../constants/status";
+    import ExportDropdown from "../components/ExportDropdown.svelte";
 
     import { onMount } from "svelte";
 
@@ -114,12 +115,10 @@
         personnelState.openEditModal(person);
     }
 
-    let showExportMenu = $state(false);
     let showKoneUsageModal = $state(false);
     let isZipExporting = $state(false);
 
     async function handleExportExcel(splitByDependency: boolean = false) {
-        showExportMenu = false;
         const loadingToast = toast.loading("Preparando exportación...");
         try {
             const depId =
@@ -146,7 +145,6 @@
     }
 
     async function handleExportAllDepsZip() {
-        showExportMenu = false;
         if (dependencies.length === 0) {
             toast.error("No hay dependencias registradas");
             return;
@@ -318,69 +316,50 @@
                 </Button>
             </PermissionGuard>
 
-            <div class="relative">
-                <Button
-                    variant="soft-emerald"
-                    onclick={() => (showExportMenu = !showExportMenu)}
-                    class="flex items-center gap-2.5 h-10 px-5"
-                    disabled={personnel.length === 0 || !networkStore.isOnline}
-                >
-                    <FileSpreadsheet
-                        size={18}
-                        strokeWidth={2.5}
-                        class="text-emerald-600/80"
-                    />
-                    Exportar Excel
-                    <ChevronDown
-                        size={14}
-                        class="ml-1 opacity-50 transition-transform {showExportMenu
-                            ? 'rotate-180'
-                            : ''}"
-                    />
-                </Button>
-
-                {#if showExportMenu}
-                    <div
-                        class="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 z-50 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300"
+            <ExportDropdown
+                icon={FileSpreadsheet}
+                label="Exportar Excel"
+                disabled={personnel.length === 0 || !networkStore.isOnline}
+                class="h-10 px-5"
+            >
+                {#snippet items()}
+                    <button
+                        class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                        onclick={() => handleExportExcel(false)}
                     >
-                        <button
-                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                            onclick={() => handleExportExcel(false)}
+                        <span
+                            class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600"
                         >
-                            <span
-                                class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600"
-                            >
-                                <FileSpreadsheet size={16} />
-                            </span>
-                            Hoja Única
-                        </button>
-                        <button
-                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                            onclick={() => handleExportExcel(true)}
+                            <FileSpreadsheet size={16} />
+                        </span>
+                        Hoja Única
+                    </button>
+                    <button
+                        class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                        onclick={() => handleExportExcel(true)}
+                    >
+                        <span
+                            class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600"
                         >
-                            <span
-                                class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600"
-                            >
-                                <FileStack size={16} />
-                            </span>
-                            Separado por Dependencia
-                        </button>
-                        <div class="mx-3 my-1 border-t border-slate-100"></div>
-                        <button
-                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
-                            onclick={handleExportAllDepsZip}
-                            disabled={isZipExporting || dependencies.length === 0}
+                            <FileStack size={16} />
+                        </span>
+                        Separado por Dependencia
+                    </button>
+                    <div class="mx-3 my-1 border-t border-slate-100"></div>
+                    <button
+                        class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
+                        onclick={handleExportAllDepsZip}
+                        disabled={isZipExporting || dependencies.length === 0}
+                    >
+                        <span
+                            class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600"
                         >
-                            <span
-                                class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600"
-                            >
-                                <FolderArchive size={16} />
-                            </span>
-                            Todas las Dependencias (ZIP)
-                        </button>
-                    </div>
-                {/if}
-            </div>
+                            <FolderArchive size={16} />
+                        </span>
+                        Todas las Dependencias (ZIP)
+                    </button>
+                {/snippet}
+            </ExportDropdown>
 
             <PermissionGuard requireEdit>
                 <Button
@@ -399,50 +378,54 @@
     <!-- Top Pagination removed per request -->
 
     <Card class="overflow-hidden">
-        <DataTable
-            data={personnel}
-            actionsWidth="130px"
-            columns={[
-                {
-                    key: "name",
-                    label: "Nombre completo",
-                    render: renderName,
-                    width: "220px",
-                },
-                { key: "employee_no", label: "No. Empleado", width: "100px" },
-                {
-                    key: "dependency",
-                    label: "Dependencia / Edificio",
-                    render: renderDependency,
-                    width: "250px",
-                },
-                {
-                    key: "cards",
-                    label: "Tarjetas",
-                    render: renderCards,
-                    sortable: false,
-                    width: "140px",
-                },
-                {
-                    key: "status",
-                    label: "Estado",
-                    render: renderStatus,
-                    width: "120px",
-                },
-            ]}
-            mobileCard={mobilePersonnelCard}
-        >
-            {#snippet actions(row: any)}
+        {#if personnelState.isLoading && personnel.length === 0}
+            <SkeletonTable columns={5} rows={5} hasActions />
+        {:else}
+            <DataTable
+                data={personnel}
+                actionsWidth="130px"
+                columns={[
+                    {
+                        key: "name",
+                        label: "Nombre completo",
+                        render: renderName,
+                        width: "220px",
+                    },
+                    { key: "employee_no", label: "No. Empleado", width: "100px" },
+                    {
+                        key: "dependency",
+                        label: "Dependencia / Edificio",
+                        render: renderDependency,
+                        width: "250px",
+                    },
+                    {
+                        key: "cards",
+                        label: "Tarjetas",
+                        render: renderCards,
+                        sortable: false,
+                        width: "140px",
+                    },
+                    {
+                        key: "status",
+                        label: "Estado",
+                        render: renderStatus,
+                        width: "120px",
+                    },
+                ]}
+                mobileCard={mobilePersonnelCard}
+            >                {#snippet actions(row: any)}
                 <Button
                     variant="soft-blue"
                     size="sm"
                     class="h-9 px-4 rounded-xl"
                     onclick={() => onOpenDetails(row)}
+                    title="Ver detalles de la persona"
                 >
                     Ver detalles
                 </Button>
             {/snippet}
-        </DataTable>
+            </DataTable>
+        {/if}
     </Card>
 
     <Pagination
