@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+import { fade } from "svelte/transition";
   import { AlertCircle, RefreshCcw } from "lucide-svelte";
   import { handleError, initGlobalRealtime } from "./lib/utils";
   import { supabase, auth } from "./lib/supabase";
@@ -179,6 +180,16 @@
 {:else if !userState.profile}
   <LoginView />
 {:else}
+  <!-- Backdrop global para sidepanel — fuera del MainLayoutWrapper para evitar clipping de backdrop-filter por overflow-hidden -->
+  {#if personnelState.isDetailsOpen}
+    <div
+      class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm"
+      onclick={() => personnelState.setDetailsOpen(false)}
+      role="presentation"
+      transition:fade={{ duration: 200 }}
+    ></div>
+  {/if}
+
   <MainLayoutWrapper>
     <Router {routes} />
     <GlobalOverlays />

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { type Snippet } from "svelte";
-    import { fly, fade } from "svelte/transition";
+    import { fly } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
     import { X } from "lucide-svelte";
 
@@ -49,15 +49,6 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if isOpen}
-    <!-- Backdrop -->
-    <button
-        type="button"
-        class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm cursor-default"
-        onclick={close}
-        aria-label="Cerrar panel"
-        transition:fade={{ duration: 200 }}
-    ></button>
-
     <!-- Side Panel / Bottom Sheet -->
     <div
         class="fixed z-50 flex flex-col bg-white shadow-2xl transition-all duration-300
