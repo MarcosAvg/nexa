@@ -1,4 +1,4 @@
-# Logs
+# ─── Logs ────────────────────────────────────────
 logs
 *.log
 npm-debug.log*
@@ -7,13 +7,25 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# ─── Dependencias ─────────────────────────────────
 node_modules
+
+# ─── Build / output ───────────────────────────────
 dist
 dist-ssr
+dev-dist/
+
+# ─── Entorno & configuración local ────────────────
 *.local
 .env
 
-# Editor directories and files
+# ─── Freebuff (desktop app local data) ────────────
+.freebuff/
+
+# ─── Archivos de diagnóstico temporales ───────────
+check_output.txt
+
+# ─── Editor directories and files ─────────────────
 .vscode/*
 !.vscode/extensions.json
 .idea
