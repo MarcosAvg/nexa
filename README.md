@@ -1,11 +1,11 @@
-# Nexa - Control de Accesos
+# Nexa — Control de Accesos
 
 Plataforma para la gestión de accesos, personal operativo y auditoría de registros.
 
 ## Funcionalidades
 
 - **Gestión de Personal**: Administración de expedientes y perfiles de usuario.
-- **Control de Accesos**: Asignación y monitoreo de tarjetas físicas.
+- **Control de Accesos**: Asignación y monitoreo de tarjetas físicas (P2000, KONE).
 - **Sistema de Tickets**: Seguimiento de incidencias y tareas.
 - **Reportes**: Generación de documentos en formato Excel y PDF.
 - **Auditoría**: Registro detallado de movimientos e historial de cambios.
@@ -14,19 +14,36 @@ Plataforma para la gestión de accesos, personal operativo y auditoría de regis
 
 - **Frontend**: Svelte 5 (Runes)
 - **Backend**: Supabase (PostgreSQL + RLS)
-- **Estilos**: Tailwind CSS
-- **Herramientas**: Vite, Lucide
+- **Estilos**: Tailwind CSS 4
+- **Herramientas**: Vite, Lucide, Chart.js
 
-## Configuración
+## Inicio rápido
 
-1. Instalar dependencias: `npm install`
-2. Configurar `.env`: Copiar `.env.example` y añadir `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
-3. Iniciar desarrollo: `npm run dev`
+```bash
+npm install
+cp .env.example .env   # editar con tus credenciales de Supabase
+npm run dev
+```
+
+## Documentación para desarrolladores
+
+→ **[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)** — guía completa con:
+
+- Configuración del entorno y base de datos
+- Arquitectura del proyecto (capas, flujo de datos)
+- Setup de Supabase y esquema de base de datos
+- Estándares de código y comentarios
+- Patrones de refactorización
+- Build, despliegue y testing
 
 ## Scripts
 
-- `npm run build`: Compilación para producción.
-- `npm run check`: Verificación de sintaxis y tipos.
+| Comando | Descripción |
+|---|---|
+| `npm run dev` | Inicia servidor de desarrollo |
+| `npm run build` | Compilación para producción |
+| `npm run preview` | Vista previa del build |
+| `npm run check` | Verificación de tipos y sintaxis |
+| `npx playwright test` | Tests E2E |
 
 ---
-Nexa - Control de Accesos.
