@@ -3,7 +3,7 @@ import { saveAs } from 'file-saver';
 import type { CatalogItem } from '../types';
 
 // ─────────────────────────────────────────
-// Types
+// Tipos
 // ─────────────────────────────────────────
 
 interface Building extends CatalogItem {
@@ -18,7 +18,7 @@ interface TemplateCatalogs {
 }
 
 // ─────────────────────────────────────────
-// Color Palette
+// Paleta de colores
 // ─────────────────────────────────────────
 const C = {
     titleText: 'FF1E293B',
@@ -42,7 +42,7 @@ const C = {
 };
 
 // ─────────────────────────────────────────
-// Floor sort order
+// Orden de pisos
 // ─────────────────────────────────────────
 function sortFloors(floors: string[]): string[] {
     const ORDER: Record<string, number> = {
@@ -62,7 +62,7 @@ function sortFloors(floors: string[]): string[] {
 }
 
 // ─────────────────────────────────────────
-// Helpers
+// Utilidades
 // ─────────────────────────────────────────
 
 function styleCell(
@@ -177,7 +177,7 @@ function paintDataRows(ws: ExcelJS.Worksheet, fromRow: number, toRow: number, to
 }
 
 // ─────────────────────────────────────────
-// Sheet: CATÁLOGOS — computed refs + writer
+// Hoja: CATÁLOGOS — referencias calculadas + writer
 // ─────────────────────────────────────────
 
 function prepareCatalogData(catalogs: TemplateCatalogs) {
@@ -223,11 +223,11 @@ function writeCatalogSheet(wb: ExcelJS.Workbook, lists: ReturnType<typeof prepar
     write(11, ['Alta (Alta/Media/Baja)', 'Alta', 'Media', 'Baja']);
 }
 
-// Alias type so sheets still reference the same shape
+// Tipo alias para que las hojas sigan referenciando la misma forma
 type CatalogRefs = ReturnType<typeof prepareCatalogData>['refs'];
 
 // ─────────────────────────────────────────
-// Sheet: INSTRUCCIONES
+// Hoja: INSTRUCCIONES
 // ─────────────────────────────────────────
 
 function buildInstructionsSheet(wb: ExcelJS.Workbook) {
@@ -237,7 +237,7 @@ function buildInstructionsSheet(wb: ExcelJS.Workbook) {
         { width: 4 }, { width: 32 }, { width: 90 }
     ];
 
-    // Title
+    // Título
     ws.mergeCells('A1:C1');
     const title = ws.getCell('A1');
     title.value = 'Plantilla de Solicitudes de Acceso';
@@ -268,7 +268,7 @@ function buildInstructionsSheet(wb: ExcelJS.Workbook) {
         styleCell(ws.getCell(`B${r}`), { bold: type === 'mandatory', size: 9, fontColor, fillColor: fill, borders: true, valign: 'top' });
         ws.getCell(`C${r}`).value = description;
         styleCell(ws.getCell(`C${r}`), { size: 9, fontColor, fillColor: fill, borders: true, wrap: true, valign: 'top' });
-        // Dynamic height: ~18px per line + 10px padding
+        // Altura dinámica: ~18px por línea + 10px padding
         const lines = description.split('\n').length + Math.ceil(description.replace(/\n/g, '').length / 105);
         ws.getRow(r).height = Math.max(10, lines * 10);
         r++;
@@ -315,7 +315,7 @@ function buildInstructionsSheet(wb: ExcelJS.Workbook) {
 }
 
 // ─────────────────────────────────────────
-// Sheet: ALTAS
+// Hoja: ALTAS
 // ─────────────────────────────────────────
 
 function buildAltasSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
@@ -347,7 +347,7 @@ function buildAltasSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 
     addSheetTitle(ws, 'SOLICITUD DE ALTA', 20);
 
-    // Row 2: explanation banner
+    // Fila 2: banner explicativo
     ws.mergeCells('A2:T2');
     const banner = ws.getCell('A2');
     banner.value = 'Use esta hoja para dar de alta a personas nuevas en el sistema de accesos (Trabajadores, Honorarios, Servicio Social, etc.). Llene todos los campos marcados con *.';
@@ -406,7 +406,7 @@ function buildAltasSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 }
 
 // ─────────────────────────────────────────
-// Sheet: MODIFICACIONES
+// Hoja: MODIFICACIONES
 // ─────────────────────────────────────────
 
 function buildModificacionesSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
@@ -421,8 +421,8 @@ function buildModificacionesSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
     // S: Horario T: Entrada U: Salida
     // V: Observaciones
     ws.columns = [
-        { key: 'apellidos', width: 22 }, // A mandatory
-        { key: 'nombres', width: 22 }, // B mandatory
+        { key: 'apellidos', width: 22 }, // A obligatorio
+        { key: 'nombres', width: 22 }, // B obligatorio
         { key: 'no_empleado', width: 14 }, // C
         { key: 'nuevo_apellido', width: 22 }, // D
         { key: 'nuevo_nombre', width: 22 }, // E
@@ -447,7 +447,7 @@ function buildModificacionesSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 
     addSheetTitle(ws, 'SOLICITUD DE MODIFICACIÓN', 22);
 
-    // Row 2: Legend note
+    // Fila 2: nota de leyenda
     ws.mergeCells('A2:V2');
     const note = ws.getCell('A2');
     note.value = '⚠️  IMPORTANTE: Solo llene los campos que desea MODIFICAR. Los campos vacíos NO serán alterados en el sistema. Si un valor es igual al actual, puede dejarlo en blanco.';
@@ -507,7 +507,7 @@ function buildModificacionesSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 }
 
 // ─────────────────────────────────────────
-// Sheet: BAJA DE PERSONA
+// Hoja: BAJA DE PERSONA
 // ─────────────────────────────────────────
 
 function buildBajaPersonaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
@@ -526,7 +526,7 @@ function buildBajaPersonaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 
     addSheetTitle(ws, 'SOLICITUD DE BAJA DE PERSONA', 7);
 
-    // Row 2: explanation banner
+    // Fila 2: banner explicativo
     ws.mergeCells('A2:G2');
     const banner = ws.getCell('A2');
     banner.value = 'Use esta hoja para solicitar la baja total de una persona del sistema de accesos. Esta acción desactivará todos sus accesos (P2000 y KONE). Para dar de baja solo una tarjeta use la hoja de REPOSICIÓN.';
@@ -558,7 +558,7 @@ function buildBajaPersonaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 }
 
 // ─────────────────────────────────────────
-// Sheet: REPOSICIÓN DE TARJETA
+// Hoja: REPOSICIÓN DE TARJETA
 // ─────────────────────────────────────────
 
 function buildReposicionSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
@@ -580,7 +580,7 @@ function buildReposicionSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 
     addSheetTitle(ws, 'SOLICITUD DE REPOSICIÓN DE TARJETA', 10);
 
-    // Row 2: explanation banner
+    // Fila 2: banner explicativo
     ws.mergeCells('A2:J2');
     const banner = ws.getCell('A2');
     banner.value = 'Use esta hoja para solicitar la reposición de una tarjeta P2000 (Puertas), KONE (Elevadores) o ambas. Puede solicitar una o las dos al mismo tiempo en una sola fila. Indique "Sí" en la(s) tarjeta(s) que requiere reponer.';
@@ -618,7 +618,7 @@ function buildReposicionSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 }
 
 // ─────────────────────────────────────────
-// Sheet: REPORTE DE FALLA
+// Hoja: REPORTE DE FALLA
 // ─────────────────────────────────────────
 
 function buildReporteFallaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
@@ -630,8 +630,8 @@ function buildReporteFallaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
     // G: Edificio / Lugar de la falla*, H: Descripción del problema*, I: ¿Desde cuándo?
     // J: Urgencia*, K: Observaciones
     ws.columns = [
-        { key: 'apellidos', width: 22 }, // A mandatory
-        { key: 'nombres', width: 22 }, // B mandatory
+        { key: 'apellidos', width: 22 }, // A obligatorio
+        { key: 'nombres', width: 22 }, // B obligatorio
         { key: 'no_empleado', width: 14 }, // C
         { key: 'dependencia', width: 26 }, // D mandatory
         { key: 'tipo_tarjeta', width: 20 }, // E mandatory
@@ -645,7 +645,7 @@ function buildReporteFallaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 
     addSheetTitle(ws, 'REPORTE DE FALLA DE TARJETA DE ACCESO', 11);
 
-    // Note banner
+    // Banner de nota
     ws.mergeCells('A2:K2');
     const note = ws.getCell('A2');
     note.value = 'Use esta hoja para reportar cuando su tarjeta de acceso no funciona correctamente (no abre la puerta, el elevador no responde, lector no lee la tarjeta, etc.). El área de Control de Accesos verificará el estado de la tarjeta y determinará si se requiere reposición u otro procedimiento.';
@@ -686,17 +686,17 @@ function buildReporteFallaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 }
 
 // ─────────────────────────────────────────
-// Main Entry Point
+// Punto de entrada principal
 // ─────────────────────────────────────────
 
 export async function generateRequestTemplate(catalogs: TemplateCatalogs) {
     const wb = new ExcelJS.Workbook();
     wb.created = new Date();
 
-    // Prepare refs from catalog data (no workbook write yet)
+    // Preparar referencias desde datos de catálogo (sin escribir workbook aún)
     const { refs, lists } = prepareCatalogData(catalogs);
 
-    // Build all visible sheets first
+    // Construir todas las hojas visibles primero
     buildInstructionsSheet(wb);
     buildAltasSheet(wb, refs);
     buildModificacionesSheet(wb, refs);
@@ -704,7 +704,7 @@ export async function generateRequestTemplate(catalogs: TemplateCatalogs) {
     buildReposicionSheet(wb, refs);
     buildReporteFallaSheet(wb, refs);
 
-    // Add catalog sheet LAST so it appears at the end (and stays hidden)
+    // Añadir hoja de catálogo al FINAL para que aparezca al final (y permanezca oculta)
     writeCatalogSheet(wb, lists);
 
     const buffer = await wb.xlsx.writeBuffer();

@@ -8,8 +8,8 @@ import SettingsView from './views/SettingsView.svelte';
 import EnlacesView from './views/EnlacesView.svelte';
 import RegistroSinTarjetaView from './views/RegistroSinTarjetaView.svelte';
 
-// NOTE: svelte-spa-router requires the `wrap()` helper for lazy loading.
-// Keeping eager imports for now to ensure compatibility with all router versions.
+// ⚠ svelte-spa-router requiere el helper wrap() para lazy loading.
+// Se mantienen imports eager para compatibilidad con todas las versiones del router.
 export const routes = {
     '/': DashboardView,
     '/dashboard': DashboardView,

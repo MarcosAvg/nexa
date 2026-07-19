@@ -32,7 +32,7 @@
                 }}
                 class="group relative flex flex-col items-center justify-center gap-0.5 flex-1 text-slate-400 transition-all duration-300"
             >
-                <!-- Active indicator dot -->
+                <!-- Punto indicador activo -->
                 <div
                     class="absolute top-1 w-1 h-1 rounded-full bg-blue-500 transition-all duration-300 scale-0 group-[.active-bottom-nav]:scale-100 opacity-0 group-[.active-bottom-nav]:opacity-100"
                 ></div>
@@ -50,13 +50,13 @@
             </a>
         {/each}
 
-        <!-- Dynamic Menu Button -->
+        <!-- Botón de menú dinámico -->
         <button
             type="button"
             onclick={() => uiState.toggleSidebar()}
             class="group relative flex flex-col items-center justify-center gap-0.5 flex-1 text-slate-400 transition-all duration-300 hover:text-slate-600"
         >
-            <!-- Active indicator dot (shows when sidebar open) -->
+            <!-- Punto indicador activo (se muestra cuando la sidebar está abierta) -->
             <div
                 class="absolute top-1 w-1 h-1 rounded-full bg-blue-500 transition-all duration-300 {uiState.isSidebarOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0'}"
             ></div>

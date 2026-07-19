@@ -10,7 +10,7 @@ export const personnelActions = {
         const oldStatusRaw = person.status_raw;
         const newStatus = oldStatusRaw === "blocked" ? "active" : "blocked";
 
-        // Optimistic UI Update
+        // Actualización optimista de UI
         const localPerson = personnelState.personnel.find(p => p.id === person.id);
         if (localPerson) localPerson.status_raw = newStatus;
 
@@ -21,7 +21,7 @@ export const personnelActions = {
             );
             await onSuccess?.();
         } catch (e) {
-            // Revert on error
+            // Revertir en caso de error
             if (localPerson) localPerson.status_raw = oldStatusRaw;
             handleError(e, "Error al actualizar estado");
         }
@@ -30,7 +30,7 @@ export const personnelActions = {
     async handleDeactivatePerson(person: Person, onSuccess?: () => Promise<void>) {
         const oldStatusRaw = person.status_raw;
 
-        // Optimistic UI Update
+        // Actualización optimista de UI
         const localPerson = personnelState.personnel.find(p => p.id === person.id);
         if (localPerson) localPerson.status_raw = "inactive";
 
@@ -39,7 +39,7 @@ export const personnelActions = {
             toast.success("Persona dada de baja");
             await onSuccess?.();
         } catch (e) {
-            // Revert on error
+            // Revertir en caso de error
             if (localPerson) localPerson.status_raw = oldStatusRaw;
             handleError(e, "Error al dar de baja");
         }
@@ -48,7 +48,7 @@ export const personnelActions = {
     async handleReactivatePerson(person: Person, onSuccess?: () => Promise<void>) {
         const oldStatusRaw = person.status_raw;
 
-        // Optimistic UI Update
+        // Actualización optimista de UI
         const localPerson = personnelState.personnel.find(p => p.id === person.id);
         if (localPerson) localPerson.status_raw = "active";
 
@@ -57,7 +57,7 @@ export const personnelActions = {
             toast.success("Persona reactivada");
             await onSuccess?.();
         } catch (e) {
-            // Revert on error
+            // Revertir en caso de error
             if (localPerson) localPerson.status_raw = oldStatusRaw;
             handleError(e, "Error al reactivar");
         }
@@ -121,7 +121,7 @@ export const personnelActions = {
         try {
             await cardService.updateProgrammingStatus(card.id, "done");
 
-            // Look for any pending "Programación" ticket for this card and complete it
+            // Buscar tickets pendientes de "Programación" para esta tarjeta y completarlos
             const { supabase: sb } = await import("../supabase");
             const { data: tickets } = await sb
                 .from("tickets")

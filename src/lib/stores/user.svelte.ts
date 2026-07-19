@@ -7,7 +7,7 @@ export class UserState {
     isOperator = $derived(this.profile?.role === 'operator');
     isViewer = $derived(this.profile?.role === 'viewer');
 
-    // Permission levels
+    // Niveles de permiso
     canEdit = $derived(this.profile?.role === 'admin' || this.profile?.role === 'operator');
     canDelete = $derived(this.profile?.role === 'admin');
 

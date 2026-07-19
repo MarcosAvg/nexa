@@ -41,7 +41,7 @@
     let dependencies = $derived(catalogState.dependencies);
     let specialAccesses = $derived(catalogState.specialAccesses);
     let schedules = $derived(catalogState.schedules);
-    let users = $state<any[]>([]); // Users still local as they are specific to this admin view
+    let users = $state<any[]>([]);    // Usuarios locales por ser específicos de esta vista de administración
 
     let currentUser = $derived.by(() => {
         return userState.currentUser ?? { name: "", email: "", avatar: null, role: "viewer" };
@@ -98,7 +98,7 @@
 
     // --- Actions ---
 
-    // Placeholder for modal states
+    // Espacio reservado para estados de modales
     let isBuildingModalOpen = $state(false);
     let isDependencyModalOpen = $state(false);
     let isAccessModalOpen = $state(false);
@@ -107,7 +107,7 @@
     // --- Edit State ---
     let editingId = $state<number | null>(null);
 
-    // Form States
+    // Estados de formulario
     let buildingName = $state("");
     let buildingFloors = $state("");
 

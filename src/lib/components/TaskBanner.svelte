@@ -188,7 +188,7 @@
 <article
     class="group relative flex flex-col h-full {config.cardBg} rounded-2xl border {config.cardBorder} overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/60 hover:-translate-y-1"
 >
-    <!-- Header: Type Icon & Priority -->
+    <!-- Encabezado: Icono de tipo y prioridad -->
     <div class="p-4 flex items-start justify-between gap-4">
         <div class="flex items-center gap-3">
             <div
@@ -231,7 +231,7 @@
         </Badge>
     </div>
 
-    <!-- Body: Title & Description -->
+    <!-- Cuerpo: Título y descripción -->
     <div class="px-4 pb-2 flex-1">
         <h3
             class="text-sm font-bold text-slate-900 leading-snug mb-1.5 line-clamp-2 min-h-[2.5rem]"
@@ -243,9 +243,8 @@
         </p>
     </div>
 
-    <!-- Metadata Section -->
-    <div class="px-4 pb-4 space-y-3">
-        <!-- Main Person Label -->
+    <!-- Sección de metadatos -->
+    <div class="px-4 pb-4 space-y-3">                <!-- Etiqueta de persona principal -->
         <div
             class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50/80 border border-slate-100/60"
         >
@@ -264,9 +263,7 @@
                     {ticket.personName}
                 </p>
             </div>
-        </div>
-
-        <!-- Secondary Meta (Date & Assets) -->
+        </div>                <!-- Metadatos secundarios (fecha y recursos) -->
         <div
             class="flex items-center justify-between text-[10px] font-bold px-1"
         >
@@ -328,7 +325,7 @@
         </PermissionGuard>
     </div>
 
-    <!-- Background Decoration -->
+    <!-- Decoración de fondo -->
     <div
         class="absolute -right-6 -top-6 w-24 h-24 {config.bg} opacity-[0.03] rounded-full blur-2xl group-hover:opacity-10 group-hover:scale-150 transition-all duration-700 pointer-events-none"
     ></div>

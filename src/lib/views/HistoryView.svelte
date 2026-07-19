@@ -19,10 +19,10 @@
 
     const PAGE_SIZE = 50;
 
-    // Debounce refresh so typing in filter inputs doesn't fire on every keystroke
+    // Debounce para evitar consultas en cada pulsación de tecla en filtros
     let filterDebounce: ReturnType<typeof setTimeout>;
     $effect(() => {
-        // Track dependencies
+        // Rastrear dependencias
         historyState.filters.person;
         historyState.filters.cardType;
         historyState.filters.folio;
@@ -34,7 +34,7 @@
         }, 400);
     });
 
-    // Get data directly from Store (already paginated by server)
+    // Obtener datos directamente del Store (already paginated by server)
     let historyLogs = $derived(historyState.historyLogs);
     let totalRecords = $derived(historyState.totalRecords);
     let currentPage = $derived(historyState.currentPage);

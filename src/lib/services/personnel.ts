@@ -139,7 +139,7 @@ export const personnelService = {
         }, "Fetch Personnel", { data: [], count: 0 });
     },
 
-    // Helper for fallback logic
+    // Helper para lógica de fallback
     async _fetchAllFallback(page: number, limit: number, search: string, statusFilter: string, dependencyId: string, buildingId: string) {
         const isComputedStatus = ["Activo/a", "Parcial", "Sin Acceso"].includes(statusFilter);
         const dbStatusMap: Record<string, string> = {
@@ -147,12 +147,17 @@ export const personnelService = {
             "Baja": "inactive"
         };
 
-        // Build base query without .range() — Supabase's query builder mutates `.range()` in place,
-        // so we can build it once and chain different `.range()` per page in batchPaginate.
-        const buildBaseQuery = () => {
-            let q = supabase
-                .from("personnel")
-                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+        // Construir query sin .range() — Supabase muta .range() in-place,
+        // así que construimos una vez y encadenamos diferentes .range() por página en batchPaginate.
+        const buildBaseQuery = (withCount: boolean = false): any => {
+            let q: any = supabase
+                .from("personnel");
+            
+            if (withCount) {
+                q = q.select("*", { count: "exact", head: true });
+            } else {
+                q = q.select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+            }
 
             if (search) {
                 const terms = search.trim().split(/\s+/).filter(Boolean);
@@ -191,12 +196,14 @@ export const personnelService = {
         } else {
             const from = (page - 1) * limit;
             const to = from + limit - 1;
-            const { data, count, error } = await buildBaseQuery()
-                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)", { count: "exact" })
+            const baseQuery = buildBaseQuery();
+            const { data, error } = await baseQuery
                 .order("first_name", { ascending: true })
                 .range(from, to);
             if (error) throw error;
-            return { data: (data || []).map(p => mapPersonRecord(p)), count: count || 0 };
+            const { count, error: countError } = await buildBaseQuery(true);
+            if (countError) throw countError;
+            return { data: (data || []).map((p: any) => mapPersonRecord(p)), count: count || 0 };
         }
     },
 
@@ -268,7 +275,7 @@ export const personnelService = {
                 if (error) throw error;
                 if (!data || data.length === 0) return [];
                 rpcIds = data.map((p: { id: string }) => p.id);
-                peopleQuery = supabase.from("personnel").select("*, cards(*), buildings(name), dependencies(name), schedules(*)").in("id", rpcIds);
+                peopleQuery = supabase.from("personnel").select("*, cards(*), buildings(name), dependencies(name), schedules(*)").in("id", rpcIds ?? []);
             }
 
             const { data: fullPeople, error: fetchError } = await peopleQuery;

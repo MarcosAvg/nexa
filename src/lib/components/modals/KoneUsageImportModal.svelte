@@ -81,7 +81,7 @@
                 return;
             }
 
-            // Detect duplicates
+            // Detectar duplicados
             const foundDuplicates = findDuplicateFolios(entries);
             rawEntries = entries;
             duplicates = foundDuplicates;
@@ -95,7 +95,7 @@
             step = "idle";
         }
 
-        // Reset file input for re-upload
+        // Reiniciar input de archivo para re-subida
         if (input) input.value = "";
     }
 
@@ -135,14 +135,14 @@
         }
     }
 
-    // Derived unique dependencies from matched results
+    // Dependencias únicas derivadas de resultados coincidentes
     let availableDependencies = $derived.by(() => {
         if (!matchResult) return [];
         const deps = new Set(matchResult.matched.map(m => m.person.dependency || 'Sin Dependencia'));
         return Array.from(deps).sort();
     });
 
-    // Filtered match result based on selected dependency
+    // Resultado filtrado según la dependencia seleccionada
     let filteredResult = $derived.by(() => {
         if (!matchResult) return null;
         if (!selectedDependency) return matchResult;
@@ -157,7 +157,7 @@
         };
     });
 
-    // Derived stats (uses filtered data)
+    // Estadísticas derivadas (usa datos filtrados)
     let stats = $derived.by(() => {
         if (!filteredResult) return null;
         const totalUsos = filteredResult.matched.reduce(

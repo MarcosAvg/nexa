@@ -40,7 +40,7 @@
                         searchResults = results.slice(0, 5);
                     }
                 } catch {
-                    // Silently handle search errors (non-critical)
+                    // Manejar errores de búsqueda silenciosamente (no crítico)
                 }
             }, 300);
         } else {

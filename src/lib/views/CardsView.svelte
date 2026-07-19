@@ -36,12 +36,12 @@
     let personnel = $derived(personnelState.personnel);
     let extraCards = $derived(personnelState.extraCards);
 
-    // Filters
+    // Filtros
     let cardStatusFilter = $state("Todas");
     let cardTypeFilter = $state("Todos");
     let cardSearch = $state("");
 
-    // Modal State
+    // Estado del modal
     let isModalOpen = $state(false);
     let editingCard = $state<any>(null);
     let replacingCard = $state<any>(null);
@@ -56,7 +56,7 @@
         onConfirm: async () => {},
     });
 
-    // State for cards (Decoupled from Personnel Store)
+    // Estado de tarjetas (Decoupled from Personnel Store)
     let cards = $state<any[]>([]);
 
     let currentPage = $state(1);
@@ -65,12 +65,12 @@
     let totalPages = $derived(Math.ceil(totalRecords / pageSize));
     let isLoading = $state(false);
 
-    // Props
-    // Phase 2 Refactor: Use appState and stores instead of props
+    // Propiedades
+    // Refactor Fase 2: Use appState and stores instead of props
 
     let currentUser = $derived(userState.currentUser);
 
-    // Handlers
+    // Manejadores
     function onOpenAddCard() {
         editingCard = null;
         isModalOpen = true;
@@ -94,7 +94,7 @@
         }
     }
 
-    // Debounced Search
+    // Búsqueda con debounce
     const debouncedSearch = createSimpleDebounce(() => {
         refreshData(1);
     }, 300);
@@ -114,7 +114,7 @@
     onMount(() => {
         refreshData();
 
-        // Auto-refresh when cards change from other views (e.g. PersonDetailsPanel)
+        // Auto-actualizar cuando cambien las tarjetas from other views (e.g. PersonDetailsPanel)
         unsubs.push(
             appEvents.on(EVENTS.CARDS_CHANGED, () => refreshData(currentPage)),
             appEvents.on(EVENTS.PERSONNEL_CHANGED, () =>
@@ -205,7 +205,7 @@
         isModalOpen = true;
     }
 
-    // Snippets (status helpers now imported from constants/status)
+    // Fragmentos (status helpers now imported from constants/status)
 </script>
 
 {#snippet renderCardType(row: any)}
@@ -364,9 +364,7 @@
                 </Button>
             </PermissionGuard>
         {/snippet}
-    </SectionHeader>
-
-    <!-- Top Pagination removed per request -->
+    </SectionHeader>        <!-- Paginación superior eliminada por solicitud -->
 
     <Card class="overflow-hidden">
         <DataTable
@@ -397,7 +395,7 @@
             {#snippet actions(row: any)}
                 <div class="flex items-center justify-end gap-1">
                     {#if row.person_id}
-                        <!-- Ver Dueño -->
+                
                         <button
                             type="button"
                             class="p-1.5 rounded-full text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"

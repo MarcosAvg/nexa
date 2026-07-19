@@ -22,16 +22,16 @@ export function handleError(error: unknown, context: string = "An error occurred
         message = error;
     }
 
-    // Supabase specific error handling
+    // Manejo de errores específico de Supabase
     if (error && typeof error === 'object' && 'code' in error) {
         switch (error.code) {
-            case "23505": // Unique violation
+            case "23505":    // Violación de unicidad
                 message = "El registro ya existe (duplicado).";
                 break;
-            case "23503": // Foreign key violation
+            case "23503":    // Violación de clave foránea
                 message = "Operación no permitida: referencia a un registro inexistente.";
                 break;
-            // Add more codes as needed
+            // Añadir más códigos según sea necesario
         }
     }
 

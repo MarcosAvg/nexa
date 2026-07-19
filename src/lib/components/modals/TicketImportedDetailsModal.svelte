@@ -46,7 +46,7 @@
     let selectedPerson = $state<any>(null);
     let searchDone = $state(false);
 
-    // Sub-modals
+    // Sub-modales
     let isCompareOpen = $state(false);
     let compareTicket = $state<any>(null);
     let isRejectOpen = $state(false);
@@ -98,9 +98,7 @@
 
     // ── MODIFICACIÓN: build compareTicket for ModificationCompareModal ──
     function openCompareModal() {
-        if (!selectedPerson) return;
-
-        // Build the 'modified' payload using ModificationCompareModal's expected keys
+        if (!selectedPerson) return;                // Construir payload 'modified' usando las claves esperadas por ModificationCompareModal
         const modifiedPayload: any = {};
         if (p.nuevo_apellido) modifiedPayload.apellidos = p.nuevo_apellido;
         if (p.nuevo_nombre) modifiedPayload.nombres = p.nuevo_nombre;
@@ -120,11 +118,9 @@
         if (p.hora_entrada) modifiedPayload.horaEntrada = p.hora_entrada;
         if (p.hora_salida) modifiedPayload.horaSalida = p.hora_salida;
 
-        // Cards and Accesses logic handles strings: "Añadir", "Reemplazar", "Quitar"
-        // Since ModificationCompareModal compares the raw floor arrays, we need to apply the action
-        // to generate the "proposed" final state of floors/accesses.
-
-        // Helper for robust action matching
+    // La lógica de tarjetas y accesos maneja strings: "Añadir", "Reemplazar", "Quitar"
+    // Como ModificationCompareModal compara arrays de pisos, necesitamos aplicar la acción
+    // para generar el estado final "propuesto" de pisos/accesos.            // Helper para matching robusto de acciones
         const isAction = (
             act: string,
             type: "replace" | "add" | "remove" | "clear",
@@ -173,7 +169,7 @@
                     (f) => !parsedFloors.includes(f),
                 );
         }
-        // Force the compare modal to show differences by explicitly passing the generated arrays
+        // Forzar al modal de comparación a mostrar diferencias pasando los arrays generados
         modifiedPayload.floors_p2000 = proposedP2000;
 
         let proposedKONE = [...(selectedPerson.floors_kone || [])];
@@ -212,7 +208,7 @@
         }
         modifiedPayload.specialAccesses = proposedAccesses;
 
-        // Inherit unchanged fields from selectedPerson
+        // Heredar campos no modificados de selectedPerson
         if (!modifiedPayload.nombres)
             modifiedPayload.nombres = selectedPerson.first_name;
         if (!modifiedPayload.apellidos)
@@ -228,7 +224,7 @@
         if (!modifiedPayload.puestoFuncion)
             modifiedPayload.puestoFuncion = selectedPerson.position;
 
-        // These don't need inheriting here since they are computed above
+        // Estos no necesitan heredarse aquí porque se calculan arriba
 
         compareTicket = {
             ...ticket,
@@ -293,7 +289,7 @@
             const folioSought = p.folio_p2000?.trim();
             const p2000Cards = cards.filter((c: any) => c.type === "P2000");
             if (p2000Cards.length === 0) {
-                // No active P2000 card
+                // Sin tarjeta P2000 activa
                 checks.push({
                     card: { type: "P2000", folio: folioSought ?? "—" },
                     match: false,

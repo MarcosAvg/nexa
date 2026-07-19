@@ -19,14 +19,12 @@
     }>();
 
     let isSubmitting = $state(false);
-    let cardActionMap = $state<Record<string, "delete" | "keep">>({});
-
-    // Initialize map when person changes or modal opens
+    let cardActionMap = $state<Record<string, "delete" | "keep">>({});        // Inicializar mapa cuando cambia la persona o se abre el modal
     $effect(() => {
         if (isOpen && person?.cards) {
             const initialMap: Record<string, "delete" | "keep"> = {};
             person.cards.forEach((card: any) => {
-                initialMap[card.id] = "keep"; // Default to keep available
+                initialMap[card.id] = "keep";        // Por defecto: conservar como disponible
             });
             cardActionMap = initialMap;
         }

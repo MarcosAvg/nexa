@@ -79,8 +79,8 @@ async function fetchPendingKoneResponsivaSet(personIds: string[]): Promise<Set<s
     if (error || !data) return new Set();
 
     return new Set(
-        (data as { person_id: string; cards?: { type: string } | null }[])
-            .filter((t) => t.cards?.type === "KONE")
+        (data as { person_id: string; cards?: { type: string }[] | null }[])
+            .filter((t) => t.cards?.some?.((c) => c.type === "KONE") ?? false)
             .map((t) => t.person_id)
     );
 }
@@ -132,8 +132,7 @@ const mapCardlessRegistryRecord = (r: RegistryRow): CardlessRegistry => {
     };
 };
 
-async function enrichWithKoneResponsiva(registries: CardlessRegistry[]): Promise<CardlessRegistry[]> {
-    // Only query current ticket status for records that don't have a stored snapshot
+async function enrichWithKoneResponsiva(registries: CardlessRegistry[]): Promise<CardlessRegistry[]> {        // Solo consultar estado actual de ticket para registros sin snapshot almacenado
     // (i.e. pre-migration records where kone_status_at_registration is null).
     const legacyIds = registries
         .filter(r => r.person_id && r.kone_status_at_registration === null)
@@ -145,11 +144,11 @@ async function enrichWithKoneResponsiva(registries: CardlessRegistry[]): Promise
     }
 
     return registries.map(r => {
-        // If snapshot is already stored, use it directly.
+        // Si el snapshot ya está almacenado, usarlo directamente.
         if (r.kone_status_at_registration !== null) {
             return { ...r, pendingKoneResponsiva: r.kone_status_at_registration ?? false };
         }
-        // Legacy record: fall back to live lookup.
+        // Registro heredado: recurrir a consulta en vivo.
         return {
             ...r,
             pendingKoneResponsiva: r.person_id ? koneSet.has(r.person_id) : false,

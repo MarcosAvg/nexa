@@ -7,9 +7,7 @@ import {
     addKpiCard,
     addTableHeader,
     addTableRow,
-} from './xlsxShared';
-
-// Re-export types from here
+} from './xlsxShared';    // Re-exportar tipos desde aquí
 export interface ExportPersonnelData {
     first_name: string;
     last_name: string;
@@ -30,7 +28,7 @@ export interface ExportPersonnelData {
     } | null;
     email?: string | null;
     cards?: { type: string; folio: string }[];
-    // Allow any other props from Person to avoid strict casting errors during development
+    // Permitir cualquier otra prop de Person para evitar errores de casting estrictos durante desarrollo
     [key: string]: any;
 }
 
@@ -63,16 +61,16 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
         pink: { bg: 'FFFCE7F3', fg: 'FF9D174D' },
     };
 
-    // Column widths
+    // Anchos de columna
     ws.columns = [
-        { width: 4 },   // A spacer
-        { width: 30 },  // B label
-        { width: 16 },  // C value
-        { width: 14 },  // D percent
-        { width: 4 },   // E spacer
-        { width: 30 },  // F label
-        { width: 16 },  // G value
-        { width: 14 },  // H percent
+        { width: 4 },    // A espaciador
+        { width: 30 },    // B etiqueta
+        { width: 16 },    // C valor
+        { width: 14 },    // D porcentaje
+        { width: 4 },    // E espaciador
+        { width: 30 },    // F etiqueta
+        { width: 16 },    // G valor
+        { width: 14 },    // H porcentaje
     ];
 
     let row = 1;
@@ -129,7 +127,7 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     });
     const buildEntries = Object.entries(buildMap).sort((a, b) => b[1] - a[1]);
 
-    // Row 1: Title
+    // Fila 1: Título
     ws.mergeCells('A1:H1');
     const titleCell = ws.getCell('A1');
     titleCell.value = `       RESUMEN EJECUTIVO — DIRECTORIO DE PERSONAL${filterInfo}`;
@@ -139,7 +137,7 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
 
     await addLogoToSheet(workbook, ws);
 
-    // Row 2: Meta
+    // Fila 2: Meta
     ws.mergeCells('A2:H2');
     const metaCell = ws.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
@@ -152,7 +150,7 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
 
     row = 4;
 
-    // Section 1: KPIs
+    // Sección 1: KPIs
     row = addSectionTitle(ws, row, '📊  INDICADORES CLAVE POR ESTADO', 'H', C);
     ws.getRow(row).height = 32;    addKpiCard(ws, row, 'B', 'TOTAL PERSONAL', total, C.blue);
     addKpiCard(ws, row, 'F', 'ACTIVOS OPERATIVOS', activosOperativos, C.emerald, calcPct(activosOperativos, total));
@@ -172,7 +170,7 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     addKpiCard(ws, row, 'B', 'Baja', bajas, C.slate, calcPct(bajas, total));
     row++; row++;
 
-    // Section 2: Card coverage
+    // Sección 2: Cobertura de tarjetas
     row = addSectionTitle(ws, row, '🪪  COBERTURA DE TARJETAS DE ACCESO', 'H', C);
     ws.mergeCells(`B${row}:H${row}`);
     const noteCell = ws.getCell(`B${row}`);
@@ -194,7 +192,7 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     addKpiCard(ws, row, 'F', '% Cobertura KONE', calcPct(conKone, activosOperativos), activosOperativos > 0 && conKone / activosOperativos >= 0.9 ? C.emerald : C.amber);
     row++; row++;
 
-    // Section 3: By Dependency
+    // Sección 3: Por dependencia
     row = addSectionTitle(ws, row, '🏢  DISTRIBUCIÓN POR DEPENDENCIA', 'H', C);
     addTableHeader(ws, row, [{ col: 'B', label: 'DEPENDENCIA' }, { col: 'C', label: 'TOTAL' }, { col: 'D', label: '% DEL TOTAL' }, { col: 'F', label: 'ACTIVOS' }, { col: 'G', label: 'INACTIVOS' }, { col: 'H', label: '% ACTIVOS' }], C.violet, C.white);
     row++;
@@ -203,7 +201,7 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
         row++;
     });
 
-    // Section 4: By Building
+    // Sección 4: Por edificio
     if (buildEntries.length > 0) {
         row = addSectionTitle(ws, row, '🏗️  DISTRIBUCIÓN POR EDIFICIO', 'H', C);
         addTableHeader(ws, row, [{ col: 'B', label: 'EDIFICIO' }, { col: 'C', label: 'TOTAL' }, { col: 'D', label: '% DEL TOTAL' }], C.sky, C.white);
@@ -214,7 +212,7 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
         });
     }
 
-    // Section 5: Data quality
+    // Sección 5: Calidad de datos
     row = addSectionTitle(ws, row, '⚠️  CALIDAD DE DATOS — CAMPOS INCOMPLETOS', 'H', C);
     addTableHeader(ws, row, [{ col: 'B', label: 'CAMPO' }, { col: 'C', label: 'SIN DATO' }, { col: 'D', label: '% INCOMPLETO' }], C.rose, C.white);
     row++;
@@ -248,7 +246,7 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     });
     row++; row++;
 
-    // Section 6: Special accesses
+    // Sección 6: Accesos especiales
     if (accessEntries.length > 0) {
         row = addSectionTitle(ws, row, '🔐  ACCESOS ESPECIALES', 'H', C);
         ws.getRow(row).height = 28;
@@ -262,7 +260,7 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
         });
     }
 
-    // Section 7: Schedule
+    // Sección 7: Horario
     if (schedEntries.length > 0) {
         row = addSectionTitle(ws, row, '🕐  DISTRIBUCIÓN DE JORNADA LABORAL', 'H', C);
         addTableHeader(ws, row, [{ col: 'B', label: 'JORNADA' }, { col: 'C', label: 'PERSONAS' }, { col: 'D', label: '% DEL TOTAL' }], C.emerald, C.white);

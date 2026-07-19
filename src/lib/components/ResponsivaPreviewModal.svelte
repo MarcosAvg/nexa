@@ -52,7 +52,7 @@
     );
     let isTextMode = $state(false);
 
-    // Email capture state
+    // Estado de captura de correo
     let showEmailPrompt = $state(false);
     let tempEmail = $state("");
     let saveEmailPermanently = $state(true);
@@ -60,9 +60,9 @@
 
     $effect(() => {
         if (isOpen) {
-            // Only synchronize from prop if the prop is NOT empty
-            // This allows viewing an existing signature without overwriting
-            // a fresh one generated locally during the current session
+            // Solo sincronizar desde prop si NO está vacía
+            // Esto permite ver una firma existente sin sobrescribir
+            // una generada localmente durante la sesión actual
             if (signature) {
                 signatureBase64 = signature;
             }
@@ -74,7 +74,7 @@
                 verificationStatus = "none";
             }
 
-            // Auto-enable text mode on small screens
+            // Activar modo texto automático en pantallas pequeñas
             if (window.innerWidth < 480) {
                 isTextMode = true;
             }
@@ -118,13 +118,13 @@
         isDownloading = true;
         try {
             const typeLabel = card?.type ? ` ${card.type}` : "";
-            // Format: "Apellido Paterno Apellido materno - [Dependencia]- Folio"
+            // Formato: "Apellido Paterno Apellido materno - [Dependencia]- Folio"
             let fileName = `Responsiva${typeLabel}_${data.numEmpleado}_${data.folio}.pdf`;
 
             if (person?.last_name && person?.first_name) {
                 fileName = `Responsiva${typeLabel} - ${person.last_name} ${person.first_name} - [${data.dependencia}] - ${data.folio}.pdf`;
             } else if (data.nombre) {
-                // Fallback using full name if parts are missing
+                // Fallback usando nombre completo si faltan partes
                 fileName = `Responsiva${typeLabel} - ${data.nombre} - [${data.dependencia}] - ${data.folio}.pdf`;
             }
 
@@ -182,7 +182,7 @@
                 legalSnapshot,
             );
 
-            // 2. Save to DB with legal integrity fields
+            // 2. Guardar en BD con campos de integridad legal
             await responsivaService.save({
                 person_id: person.id,
                 folio: card.folio,
@@ -193,10 +193,10 @@
                 legal_snapshot: legalSnapshot,
             });
 
-            // 3. Update card status
+            // 3. Actualizar estado de la tarjeta
             await onSign(card, signature);
 
-            // 4. Update local state to show signature in preview
+            // 4. Actualizar estado local para mostrar firma en preview
             signatureBase64 = signature;
             showSignatureModal = false;
 
@@ -247,17 +247,17 @@ Por favor, conserve este documento para sus registros. Este archivo cuenta con u
 Atentamente,
 Control de Accesos - Nexa`;
 
-        // Generate PDF for sharing (regardless of share vs mailto, it's good to have it ready)
+        // Generar PDF para compartir (independientemente de share vs mailto)
         let pdfFile: File | null = null;
         try {
             const typeLabel = card?.type ? ` ${card.type}` : "";
-            // Format: "Apellido Paterno Apellido materno - [Dependencia]- Folio"
+            // Formato: "Apellido Paterno Apellido materno - [Dependencia]- Folio"
             let fileName = `Responsiva${typeLabel}_${data.numEmpleado}_${data.folio}.pdf`;
 
             if (person?.last_name && person?.first_name) {
                 fileName = `Responsiva${typeLabel} - ${person.last_name} ${person.first_name} - [${data.dependencia}] - ${data.folio}.pdf`;
             } else if (data.nombre) {
-                // Fallback using full name if parts are missing
+                // Fallback usando nombre completo si faltan partes
                 fileName = `Responsiva${typeLabel} - ${data.nombre} - [${data.dependencia}] - ${data.folio}.pdf`;
             }
             const snapshot = data.legal_snapshot || "";
@@ -275,10 +275,10 @@ Control de Accesos - Nexa`;
                 bgBase64,
                 fileName,
                 paragraphs,
-                false, // Don't save to disk immediately, we'll do it manually below
+                false, // No guardar en disco inmediatamente, se hará manualmente abajo
             );
 
-            // AUTO-DOWNLOAD: Always download so the user has it ready
+            // AUTO-DOWNLOAD: descargar siempre para que el usuario lo tenga listo
             doc.save(fileName);
             toast.success("Descargando responsiva para adjuntar...");
 
@@ -290,7 +290,7 @@ Control de Accesos - Nexa`;
             handleError(e, "Preparar PDF para Email");
         }
 
-        // 1. Try Web Share API with Files (Prioritized for Mobile)
+        // 1. Intentar Web Share API con archivos (prioritario para móvil)
         if (
             navigator.share &&
             pdfFile &&
@@ -310,7 +310,7 @@ Control de Accesos - Nexa`;
             }
         }
 
-        // 2. Fallback: Save email if confirmed in prompt (only if we got here)
+        // 2. Fallback: guardar correo si se confirmó en el prompt (solo si llegamos aquí)
         if (
             showEmailPrompt &&
             tempEmail &&
@@ -332,7 +332,7 @@ Control de Accesos - Nexa`;
             }
         }
 
-        // 3. Final Fallback: Mailto link (cannot attach files, but opens mail client)
+        // 3. Fallback final: enlace mailto (no adjunta archivos, pero abre el cliente de correo)
         const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.location.href = mailtoUrl;
         showEmailPrompt = false;
@@ -351,7 +351,7 @@ Control de Accesos - Nexa`;
     size="xl"
     onclose={reset}
 >
-    <!-- Standard View -->
+    <!-- Vista estándar -->
     <div
         class="bg-slate-100 rounded-lg overflow-x-hidden overflow-y-auto flex flex-col items-center p-2 sm:p-4 max-h-[70vh]"
     >
@@ -480,7 +480,7 @@ Control de Accesos - Nexa`;
             </div>
         {/if}
 
-        <!-- Responsive PDF container with scaling -->
+        <!-- Contenedor PDF responsivo con escalado -->
         <div class="pdf-preview-wrapper relative">
             <div
                 class={isTextMode

@@ -36,7 +36,7 @@
     let fetchedPerson = $state<any>(null);
     let isLoadingPerson = $state(false);
 
-    // Derived person for dependency info
+    // Persona derivada para info de dependencia
     let relatedPerson = $derived.by(() => {
         if (!ticket?.person_id) return null;
         return (
@@ -92,7 +92,7 @@
 
     function getUserName(id: string) {
         if (!id) return "N/A";
-        // If id is a name (legacy/external), just return it
+        // Si id es un nombre (heredado/externo), devolverlo directamente
         if (!id.startsWith("u-") && !id.match(/^[0-9a-f]{8}-/)) return id;
 
         const user = users.find((u) => u.id === id);
@@ -151,7 +151,7 @@
         if (!ticket) return;
         isSubmitting = true;
         try {
-            // Special logic for programming tickets
+            // Lógica especial para tickets de programación
             if (ticket.type === "Programación" && ticket.card_id) {
                 await cardService.updateProgrammingStatus(
                     ticket.card_id,

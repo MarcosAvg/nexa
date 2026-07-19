@@ -30,7 +30,7 @@ export const responsivaService = {
 
         if (error) throw error;
 
-        // Fetch person name for history
+        // Obtener nombre de la persona para el historial
         const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", payload.person_id).single();
         const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${payload.person_id})`;
 
@@ -60,7 +60,7 @@ export const responsivaService = {
             throw new Error("No se pudo eliminar la responsiva. Verifique permisos (RLS).");
         }
 
-        // Fetch person name for history BEFORE deleting
+        // Obtener nombre de la persona para el historial BEFORE deleting
         const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", personId).single();
         const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${personId})`;
 

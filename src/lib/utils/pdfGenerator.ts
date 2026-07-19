@@ -8,7 +8,7 @@ export async function generateCardPdf(
 ) {
     const { jsPDF } = await import("jspdf");
 
-    // CR80 standard card dimensions: 54mm x 85.6mm (portrait)
+    // Dimensiones estándar de tarjeta CR80: 54mm x 85.6mm (vertical)
     const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -19,44 +19,44 @@ export async function generateCardPdf(
     const pageHeight = 85.6;
 
     try {
-        // Background - white
+        // Fondo - blanco
         doc.setFillColor(255, 255, 255);
         doc.rect(0, 0, pageWidth, pageHeight, "F");
 
-        // Card type color
-        const typeColor = type === "KONE" ? [14, 165, 233] : [245, 158, 11]; // Blue for KONE, Amber for P2000
+        // Color del tipo de tarjeta
+        const typeColor = type === "KONE" ? [14, 165, 233] : [245, 158, 11]; // Azul para KONE, Ámbar para P2000
         const typeLabel = type === "KONE" ? "Elevadores" : "Puertas";
 
-        // Type label (large, centered at top)
+        // Etiqueta de tipo (grande, centrada arriba)
         doc.setTextColor(typeColor[0], typeColor[1], typeColor[2]);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(18);
         doc.text(type, pageWidth / 2, 15, { align: "center" });
 
-        // Subtitle (smaller, below type)
+        // Subtítulo (más pequeño, debajo del tipo)
         doc.setTextColor(100, 100, 100);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.text(typeLabel, pageWidth / 2, 22, { align: "center" });
 
-        // Divider line
+        // Línea divisoria
         doc.setDrawColor(typeColor[0], typeColor[1], typeColor[2]);
         doc.setLineWidth(0.5);
         doc.line(8, 26, pageWidth - 8, 26);
 
-        // Folio label
+        // Etiqueta de folio
         doc.setTextColor(100, 100, 100);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
         doc.text("FOLIO", pageWidth / 2, 38, { align: "center" });
 
-        // Folio number (large, centered)
+        // Número de folio (grande, centrado)
         doc.setTextColor(0, 0, 0);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(24);
         doc.text(folio, pageWidth / 2, 52, { align: "center" });
 
-        // Open print dialog
+        // Abrir diálogo de impresión
         doc.autoPrint();
         window.open(doc.output('bloburl'), '_blank');
 
@@ -104,11 +104,11 @@ export async function generateResponsivaPdf(
         // 4. Body Paragraphs (11pt, 100mm from top, Justified with Bold spots)
         let currentY = 100;
         const fontSize = 11;
-        const lineHeight = 6.5; // Approx 1.5 line height for 11pt
+        const lineHeight = 6.5; // Aprox. 1.5 altura de línea para 11pt
 
-        // Helper to draw text with bold support and justification
+        // Dibujar texto con soporte de negritas y justificación
         const drawRichText = (text: string, x: number, y: number, maxWidth: number) => {
-            // Split by words but preserve space logic
+            // Dividir por palabras pero preservar lógica de espacios
             const rawWords = text.split(/\s+/);
             let lines: any[] = [];
             let currentLine: any[] = [];
@@ -129,7 +129,7 @@ export async function generateResponsivaPdf(
                 doc.setFont("helvetica", weight);
                 const wordWidth = doc.getTextWidth(cleanWord);
 
-                // Check if adding this word (and a space if not first) exceeds width
+                // Verificar si añadir esta palabra (y espacio si no es la primera) excede el ancho
                 const spaceNeeded = currentLine.length > 0 ? spaceWidth : 0;
                 if (currentLineWidth + spaceNeeded + wordWidth > maxWidth) {
                     lines.push({ words: currentLine, width: currentLineWidth });
@@ -171,7 +171,7 @@ export async function generateResponsivaPdf(
         };
 
         paragraphs.forEach(p => {
-            // Ensure placeholders are replaced (if they exist)
+            // Asegurar que los placeholders se reemplacen (si existen)
             const processedText = p
                 .replace(/{nombre}/g, `**${data.nombre}**`)
                 .replace(/{numEmpleado}/g, `**${data.numEmpleado}**`)
@@ -179,7 +179,7 @@ export async function generateResponsivaPdf(
                 .replace(/{folio}/g, `**${data.folio}**`);
 
             currentY = drawRichText(processedText, margin, currentY, contentWidth);
-            currentY += 4; // Gap between paragraphs (4mm)
+            currentY += 4; // Espacio entre párrafos (4mm)
         });
 
         // 5. Signature Area (Starting at 220mm)
@@ -187,24 +187,24 @@ export async function generateResponsivaPdf(
         const sigX = (pageWidth - sigBoxWidth) / 2;
         currentY = 220;
 
-        // Signature Img (exactly like Svelte, bottom-aligned relative to box)
+        // Imagen de firma (alineada al fondo relativo al cuadro)
         if (signature) {
-            // Box height is 25mm, img max-height 25mm
+            // Altura del cuadro es 25mm, img max-height 25mm
             doc.addImage(signature, 'PNG', pageWidth / 2 - 30, currentY - 26, 60, 25, undefined, 'FAST');
         }
 
-        // Signature Line
+        // Línea de firma
         doc.setDrawColor(0);
         doc.setLineWidth(0.3);
         doc.line(sigX, currentY, sigX + sigBoxWidth, currentY);
 
-        // Labels (9pt Bold, 10pt Normal)
+        // Etiquetas (9pt Negrita, 10pt Normal)
         doc.setTextColor(68, 68, 68); // #444
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
         doc.text("FIRMA DEL EMPLEADO", pageWidth / 2, currentY + 5, { align: "center" });
 
-        doc.setTextColor(0, 0, 0); // Black
+        doc.setTextColor(0, 0, 0); // Negro
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10);
         doc.text(data.nombre, pageWidth / 2, currentY + 11, { align: "center" });

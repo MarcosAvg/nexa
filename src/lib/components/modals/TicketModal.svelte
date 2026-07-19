@@ -30,27 +30,26 @@
         onSave?: () => void;
     } = $props();
 
-    // Data Sources
+    // Fuentes de datos
     let users = $state<any[]>([]);
     let dependencies = $derived(catalogState.dependencies);
     let currentUser = $derived(userState.profile);
 
-    // Form State
+    // Estado del formulario
     let formData = $state({
         createdBy: "",
         type: "Reporte de Falla",
-        priority: "Media",
-        title: "", // Still kept for internal summary or email subject
+        priority: "Media",            title: "", // Se mantiene para resumen interno o asunto de correo
         description: "",
         assignedTo: "",
-        // Requestor Data
+        // Datos del solicitante
         requestor: {
             name: "",
             dependency: "",
             extension: "",
             email: "",
         },
-        // Related Person
+        // Persona relacionada
         relatedPersonId: "",
         personNotListed: false,
         notListedPersonName: "",
@@ -58,7 +57,7 @@
         notListedPersonDependency: "",
     });
 
-    // Validations & Search
+    // Validaciones y búsqueda
     let isLoading = $state(false);
     let searchTerm = $state("");
     let searchResults = $state<any[]>([]);
@@ -66,7 +65,7 @@
     let showSearchResults = $state(false);
     let searchDebounce: ReturnType<typeof setTimeout>;
 
-    // Options
+    // Opciones
     const ticketTypes = [
         "Modificación",
         "Solicitud de acceso",
@@ -80,7 +79,7 @@
     ];
 
     onMount(async () => {
-        // Load users for "Created By" and "Assigned To"
+        // Cargar usuarios para "Creado por" y "Asignado a"
         const pro = await profileService.fetchAll();
         users = pro;
     });
@@ -123,7 +122,7 @@
 
     let allPersonnel = $derived(personnelState.personnelOptions);
 
-    // Search Logic
+    // Lógica de búsqueda
     function handleSearch(e: Event) {
         const val = (e.target as HTMLInputElement).value;
         searchTerm = val;
@@ -147,7 +146,7 @@
                         showSearchResults = true;
                     }
                 } catch {
-                    // Silently handle search errors (non-critical)
+                    // Manejar errores de búsqueda silenciosamente (no crítico)
                 }
             }, 300);
         } else {
@@ -178,7 +177,7 @@
     }
 
     async function handleSubmit() {
-        // Validation
+        // Validación
         if (!formData.description || !formData.type) {
             toast.error(
                 "Complete los campos obligatorios (Tipo y Descripción)",

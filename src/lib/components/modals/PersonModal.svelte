@@ -60,14 +60,14 @@
         forceDirectSave?: boolean;
     } = $props();
 
-    // Catalogs
+    // Catálogos
     let buildings = $derived(catalogState.buildings);
     let dependencies = $derived(catalogState.dependencies);
     let schedules = $derived(catalogState.schedules);
     let specialAccesses = $derived(catalogState.specialAccesses);
     let availableCards = $derived(personnelState.extraCards);
 
-    // Form state
+    // Estado del formulario
     let nombres = $state("");
     let apellidos = $state("");
     let noEmpleado = $state("");
@@ -85,38 +85,38 @@
     let accesosEspeciales = $state<string[]>([]);
     let tarjetasAsignadas = $state<{ type: string; folio: string }[]>([]);
 
-    // Nested modal state
+    // Estado del modal anidado
     let isCardModalOpen = $state(false);
     let isSubmitting = $state(false);
     let errors = $state<Record<string, string>>({});
 
-    // Duplicate detection
+    // Detección de duplicados
     let potentialDuplicates = $state<any[]>([]);
     let isCheckingDuplicates = $state(false);
     let lastCheckedName = $state("");
 
-    // Derived floors based on selected building
+    // Pisos derivados según el edificio seleccionado
     let availableFloors = $derived.by(() => {
         const b = buildings.find((b) => b.name === edificio);
         return b?.floors || [];
     });
 
-    // When building changes, reset floor selections
+    // Al cambiar de edificio, reiniciar selección de pisos
     $effect(() => {
         if (edificio && !editingPerson && !prefill) {
-            // Only reset if not loading initial data (editing or prefilling)
+            // Solo reiniciar si no se están cargando datos iniciales (edición o precarga)
             pisoBase = "";
             pisosP2000 = [];
             pisosKone = [];
         }
     });
 
-    // Auto-uppercase names + Duplicate check
+    // Auto-mayúsculas en nombres + verificación de duplicados
     $effect(() => {
         if (nombres) nombres = nombres.toUpperCase();
         if (apellidos) apellidos = apellidos.toUpperCase();
 
-        // Only check if we are creating a NEW person or prefilling
+        // Solo verificar si estamos creando una persona NUEVA o precargando
         if (!editingPerson || prefill) {
             const fullName = `${nombres.trim()} ${apellidos.trim()}`.trim();
             if (
@@ -139,9 +139,9 @@
     async function checkDuplicates(nom: string, ape: string) {
         isCheckingDuplicates = true;
         try {
-            // We use the fuzzy search but with a high threshold or just name matching
+            // Usamos búsqueda difusa con umbral alto o solo coincidencia de nombre
             const results = await personnelService.searchByName(ape, nom);
-            // Filter to find very close matches (insensitive to accents)
+            // Filtrar para encontrar coincidencias muy cercanas (insensible a acentos)
             potentialDuplicates = results.filter((p) => {
                 const n1 = (p.first_name + " " + p.last_name)
                     .toLowerCase()
@@ -154,13 +154,13 @@
                 return n1.includes(n2) || n2.includes(n1);
             });
         } catch {
-            // Silently handle duplicate check errors (non-critical)
+            // Manejar errores de verificación de duplicados silenciosamente (no crítico)
         } finally {
             isCheckingDuplicates = false;
         }
     }
 
-    // Populate form
+    // Poblar formulario
     let lastLoadedPersonId = $state("");
 
     $effect(() => {
@@ -191,7 +191,7 @@
                 accesosEspeciales = [...(editingPerson.specialAccesses || [])];
                 tarjetasAsignadas = [...(editingPerson.cards || [])];
 
-                // If we also have a prefill (linking an Alta ticket), overwrite the requested data selectivly
+                // Si también tenemos precarga (vinculando ticket de Alta), sobrescribir datos solicitados
                 if (prefill) {
                     const wantsP2000 =
                         !allowedCardTypes || allowedCardTypes.includes("P2000");
@@ -226,7 +226,7 @@
                         accesosEspeciales = [];
                     }
 
-                    // Also overwrite building, base floor and schedule as they are part of the "access" profile
+                    // También sobrescribir edificio, piso base y horario como parte del perfil de acceso
                     if (prefill.edificio) edificio = prefill.edificio;
                     if (prefill.pisoBase) pisoBase = prefill.pisoBase;
                     if (prefill.horario) diasHorario = prefill.horario;
@@ -242,7 +242,7 @@
             prefill &&
             lastLoadedPersonId !== "__prefill__"
         ) {
-            // Pre-fill for a NEW person from an imported ticket
+            // Precarga para una persona NUEVA desde un ticket importado
             untrack(() => {
                 const cat = catalogState;
                 nombres = prefill.nombres ?? "";

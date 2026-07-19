@@ -1,5 +1,5 @@
 export async function generateLegalHash(data: any, signature: string, legalSnippet: string): Promise<string> {
-    // We only hash the core data fields to ensure stability between save and verify
+    // Solo hasheamos los campos de datos centrales para asegurar estabilidad entre guardado y verificación
     // excluding metadata like legal_hash or legal_snapshot that might be in the object
     const stableData = {
         folio: data.folio,

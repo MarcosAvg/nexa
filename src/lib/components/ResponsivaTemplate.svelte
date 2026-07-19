@@ -46,20 +46,20 @@
 >
     {#if data}
         <div class="page">
-            <!-- Professional Background Image -->
+            <!-- Imagen de fondo profesional -->
             <img src={bgImg} alt="" class="page-background" />
 
-            <!-- Header -->
+            <!-- Encabezado -->
             <div class="header">
                 <div class="date-line">
                     Monterrey, N.L. a {data.fecha}
                 </div>
             </div>
 
-            <!-- Title -->
+            <!-- Título -->
             <h1 class="title">CARTA RESPONSIVA DE ENTREGA DE ACCESO</h1>
 
-            <!-- Body -->
+            <!-- Cuerpo -->
             <div class="content">
                 {#each paragraphs as paragraph}
                     <p>
@@ -89,7 +89,7 @@
                 {/each}
             </div>
 
-            <!-- Signatures -->
+            <!-- Firmas -->
             <div class="signatures">
                 <div class="signature-box">
                     <div class="signature-wrapper">

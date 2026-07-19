@@ -104,7 +104,7 @@
     >
         <PermissionGuard requireEdit disabledOnly>
             {#snippet children({ disabled: permissionDisabled })}
-                <!-- Responsiva: Distinct Emerald icon with label -->
+                <!-- Responsiva: icono Esmeralda distintivo con etiqueta -->
                 <button
                     type="button"
                     class="flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 group {programming_status ===
@@ -133,7 +133,7 @@
                 </button>
 
                 {#if programming_status !== "done"}
-                    <!-- Programar: Blue -->
+                    <!-- Programar: Azul -->
                     <button
                         type="button"
                         class="flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 group text-blue-600 hover:bg-blue-50 disabled:text-slate-300 disabled:bg-slate-50"
@@ -153,7 +153,7 @@
                 {/if}
 
                 <div class="flex items-center gap-1">
-                    <!-- Imprimir: Slate -->
+                    <!-- Imprimir: Pizarra -->
                     <button
                         type="button"
                         class="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all duration-200 disabled:opacity-50"
@@ -164,7 +164,7 @@
                         <Printer size={16} />
                     </button>
 
-                    <!-- Bloquear: Amber -->
+                    <!-- Bloquear: Ámbar -->
                     <button
                         type="button"
                         class="p-2 rounded-full text-slate-400 hover:text-amber-500 hover:bg-amber-50 transition-all duration-200 disabled:opacity-50"
@@ -186,7 +186,7 @@
                         <RefreshCw size={16} />
                     </button>
 
-                    <!-- Dar de baja: Rose -->
+                    <!-- Dar de baja: Rosa -->
                     <button
                         type="button"
                         class="p-2 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200 disabled:opacity-50"
@@ -201,7 +201,7 @@
         </PermissionGuard>
     </div>
 
-    <!-- God Mode: Direct Status Editor -->
+    <!-- Modo Dios: Editor de estado directo -->
     {#if uiState.isDirectEditMode && onDirectStatusChange}
         <div class="pt-3 border-t border-amber-200 bg-amber-50/60 -mx-4 -mb-4 px-4 pb-4 rounded-b-xl">
             <div class="flex items-center gap-1.5 mb-2.5">
@@ -209,7 +209,7 @@
                 <span class="text-[9px] font-extrabold uppercase tracking-[0.2em] text-amber-600">Modo Dios — Edición Directa</span>
             </div>
             <div class="grid grid-cols-2 gap-3">
-                <!-- Responsiva Status -->
+                <!-- Estado de Responsiva -->
                 <div class="space-y-1">
                     <p class="text-[9px] font-bold text-amber-700 uppercase tracking-wider">Responsiva</p>
                     <div class="flex flex-col gap-1">
@@ -224,7 +224,7 @@
                         {/each}
                     </div>
                 </div>
-                <!-- Programming Status -->
+                <!-- Estado de Programación -->
                 <div class="space-y-1">
                     <p class="text-[9px] font-bold text-amber-700 uppercase tracking-wider">Programación</p>
                     <div class="flex flex-col gap-1">

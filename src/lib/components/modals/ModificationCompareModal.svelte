@@ -26,10 +26,10 @@
     let fetchedPerson = $state<Person | null>(null);
     let isLoadingPerson = $state(false);
 
-    // Get person data from store (current DB state) or fetch it
+    // Obtener datos de persona del store (estado actual BD) o consultarlos
     let currentPerson = $derived.by(() => {
         if (!ticket?.person_id) return null;
-        // Prioritize store data for consistency, fallback to fetched data
+        // Priorizar datos del store para consistencia, fallback a datos consultados
         return (
             personnelState.personnel.find((p) => p.id === ticket.person_id) ||
             fetchedPerson ||
@@ -63,10 +63,10 @@
         }
     });
 
-    // Get modified data from ticket payload
+    // Obtener datos modificados del payload del ticket
     let modifiedData = $derived(ticket?.payload?.modified || null);
 
-    // Field definitions for comparison
+    // Definiciones de campos para comparación
     const fieldDefs = [
         {
             label: "Nombre(s)",
@@ -132,7 +132,7 @@
         return time;
     }
 
-    // Floor array comparison helpers
+    // Utilidades de comparación de arrays de pisos
     function getFloorChanges(
         currentFloors: string[],
         modifiedFloors: string[],
@@ -159,7 +159,7 @@
         );
     }
 
-    // Schedule comparison
+    // Comparación de horario
     function getCurrentScheduleEntry(): string {
         return normalizeTime(currentPerson?.schedule?.entry || "—");
     }
@@ -176,7 +176,7 @@
         return normalizeTime(String(val));
     }
 
-    // Special Access Comparison State
+    // Estado de comparación de accesos especiales
     let currentAccesses = $derived(currentPerson?.specialAccesses || []);
     let modifiedAccesses = $derived(modifiedData?.specialAccesses || []);
     let accessChanges = $derived(
@@ -191,7 +191,7 @@
         isSubmitting = true;
 
         try {
-            // Build the save payload from modified data
+            // Construir payload de guardado desde datos modificados
             const saveData = {
                 id: currentPerson.id,
                 ...modifiedData,
@@ -199,13 +199,13 @@
 
             await personnelService.save(saveData);
 
-            // Delete the ticket
+            // Eliminar el ticket
             await ticketService.delete(
                 ticket.id,
                 `Modificación aprobada: ${ticket.description}`,
             );
 
-            // Log the modification approval
+            // Registrar la aprobación de modificación
             await HistoryService.log(
                 "PERSONNEL",
                 currentPerson.id,
@@ -215,7 +215,7 @@
                 },
             );
 
-            // Refresh data
+            // Actualizar datos
             const [updatedPersonnel, updatedCards] = await Promise.all([
                 personnelService.fetchAll(),
                 cardService.fetchExtra(),
@@ -249,7 +249,7 @@
                 `Modificación rechazada: ${ticket.description}`,
             );
 
-            // Log the rejection
+            // Registrar el rechazo
             await HistoryService.log(
                 "PERSONNEL",
                 ticket.person_id || "",

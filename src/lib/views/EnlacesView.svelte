@@ -96,7 +96,7 @@
             list = list.filter((e) => e.floor === filterFloor);
         }
 
-        // Default sort by "Piso base"
+        // Orden por defecto: "Piso base"
         list.sort((a, b) => {
             const aVal = a.floor;
             const bVal = b.floor;
@@ -374,7 +374,7 @@
 
 <PermissionGuard requireEdit>
     {#snippet children({ disabled })}
-        <!-- FAB for mobile -->
+        <!-- FAB para móvil -->
         <div class="sm:hidden">
             <FloatingActionButton
                 onclick={() => (isAddModalOpen = true)}

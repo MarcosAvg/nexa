@@ -28,12 +28,12 @@
 
   let loadingAuth = $state(true);
   let initError = $state(false);
-  // Flag to prevent double-fetch: onAuthStateChange fires SIGNED_IN right after
-  // getSession() on startup, which would run initData twice for the same user.
+  // Flag para evitar doble fetch: onAuthStateChange dispara SIGNED_IN justo después
+  // de getSession() al inicio, lo que ejecutaría initData dos veces para el mismo usuario.
   let appInitialized = $state(false);
 
   onMount(async () => {
-    // Check initial session
+    // Verificar sesión inicial
     const {
       data: { session: initialSession },
     } = await supabase.auth.getSession();
@@ -47,10 +47,10 @@
     loadingAuth = false;
     appInitialized = true;
 
-    // Listen for auth changes
+    // Escuchar cambios de autenticación
     supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (newSession) {
-        // Skip TOKEN_REFRESHED for the same user — prevents Svelte state thrashing / UI freeze
+        // Omitir TOKEN_REFRESHED para el mismo usuario — evita thrashing de estado / congelamiento de UI
         if (
           event === "TOKEN_REFRESHED" &&
           userState.profile &&
@@ -59,7 +59,7 @@
           return;
         }
 
-        // Skip redundant SIGNED_IN that fires right after getSession() on startup
+        // Omitir SIGNED_IN redundante que se dispara justo después de getSession() al inicio
         if (
           event === "SIGNED_IN" &&
           appInitialized &&
@@ -73,7 +73,7 @@
         initData(true);
       } else {
         userState.clear();
-        // Clear cached userId so next login doesn't inherit old user
+        // Limpiar userId cache para que el siguiente login no herede usuario anterior
         const { HistoryService } = await import("./lib/services/history");
         HistoryService.clearCache();
       }
@@ -88,7 +88,7 @@
       }
 
       // 1. Critical data for immediate UI (Dashboard / Catalogs)
-      // Replaced old personnelService.fetchOptions with new efficient one if available
+      // Reemplazado el antiguo personnelService.fetchOptions con uno nuevo eficiente si está disponible
       const [_pOptions, _d, _b, _a, _s] = await Promise.all([
         personnelService.fetchOptions(true),
         catalogService.fetchDependencies(true),
@@ -104,7 +104,7 @@
       catalogState.setSchedules(_s);
 
       // 2. Secondary data loaded in background (Non-blocking)
-      // This allows the app to be interactive faster
+      // Esto permite que la app sea interactiva más rápido
       (async () => {
         try {
           const [_c, _t, _h] = await Promise.all([
@@ -116,10 +116,10 @@
           ticketState.setTickets(_t);
           historyState.setHistory(_h.data, _h.count);
 
-          // Refresh dashboard metrics with the new efficient RPC
+          // Actualizar métricas del dashboard con el nuevo RPC eficiente
           personnelState.refreshDashboardMetrics();
 
-          // Init Realtime subscriptions
+          // Inicializar suscripciones Realtime
           personnelState.initRealtime();
           initGlobalRealtime();
         } catch (e) {

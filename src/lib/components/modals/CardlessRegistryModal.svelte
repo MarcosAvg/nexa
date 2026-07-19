@@ -29,22 +29,22 @@
     let dependencyNames = $derived(dependencies.map((d) => d.name));
     let reasons = $derived(cardlessRegistryService.REASONS);
 
-    // Person fields — always visible
+    // Campos de persona — siempre visibles
     let manualFirstName = $state("");
     let manualLastName  = $state("");
     let manualEmployeeNo = $state("");
     let manualDependency = $state("");
 
-    // Linked person (when a suggestion is chosen)
+    // Persona vinculada (cuando se elige una sugerencia)
     let selectedPerson = $state<Person | null>(null);
 
-    // Suggestion dropdown
+    // Desplegable de sugerencias
     let searchResults  = $state<Person[]>([]);
     let isSearching    = $state(false);
     let searchTimeout: ReturnType<typeof setTimeout> | undefined;
     let searchSeq = 0;
 
-    // Rest of the form
+    // Resto del formulario
     let manualBuilding = $state("");
     let manualFloor    = $state("");
     let selectedReason = $state("");
@@ -80,7 +80,7 @@
 
     function triggerPersonSearch() {
         clearTimeout(searchTimeout);
-        // Only search when not already linked
+        // Solo buscar cuando no esté vinculado
         if (selectedPerson) return;
 
         const first = manualFirstName.trim();
@@ -199,25 +199,27 @@
      */
     let koneStatusSnapshot = $derived.by((): boolean | null => {
         if (!selectedPerson) return null;
-        // When editing, reuse the stored snapshot if the person hasn't changed
+        // Al editar, reutilizar el snapshot almacenado si la persona no ha cambiado
         if (editingRegistry && selectedPerson.id === editingRegistry.person_id) {
             return editingRegistry.kone_status_at_registration ?? null;
         }
         const koneCard = selectedPerson.cards?.find(c => c.type === "KONE");
-        // No KONE card assigned at all
+        // Sin tarjeta KONE asignada
         if (!koneCard) return null;
-        // Has KONE card — check if responsiva is still pending
+        // Tiene tarjeta KONE — verificar si responsiva sigue pendiente
         const isPending = koneCard.responsiva_status !== "signed" && koneCard.responsiva_status !== "legacy";
         return isPending;
     });
 
 
     function resolveBuildingId(): number | null {
-        return buildings.find((b) => b.name === manualBuilding)?.id ?? null;
+        const b = buildings.find((b: { name: string; id: number | string }) => b.name === manualBuilding);
+        return b?.id != null ? Number(b.id) : null;
     }
 
     function resolveDependencyId(): number | null {
-        return dependencies.find((d) => d.name === manualDependency)?.id ?? null;
+        const d = dependencies.find((d: { name: string; id: number | string }) => d.name === manualDependency);
+        return d?.id != null ? Number(d.id) : null;
     }
 
     async function handleSubmit() {
@@ -260,7 +262,7 @@
                 first_name:    manualFirstName.trim(),
                 last_name:     manualLastName.trim(),
                 employee_no:   manualEmployeeNo.trim() || null,
-                // Snapshot: null = no linked person or no KONE card assigned.
+                // Snapshot: null = sin persona vinculada o sin tarjeta KONE asignada.
                 // true = KONE card assigned but responsiva still pending.
                 // false = KONE card assigned and already signed (digital or legacy).
                 kone_status_at_registration: koneStatusSnapshot,
@@ -328,7 +330,7 @@
                         id="manual-first-name"
                         type="text"
                         bind:value={manualFirstName}
-                        oninput={(e) => handleNameInput(e, "first")}
+                        oninput={(e: Event) => handleNameInput(e, "first")}
                         placeholder="Nombres"
                         disabled={!!selectedPerson}
                         style="text-transform: uppercase"
@@ -340,7 +342,7 @@
                         id="manual-last-name"
                         type="text"
                         bind:value={manualLastName}
-                        oninput={(e) => handleNameInput(e, "last")}
+                        oninput={(e: Event) => handleNameInput(e, "last")}
                         placeholder="Apellidos"
                         disabled={!!selectedPerson}
                         style="text-transform: uppercase"
@@ -365,9 +367,7 @@
                         disabled={!!selectedPerson}
                     />
                 </div>
-            </div>
-
-            <!-- Suggestion list -->
+            </div>                    <!-- Lista de sugerencias -->
             {#if searchResults.length > 0 && !selectedPerson}
                 <div class="rounded-xl border border-blue-200 bg-blue-50/60 overflow-hidden">
                     <div class="px-3 py-2 flex items-center gap-2 border-b border-blue-100">
@@ -400,9 +400,7 @@
                     <div class="animate-spin h-3.5 w-3.5 border-2 border-slate-300 border-t-blue-600 rounded-full"></div>
                     Buscando coincidencias...
                 </div>
-            {/if}
-
-            <!-- Linked person chip -->
+            {/if}                    <!-- Chip de persona vinculada -->
             {#if selectedPerson}
                 <div class="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
                     <div class="flex items-center justify-between gap-3">

@@ -100,9 +100,7 @@
                 return;
             }
             parseResult = result;
-            step = "parsed";
-
-            // Initialize selections with all valid rows
+            step = "parsed";                // Inicializar selección con todas las filas válidas
             const initialSelected = new Set<string>();
             result.sheets.forEach((sheet) => {
                 sheet.rows.forEach((row) => {
@@ -128,7 +126,7 @@
         step = "review";
 
         const newMatches = new Map<string, Person[]>();
-        // Deduplicate by name pair to avoid redundant API calls
+        // Desduplicar por par de nombres para evitar llamadas API redundantes
         const nameCache = new Map<string, Person[]>();
 
         const selectedRowsList: { sheet: ParsedSheet; row: ParsedRow }[] = [];
@@ -162,7 +160,7 @@
         }
 
         matchResults = newMatches;
-        // Auto-expand all rows
+        // Expandir todas las filas automáticamente
         expandedReviewRows = new Set(newMatches.keys());
         isReviewing = false;
     }
@@ -371,11 +369,11 @@
         KONE: "bg-blue-100 text-blue-700 border-blue-200",
     };
 
-    function cardStatusBadge(status: string): { text: string; color: string } {
-        if (status === "active") return { text: "Activa", color: "emerald" };
-        if (status === "blocked") return { text: "Bloqueada", color: "rose" };
-        return { text: status, color: "slate" };
-    }
+function cardStatusBadge(status: string): { text: string; color: "emerald" | "rose" | "slate" } {
+    if (status === "active") return { text: "Activa", color: "emerald" };
+    if (status === "blocked") return { text: "Bloqueada", color: "rose" };
+    return { text: status, color: "slate" };
+}
 </script>
 
 <Modal
@@ -424,8 +422,7 @@
 
         <!-- ── STEP: PARSED ── -->
         {#if step === "parsed"}
-            {#if parseResult}
-                <!-- Summary -->
+            {#if parseResult}                    <!-- Resumen -->
                 <div class="grid grid-cols-3 gap-3 text-center">
                     <div
                         class="rounded-lg p-3 bg-slate-50 border border-slate-200"
@@ -471,16 +468,14 @@
                             Con errores (se omitirán)
                         </p>
                     </div>
-                </div>
-
-                <!-- Per-sheet breakdown -->
+                </div>                        <!-- Desglose por hoja -->
                 <div class="space-y-2">
                     {#each parseResult.sheets as sheet}
                         {@const isExpanded = expandedSheets.has(sheet.key)}
                         <div
                             class="rounded-lg border border-slate-200 overflow-hidden"
                         >
-                            <!-- Header -->
+                            <!-- Encabezado -->
                             <div
                                 class="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200/50"
                             >
@@ -548,7 +543,7 @@
                                 </button>
                             </div>
 
-                            <!-- Rows detail (expandable) -->
+                            <!-- Detalle de filas (expandible) -->
                             {#if isExpanded}
                                 <div
                                     class="divide-y divide-slate-100 max-h-48 overflow-y-auto"
@@ -645,8 +640,7 @@
                         </p>
                     </div>
                 </div>
-            {:else if parseResult}
-                <!-- Review summary bar -->
+            {:else if parseResult}                        <!-- Barra de resumen de revisión -->
                 {@const totalMatched = [...matchResults.values()].filter(
                     (v) => v.length > 0,
                 ).length}
@@ -671,9 +665,7 @@
                     >
                         {totalSelected} total
                     </div>
-                </div>
-
-                <!-- Review rows by sheet -->
+                </div>                            <!-- Filas de revisión por hoja -->
                 <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
                     {#each parseResult.sheets as sheet}
                         {@const sheetRows = sheet.rows.filter(
@@ -707,7 +699,7 @@
                                         <div
                                             class="rounded-xl border border-slate-200 overflow-hidden bg-white"
                                         >
-                                            <!-- Row header -->
+                                            <!-- Encabezado de fila -->
                                             <button
                                                 class="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50/50 transition-colors"
                                                 onclick={() =>
@@ -784,7 +776,7 @@
                                                 </div>
                                             </button>
 
-                                            <!-- Expanded detail -->
+                                            <!-- Detalle expandido -->
                                             {#if isExpanded}
                                                 <div
                                                     class="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3"
@@ -1091,7 +1083,7 @@
                                                                                 </p>
                                                                             </div>
                                                                         </div>
-                                                                        <!-- Cards display -->
+                                                                        <!-- Visualización de tarjetas -->
                                                                         {#if activeCards.length > 0}
                                                                             <div
                                                                                 class="flex flex-wrap gap-1.5 mt-1.5 ml-9"
@@ -1136,7 +1128,7 @@
                                                                             </p>
                                                                         {/if}
 
-                                                                        <!-- Type-specific context on matched person -->
+                                                                        <!-- Contexto específico por tipo en persona coincidente -->
                                                                         {#if sheet.key === "baja_persona" && activeCards.length > 0}
                                                                             <p
                                                                                 class="text-[10px] text-rose-500 font-medium mt-1.5 ml-9"

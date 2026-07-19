@@ -47,7 +47,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if isOpen}
-    <!-- Backdrop -->
+    <!-- Fondo -->
     <button
         type="button"
         class="fixed inset-0 {zIndex} bg-slate-900/40 backdrop-blur-[6px] transition-all duration-300 cursor-default"
@@ -55,7 +55,7 @@
         aria-label="Cerrar"
     ></button>
 
-    <!-- Modal Container -->
+    <!-- Contenedor del modal -->
     <div
         class="fixed inset-0 {zIndex} flex items-center justify-center sm:items-center max-sm:items-end {size ===
         'full'
@@ -71,12 +71,12 @@
             aria-modal="true"
             aria-labelledby="modal-title"
         >
-            <!-- Mobile Top Drag Handle Indicator -->
+            <!-- Indicador de arrastre superior para móvil -->
             {#if size !== "full"}
                 <div class="sm:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-1 flex-shrink-0"></div>
             {/if}
 
-            <!-- Header -->
+            <!-- Encabezado -->
             {#if size !== "full"}
                 <div
                     class="flex items-start justify-between gap-4 p-8 pb-6 max-sm:p-6 max-sm:pt-2 bg-slate-50/30 backdrop-blur-sm"
@@ -109,14 +109,14 @@
                 </div>
             {/if}
 
-            <!-- Body -->
+            <!-- Cuerpo -->
             <div
                 class="flex-1 overflow-y-auto {size === 'full' ? 'p-0' : 'p-6'}"
             >
                 {@render children?.()}
             </div>
 
-            <!-- Footer -->
+            <!-- Pie -->
             {#if footer && size !== "full"}
                 <div
                     class="flex items-center justify-end gap-3 p-8 pt-6 border-t border-slate-100 bg-slate-50/40 backdrop-blur-sm"

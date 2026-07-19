@@ -12,11 +12,11 @@ export interface Person {
     first_name: string;
     last_name: string;
     employee_no: string;
-    // Database status
+    // Estado en base de datos
     status_raw: string;
-    // Display status (computed)
+    // Estado mostrado (calculado)
     status: string;
-    name: string; // Computed: first_name + last_name
+    name: string; // Calculado: first_name + last_name
     building: string;
     dependency: string;
     schedule: {
@@ -43,7 +43,7 @@ export interface Card {
     person_id: string | null;
     programming_status: string | null;
     responsiva_status: string | null;
-    // Computed/Joined properties
+    // Propiedades calculadas/combinadas
     personName?: string;
     personStatus?: string;
     personnel?: {
@@ -64,7 +64,7 @@ export interface Ticket {
     person_id: string | null;
     card_id: string | null;
     payload: any;
-    // Computed/Joined properties
+    // Propiedades calculadas/combinadas
     personName?: string;
     cardType?: string;
     cardFolio?: string;
@@ -135,7 +135,7 @@ export interface CardlessRegistry {
      * pre-dates this feature (backfilled by migration).
      */
     kone_status_at_registration: boolean | null;
-    // Computed/Joined properties
+    // Propiedades calculadas/combinadas
     personName?: string;
     buildingName?: string;
     dependencyName?: string;

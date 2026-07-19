@@ -9,7 +9,5 @@ export const RESPONSIVA_LEGAL_TEXTS = {
         "Me comprometo a hacer uso responsable de dicho acceso, así como a conservarlo en buen estado durante el tiempo que lo tenga bajo mi resguardo.",
         "De igual manera, me comprometo hacer la devolución del acceso, en las mismas condiciones en las que me fue entregado en el momento que me sea requerido o al finalizar mi relación laboral con esta Dependencia."
     ]
-};
-
-// For backward compatibility during migration
+};    // Para compatibilidad hacia atrás durante la migración
 export const RESPONSIVA_LEGAL_TEXT = RESPONSIVA_LEGAL_TEXTS.KONE;

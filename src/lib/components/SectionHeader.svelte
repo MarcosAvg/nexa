@@ -19,7 +19,7 @@
     class="relative z-30 bg-white/80 backdrop-blur-md p-5 lg:p-7 rounded-[22px] border border-slate-200/50 shadow-sm transition-all duration-300 hover:shadow-md"
 >
     <div class="flex flex-col gap-4 sm:gap-6">
-        <!-- Title row with search and actions -->
+        <!-- Fila de título con búsqueda y acciones -->
         <div
             class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
         >
@@ -31,7 +31,7 @@
                 </h2>
 
                 <div class="flex items-center gap-2">
-                    <!-- Mobile Actions Toggle -->
+                    <!-- Alternar acciones en móvil -->
                     {#if actions}
                         <button
                             type="button"
@@ -47,7 +47,7 @@
                         </button>
                     {/if}
 
-                    <!-- Mobile Filter Toggle (visible only on mobile) -->
+                    <!-- Alternar filtros en móvil (visible solo en móvil) -->
                     {#if filters}
                         <button
                             type="button"
@@ -70,7 +70,7 @@
                         </button>
                     {/if}
 
-                    <!-- Mobile search button (visible only on mobile) -->
+                    <!-- Botón de búsqueda en móvil (visible solo en móvil) -->
                     {#if onSearch}
                         <button
                             type="button"
@@ -84,7 +84,7 @@
                 </div>
             </div>
 
-            <!-- Actions: hidden on mobile, visible from sm: up -->
+            <!-- Acciones: ocultas en móvil, visibles desde sm: hacia arriba -->
             {#if actions}
                 <div
                     class="hidden sm:flex items-center gap-2 sm:gap-3 shrink-0"
@@ -92,9 +92,7 @@
                     {@render actions()}
                 </div>
             {/if}
-        </div>
-
-        <!-- Mobile Collapsible Actions Container -->
+        </div>            <!-- Contenedor de acciones plegable en móvil -->
         {#if actions && showActions}
             <div
                 class="sm:hidden pt-4 pb-2 border-t border-slate-150/60"
@@ -104,9 +102,7 @@
                     {@render actions()}
                 </div>
             </div>
-        {/if}
-
-        <!-- Filters (Collapsible on mobile) -->
+        {/if}            <!-- Filtros (plegables en móvil) -->
         {#if filters}
             <div
                 class="sm:block {showFilters ? 'block' : 'hidden'} sm:pt-0 pt-2"

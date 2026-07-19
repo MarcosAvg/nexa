@@ -18,7 +18,7 @@
     type Props = {
         isOpen: boolean;
         mode?: "assign" | "inventory";
-        availableCards?: any[]; // Legacy prop
+        availableCards?: any[];    // Prop heredada
         replacingCard?: { type: string; folio: string; id: string } | null;
         /** If set, only these card types are selectable (e.g. ['P2000']) */
         allowedCardTypes?: string[] | null;
@@ -49,7 +49,7 @@
     let confirmCreate = $state(false);
     let oldCardStatus = $state("blocked"); // blocked | available
 
-    // Sync card type when replacing or when allowedCardTypes restricts to one type
+    // Sincronizar tipo de tarjeta al reemplazar o cuando allowedCardTypes restringe a un tipo
     $effect(() => {
         if (replacingCard) {
             cardType = replacingCard.type as "P2000" | "KONE";
@@ -58,7 +58,7 @@
         }
     });
 
-    // List of cards in inventory filtered by type
+    // Lista de tarjetas en inventario filtradas por tipo
     let filteredInventory = $derived.by(() => {
         return extraCards.filter(
             (c) =>
@@ -68,7 +68,7 @@
         );
     });
 
-    // Cards matching search in inventory
+    // Tarjetas que coinciden con la búsqueda en inventario
     let inventoryResults = $derived.by(() => {
         if (!searchQuery.trim()) return filteredInventory.slice(0, 10);
         return filteredInventory.filter((c) =>
@@ -77,8 +77,8 @@
     });
 
     // ─── Async search status (server-side lookup) ───────────────────────
-    // Checks extraCards locally first, then queries Supabase for assigned cards.
-    // This ensures ALL cards are checked, not just the paginated personnel subset.
+    // Verifica extraCards localmente, luego consulta Supabase para tarjetas asignadas.
+    // Esto asegura que TODAS las tarjetas se revisen, no solo el subconjunto paginado.
     let searchStatus = $state<{
         type: "available" | "occupied" | "restricted" | "new";
         card?: any;
@@ -127,7 +127,7 @@
             try {
                 const result = await cardService.findByFolio(query, type);
 
-                // Guard: query may have changed during fetch
+                // Guard: la consulta pudo haber cambiado durante la obtención
                 if (searchQuery.trim() !== query || cardType !== type) return;
 
                 if (result) {
@@ -156,15 +156,13 @@
                     searchStatus = { type: "new" };
                 }
             } catch {
-                // On error, fall back to "new"
+                // En error, retroceder a "nuevo"
                 searchStatus = { type: "new" };
             } finally {
                 isSearching = false;
             }
         }, 300);
-    });
-
-    // Reset confirm when search or type changes
+    });        // Reiniciar confirmación cuando cambia la búsqueda o el tipo
     $effect(() => {
         if (searchQuery || cardType) confirmCreate = false;
     });
@@ -196,8 +194,8 @@
 
         isSubmitting = true;
         try {
-            // In inventory mode, we don't assign to a person.
-            // In assign mode, we mark it as active.
+    // En modo inventario, no asignamos a una persona.
+    // En modo asignación, la marcamos como activa.
             const savePayload: any = {
                 type: cardType,
                 folio: searchQuery.trim(),
@@ -205,13 +203,13 @@
                 status: mode === "assign" ? "active" : "available",
             };
 
-            // CRITICAL: If the card already exists in inventory, we MUST pass its ID
+            // CRÍTICO: Si la tarjeta ya existe en inventario, debemos pasar su ID
             // to update it instead of attempting to create a duplicate folio.
             if (status.type === "available" && status.card?.id) {
                 savePayload.id = status.card.id;
             }
 
-            // Pass replacement options if replacing
+            // Pasar opciones de reemplazo si está reemplazando
             if (replacingCard) {
                 await onSave?.(savePayload, { oldCardStatus });
             } else {
@@ -478,9 +476,7 @@
                         </div>
                     {/if}
                 </div>
-            {/if}
-
-            <!-- Real-time Status Feedback -->
+            {/if}                <!-- Retroalimentación de estado en tiempo real -->
             {#if searchQuery.trim()}
                 <div
                     class="animate-in fade-in slide-in-from-top-2 duration-200"

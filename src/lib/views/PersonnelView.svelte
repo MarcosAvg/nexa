@@ -44,13 +44,13 @@
         "Sin Edificio",
     ]);
 
-    // Local UI filters
+    // Filtros locales de UI
     let statusFilter = $state("Todos");
     let dependencyFilter = $state("");
     let buildingFilter = $state("");
     let personSearch = $state("");
 
-    // Modal State
+    // Estado del modal
     let isDetailsOpen = $derived(personnelState.isDetailsOpen);
     let selectedPersonId = $derived(personnelState.selectedPersonId);
     let selectedPerson = $derived(
@@ -61,7 +61,7 @@
         personnelState.refresh();
     });
 
-    // Filter Logic
+    // Lógica de filtrado
     function handleFilterChange() {
         const depId =
             dependencies.find((d) => d.name === dependencyFilter)?.id || "";
@@ -84,7 +84,7 @@
         }
     });
 
-    // Search Logic (Debounced)
+    // Lógica de búsqueda (Debounced)
     const debouncedSearch = createSimpleDebounce((value: string) => {
         personnelState.search(value);
     }, 300);

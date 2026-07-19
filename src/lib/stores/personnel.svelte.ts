@@ -53,14 +53,14 @@ export class PersonnelState {
                 return;
             }
         } catch {
-            // Fallback: use the old multi-query implementation if the RPC is not yet deployed
+            // Fallback: usar implementación multi-query si la RPC aún no está disponible
         }
         try {
             const { personnelService } = await import("../services/personnel");
             const stats = await personnelService.fetchDashboardStats();
             this.dashboardStats = stats;
         } catch (error) {
-            // Silently handle dashboard stats refresh error - will retry on next refresh
+            // Manejar error de actualización de estadísticas silenciosamente - reintentará
         }
     }
 
@@ -70,7 +70,7 @@ export class PersonnelState {
             const { personnelService } = await import("../services/personnel");
             this.dashboardMetrics = await personnelService.fetchDashboardMetrics();
         } catch (error) {
-            // Silently handle dashboard metrics refresh error - will retry on next refresh
+            // Manejar error de actualización de métricas silenciosamente - reintentará
         } finally {
             this.metricsLoading = false;
         }
@@ -153,31 +153,32 @@ export class PersonnelState {
         try {
             const { personnelService } = await import("../services/personnel");
             personnelService.subscribeToChanges((payload) => {
-                // Always refresh metrics on any change
+                // Siempre actualizar métricas en cualquier cambio
                 this.refreshDashboardMetrics();
                 this.refreshDashboardStats();
 
                 if (payload.eventType === 'UPDATE') {
-                    // Update the local personnel array optimally
-                    const index = this.personnel.findIndex(p => p.id === payload.new.id);
+                    // Actualizar el array local de personal de forma óptima
+                    const newData = payload.new as Record<string, unknown>;
+                    const index = this.personnel.findIndex(p => p.id === newData.id);
                     if (index !== -1) {
-                        // Apply optimistic changes for basic fields
+                        // Aplicar cambios optimistas para campos básicos
                         const current = this.personnel[index];
                         this.personnel[index] = {
                             ...current,
-                            first_name: payload.new.first_name,
-                            last_name: payload.new.last_name,
-                            name: `${payload.new.first_name} ${payload.new.last_name}`,
-                            employee_no: payload.new.employee_no,
-                            status_raw: payload.new.status,
-                            photo_url: payload.new.photo_url || current.photo_url,
+                            first_name: String(newData.first_name ?? current.first_name),
+                            last_name: String(newData.last_name ?? current.last_name),
+                            name: `${String(newData.first_name ?? '')} ${String(newData.last_name ?? '')}`,
+                            employee_no: String(newData.employee_no ?? ''),
+                            status_raw: String(newData.status ?? ''),
+                            photo_url: String(newData.photo_url ?? current.photo_url ?? ''),
                         };
 
-                        this._refreshOptimisticPerson(payload.new.id);
+                        this._refreshOptimisticPerson(String(newData.id));
                     }
                 } else if (payload.eventType === 'DELETE' || payload.eventType === 'INSERT') {
-                    // Only refresh full list for INSERT/DELETE if we are on page 1
-                    // Or if the record being changed is the one currently selected
+                    // Solo actualizar lista completa para INSERT/DELETE si estamos en página 1
+                    // O si el registro que cambia es el actualmente seleccionado
                     const isRelevant =
                         this.currentPage === 1 ||
                         this.selectedPersonId === payload.new?.id ||

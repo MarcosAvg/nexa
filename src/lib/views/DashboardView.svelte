@@ -41,7 +41,7 @@
 
     let currentUser = $derived(userState.currentUser);
 
-    // KPI cards
+    // Tarjetas KPI
     let activePersonnelCount = $derived(
         personnelState.dashboardStats.activePersonnel,
     );
@@ -51,11 +51,11 @@
         pendingItems.filter((t) => t.type === "Firma Responsiva").length,
     );
 
-    // Metrics
+    // Métricas
     let metrics = $derived(personnelState.dashboardMetrics);
     let metricsLoading = $derived(personnelState.metricsLoading);
 
-    // Helpers
+    // Utilidades
     function pct(n: number, total: number) {
         return total > 0 ? Math.round((n / total) * 100) : 0;
     }
@@ -131,8 +131,7 @@
     let overallPct = $derived(pct(totalFields - totalMissing, totalFields));
 </script>
 
-<div class="space-y-6">
-    <!-- Header -->
+<div class="space-y-6">                <!-- Encabezado -->
     <div class="flex flex-col gap-1.5">
         <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">
             Panel de Control
@@ -140,9 +139,7 @@
         <p class="text-[15px] font-medium text-slate-500">
             Resumen operativo y métricas de personal.
         </p>
-    </div>
-
-    <!-- KPI Cards -->
+    </div>                <!-- Tarjetas KPI -->
     <div class="grid gap-5 grid-cols-2 lg:grid-cols-3">
         <Card
             class="p-6 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
@@ -230,9 +227,7 @@
                 <FileText size={100} />
             </div>
         </Card>
-    </div>
-
-    <!-- Metrics Panels -->
+    </div>                <!-- Paneles de métricas -->
     {#if metricsLoading}
         <div class="grid lg:grid-cols-3 gap-6">
             {#each [1, 2, 3, 4, 5] as _}
@@ -248,10 +243,8 @@
                 </Card>
             {/each}
         </div>
-    {:else if metrics.totalPersonnel > 0}
-        <!-- Row 1: Status + Card Coverage + Data Quality -->
-        <div class="grid lg:grid-cols-3 gap-6">
-            <!-- Status Distribution -->
+    {:else if metrics.totalPersonnel > 0}                <!-- Fila 1: Estado + Cobertura + Calidad de datos -->
+        <div class="grid lg:grid-cols-3 gap-6">                    <!-- Distribución de estados -->
             <Card
                 class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-[22px]"
             >
@@ -309,9 +302,7 @@
                         </div>
                     {/each}
                 </div>
-            </Card>
-
-            <!-- Card Coverage + Stock -->
+            </Card>                    <!-- Cobertura de tarjetas + Stock -->
             <Card
                 class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-[22px]"
             >
@@ -332,8 +323,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="p-6 space-y-5">
-                    <!-- P2000 -->
+                <div class="p-6 space-y-5">                        <!-- P2000 -->
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
                             <span
@@ -371,8 +361,7 @@
                                 {metrics.cardCoverage.sinP2000} sin tarjeta</span
                             >
                         </div>
-                    </div>
-                    <!-- KONE -->
+                    </div>                        <!-- KONE -->
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
                             <span
@@ -410,8 +399,7 @@
                                 {metrics.cardCoverage.sinKone} sin tarjeta</span
                             >
                         </div>
-                    </div>
-                    <!-- Stock inline -->
+                    </div>                        <!-- Stock en línea -->
                     <div class="pt-4 border-t border-slate-100/60">
                         <div class="grid grid-cols-2 gap-3">
                             <div
@@ -445,9 +433,7 @@
                         </div>
                     </div>
                 </div>
-            </Card>
-
-            <!-- Data Quality -->
+            </Card>                    <!-- Calidad de datos -->
             <Card
                 class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-[22px]"
             >
@@ -528,11 +514,8 @@
                     </div>
                 </div>
             </Card>
-        </div>
-
-        <!-- Row 2: Dependencies (2/3) + Buildings (1/3) -->
-        <div class="grid lg:grid-cols-3 gap-6">
-            <!-- Dependencies -->
+        </div>                <!-- Fila 2: Dependencias (2/3) + Edificios (1/3) -->
+        <div class="grid lg:grid-cols-3 gap-6">                    <!-- Dependencias -->
             <Card
                 class="lg:col-span-2 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-[22px]"
             >
@@ -610,9 +593,7 @@
                         </div>
                     {/each}
                 </div>
-            </Card>
-
-            <!-- Buildings -->
+            </Card>                    <!-- Edificios -->
             <Card
                 class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-[22px]"
             >

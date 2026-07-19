@@ -8,7 +8,7 @@
  * Usage:
  *   appEvents.emit('personnel:changed');
  *   const unsub = appEvents.on('personnel:changed', () => refresh());
- *   // later: unsub();
+ *    // después: unsub();
  */
 
 type Listener = (payload?: any) => void;
@@ -21,7 +21,7 @@ class AppEvents {
             this.listeners.set(event, new Set());
         }
         this.listeners.get(event)!.add(callback);
-        // Return unsubscribe function
+        // Devolver función para cancelar suscripción
         return () => {
             this.listeners.get(event)?.delete(callback);
         };
@@ -34,9 +34,7 @@ class AppEvents {
     }
 }
 
-export const appEvents = new AppEvents();
-
-// Event name constants to avoid typos
+export const appEvents = new AppEvents();    // Constantes de nombres de eventos para evitar errores tipográficos
 export const EVENTS = {
     PERSONNEL_CHANGED: 'personnel:changed',
     CARDS_CHANGED: 'cards:changed',

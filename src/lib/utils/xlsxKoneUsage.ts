@@ -4,7 +4,7 @@ import type { ExportPersonnelData } from './xlsxExport';
 import { batchPaginate } from './batchPaginate';
 
 // ─────────────────────────────────────────
-// Types
+// Tipos
 // ─────────────────────────────────────────
 
 export interface KoneUsageEntry {
@@ -34,7 +34,7 @@ export interface DuplicateFolioInfo {
 }
 
 // ─────────────────────────────────────────
-// Parse Excel File
+// Parsear archivo Excel
 // ─────────────────────────────────────────
 
 /**
@@ -71,7 +71,7 @@ function parseExcelDate(value: any): Date | null {
     const parsed = new Date(strValue);
     if (!isNaN(parsed.getTime())) return parsed;
 
-    // Splits by /, :, -, ., space
+    // Divide por /, :, -, ., espacio
     const parts = strValue.split(/[/: .\-]/).filter(Boolean);
     if (parts.length >= 3) {
         let d = parseInt(parts[0], 10);
@@ -97,7 +97,7 @@ export async function parseKoneUsageFile(
     const worksheet = workbook.worksheets[0];
     if (!worksheet) throw new Error('El archivo Excel no contiene hojas.');
 
-    // Find column indices by scanning headers
+    // Encontrar índices de columnas escaneando encabezados
     let folioCol = -1;
     let conteoCol = -1;
     let ultimaModCol = -1;
@@ -105,13 +105,13 @@ export async function parseKoneUsageFile(
     let headerRow = -1;
 
     worksheet.eachRow((row, rowNumber) => {
-        if (folioCol >= 0 && conteoCol >= 0 && ultimaModCol >= 0 && ultimoRegCol >= 0) return; // Already found
+        if (folioCol >= 0 && conteoCol >= 0 && ultimaModCol >= 0 && ultimoRegCol >= 0) return;        // Ya encontrado
 
         row.eachCell((cell, colNumber) => {
             const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
             const valNorm = normalize(String(cell.value ?? '').trim());
-            // We search for "folio" and "conteo".
-            // If we find folio in Column A (colNumber 1), we lock it.
+            // Buscamos "folio" y "conteo".
+            // Si encontramos folio en Columna A (colNumber 1), lo fijamos.
             if (valNorm === 'folio') {
                 folioCol = colNumber;
                 headerRow = rowNumber;
@@ -128,12 +128,12 @@ export async function parseKoneUsageFile(
         });
     });
 
-    // Final validation of columns
+    // Validación final de columnas
     if (folioCol < 0 || conteoCol < 0) {
         throw new Error('No se encontraron las columnas "Folio" y "Conteo" en el archivo.');
     }
 
-    // Extract data rows
+    // Extraer filas de datos
     const entries: KoneUsageEntry[] = [];
 
     worksheet.eachRow((row, rowNumber) => {
@@ -142,7 +142,7 @@ export async function parseKoneUsageFile(
         const folioCell = row.getCell(folioCol);
         const conteoCell = row.getCell(conteoCol);
 
-        // USE cell.text to get the literal string shown in Excel (handles numeric folios/leading zeros)
+        // Usar cell.text para obtener el string literal de Excel (maneja folios numéricos/ceros a la izquierda)
         const folio = (folioCell.text || String(folioCell.value ?? '')).trim();
 
         const conteoRaw = conteoCell.value;
@@ -165,7 +165,7 @@ export async function parseKoneUsageFile(
 
         if (parsedCreationLimit && ultimaModDate) {
             if (ultimaModDate > parsedCreationLimit) {
-                return; // Exclude card created/modified recently
+                return;        // Excluir tarjeta creada/modificada recientemente
             }
         }
 
@@ -184,8 +184,7 @@ export async function parseKoneUsageFile(
     return entries;
 }
 
-// ─────────────────────────────────────────
-// Find Duplicate Folios
+// ─────────────────────────────────────────    // Encontrar folios duplicados
 // ─────────────────────────────────────────
 
 /**
@@ -195,7 +194,7 @@ export async function parseKoneUsageFile(
 export function findDuplicateFolios(entries: KoneUsageEntry[]): DuplicateFolioInfo[] {
     const folioMap = new Map<string, { conteo: number; diasInactividad: number | null }[]>();
     
-    // Group all entries by folio
+    // Agrupar todas las entradas por folio
     for (const entry of entries) {
         const existing = folioMap.get(entry.folio);
         if (existing) {
@@ -205,7 +204,7 @@ export function findDuplicateFolios(entries: KoneUsageEntry[]): DuplicateFolioIn
         }
     }
     
-    // Find folios with multiple occurrences (duplicates)
+    // Encontrar folios con múltiples ocurrencias (duplicados)
     const duplicates: DuplicateFolioInfo[] = [];
     for (const [folio, rows] of folioMap.entries()) {
         if (rows.length > 1) {
@@ -219,7 +218,7 @@ export function findDuplicateFolios(entries: KoneUsageEntry[]): DuplicateFolioIn
         }
     }
     
-    // Sort by total occurrences descending
+    // Ordenar por ocurrencias totales descendente
     duplicates.sort((a, b) => b.occurrences - a.occurrences);
     
     return duplicates;
@@ -250,8 +249,7 @@ export function getDuplicateFoliosSummary(duplicates: DuplicateFolioInfo[]): str
     return summary;
 }
 
-// ─────────────────────────────────────────
-// Match Folios to Personnel via Supabase
+// ─────────────────────────────────────────    // Coincidir folios con personal vía Supabase
 // ─────────────────────────────────────────
 
 /**
@@ -264,9 +262,7 @@ export async function matchKoneUsageToPersonnel(
 ): Promise<KoneUsageMatchResult> {
     if (entries.length === 0) {
         return { matched: [], unmatched: [], totalImported: 0 };
-    }
-
-    // Build a folio→Map info (in case of duplicates, keep newest or sum? Let's sum conteos, and preserve minimum inactividad)
+    }        // Construir folio→Map info (en caso de duplicados, ¿conservar el más nuevo o sumar? Sumamos conteos y preservamos inactividad mínima)
     const conteoMap = new Map<string, { conteo: number, diasInactividad: number | null }>();
     for (const entry of entries) {
         const existing = conteoMap.get(entry.folio);
@@ -283,44 +279,43 @@ export async function matchKoneUsageToPersonnel(
     }
 
     const folios = Array.from(conteoMap.keys());
-    const allMatchingCards: any[] = [];
-
-    // Chunking to avoid extremely long queries and handle pagination
+    const allMatchingCards: any[] = [];        // Fragmentar para evitar consultas extremadamente largas y manejar paginación
     const CHUNK_SIZE = 500;
     for (let i = 0; i < folios.length; i += CHUNK_SIZE) {
         const chunk = folios.slice(i, i + CHUNK_SIZE);
         try {
-            const cards = await batchPaginate(
-                (from, to) => supabase
-                    .from('cards')
-                    .select(`
-                        id, folio, type, status, person_id,
-                        personnel (
-                            id, first_name, last_name, employee_no, email, area, position, floor, status,
-                            buildings ( name ),
-                            dependencies ( name ),
-                            schedules ( name, default_entry, default_exit ),
-                            cards ( id, folio, type, status, programming_status, responsiva_status ),
-                            floors_p2000, floors_kone, special_accesses, entry_time, exit_time
-                        )
-                    `)
-                    .eq('type', 'KONE')
-                    .in('folio', chunk)
-                    .range(from, to),
+            const cards = await batchPaginate<any>(
+                async (from, to) => {
+                    const { data, error } = await supabase
+                        .from('cards')
+                        .select(`
+                            id, folio, type, status, person_id,
+                            personnel (
+                                id, first_name, last_name, employee_no, email, area, position, floor, status,
+                                buildings ( name ),
+                                dependencies ( name ),
+                                schedules ( name, default_entry, default_exit ),
+                                cards ( id, folio, type, status, programming_status, responsiva_status ),
+                                floors_p2000, floors_kone, special_accesses, entry_time, exit_time
+                            )
+                        `)
+                        .eq('type', 'KONE')
+                        .in('folio', chunk)
+                        .range(from, to);
+                    return { data, error };
+                },
                 1000
             );
             allMatchingCards.push(...cards);
         } catch (error: any) {
             throw new Error(`Error al buscar tarjetas (chunk ${i}): ${error.message}`);
         }
-    }
-
-    // Build a lookup: folio → card data
+    }        // Construir búsqueda: folio → datos de tarjeta
     const cardByFolio = new Map<string, any>();
     for (const card of allMatchingCards) {
         if (card.personnel) {
             const existing = cardByFolio.get(card.folio);
-            // Prioritize active cards. If there is already an active card, don't overwrite it with a non-active one.
+            // Priorizar tarjetas activas. Si ya hay una tarjeta activa, no sobrescribir con una no activa.
             if (!existing || card.status === 'active' || existing.status !== 'active') {
                 cardByFolio.set(card.folio, card);
             }
@@ -334,7 +329,7 @@ export async function matchKoneUsageToPersonnel(
         if (card && card.personnel) {
             const p = card.personnel as any;
 
-            // Map to ExportPersonnelData
+            // Mapear a ExportPersonnelData
             const allCards = (p.cards || []);
             const activeCards = allCards.filter((c: any) => c.status === 'active');
             const readyCards = activeCards.filter(
@@ -380,7 +375,7 @@ export async function matchKoneUsageToPersonnel(
         }
     }
 
-    // Sort matches by conteo descending
+    // Ordenar coincidencias por conteo descendente
     matched.sort((a, b) => b.conteo - a.conteo);
 
     return {

@@ -1,7 +1,7 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import type { Ticket } from "../types";
-import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, appEvents, EVENTS, batchPaginate } from "../utils";
+import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, appEvents, EVENTS, batchPaginate, handleError } from "../utils";
 import { ticketState } from "../stores";
 
 type CardAssignmentInfo = {
@@ -42,14 +42,14 @@ async function fetchCardAssignmentTypes(
 
     const byCard: Record<string, { action: string; timestamp: string; personId?: string }> = {};
     for (const log of logs) {
-        const cardId = log.details?.related_card_id;
+        const cardId = (log.details as Record<string, unknown>)?.related_card_id as string | undefined;
         if (!cardId) continue;
         const existing = byCard[cardId];
         if (!existing || log.timestamp > existing.timestamp) {
             byCard[cardId] = {
                 action: log.action,
                 timestamp: log.timestamp,
-                personId: log.entity_id || log.details?.related_person_id,
+                personId: log.entity_id || (log.details as Record<string, unknown>)?.related_person_id as string | undefined,
             };
         }
     }
@@ -89,8 +89,9 @@ async function enrichWithMovementType(tickets: Ticket[]): Promise<(Ticket & { mo
     const cardIds = tickets.map((t) => t.card_id).filter(Boolean) as string[];
     const personnelCreatedAt: Record<string, string> = {};
     for (const t of tickets) {
-        if (t.person_id && t.personnel?.created_at) {
-            personnelCreatedAt[t.person_id] = t.personnel.created_at;
+        const pers = t.personnel as { created_at?: string } | null;
+        if (t.person_id && pers?.created_at) {
+            personnelCreatedAt[t.person_id] = pers.created_at;
         }
     }
 
@@ -101,15 +102,16 @@ async function enrichWithMovementType(tickets: Ticket[]): Promise<(Ticket & { mo
         let movementType = info?.movementType ?? "Sin clasificar";
         let assignmentDate = info?.registeredAt || t.created_at;
 
-        if (movementType === "Sin clasificar" && t.person_id && t.personnel?.created_at) {
-            const createDate = new Date(t.personnel.created_at);
+        const personnelWithDate = t.personnel as { created_at?: string } | null;
+        if (movementType === "Sin clasificar" && t.person_id && personnelWithDate?.created_at) {
+            const createDate = new Date(personnelWithDate.created_at);
             const ticketDate = new Date(t.created_at);
             const diffDays = Math.floor(
                 (ticketDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24)
             );
             if (diffDays >= 0 && diffDays <= 7) {
                 movementType = "Alta de Personal";
-                assignmentDate = t.personnel.created_at;
+                assignmentDate = personnelWithDate.created_at;
             } else {
                 movementType = "Asignación";
             }
@@ -205,11 +207,11 @@ export const ticketService = {
 
             if (error) throw error;
 
-            const mapped = (data || []).map(t => ({ ...t } as Ticket));
+            const mapped = ((data || []) as any[]).map(t => ({ ...t } as unknown as Ticket));
 
             if (section === "Responsivas" && mapped.length > 0) {
                 const enriched = await enrichWithMovementType(mapped);
-                return { data: enriched as Ticket[], count: count || 0 };
+                return { data: enriched as unknown as Ticket[], count: count || 0 };
             }
 
             return { data: mapped, count: count || 0 };
@@ -311,7 +313,7 @@ export const ticketService = {
 
             created = newTickets?.length ?? 0;
 
-            // Single history log for the whole import
+            // Único registro de historial para toda la importación
             if (created > 0) {
                 await HistoryService.log('TICKET', newTickets![0].id, 'CREATE', {
                     message: `Importación masiva: ${created} ticket(s) creados desde plantilla Excel`,
@@ -319,7 +321,7 @@ export const ticketService = {
                 });
             }
 
-            // Refresh store
+            // Actualizar store
             const fresh = await ticketService.fetchAll();
             ticketState.setTickets(fresh);
             appEvents.emit(EVENTS.TICKETS_CHANGED);

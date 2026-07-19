@@ -1,8 +1,8 @@
 import type * as ExcelJSTypes from 'exceljs';
 
 // ─── Shared Color Palette ──────────────────────────────────────────
-// Every export function used to define its own COLORS object.
-// Now they all share this single source of truth.
+// Cada función de exportación solía definir su propio objeto COLORS.
+// Ahora todas comparten esta única fuente de verdad.
 
 export const XLSX_COLORS = {
     title: 'FF1E293B',
@@ -51,7 +51,7 @@ export async function createExcelWorkbook(): Promise<{
         import('file-saver')
     ]);
     const Workbook = ExcelJSModule.default || ExcelJSModule;
-    const workbook = new Workbook();
+    const workbook = new (Workbook as unknown as { new(): any })();
     return { workbook, saveAsFunction };
 }
 
@@ -99,7 +99,7 @@ export interface TitleRowConfig {
 export async function addTitleAndMetaRow(config: TitleRowConfig): Promise<void> {
     const { worksheet, workbook, title, lastCol, metaLines } = config;
 
-    // Row 1: Title + Logo
+    // Fila 1: Título + Logo
     worksheet.mergeCells(`A1:${lastCol}1`);
     const titleCell = worksheet.getCell('A1');
     titleCell.value = `       ${title}`;
@@ -109,7 +109,7 @@ export async function addTitleAndMetaRow(config: TitleRowConfig): Promise<void> 
 
     await addLogoToSheet(workbook, worksheet);
 
-    // Row 2: Meta
+    // Fila 2: Meta
     worksheet.mergeCells(`A2:${lastCol}2`);
     const metaCell = worksheet.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
@@ -230,7 +230,7 @@ export function styleDataCell(
 }
 
 // ═════════════════════════════════════════════════════════════════════
-// Summary Sheet Helpers (used by addStatsSheet and addKoneSummarySheet)
+// Auxiliares de hoja de resumen (usados por addStatsSheet y addKoneSummarySheet)
 // ═════════════════════════════════════════════════════════════════════
 
 /** Applies thin borders to all 4 sides of a cell. */

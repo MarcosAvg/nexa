@@ -63,8 +63,8 @@
         lg: "h-14 px-10 text-base",
     };
 
-    // Derived class using simple string concatenation for now as we don't have clsx/tailwind-merge yet
-    // Ideally we would use those libraries if added.
+    // Clase derivada usando concatenación simple, sin clsx/tailwind-merge aún
+    // Idealmente usaríamos esas librerías si se añaden.
     let computedClass = $derived(
         `${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`,
     );

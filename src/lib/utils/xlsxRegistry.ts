@@ -71,17 +71,20 @@ async function fetchKoneResponsivaSignDates(): Promise<Map<string, string>> {
     const signMap = new Map<string, string>();
 
     try {
-        const allRows = await batchPaginate(
-            (from, to) => supabase
-                .from('signed_responsivas')
-                .select('person_id, created_at')
-                .eq('card_type', 'KONE')
-                .order('created_at', { ascending: false })
-                .range(from, to),
+        const allRows = await batchPaginate<any>(
+            async (from, to) => {
+                const { data, error } = await supabase
+                    .from('signed_responsivas')
+                    .select('person_id, created_at')
+                    .eq('card_type', 'KONE')
+                    .order('created_at', { ascending: false })
+                    .range(from, to);
+                return { data, error };
+            },
             1000
         );
 
-        for (const row of allRows) {
+        for (const row of allRows as { person_id: string; created_at: string }[]) {
             if (!row.person_id) continue;
             const existing = signMap.get(row.person_id);
             if (!existing || row.created_at > existing) {
@@ -89,7 +92,7 @@ async function fetchKoneResponsivaSignDates(): Promise<Map<string, string>> {
             }
         }
     } catch {
-        // Non-critical — export continues without sign dates
+        // No crítico — la exportación continúa sin fechas de firma
     }
 
     return signMap;
@@ -728,7 +731,7 @@ export async function exportCardlessRegistryToExcel(
     await addCardlessEvidenceSheet(workbook, enrichedData, filterDescription);
     await addCardlessReincidenceSheet(workbook, enrichedData, filterDescription);
 
-    // Sheet 3: Detail
+    // Hoja 3: Detalle
     const worksheet = workbook.addWorksheet('Detalle');
 
     worksheet.columns = [

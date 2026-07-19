@@ -37,9 +37,7 @@
     let isRejecting = $state(false);
     let selectedCandidate = $state<any>(null);
 
-    let p = $derived(ticket?.payload ?? {});
-
-    // Build the prefill object from payload field names
+    let p = $derived(ticket?.payload ?? {});            // Construir objeto prefill desde los nombres de campo del payload
     let prefill = $derived.by(() => {
         if (!p) return null;
         return {
@@ -78,7 +76,7 @@
     });
 
     async function handlePersonSaved() {
-        // PersonModal already created the person. Delete the ticket.
+        // PersonModal ya creó la persona. Eliminar el ticket.
         if (!ticket) return;
         try {
             await ticketService.delete(
@@ -143,9 +141,7 @@
             isRejecting = false;
         }
     }
-</script>
-
-<!-- PersonModal pre-filled as a new person (no id = insert) -->
+</script>                <!-- PersonModal precargado como persona nueva (sin id = insert) -->
 <PersonModal
     bind:isOpen
     {prefill}
@@ -314,9 +310,7 @@
             Rechazar
         </Button>
     {/snippet}
-</PersonModal>
-
-<!-- Reject confirmation -->
+</PersonModal>                <!-- Confirmación de rechazo -->
 <ConfirmationModal
     bind:isOpen={isRejectOpen}
     title="Rechazar solicitud de Alta"

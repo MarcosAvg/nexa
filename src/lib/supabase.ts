@@ -11,7 +11,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const auth = {
     async signIn(email: string) {
-        // Using Magic Links for simplicity and security if configured, 
+        // Usando Magic Links por simplicidad y seguridad si está configurado, 
         // or password if the user prefers. Let's start with a generic signIn.
         const { error } = await supabase.auth.signInWithOtp({ email });
         return { error };

@@ -15,7 +15,7 @@
     } from "lucide-svelte";
     import { onMount } from "svelte";
 
-    // Navigation items filtered by role
+    // Elementos de navegación filtrados por rol
     const sidebarItems = $derived.by(() => {
         const items = [
             { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -42,10 +42,10 @@
 
     async function handleLogout() {
         await supabase.auth.signOut();
-        // Router will handle redirect if we add a guard, or App.svelte will see no session
+        // El router manejará el redirect si añadimos un guard, o App.svelte verá que no hay sesión
     }
 
-    // Derived state for current user
+    // Estado derivado para el usuario actual
     const currentUser = $derived.by(() => {
         if (!userState.profile) return undefined;
         return {
@@ -55,7 +55,7 @@
         };
     });
 
-    // Sync active page with route for header title
+    // Sincronizar página activa con ruta para el título del encabezado
     $effect(() => {
         const path = $location;
         if (path.includes("dashboard")) uiState.setActivePage("Dashboard");

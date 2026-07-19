@@ -30,13 +30,13 @@
     <div
         class="flex flex-1 flex-col overflow-hidden transition-all duration-300 {uiState.isSidebarCondensed ? 'lg:pl-20' : 'lg:pl-72'}"
     >
-        <!-- Mobile WCO safe area -->
+        <!-- Área segura WCO para móvil -->
         <div
             class="lg:hidden flex-shrink-0"
             style="height: env(titlebar-area-height, 0px); -webkit-app-region: drag;"
         ></div>
 
-        <!-- Desktop Drag Region (Invisible but functional for WCO) -->
+        <!-- Región de arrastre para escritorio (invisible pero funcional para WCO) -->
         <div
             class="hidden lg:block sticky top-0 z-40 w-full flex-shrink-0"
             style="height: env(titlebar-area-height, 0px); -webkit-app-region: drag;"
@@ -49,6 +49,6 @@
         </main>
     </div>
 
-    <!-- Mobile Bottom Navigation -->
+    <!-- Navegación inferior para móvil -->
     <BottomNav />
 </div>

@@ -21,8 +21,7 @@
     const sortedActions = Object.entries(ACTION_NAMES).sort((a, b) => a[1].localeCompare(b[1]));
 </script>
 
-<div class="flex flex-col md:flex-row gap-4 w-full">
-    <!-- Persona Input -->
+<div class="flex flex-col md:flex-row gap-4 w-full">                <!-- Input de persona -->
     <div class="flex-1 min-w-[200px] relative">
         <label
             for="filter-person"
@@ -57,9 +56,7 @@
             <option value="P2000">P2000</option>
             <option value="KONE">KONE</option>
         </Select>
-    </div>
-
-    <!-- Folio Input -->
+    </div>                <!-- Input de folio -->
     <div class="w-full md:w-48">
         <label
             for="filter-folio"
@@ -80,9 +77,7 @@
                 class="block w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
             />
         </div>
-    </div>
-
-    <!-- Accion Select -->
+    </div>                <!-- Select de acción -->
     <div class="w-full md:w-56">
         <label
             for="filter-action"

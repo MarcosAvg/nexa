@@ -192,7 +192,7 @@ export async function exportKoneUsageAllDependenciesAsZip(
         const dep = depList[i];
         onProgress?.(i, total, dep);
 
-        // Filter the match result to this dependency
+        // Filtrar resultados para esta dependencia
         const filteredResult: KoneUsageMatchResult = {
             matched: matchResult.matched.filter(
                 (m) => (m.person.dependency || 'Sin Dependencia') === dep

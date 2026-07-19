@@ -43,7 +43,7 @@ export const COMPUTED_STATUSES = [
 ];
 
 /** Variantes de Badge para cada estado de personal */
-export function getPersonnelStatusVariant(status: string): string {
+export function getPersonnelStatusVariant(status: string): "emerald" | "amber" | "slate" | "rose" {
     if (status === PERSONNEL_STATUS.ACTIVO) return "emerald";
     if (status === PERSONNEL_STATUS.PARCIAL) return "amber";
     if (status === PERSONNEL_STATUS.SIN_ACCESO) return "slate";
@@ -76,7 +76,7 @@ export const CARD_STATUS_FILTER_MAP: Record<string, string> = {
     "Disponible": CARD_STATUS.AVAILABLE,
 };
 
-export function getCardStatusVariant(status: string): string {
+export function getCardStatusVariant(status: string): "emerald" | "rose" | "slate" | "blue" {
     if (status === CARD_STATUS.ACTIVE) return "emerald";
     if (status === CARD_STATUS.BLOCKED) return "rose";
     if (status === CARD_STATUS.INACTIVE) return "slate";
@@ -95,7 +95,7 @@ export const CARD_TYPES = {
     P2000: "P2000",
 } as const;
 
-export function getCardTypeVariant(type: string): string {
+export function getCardTypeVariant(type: string): "blue" | "amber" | "slate" {
     if (type === CARD_TYPES.KONE) return "blue";
     if (type === CARD_TYPES.P2000) return "amber";
     return "slate";

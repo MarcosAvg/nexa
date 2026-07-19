@@ -1,6 +1,11 @@
-// ─── Barrel File ──────────────────────────────────────────────────────
-// Re-exports all Excel export functions from their dedicated modules.
-// Keeps exportKoneUsageToExcel here because it's imported by xlsxKoneUsage.ts.
+/**
+ * xlsxExport.ts
+ *
+ * Punto de entrada para exportación a Excel.
+ * Re-exporta funciones desde módulos especializados.
+ * Mantiene exportKoneUsageToExcel aquí porque es importado
+ * por xlsxKoneUsage.ts para evitar dependencia circular.
+ */
 
 export type {
     ExportPersonnelData,
@@ -515,21 +520,21 @@ export async function exportKoneUsageToExcel(
                 },
             };
 
-            // Conteo column (11) — usage badge
+            // Columna de conteo (11) — badge de uso
             if (colNumber === 11) {
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: usageColors.head } };
                 cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: usageColors.sub } };
                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
             }
 
-            // Usage level column (13) — label badge
+            // Columna de nivel de uso (13) — badge de etiqueta
             if (colNumber === 13) {
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: usageColors.head } };
                 cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: usageColors.sub } };
                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
             }
 
-            // Status column (14) — badge
+            // Columna de estado (14) — badge
             if (colNumber === 14) {
                 let stColors = COLORS.slate;
                 if (entry.person.status === 'Activo/a') stColors = COLORS.emerald;
@@ -590,7 +595,7 @@ export async function exportKoneUsageToExcel(
         { key: 'specialAccesses', width: 28 },
     ];
 
-    // Row 1: Title + Logo for this sheet
+    // Fila 1: Título + Logo para esta hoja
     ws2.mergeCells('A1:O1');
     const titleCell2 = ws2.getCell('A1');
     titleCell2.value = `       DIRECTORIO CON CONTEO DE USO ${filterSuffix}`;
@@ -600,7 +605,7 @@ export async function exportKoneUsageToExcel(
 
     await addLogoToSheet(workbook, ws2);
 
-    // Row 2: Meta
+    // Fila 2: Meta
     ws2.mergeCells('A2:O2');
     const metaCell2 = ws2.getCell('A2');
     metaCell2.value = `Reporte generado: ${dateStr}  |  Registros: ${filteredMatched.length}  |  Umbral bajo uso: ${usageThreshold}`;
@@ -608,8 +613,8 @@ export async function exportKoneUsageToExcel(
     metaCell2.alignment = { vertical: 'middle', horizontal: 'left' };
     ws2.getRow(2).height = 20;
 
-    // Data rows (same data, different layout — a richer directory-like sheet)
-    // Super-Header Row 3
+    // Filas de datos (mismos datos, diseño diferente — hoja tipo directorio enriquecido)
+    // Super-encabezado Fila 3
     const groups2 = [
         { label: '#', range: 'A3:A3', colors: COLORS.slate, endCol: 1 },
         { label: 'DATOS PERSONALES', range: 'B3:D3', colors: COLORS.personal, endCol: 4 },
@@ -635,7 +640,7 @@ export async function exportKoneUsageToExcel(
     });
     ws2.getRow(3).height = 24;
 
-    // Sub-Header Row 4
+    // Sub-encabezado Fila 4
     const subHeaders2 = [
         { label: 'NO.', group: groups2[0], col: 1 },
         { label: 'APELLIDOS', group: groups2[1], col: 2 },

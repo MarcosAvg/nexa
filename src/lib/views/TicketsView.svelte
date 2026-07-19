@@ -38,7 +38,7 @@
     import { networkStore } from "../stores/network.svelte";
 
 
-    // Server-side paginated tickets (replaces client-side filtering)
+    // Tickets paginados del servidor (reemplaza filtrado del lado del cliente)
     let tickets = $state<any[]>([]);
     let currentPage = $state(1);
     let pageSize = $state(50);
@@ -48,10 +48,10 @@
     let isZipExporting = $state(false);
     let showExportMenu = $state(false);
 
-    // Sections
+    // Secciones
     let currentSection = $state<"General" | "Responsivas">("General");
 
-    // Filters
+    // Filtros
     let typeFilter = $state("Todos");
     let priorityFilter = $state("Todas");
     let searchQuery = $state("");
@@ -65,7 +65,7 @@
             searchQuery = "";
             dependencyFilter = "Todas";
             showExportMenu = false;
-            // Reset search input if it exists
+            // Reiniciar campo de búsqueda si existe
             const searchInput = document.getElementById(
                 "ticket-search",
             ) as HTMLInputElement;
@@ -74,41 +74,41 @@
         }
     }
 
-    // Modal State
+    // Estado del modal
     let isModalOpen = $state(false);
     let editingTicket = $state<any>(null);
 
-    // Manual Details State
+    // Estado de detalles manuales
     let isManualDetailsOpen = $state(false);
     let manualTicket = $state<any>(null);
 
-    // Import modal
+    // Modal de importación
     let isImportOpen = $state(false);
 
-    // Smart ticket modals (from plantilla import)
+    // Modales de ticket inteligente (desde importación de plantilla)
     let isAltaOpen = $state(false);
     let altaTicket = $state<any>(null);
     let isImportedOpen = $state(false);
     let importedTicket = $state<any>(null);
 
-    // Confirmation States
+    // Estado de confirmacións
     let ticketToComplete = $state<any>(null);
 
-    // Modification Compare Modal
+    // Modal de comparación de modificación
     let isCompareOpen = $state(false);
     let compareTicket = $state<any>(null);
 
     let personnel = $derived(personnelState.personnel);
     let dependencies = $derived(catalogState.dependencies);
 
-    // Server-paginated data with person name resolution
+    // Datos paginados del servidor con resolución de nombre de persona
     let filteredTickets = $derived(
         tickets.map((t) => {
             let personName = "Desconocido";
             if (t.personnel) {
                 personName = `${t.personnel.first_name} ${t.personnel.last_name}`;
             } else if (t.payload?.nombres || t.payload?.apellidos) {
-                // Resolution for imported tickets (altas, mods, etc)
+                // Resolución para tickets importados (altas, modificaciones, etc.)
                 personName =
                     `${t.payload.apellidos || ""}, ${t.payload.nombres || ""}`.trim();
                 if (personName.startsWith(","))
@@ -119,7 +119,7 @@
                 personName = t.payload.relatedPerson.name;
             }
 
-            // Also try to resolve card info from payload if it's an import (e.g. Reposición)
+            // También resolver info de tarjeta desde payload si es importación (ej. Reposición)
             let cardType = t.card_type;
             let cardFolio = t.card_folio;
 
@@ -253,7 +253,7 @@
             ]);
             tickets = result.data;
             totalRecords = result.count;
-            // Also update the global store for Dashboard pending count
+            // Actualizar también el store global para el conteo de pendientes del Dashboard
             ticketState.setTickets(result.data);
             personnelState.setCards(extraCards);
             await validateOpenModalsAgainstDb();
@@ -262,7 +262,7 @@
         }
     }
 
-    // Debounced search
+    // Búsqueda con debounce
     const debouncedSearch = createSimpleDebounce(() => {
         refreshData(1);
     }, 300);
@@ -294,7 +294,7 @@
 
     onDestroy(() => unsubs.forEach((fn) => fn()));
 
-    // Handlers
+    // Manejadores
     const IMPORTED_TYPES = new Set([
         "Alta de Persona",
         "Modificación",
@@ -304,7 +304,7 @@
     ]);
 
     function onManageTicket(ticket: any) {
-        // Route imported ticket types to dedicated modals
+        // Enrutar tipos de ticket importados a modales dedicados
         if (ticket.type === "Alta de Persona") {
             altaTicket = ticket;
             isAltaOpen = true;
@@ -323,7 +323,7 @@
             return;
         }
 
-        // Default: manual details
+        // Predeterminado: detalles manuales
         manualTicket = ticket;
         isManualDetailsOpen = true;
     }
@@ -359,12 +359,12 @@
             return;
         }
 
-        // For other types, we can use the manual modal flow or quick complete
-        // defaulting to manual modal for consistent "review" experience if clicked via banner
-        // But onStartCompletion is triggered by the "check" button on banner
+        // Para otros tipos, usar flujo manual o completado rápido
+        // Por defecto, modal manual para experiencia consistente de revisión desde banner
+        // onStartCompletion se dispara con el botón de verificar en banner
 
         ticketToComplete = ticket;
-        // Directly call handleFinalConfirm for simple tickets
+        // Llamar directamente a handleFinalConfirm para tickets simples
         handleFinalConfirm();
     }
 
@@ -374,7 +374,7 @@
         const ticket = ticketToComplete;
         ticketToComplete = null;
 
-        // Optimistic: remove from local array immediately (no flash)
+        // Optimista: eliminar del array local inmediatamente (sin parpadeo)
         const prevTickets = tickets;
         tickets = tickets.filter((t) => t.id !== ticket.id);
         totalRecords = Math.max(0, totalRecords - 1);
@@ -384,7 +384,7 @@
             toast.success("Ticket completado");
         } catch (e) {
             handleError(e, "Completar Ticket");
-            // Rollback on error
+            // Reversión en caso de error
             tickets = prevTickets;
             totalRecords = totalRecords + 1;
         }

@@ -32,7 +32,7 @@
         rowClass,
     }: Props = $props();
 
-    // Sort state
+    // Estado de ordenamiento
     let sortKey = $state<string | null>(null);
     let sortDirection = $state<"asc" | "desc" | null>(null);
 
@@ -43,11 +43,11 @@
             let aVal = a[sortKey!];
             let bVal = b[sortKey!];
 
-            // Normalize for sorting (handle missing values)
+            // Normalizar para ordenamiento (manejar valores faltantes)
             if (aVal === null || aVal === undefined) aVal = "";
             if (bVal === null || bVal === undefined) bVal = "";
 
-            // Handle string comparison
+            // Comparación de strings
             if (typeof aVal === "string" && typeof bVal === "string") {
                 const cmp = aVal.localeCompare(bVal, undefined, {
                     numeric: true,
@@ -56,7 +56,7 @@
                 return sortDirection === "asc" ? cmp : -cmp;
             }
 
-            // Handle other comparisons (numbers, etc)
+            // Otras comparaciones (números, etc.)
             if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
             if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
             return 0;
@@ -77,7 +77,7 @@
         }
     }
 
-    // Virtual Scrolling State & Logic
+    // Estado y lógica de scroll virtual
     let scrollTop = $state(0);
     const rowHeight = 56; // estimated row height in px
     const overscan = 10;
@@ -97,7 +97,7 @@
     let offsetY = $derived(startIndex * rowHeight);
     let totalHeight = $derived(sortedData.length * rowHeight);
 
-    // Card expand logic for mobile
+    // Lógica de expansión de tarjetas para móvil
     let expandedRowIds = $state(new Set<any>());
 
     function toggleRow(row: any) {
@@ -116,7 +116,7 @@
     }
 </script>
 
-<!-- Desktop Table View (hidden on small/medium screens) -->
+<!-- Vista de tabla para escritorio (oculta en pantallas pequeñas/medianas) -->
 <div
     class="hidden lg:block overflow-hidden rounded-2xl border border-slate-200/50 shadow-sm bg-white/80 backdrop-blur-sm"
 >
@@ -188,7 +188,7 @@
                     {/if}
                 </tr>
             </thead>
-            <!-- Virtual Scrolling implementation -->
+            <!-- Implementación de scroll virtual -->
             {#if sortedData.length === 0}
                 <tbody class="divide-y divide-slate-100/60">
                     <tr>
@@ -277,17 +277,17 @@
     </div>
 </div>
 
-<!-- Mobile/Tablet Card View (visible on small/medium screens) -->
+<!-- Vista de tarjetas para móvil/tablet (visible en pantallas pequeñas/medianas) -->
 <div class="lg:hidden space-y-4">
     {#each sortedData as row (row.id || Math.random())}
         {#if mobileCard}
             {@render mobileCard(row)}
         {:else}
-            <!-- Card component with internal state logic simplified -->
+            <!-- Componente de tarjeta con lógica de estado interno simplificada -->
             <article
                 class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5 space-y-4 relative overflow-hidden transition-all duration-200"
             >
-                <!-- Card Header -->
+                <!-- Encabezado de tarjeta -->
                 <div class="flex items-start justify-between gap-3">
                     <div class="flex flex-col">
                         <span
@@ -307,9 +307,9 @@
                     {/if}
                 </div>
 
-                <!-- Card Content (Expandable) -->
+                <!-- Contenido de tarjeta (expandible) -->
                 <div class="grid grid-cols-1 gap-1 pt-1">
-                    <!-- Always visible fields (next 1 or 2) -->
+                    <!-- Campos siempre visibles (siguientes 1 o 2) -->
                     {#each columns.slice(1, 3) as column}
                         <div
                             class="flex items-center justify-between gap-4 py-1.5 border-b border-slate-50 last:border-0"
@@ -330,7 +330,7 @@
                         </div>
                     {/each}
 
-                    <!-- Expandable fields -->
+                    <!-- Campos expandibles -->
                     <div
                         class="content-wrapper overflow-hidden transition-all duration-300"
                         style="max-height: {isRowExpanded(row)
@@ -364,7 +364,7 @@
                         {/each}
                     </div>
 
-                    <!-- Expand Toggle -->
+                    <!-- Alternar expansión -->
                     {#if columns.length > 3}
                         <button
                             class="w-full pt-3 text-[11px] font-bold text-blue-600 uppercase tracking-widest hover:text-blue-700 flex items-center justify-center gap-1"

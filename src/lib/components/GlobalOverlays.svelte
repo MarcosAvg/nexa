@@ -10,7 +10,7 @@
     import { personnelActions, appEvents, EVENTS } from "../utils";
     import { uiState } from "../stores/ui.svelte";
 
-    // Computed state from global store
+    // Estado calculado desde el store global
     let isDetailsOpen = $derived(personnelState.isDetailsOpen);
     let selectedPersonId = $derived(personnelState.selectedPersonId);
 
@@ -74,7 +74,7 @@
         return () => unsub();
     });
 
-    // Local state for Global Overlays (actions triggered from here)
+    // Estado local para overlays globales (acciones disparadas desde aquí)
     let isCardModalOpen = $state(false);
     let replacingCard = $state<any>(null);
     let deleteModal = $state<{
@@ -94,7 +94,7 @@
         onConfirm: async () => {},
     });
 
-    // Refresh Data Helper
+    // Auxiliar de actualización de datos
     async function refreshData() {
         await Promise.all([
             personnelState.refresh(
@@ -119,7 +119,7 @@
         }
     }
 
-    // Action wrappers that inject refreshData
+    // Envoltorios de acción que inyectan refreshData
     const onBlock = (p: any) => {
         confirmModal = {
             isOpen: true,
@@ -207,7 +207,7 @@
         };
     };
 
-    // Card Save Handler (from AddCardModal inside Details Panel context)
+    // Manejador de guardado de tarjeta (desde AddCardModal en contexto de Details Panel)
     const handleCardSave = async (
         cardData: { type: string; folio: string },
         replacementOptions?: { oldCardStatus: string },
@@ -220,16 +220,13 @@
             refreshData,
             replacementOptions,
         );
-        isCardModalOpen = false;
-        replacingCard = null; // Reset
+        isCardModalOpen = false;            replacingCard = null; // Reiniciar
     };
 
     function onEdit(person: any) {
         personnelState.openEditModal(person);
     }
-</script>
-
-<!-- Global Details Panel -->
+</script>        <!-- Panel de detalles global -->
 <PersonDetailsPanel
     isOpen={isDetailsOpen}
     person={selectedPerson}
@@ -248,17 +245,13 @@
     {onCardProgram}
     onRefresh={refreshData}
     onclose={() => personnelState.setDetailsOpen(false)}
-/>
-
-<!-- Global Edit Modal -->
+/>        <!-- Modal de edición global -->
 <PersonModal
     isOpen={personnelState.isEditModalOpen}
     editingPerson={personnelState.editingPerson}
     forceDirectSave={uiState.isDirectEditMode}
     onclose={() => personnelState.closeEditModal()}
-/>
-
-<!-- Global Add Card Modal (triggered from Details Panel) -->
+/>        <!-- Modal de añadir tarjeta global (desde Panel de detalles) -->
 <AddCardModal
     bind:isOpen={isCardModalOpen}
     mode="assign"
@@ -268,9 +261,7 @@
         replacingCard = null;
         isCardModalOpen = false;
     }}
-/>
-
-<!-- Generic Confirmation Modal -->
+/>        <!-- Modal de confirmación genérico -->
 <ConfirmationModal
     bind:isOpen={confirmModal.isOpen}
     title={confirmModal.title}

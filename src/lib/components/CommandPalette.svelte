@@ -28,10 +28,10 @@
     let selectedIndex = $state(0);
     let inputElement = $state<HTMLInputElement | null>(null);
 
-    // Auto-focus input when opening
+    // Auto-foco al input al abrir
     $effect(() => {
         if (isOpen && inputElement) {
-            // Using a tiny timeout to ensure the "animate-in" transition doesn't interfere with focus
+            // Usando un pequeño timeout para que la transición "animate-in" no interfiera con el foco
             const timer = setTimeout(() => {
                 inputElement?.focus();
             }, 50);
@@ -113,7 +113,7 @@
         }
     });
 
-    // Reset selection when results change
+    // Reiniciar selección cuando los resultados cambian
     $effect(() => {
         if (allResults.length > 0 && selectedIndex >= allResults.length) {
             selectedIndex = 0;
@@ -240,7 +240,7 @@
 </script>
 
 {#if isOpen}
-    <!-- Backdrop with premium blur -->
+    <!-- Fondo con desenfoque premium -->
     <div
         class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] p-4 flex justify-center items-start pt-[12vh]"
         role="button"
@@ -256,7 +256,7 @@
             aria-label="Buscador Global"
             onclick={(e) => e.stopPropagation()}
         >
-            <!-- Search Bar -->
+            <!-- Barra de búsqueda -->
             <div class="relative group">
                 <div class="flex items-center px-6 py-5 gap-4">
                     <Search class="text-indigo-500 group-focus-within:scale-110 transition-transform" size={22} />
@@ -279,13 +279,13 @@
                     </div>
                 </div>
                 
-                <!-- Subtle loading progress bar -->
+                <!-- Barra de progreso de carga sutil -->
                 {#if isLoading}
                     <div class="absolute bottom-0 left-0 h-[2px] bg-indigo-500 animate-progress-indefinite w-full"></div>
                 {/if}
             </div>
 
-            <!-- Results List -->
+            <!-- Lista de resultados -->
             <div class="max-h-[50vh] overflow-y-auto p-3 scrollbar-hide">
                 {#if allResults.length > 0}
                     {#each allResults as item, i}
@@ -297,7 +297,7 @@
                             onclick={() => executeAction(item)}
                             onmouseenter={() => (selectedIndex = i)}
                         >
-                            <!-- Icon Wrapper -->
+                            <!-- Contenedor de icono -->
                             <div
                                 class="w-11 h-11 rounded-xl flex items-center justify-center transition-colors {isSelected
                                     ? 'bg-white/20 text-white'
@@ -306,7 +306,7 @@
                                 <item.icon size={22} />
                             </div>
 
-                            <!-- Content -->
+                            <!-- Contenido -->
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center justify-between gap-2">
                                     <p class="text-sm font-bold truncate {isSelected ? 'text-white' : 'text-slate-700'}">
@@ -325,7 +325,7 @@
                                 {/if}
                             </div>
 
-                            <!-- Arrow indicator on select -->
+                            <!-- Indicador de flecha al seleccionar -->
                             {#if isSelected}
                                 <ChevronRight size={16} class="text-white/70 animate-in slide-in-from-left-2" />
                             {/if}
@@ -342,7 +342,7 @@
                         </p>
                     </div>
                 {:else if !query}
-                    <!-- Suggestions / Quick Links when empty -->
+                    <!-- Sugerencias / Enlaces rápidos cuando está vacío -->
                     <div class="p-2">
                         <div class="flex items-center gap-2 px-3 mb-3">
                             <Zap size={14} class="text-amber-500 fill-amber-500" />
@@ -371,7 +371,7 @@
                 {/if}
             </div>
 
-            <!-- Enhanced Footer -->
+            <!-- Pie de página mejorado -->
             <div class="px-6 py-4 bg-slate-50/80 backdrop-blur-sm border-t border-slate-100 flex items-center justify-between">
                 <div class="flex items-center gap-5">
                     <div class="flex items-center gap-2">

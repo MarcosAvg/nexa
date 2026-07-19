@@ -1,7 +1,7 @@
 import { supabase } from "../supabase";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, batchPaginate } from "../utils";
 
-// Module-level userId cache — avoids calling getSession() on every log
+// Caché de userId a nivel de módulo — evita llamar a getSession() en cada registro
 let _cachedUserId: string | undefined;
 
 export const HistoryService = {
@@ -26,14 +26,14 @@ export const HistoryService = {
         const idStr = entityId ? String(entityId) : null;
         const detailsObj = typeof details === 'string' ? { message: details } : details;
 
-        // Extract entityName from details if provided by caller, avoiding extra queries
-        const entityName: string | null = detailsObj?.entityName || null;
-        // Remove entityName from persisted details to keep them clean
+        // Extraer entityName de details si el llamante lo provee, evitando consultas extras
+        const entityName: string | null = (detailsObj?.entityName as string) || null;
+        // Eliminar entityName de los detalles persistidos para mantenerlos limpios
         if (detailsObj?.entityName) {
             delete detailsObj.entityName;
         }
 
-        // Cache userId after first call to avoid repeated getSession() round-trips
+        // Cachear userId tras la primera llamada para evitar viajes repetidos a getSession()
         let userId = performedBy;
         if (!userId) {
             if (!_cachedUserId) {
@@ -55,7 +55,7 @@ export const HistoryService = {
             }]);
 
         if (error) {
-            // Silently handle history logging errors - not critical for user flow
+            // Manejar errores de registro de historial silenciosamente - no crítico para el flujo
         }
     },
 

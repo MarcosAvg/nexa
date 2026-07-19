@@ -17,7 +17,7 @@
     let isDrawing = false;
     let hasSignature = $state(false);
 
-    // Smoothing / ink state
+    // Suavizado / estado de tinta
     let lastX = 0;
     let lastY = 0;
     let lastTime = 0;
@@ -33,12 +33,12 @@
     let toolbarEl: HTMLDivElement | null = null;
 
     // ─── Adaptive capture zone ──────────────────────────────────────────
-    // When the user first touches in tablet mode, that point becomes the
+    // Cuando el usuario toca por primera vez en modo tablet, ese punto se convierte en el
     // center of a small screen region. Only this region maps to the full
     // canvas, so a natural-sized signature fills the entire pad.
     //
-    // ZONE_W / ZONE_H control how much screen space maps to the canvas.
-    // Smaller values = small tablet movement → large canvas strokes.
+    // ZONE_W / ZONE_H controlan cuánto espacio de pantalla se asigna al canvas.
+    // Valores pequeños = movimiento pequeño de tablet → trazos grandes en canvas.
     const ZONE_W = 600; // px of screen width mapped to canvas
     const ZONE_H = 350; // px of screen height mapped to canvas
     let captureZone: { left: number; top: number } | null = null;
@@ -49,9 +49,9 @@
 
     function ensureCaptureZone(e: PointerEvent) {
         if (captureZone) return;
-        // Offset so the first touch maps to (1/3 width, 2/3 height) of the canvas.
-        // Horizontal: 1/3 from the left, leaving room to sign rightward.
-        // Vertical: 2/3 from the top (1/3 from the bottom), natural lower baseline.
+    // Offset para que el primer toque se asigne a (1/3 ancho, 2/3 alto) del canvas.
+    // Horizontal: 1/3 desde la izquierda, dejando espacio para firmar hacia la derecha.
+    // Vertical: 2/3 desde arriba (1/3 desde abajo), línea base natural inferior.
         captureZone = {
             left: Math.max(
                 0,
@@ -96,8 +96,8 @@
     }
 
     // ─── Pointer-to-canvas coordinate mapping ───────────────────────────
-    // NORMAL mode: standard canvas-relative coords, null if outside bounds.
-    // TABLET mode: the adaptive capture zone maps to the full canvas.
+    // Modo NORMAL: coordenadas relativas al canvas estándar, null si está fuera de límites.
+    // Modo TABLET: la zona de captura adaptativa se asigna al canvas completo.
     //   → left edge of zone = left edge of canvas (x=0)
     //   → right edge of zone = right edge of canvas (x=canvasW)
     //   A natural ~15cm signature on the tablet fills the whole canvas.
@@ -106,11 +106,11 @@
         const rect = canvasEl.getBoundingClientRect();
 
         if (tabletMode && captureZone) {
-            // Map capture zone → canvas proportionally
+            // Mapear zona de captura → canvas proporcionalmente
             const x = ((e.clientX - captureZone.left) / ZONE_W) * rect.width;
             const y = ((e.clientY - captureZone.top) / ZONE_H) * rect.height;
 
-            // Clamp to canvas bounds (allow slight overshoot for edge strokes)
+            // Limitar a bordes del canvas (permitir ligero exceso para trazos de borde)
             const pad = 5;
             if (
                 x < -pad ||
@@ -125,7 +125,7 @@
             };
         }
 
-        // Normal mode: canvas-relative with bounds check
+        // Modo normal: relativo al canvas con verificación de límites
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
@@ -133,7 +133,7 @@
     }
 
     // ─── Stroke width calculation ───────────────────────────────────────
-    // Uses stylus pressure when available, otherwise falls back to velocity
+    // Usa presión del lápiz cuando está disponible, si no, usa velocidad
     function calcWidth(
         x: number,
         y: number,
@@ -141,7 +141,7 @@
         now: number,
     ): number {
         if (pressure > 0 && pressure < 1) {
-            // Pressure-based: direct mapping from pressure to width
+            // Basado en presión: mapeo directo de presión a ancho
             const targetWidth = MIN_WIDTH + pressure * (MAX_WIDTH - MIN_WIDTH);
             return (
                 lastWidth * VELOCITY_FILTER_WEIGHT +
@@ -149,7 +149,7 @@
             );
         }
 
-        // Velocity-based fallback (mouse / touch without pressure)
+        // Fallback basado en velocidad (mouse / touch sin presión)
         const dist = Math.sqrt(Math.pow(x - lastX, 2) + Math.pow(y - lastY, 2));
         const time = now - lastTime;
         const velocity = dist / (time || 1);
@@ -164,7 +164,7 @@
     function onPointerDown(e: PointerEvent) {
         e.preventDefault();
 
-        // In tablet mode, set the capture zone on first touch
+        // En modo tablet, establecer zona de captura en el primer toque
         if (tabletMode) ensureCaptureZone(e);
 
         // setPointerCapture ensures moves keep coming even if pointer leaves element
@@ -188,12 +188,12 @@
         e.preventDefault();
 
         const coords = mapToCanvas(e);
-        if (!coords) return; // Outside canvas — skip silently
+        if (!coords) return; // Fuera del canvas — saltar silenciosamente
 
         const now = Date.now();
         const newWidth = calcWidth(coords.x, coords.y, e.pressure, now);
 
-        // Quadratic curve for smooth ink feel
+        // Curva cuadrática para sensación de tinta suave
         const midX = (lastX + coords.x) / 2;
         const midY = (lastY + coords.y) / 2;
 
@@ -233,7 +233,7 @@
         const dpr = window.devicePixelRatio || 1;
         ctx.scale(dpr, dpr);
         hasSignature = false;
-        // Reset adaptive zone so next stroke can recenter
+        // Reiniciar zona adaptativa para que el siguiente trazo pueda re-centrarse
         resetCaptureZone();
     }
 
@@ -263,14 +263,14 @@
             position: "fixed",
             inset: "0",
             zIndex: "9999",
-            touchAction: "none", // Block scroll/zoom/gestures
+            touchAction: "none", // Bloquear scroll/zoom/gestos
             cursor: "crosshair",
             background: "transparent",
             userSelect: "none",
             webkitUserSelect: "none",
         } as Record<string, string>);
 
-        // Pointer events on overlay
+        // Eventos de puntero en overlay
         overlayEl.addEventListener("pointerdown", onPointerDown);
         overlayEl.addEventListener("pointermove", onPointerMove);
         overlayEl.addEventListener("pointerup", onPointerUp);
@@ -348,7 +348,7 @@
 
         document.body.appendChild(toolbarEl);
 
-        // Wire toolbar button events (must stopPropagation so overlay doesn't capture them)
+        // Conectar eventos de botones de toolbar (stopPropagation para que overlay no los capture)
         toolbarEl
             .querySelector("#sig-overlay-clear")
             ?.addEventListener("pointerdown", (e) => {
@@ -371,7 +371,7 @@
                 tabletMode = false;
             });
 
-        // Escape key exits overlay
+        // Tecla Escape sale del overlay
         window.addEventListener("keydown", onEscapeKey);
     }
 

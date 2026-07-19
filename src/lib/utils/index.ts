@@ -1,6 +1,6 @@
 // ─── Barrel File — src/lib/utils/index.ts ─────────────────────────────
-// Re-exports all utility functions/classes for simplified imports.
-// Use: import { handleError, batchPaginate, ... } from '../utils';
+// Re-exporta todas las funciones/clases utilitarias para imports simplificados.
+// Uso: import { handleError, batchPaginate, ... } from '../utils';
 
 export { AppError, handleError, withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout } from './error';
 export { batchPaginate, batchForEach, batchCollectIds } from './batchPaginate';
@@ -14,7 +14,7 @@ export { personnelActions } from './personnelActions';
 export { initGlobalRealtime, destroyGlobalRealtime } from './realtime';
 export { createSimpleDebounce } from './search.svelte';
 
-// XLSX & ZIP exports (via xlsxExport barrel which re-exports submodules)
+// Exportaciones XLSX y ZIP (a través de xlsxExport barrel que re-exporta submódulos)
 export type {
     ExportPersonnelData,
     ExportOptions,

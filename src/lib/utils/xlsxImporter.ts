@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 
 // ─────────────────────────────────────────
-// Types
+// Tipos
 // ─────────────────────────────────────────
 
 export type SheetKey =
@@ -35,7 +35,7 @@ export interface ImportParseResult {
 }
 
 // ─────────────────────────────────────────
-// Config per sheet
+// Configuración por hoja
 // ─────────────────────────────────────────
 
 type ColDef = { field: string; label: string; required?: boolean };
@@ -154,7 +154,7 @@ const SHEET_CONFIG: Record<SheetKey, {
 };
 
 // ─────────────────────────────────────────
-// Ticket type mapping
+// Mapeo de tipo de ticket
 // ─────────────────────────────────────────
 
 export const SHEET_TO_TICKET_TYPE: Record<SheetKey, string> = {
@@ -175,21 +175,21 @@ function cellText(cell: ExcelJS.Cell): string {
     const v = cell.value;
     if (v === null || v === undefined) return '';
 
-    // Formula: use computed result
+    // Fórmula: usar resultado calculado
     if (typeof v === 'object' && 'result' in v) {
         return cellText({ ...cell, value: (v as any).result } as ExcelJS.Cell);
     }
 
-    // Date object (ExcelJS returns times & dates as JS Date)
+    // Objeto Date (ExcelJS devuelve horas y fechas como JS Date)
     if (v instanceof Date) {
         const y = v.getUTCFullYear();
-        // Excel time-only values have date 1899-12-30 (year 1899 or 1900 after rounding)
+        // Valores solo de hora en Excel tienen fecha 1899-12-30 (año 1899 o 1900 tras redondeo)
         if (y <= 1900) {
             const hh = String(v.getUTCHours()).padStart(2, '0');
             const mm = String(v.getUTCMinutes()).padStart(2, '0');
             return `${hh}:${mm}`;
         }
-        // Full date
+        // Fecha completa
         const dd = String(v.getUTCDate()).padStart(2, '0');
         const mo = String(v.getUTCMonth() + 1).padStart(2, '0');
         return `${dd}/${mo}/${y}`;
@@ -199,7 +199,7 @@ function cellText(cell: ExcelJS.Cell): string {
 }
 
 // ─────────────────────────────────────────
-// Field label lookup (field key → human-readable label)
+// Búsqueda de etiqueta de campo (clave → etiqueta legible)
 // ─────────────────────────────────────────
 
 export const FIELD_LABELS: Record<string, string> = {};
@@ -223,7 +223,7 @@ function parseSheet(ws: ExcelJS.Worksheet, key: SheetKey): ParsedSheet {
         cfg.cols.forEach((col, idx) => {
             let val = cellText(row.getCell(idx + 1));
 
-            // Sanitization: Strip mailto: from emails
+            // Sanitización: eliminar mailto: de correos
             if (col.field === "correo" && val.toLowerCase().startsWith("mailto:")) {
                 val = val.replace(/^mailto:\s*/i, "").trim();
             }
@@ -257,15 +257,15 @@ function parseSheet(ws: ExcelJS.Worksheet, key: SheetKey): ParsedSheet {
 }
 
 // ─────────────────────────────────────────
-// Utils
+// Utilidades
 // ─────────────────────────────────────────
 
 /** Parses a string of floors into a naturally sorted array of strings. */
 export function parseFloors(floorsStr: string | null | undefined): string[] {
     if (!floorsStr) return [];
     
-    // Excel may convert "13,14" into a decimal number 13.14
-    // We replace the word " y " with a comma and split by natural delimiters
+    // Excel puede convertir "13,14" en un número decimal 13.14
+    // Reemplazamos la palabra " y " por coma y dividimos por delimitadores naturales
     const parsed = String(floorsStr)
         .replace(/\by\b/gi, ',')
         .split(/[,;|.]/)
@@ -278,7 +278,7 @@ export function parseFloors(floorsStr: string | null | undefined): string[] {
 }
 
 // ─────────────────────────────────────────
-// Main export
+// Exportación principal
 // ─────────────────────────────────────────
 
 export async function parseTemplateFile(file: File): Promise<ImportParseResult> {

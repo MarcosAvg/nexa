@@ -43,7 +43,7 @@
             // 2. Fetch history logs for CARD entity_type to understand WHY a card is gone
             const history = await HistoryService.fetchCardHistoryByRange(type);
             
-            // Group all logs by folio
+            // Agrupar todos los registros por folio
             const logsByFolio = new Map<string, typeof history>();
             history.forEach(log => {
                 const folioMatch = log.entity_name?.match(/Folio:\s*(\w+)/i);
@@ -53,7 +53,7 @@
                 logsByFolio.get(folio)!.push(log);
             });
             
-            // Analyze each folio's full history → reason, date, person_id
+            // Analizar el historial completo de cada folio → motivo, fecha, person_id
             type HistoryResult = { reason: string, date: string | null, personId: string | null };
             const historyMap = new Map<string, HistoryResult>();
             
@@ -81,12 +81,12 @@
                     }
                 }
                 
-                // If no date from replacement/delete, use the most recent log
+                // Si no hay fecha de reemplazo/eliminación, usar el registro más reciente
                 if (!relevantDate && logs.length > 0) {
                     relevantDate = logs[0].timestamp;
                 }
                 if (!relevantPersonId) {
-                    // Try to find person_id from any log's details
+                    // Intentar encontrar person_id en los detalles de cualquier registro
                     for (const log of logs) {
                         if (log.details?.related_person_id) {
                             relevantPersonId = log.details.related_person_id;
@@ -259,7 +259,7 @@
                     <Input 
                         type="number" 
                         placeholder="Ej. 1" 
-                        bind:value={startRange}
+                        bind:value={startRange as any}
                         min="1"
                     />
                 </div>
@@ -268,7 +268,7 @@
                     <Input 
                         type="number" 
                         placeholder="Ej. 100" 
-                        bind:value={endRange}
+                        bind:value={endRange as any}
                         min="1"
                     />
                 </div>

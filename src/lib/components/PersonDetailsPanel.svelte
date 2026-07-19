@@ -63,7 +63,7 @@
         onCardProgram,
     }: Props = $props();
 
-    // Reset highlight when closing
+    // Restablecer resaltado al cerrar
     $effect(() => {
         if (!isOpen) {
             personnelState.highlightedCardId = null;
@@ -96,7 +96,7 @@
     async function handleGenerateResponsiva(card: any) {
         if (!person) return;
 
-        // Safety check: Cannot generate responsiva if not programmed
+        // Verificación de seguridad: no se puede generar responsiva si no está programada
         if (card.programming_status !== "done") {
             toast.error(
                 "La tarjeta debe estar programada antes de generar la responsiva.",
@@ -121,12 +121,12 @@
         ];
         const dateStr = `${date.getDate()} de ${months[date.getMonth()]} de ${date.getFullYear()}`;
 
-        // Smart Opening: Check if we have a signed version for this folio in history
+        // Apertura inteligente: verificar si existe versión firmada de este folio en historial
         let existingResp = signedResponsivas.find(
             (r) => r.folio === card.folio && r.card_type === card.type,
         );
 
-        // Fetch fresh data if it might be stale
+        // Obtener datos actualizados si pudieran estar desactualizados
         if (existingResp) {
             try {
                 await loadResponsivas();
@@ -176,13 +176,13 @@
         if (!person?.id || !confirm("¿Eliminar este registro de responsiva?"))
             return;
 
-        // Find the record to check the folio before deleting
+        // Buscar el registro para verificar el folio antes de eliminar
         const respToDelete = signedResponsivas.find((r) => r.id === id);
 
         try {
             await responsivaService.delete(id, person.id.toString());
 
-            // Status Rollback: If this folio is currently assigned to the person, mark it as unsigned
+            // Reversión de estado: si este folio está asignado, marcarlo como no firmado
             if (respToDelete) {
                 const affectedCard = person.cards?.find(
                     (c) =>
@@ -216,7 +216,7 @@
                 legal_hash: freshResp.legal_hash,
             };
             selectedSignature = freshResp.signature;
-            // Construct a context object for the modal
+            // Construir objeto de contexto para el modal
             selectedShowCard = person?.cards?.find(
                 (c) => c.folio === freshResp.folio,
             ) || {
@@ -281,7 +281,7 @@
 >
     {#if person}
         <div class="space-y-6">
-            <!-- Info Card -->
+            <!-- Tarjeta de información -->
             <section
                 class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
             >
@@ -360,7 +360,7 @@
                     {/if}
                 </div>
 
-                <!-- Location -->
+                <!-- Ubicación -->
                 <div class="pt-3 border-t border-slate-200">
                     <div class="flex items-center gap-2 text-slate-600 mb-2">
                         <Building2 size={14} />
@@ -373,7 +373,7 @@
                     </p>
                 </div>
 
-                <!-- Floors Assigned -->
+                <!-- Pisos Asignados -->
                 {#if (person.floors_p2000 && person.floors_p2000.length > 0) || (person.floors_kone && person.floors_kone.length > 0)}
                     <div class="pt-3 border-t border-slate-200 space-y-3">
                         <span
@@ -412,7 +412,7 @@
                     </div>
                 {/if}
 
-                <!-- Special Accesses -->
+                <!-- Accesos Especiales -->
                 {#if person.specialAccesses && person.specialAccesses.length > 0}
                     <div class="pt-3 border-t border-slate-200">
                         <div
@@ -432,7 +432,7 @@
                     </div>
                 {/if}
 
-                <!-- Schedule -->
+                <!-- Horario -->
                 {#if person.schedule}
                     <div class="pt-3 border-t border-slate-200">
                         <div
@@ -451,7 +451,7 @@
                     </div>
                 {/if}
 
-                <!-- Status -->
+                <!-- Estado -->
                 <div class="pt-3 border-t border-slate-200">
                     <div class="flex justify-between items-center">
                         <span class="text-xs text-slate-500">Estado</span>
@@ -470,7 +470,7 @@
                 </div>
             </section>
 
-            <!-- Action Buttons -->
+            <!-- Botones de acción -->
             <section class="space-y-3">
                 <div class="flex items-center justify-between">
                     <h3
@@ -568,7 +568,7 @@
                 </div>
             </section>
 
-            <!-- Assigned Cards -->
+            <!-- Tarjetas Asignadas -->
             <section class="space-y-3">
                 <div class="flex items-center justify-between">
                     <h3
@@ -624,7 +624,7 @@
                 {/if}
             </section>
 
-            <!-- Responsivas History -->
+            <!-- Historial de Responsivas -->
             <section class="space-y-3 pt-6 border-t border-slate-200">
                 <div class="flex items-center gap-2 text-slate-400">
                     <HistoryIcon size={14} />

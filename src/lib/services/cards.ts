@@ -176,7 +176,7 @@ export const cardService = {
                 .limit(5);
 
             if (error) throw error;
-            return data || [];
+            return (data || []) as unknown as Card[];
         }, "Search Cards by Folio", []);
     },
 

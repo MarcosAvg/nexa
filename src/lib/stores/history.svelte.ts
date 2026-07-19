@@ -32,7 +32,7 @@ export class HistoryState {
     }
 
     addLog(log: HistoryLog) {
-        // Optimistically add to top, but real source of truth is server
+        // Añadir optimistamente al inicio, pero la fuente real es el servidor
         this.historyLogs.unshift(log);
         this.totalRecords++;
     }

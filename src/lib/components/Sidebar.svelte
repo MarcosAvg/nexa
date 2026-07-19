@@ -1,7 +1,7 @@
 <script lang="ts">
     import { link } from "svelte-spa-router";
     import active from "svelte-spa-router/active";
-    import { uiState } from "../stores/ui.svelte"; // Correct path to store
+    import { uiState } from "../stores/ui.svelte"; // Ruta correcta al store
     import { userState } from "../stores";
     import Logo from "./Logo.svelte";
     import { LogOut, ChevronLeft, ChevronRight, Wrench } from "lucide-svelte";
