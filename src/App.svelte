@@ -4,6 +4,7 @@ import { fade } from "svelte/transition";
   import { AlertCircle, RefreshCcw } from "lucide-svelte";
   import { handleError, initGlobalRealtime } from "./lib/utils";
   import { supabase, auth } from "./lib/supabase";
+  import { versionState } from "./lib/stores/version.svelte";
   import {
     uiState,
     userState,
@@ -47,6 +48,9 @@ import { fade } from "svelte/transition";
 
     loadingAuth = false;
     appInitialized = true;
+
+    // Iniciar detector de nuevas versiones
+    versionState.init();
 
     // Escuchar cambios de autenticación
     supabase.auth.onAuthStateChange(async (event, newSession) => {

@@ -3,8 +3,9 @@
     import active from "svelte-spa-router/active";
     import { uiState } from "../stores/ui.svelte"; // Ruta correcta al store
     import { userState } from "../stores";
+    import { versionState } from "../stores/version.svelte";
     import Logo from "./Logo.svelte";
-    import { LogOut, ChevronLeft, ChevronRight, Wrench } from "lucide-svelte";
+    import { LogOut, ChevronLeft, ChevronRight, Wrench, RefreshCcw } from "lucide-svelte";
 
     /**
      * Sidebar — Navegación lateral con modo expandido/condensado.
@@ -131,7 +132,7 @@
                 >
                     <Wrench size={16} strokeWidth={2.5} class="{uiState.isDirectEditMode ? 'animate-pulse' : ''}" />
                     {#if !uiState.isSidebarCondensed}
-                        <span class="text-[11px] font-extrabold tracking-wider uppercase">Modo Dios</span>
+                        <span class="text-[11px] font-extrabold tracking-wider uppercase">Editor Directo</span>
                         <div class="ml-auto flex items-center justify-center">
                             <div class="w-8 h-4 rounded-full transition-colors duration-300 relative {uiState.isDirectEditMode ? 'bg-amber-500' : 'bg-slate-700'}">
                                 <div class="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-300 {uiState.isDirectEditMode ? 'translate-x-[18px]' : 'translate-x-[2px]'}"></div>
@@ -189,11 +190,23 @@
             </div>
 
             {#if !uiState.isSidebarCondensed}
-                <p
-                    class="text-[10px] text-center text-slate-600 mt-5 px-2 tracking-[0.1em] font-extrabold uppercase opacity-60 whitespace-nowrap transition-opacity duration-300"
-                >
-                    Nexa Access &copy; 2024
-                </p>
+                <div class="mt-5 space-y-2">
+                    {#if versionState.isUpdateAvailable}
+                        <button
+                            class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-extrabold tracking-wide hover:bg-emerald-500/20 transition-all animate-pulse"
+                            onclick={() => versionState.refreshPage()}
+                            title="Recargar para aplicar la nueva versión"
+                        >
+                            <RefreshCcw size={13} strokeWidth={2.5} />
+                            Actualización disponible
+                        </button>
+                    {/if}
+                    <p
+                        class="text-[10px] text-center text-slate-600 px-2 tracking-[0.1em] font-extrabold uppercase opacity-60 whitespace-nowrap transition-opacity duration-300"
+                    >
+                        Nexa Access &copy; 2026
+                    </p>
+                </div>
             {/if}
         </div>
     {/if}
