@@ -6,7 +6,7 @@
         SectionHeader, FilterGroup, FilterSelect, Button, Card,
         DataTable, Badge, PermissionGuard, FloatingActionButton,
         ContentView, SearchInput, Pagination,
-        AddCardModal, DetectMissingCardsModal, ConfirmationModal,
+        AddCardModal, ConfirmationModal,
     } from "../components";
     import {
         User,
@@ -16,7 +16,6 @@
         Ban,
         Plus,
         FileSpreadsheet,
-        FileSearch,
         CreditCard,
     } from "lucide-svelte";
 
@@ -43,8 +42,6 @@
     let isModalOpen = $state(false);
     let editingCard = $state<any>(null);
     let replacingCard = $state<any>(null);
-    let isDetectModalOpen = $state(false);
-
     // Estado derivado del store
     let cards = $derived(cardState.pagination.items);
     let currentPage = $derived(cardState.pagination.currentPage);
@@ -244,15 +241,6 @@
                 <FileSpreadsheet size={18} strokeWidth={2.5} class="text-emerald-600/80" />
                 Exportar Excel
             </Button>
-            <Button
-                variant="outline"
-                class="flex items-center gap-2.5 h-10 px-4 group border-blue-200 text-blue-700 hover:bg-blue-50"
-                disabled={!networkStore.isOnline}
-                onclick={() => (isDetectModalOpen = true)}
-            >
-                <FileSearch size={16} class="text-blue-500 transition-transform group-hover:scale-110" />
-                Detectar Faltantes
-            </Button>
             <PermissionGuard requireEdit>
                 <Button
                     variant="primary"
@@ -414,8 +402,6 @@
         isModalOpen = false;
     }}
 />
-
-<DetectMissingCardsModal bind:isOpen={isDetectModalOpen} />
 
 <ConfirmationModal
     bind:isOpen={confirm.isOpen}

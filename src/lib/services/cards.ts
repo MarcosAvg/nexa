@@ -412,11 +412,4 @@ export const cardService = {
         }, "Delete Card");
     },
 
-    async fetchCardsByType(type: string): Promise<{ folio: string, status: string }[]> {
-        return withErrorHandlingSafe(async () => {
-            return await batchPaginate(async (from, to) => {
-                return supabase.from("cards").select("folio, status").eq("type", type).range(from, to);
-            });
-        }, "Fetch Cards By Type", []);
-    }
 };

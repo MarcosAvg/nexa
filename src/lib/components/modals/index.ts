@@ -4,7 +4,6 @@ export { default as CardlessRegistryModal } from './CardlessRegistryModal.svelte
 export { default as ConfirmAltaModal } from './ConfirmAltaModal.svelte';
 export { default as ConfirmationModal } from './ConfirmationModal.svelte';
 export { default as DeletePersonnelModal } from './DeletePersonnelModal.svelte';
-export { default as DetectMissingCardsModal } from './DetectMissingCardsModal.svelte';
 export { default as EditEnlaceModal } from './EditEnlaceModal.svelte';
 export { default as ImportPreviewModal } from './ImportPreviewModal.svelte';
 export { default as KoneUsageImportModal } from './KoneUsageImportModal.svelte';

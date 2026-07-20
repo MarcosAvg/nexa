@@ -139,15 +139,5 @@ export const HistoryService = {
         }, "Fetch History for Export", []);
     },
 
-    async fetchCardHistoryByRange(type: string) {
-        return withErrorHandlingSafe(async () => {
-            return await batchPaginate<any>(async (from, to) => {
-                return supabase.from("history_logs")
-                    .select("entity_id, entity_name, action, details, timestamp")
-                    .eq("entity_type", "CARD").ilike("entity_name", `${type}%`)
-                    .in("action", ["REPLACE_OLD", "DELETE", "BLOCK", "UNASSIGN", "UPDATE_STATUS", "CREATE"])
-                    .order("timestamp", { ascending: false }).range(from, to);
-            });
-        }, "Fetch Card History By Range", []);
-    }
+
 };

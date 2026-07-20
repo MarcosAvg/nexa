@@ -22,7 +22,6 @@ export {
 
 export {
     exportCardsToExcel,
-    exportMissingCardsToExcel,
 } from './xlsxCards';
 
 export {

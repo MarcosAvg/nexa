@@ -28,7 +28,6 @@ export {
     exportPersonnelToExcel,
     exportResponsivasToExcel,
     exportCardsToExcel,
-    exportMissingCardsToExcel,
     exportHistoryToExcel,
     exportCardlessRegistryToExcel,
     exportKoneUsageToExcel,
