@@ -4,8 +4,9 @@
     import { uiState } from "../stores/ui.svelte"; // Ruta correcta al store
     import { userState } from "../stores";
     import { versionState } from "../stores/version.svelte";
+    import Modal from "./Modal.svelte";
     import Logo from "./Logo.svelte";
-    import { LogOut, ChevronLeft, ChevronRight, Wrench, RefreshCcw } from "lucide-svelte";
+    import { LogOut, ChevronLeft, ChevronRight, Wrench, RefreshCcw, CheckCircle2, RotateCcw } from "lucide-svelte";
 
     /**
      * Sidebar — Navegación lateral con modo expandido/condensado.
@@ -23,6 +24,8 @@
     };
 
     let { items, user, onLogout }: Props = $props();
+
+    let isUpdateModalOpen = $state(false);
 </script>
 
 <aside
@@ -191,15 +194,34 @@
 
             {#if !uiState.isSidebarCondensed}
                 <div class="mt-5 space-y-2">
-                    {#if versionState.isUpdateAvailable}
-                        <button
-                            class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-extrabold tracking-wide hover:bg-emerald-500/20 transition-all animate-pulse"
-                            onclick={() => versionState.refreshPage()}
-                            title="Recargar para aplicar la nueva versión"
+                    {#if versionState.hasChecked}
+                        {#if versionState.isUpdateAvailable}
+                            <button
+                                class="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-extrabold tracking-wide hover:bg-emerald-500/20 transition-all animate-pulse group"
+                                onclick={() => isUpdateModalOpen = true}
+                                title="Nueva versión disponible"
+                            >
+                                <RefreshCcw size={13} strokeWidth={2.5} class="group-hover:rotate-180 transition-transform duration-500" />
+                                <span>Actualización disponible</span>
+                            </button>
+                        {:else}
+                            <div
+                                class="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-500/5 border border-emerald-500/15 text-emerald-400/70 text-[11px] font-extrabold tracking-wide"
+                            >
+                                <CheckCircle2 size={12} strokeWidth={2.5} />
+                                <span>Al día</span>
+                                {#if versionState.formattedBuildTime}
+                                    <span class="text-[9px] font-medium text-emerald-400/40 ml-auto">{versionState.formattedBuildTime}</span>
+                                {/if}
+                            </div>
+                        {/if}
+                    {:else}
+                        <div
+                            class="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-slate-800/30 border border-slate-700/30 text-slate-500 text-[11px] font-extrabold tracking-wide"
                         >
-                            <RefreshCcw size={13} strokeWidth={2.5} />
-                            Actualización disponible
-                        </button>
+                            <div class="w-3 h-3 rounded-full border-2 border-slate-500 border-t-transparent animate-spin"></div>
+                            <span>Verificando...</span>
+                        </div>
                     {/if}
                     <p
                         class="text-[10px] text-center text-slate-600 px-2 tracking-[0.1em] font-extrabold uppercase opacity-60 whitespace-nowrap transition-opacity duration-300"
@@ -211,6 +233,46 @@
         </div>
     {/if}
 </aside>
+
+<!-- Modal de actualización -->
+{#if !uiState.isSidebarCondensed}
+    <Modal
+        bind:isOpen={isUpdateModalOpen}
+        title="Nueva versión disponible"
+        description="Se ha detectado una versión más reciente de Nexa Access. Recarga la aplicación para obtener los últimos cambios."
+        size="sm"
+    >
+        <div class="flex flex-col items-center text-center gap-4 py-2">
+            <div class="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
+                <RefreshCcw size={28} strokeWidth={2} class="text-emerald-600" />
+            </div>
+            <div class="space-y-1">
+                <p class="text-sm text-slate-600">
+                    Versión actual:
+                    <span class="font-bold text-slate-800">{versionState.formattedBuildTime ?? '—'}</span>
+                </p>
+                <p class="text-sm text-slate-500">
+                    La recarga tomará solo unos segundos.
+                </p>
+            </div>
+        </div>
+        {#snippet footer()}
+            <button
+                class="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-all active:scale-95"
+                onclick={() => isUpdateModalOpen = false}
+            >
+                Después
+            </button>
+            <button
+                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/20"
+                onclick={() => versionState.refreshPage()}
+            >
+                <RotateCcw size={16} strokeWidth={2.5} />
+                Recargar ahora
+            </button>
+        {/snippet}
+    </Modal>
+{/if}
 
 <!-- Mobile overlay -->
 {#if uiState.isSidebarOpen}

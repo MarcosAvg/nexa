@@ -1,11 +1,30 @@
 /**
  * VersionState — Detecta si hay una nueva versión disponible
- * comparando el build-time local con el servidor periódicamente.
+ * comparando el build-time local con el servidor periódicamente,
+ * y muestra un indicador de estado "Al día" o "Actualización disponible".
  */
 export class VersionState {
     localBuildTime = $state<string>("");
     isUpdateAvailable = $state(false);
+    /** true cuando la primera verificación ya se completó. */
+    hasChecked = $state(false);
     lastCheckTime = $state<number>(0);
+    /** Build-time formateado para mostrar al usuario. */
+    formattedBuildTime = $derived.by(() => {
+        if (!this.localBuildTime) return null;
+        try {
+            const d = new Date(this.localBuildTime);
+            return d.toLocaleString("es-MX", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        } catch {
+            return this.localBuildTime.slice(0, 10);
+        }
+    });
 
     private checkInterval: ReturnType<typeof setInterval> | null = null;
     private initialized = false;
@@ -30,7 +49,10 @@ export class VersionState {
     }
 
     async checkForUpdate() {
-        if (!this.localBuildTime) return;
+        if (!this.localBuildTime) {
+            this.hasChecked = true;
+            return;
+        }
 
         try {
             const res = await fetch(`/build-info.json?t=${Date.now()}`);
@@ -41,8 +63,9 @@ export class VersionState {
                 this.isUpdateAvailable = true;
             }
             this.lastCheckTime = Date.now();
+            this.hasChecked = true;
         } catch {
-            // Error de red, ignorar
+            this.hasChecked = true;
         }
     }
 
