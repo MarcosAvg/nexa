@@ -197,8 +197,8 @@
             ? ticket.needsBaja
                 ? { variant: "rose" as const, label: "Baja de Registro" }
                 : ticket.daysElapsed >= settingsState.responsivaWarnDays
-                    ? { variant: "amber" as const, label: "Por vencer" }
-                    : { variant: "emerald" as const, label: "Pendiente" }
+                    ? { variant: "emerald" as const, label: "Por vencer" }
+                    : { variant: "amber" as const, label: "Pendiente" }
             : null
     );
 </script>
