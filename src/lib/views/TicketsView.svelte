@@ -21,6 +21,8 @@
     import { cardService } from "../services/cards";
     import { toast } from "svelte-sonner";
     import { handleError, exportResponsivasToExcel, exportResponsivasAllDependenciesAsZip } from "../utils";
+    import { settingsState } from "../stores";
+    import { computeResponsivaManagement } from "../utils/xlsxResponsivas";
     import {
         ImportPreviewModal, ConfirmAltaModal, TicketImportedDetailsModal,
     } from "../components";
@@ -122,7 +124,21 @@
                 }
             }
 
-            return { ...t, personName, cardType, cardFolio, movementType: t.movementType };
+            // Determinar si la firma de responsiva requiere baja de registro
+            let needsBaja = false;
+            let daysElapsed = 0;
+            if (t.type === "Firma Responsiva" && t.created_at) {
+                const mgmt = computeResponsivaManagement(
+                    t.movementType || "Sin clasificar",
+                    t.assignmentDate || t.created_at,
+                    t.created_at,
+                    settingsState.responsivaPickupDays
+                );
+                needsBaja = mgmt.needsBaja;
+                daysElapsed = mgmt.daysElapsed;
+            }
+
+            return { ...t, personName, cardType, cardFolio, movementType: t.movementType, needsBaja, daysElapsed };
         }),
     );
 

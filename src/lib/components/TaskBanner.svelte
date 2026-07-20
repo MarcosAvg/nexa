@@ -17,6 +17,7 @@
         AlertCircle,
     } from "lucide-svelte";
     import { networkStore } from "../stores/network.svelte";
+    import { settingsState } from "../stores";
     import { getTicketPriorityVariant } from "../constants/status";
 
     type Ticket = {
@@ -28,6 +29,8 @@
         cardType?: string;
         cardFolio?: string;
         movementType?: string;
+        needsBaja?: boolean;
+        daysElapsed?: number;
         priority: string;
         status: string;
         created_at?: string;
@@ -186,6 +189,18 @@
     }
 
     const priorityColor = $derived(getTicketPriorityVariant(ticket.priority));
+
+    // Configuración de badge de urgencia para Firma Responsiva
+    // Usa valores reactivos del store de configuración
+    const responsivaUrgency = $derived(
+        ticket.type === "Firma Responsiva" && ticket.daysElapsed != null
+            ? ticket.needsBaja
+                ? { variant: "rose" as const, label: "Baja de Registro" }
+                : ticket.daysElapsed >= settingsState.responsivaWarnDays
+                    ? { variant: "amber" as const, label: "Por vencer" }
+                    : { variant: "emerald" as const, label: "Pendiente" }
+            : null
+    );
 </script>
 
 <article
@@ -214,6 +229,14 @@
                     >
                         {ticket.movementType}
                     </span>
+                    {#if responsivaUrgency}
+                        <Badge
+                            variant={responsivaUrgency.variant}
+                            class="ml-1.5 px-2 py-0.5 text-[9px] uppercase font-black tracking-tight rounded-lg"
+                        >
+                            {ticket.daysElapsed} día{ticket.daysElapsed !== 1 ? "s" : ""} · {responsivaUrgency.label}
+                        </Badge>
+                    {/if}
                 {/if}
                 <div class="flex items-center gap-1.5 text-slate-300">
                     <Hash size={10} />

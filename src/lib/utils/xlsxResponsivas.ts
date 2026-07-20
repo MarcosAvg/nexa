@@ -1,7 +1,9 @@
 import type * as ExcelJSTypes from 'exceljs';
 import { addLogoToSheet } from './xlsxShared';
 
-const RESPONSIVA_PICKUP_DAYS = 7;
+export const RESPONSIVA_PICKUP_DAYS = 7;
+/** Días a partir de los cuales se muestra advertencia "Por vencer" (ámbar) en la UI. */
+export const RESPONSIVA_WARN_DAYS = 5;
 
 function daysSince(dateStr: string, reference: Date = new Date()): number {
     if (!dateStr) return 0;
@@ -33,16 +35,17 @@ function formatPickupTrackingLabel(
     return `Restan ${formatDaysRemaining(daysRemaining)} para recoger`;
 }
 
-function computeResponsivaManagement(
+export function computeResponsivaManagement(
     movementType: string,
     referenceDate: string,
-    ticketCreatedAt: string
+    ticketCreatedAt: string,
+    pickupDays: number = RESPONSIVA_PICKUP_DAYS
 ) {
     const isReposicion = movementType === "Reposición";
     const elapsedRef = isReposicion ? referenceDate : ticketCreatedAt;
     const daysElapsed = daysSince(elapsedRef);
-    const daysRemaining = Math.max(0, RESPONSIVA_PICKUP_DAYS - daysSince(ticketCreatedAt));
-    const needsBaja = !isReposicion && daysSince(ticketCreatedAt) > RESPONSIVA_PICKUP_DAYS;
+    const daysRemaining = Math.max(0, pickupDays - daysSince(ticketCreatedAt));
+    const needsBaja = !isReposicion && daysSince(ticketCreatedAt) > pickupDays;
 
     return {
         daysElapsed,

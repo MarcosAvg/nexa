@@ -6,5 +6,6 @@ export * from "./catalogs.svelte";
 export * from "./history.svelte";
 export * from "./cardlessRegistry.svelte";
 export * from "./cards.svelte";
+export * from "./settings.svelte";
 export { PaginatedListState } from "./paginatedList.svelte";
 
