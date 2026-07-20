@@ -324,66 +324,66 @@
                 <div class="grid gap-3">
                     <button 
                         type="button"
-                        class="flex justify-between items-center w-full text-left group transition-colors cursor-pointer"
+                        class="flex justify-between items-start w-full text-left gap-4 group transition-colors cursor-pointer"
                         onclick={() => copyToClipboard(person?.first_name || '', 'Nombres')}
-                        title="Copiar nombres"
+                        title={person.first_name || 'Copiar nombres'}
                     >
-                        <span class="text-xs text-slate-500 group-hover:text-blue-500 transition-colors"
+                        <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
                             >Nombres</span
                         >
-                        <span class="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors"
+                        <span class="text-sm font-bold text-slate-800 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                             >{person.first_name}</span
                         >
                     </button>
                     <button 
                         type="button"
-                        class="flex justify-between items-center w-full text-left group transition-colors cursor-pointer"
+                        class="flex justify-between items-start w-full text-left gap-4 group transition-colors cursor-pointer"
                         onclick={() => copyToClipboard(person?.last_name || '', 'Apellidos')}
-                        title="Copiar apellidos"
+                        title={person.last_name || 'Copiar apellidos'}
                     >
-                        <span class="text-xs text-slate-500 group-hover:text-blue-500 transition-colors"
+                        <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
                             >Apellidos</span
                         >
-                        <span class="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors"
+                        <span class="text-sm font-bold text-slate-800 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                             >{person.last_name}</span
                         >
                     </button>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs text-slate-500">No. Empleado</span>
-                        <span class="text-sm font-bold text-slate-800"
+                    <div class="flex justify-between items-start gap-4">
+                        <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5">No. Empleado</span>
+                        <span class="text-sm font-bold text-slate-800 text-right break-words max-w-[60%]"
                             >{person.employee_no}</span
                         >
                     </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs text-slate-500">Dependencia</span>
-                        <span class="text-sm font-medium text-slate-700"
+                    <div class="flex justify-between items-start gap-4">
+                        <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5">Dependencia</span>
+                        <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%]" title={person.dependency}
                             >{person.dependency}</span
                         >
                     </div>
                     {#if person.email}
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-slate-500">Correo</span>
-                            <span class="text-sm font-medium text-slate-700"
+                        <div class="flex justify-between items-start gap-4">
+                            <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5">Correo</span>
+                            <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%]" title={person.email}
                                 >{person.email}</span
                             >
                         </div>
                     {/if}
                     {#if person.area}
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-slate-500"
+                        <div class="flex justify-between items-start gap-4">
+                            <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5"
                                 >Área / Equipo</span
                             >
-                            <span class="text-sm font-medium text-slate-700"
+                            <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%]" title={person.area}
                                 >{person.area}</span
                             >
                         </div>
                     {/if}
                     {#if person.position}
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-slate-500"
+                        <div class="flex justify-between items-start gap-4">
+                            <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5"
                                 >Puesto / Función</span
                             >
-                            <span class="text-sm font-medium text-slate-700"
+                            <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%]" title={person.position}
                                 >{person.position}</span
                             >
                         </div>
