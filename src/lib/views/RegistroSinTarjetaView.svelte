@@ -24,27 +24,28 @@
     import { toast } from "svelte-sonner";
     
     import { networkStore } from "../stores/network.svelte";
-    import { onMount } from "svelte";
+    let registries = $derived(cardlessRegistryState.pagination.items);
+    let totalCount = $derived(cardlessRegistryState.pagination.totalRecords);
+    let currentPage = $derived(cardlessRegistryState.pagination.currentPage);
+    let pageSize = $derived(cardlessRegistryState.pagination.pageSize);
+    let isLoading = $derived(cardlessRegistryState.pagination.isLoading);
 
-    let registries = $derived(cardlessRegistryState.registries);
-    let totalCount = $derived(cardlessRegistryState.totalCount);
-    let currentPage = $derived(cardlessRegistryState.currentPage);
-    let pageSize = $derived(cardlessRegistryState.pageSize);
-    let isLoading = $derived(cardlessRegistryState.isLoading);
-
-    let startDate = $state("");
-    let endDate = $state("");
-    let reasonFilter = $state("");
-    let searchFilter = $state("");
-    let dependencyFilter = $state("");
     let dateRangeError = $state("");
+
+    // Filtros que mapean nombre → ID antes de aplicar
+    let depNameFilter = $state("");
+
+    $effect(() => {
+        const depId = depNameFilter
+            ? String(dependencies.find((d) => d.name === depNameFilter)?.id ?? "")
+            : "";
+        cardlessRegistryState.filters.dependencyId = depId;
+    });
 
     let buildings = $derived(catalogState.buildings);
     let dependencies = $derived(catalogState.dependencies);
     let dependencyNames = $derived(dependencies.map((d) => d.name));
     let reasons = $derived(cardlessRegistryService.REASONS);
-
-    let searchTimeout: ReturnType<typeof setTimeout> | undefined;
 
     let isModalOpen = $state(false);
     let editingRegistry = $state<CardlessRegistry | null>(null);
@@ -55,11 +56,7 @@
     let isConfirmDeleteOpen = $state(false);
     let registryToDelete = $state<CardlessRegistry | null>(null);
 
-    let fetchSeq = 0;
-
-    onMount(() => {
-        refreshData();
-    });
+    // No onMount necesario: el $effect debounced dispara la carga inicial automáticamente
 
     function dependencyIdFromName(name: string): string {
         if (!name) return "";
@@ -80,49 +77,25 @@
         return start <= end;
     }
 
-    function applyFiltersAndRefresh() {
-        if (!isValidDateRange(startDate, endDate)) {
-            dateRangeError = "La fecha de inicio no puede ser posterior a la fecha fin";
-            toast.error(dateRangeError);
-            return;
-        }
-        dateRangeError = "";
+    let filterDebounce: ReturnType<typeof setTimeout>;
+    $effect(() => {
+        cardlessRegistryState.filters.startDate;
+        cardlessRegistryState.filters.endDate;
+        cardlessRegistryState.filters.reason;
+        cardlessRegistryState.filters.search;
+        cardlessRegistryState.filters.dependencyId;
 
-        cardlessRegistryState.setFilters({
-            startDate,
-            endDate,
-            reason: reasonFilter,
-            search: searchFilter,
-            dependencyId: dependencyIdFromName(dependencyFilter),
-        });
-        refreshData();
-    }
-
-    function handleSearchInput(e: Event) {
-        searchFilter = (e.target as HTMLInputElement).value;
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(applyFiltersAndRefresh, 350);
-    }
-
-    async function refreshData() {
-        const seq = ++fetchSeq;
-        cardlessRegistryState.setLoading(true);
-        try {
-            const { data, count } = await cardlessRegistryService.fetchAll(
-                cardlessRegistryState.currentPage,
-                cardlessRegistryState.pageSize,
-                cardlessRegistryState.currentFilters
-            );
-            if (seq !== fetchSeq) return;
-            cardlessRegistryState.setRegistries(data, count);
-        } catch {
-            if (seq !== fetchSeq) return;
-            // handleError ya mostró toast en el servicio
-        } finally {
-            if (seq === fetchSeq) {
-                cardlessRegistryState.setLoading(false);
+        clearTimeout(filterDebounce);
+        filterDebounce = setTimeout(() => {
+            if (isValidDateRange(cardlessRegistryState.filters.startDate, cardlessRegistryState.filters.endDate)) {
+                dateRangeError = "";
+                cardlessRegistryState.refresh(1);
             }
-        }
+        }, 400);
+    });
+
+    function refreshData() {
+        cardlessRegistryState.refresh(cardlessRegistryState.pagination.currentPage);
     }
 
     function openAddModal() {
@@ -161,7 +134,7 @@
         const remaining = Math.max(0, totalCount - 1);
         const maxPage = Math.max(1, Math.ceil(remaining / pageSize) || 1);
         if (currentPage > maxPage) {
-            cardlessRegistryState.setPage(maxPage);
+            cardlessRegistryState.pagination.currentPage = maxPage;
         }
         registryToDelete = null;
         await refreshData();
@@ -172,18 +145,18 @@
         isExporting = true;
         try {
             const rows = await cardlessRegistryService.fetchAllMatching(
-                cardlessRegistryState.currentFilters
+                cardlessRegistryState.filters
             );
             if (rows.length === 0) {
                 toast.error("No hay registros para exportar");
                 return;
             }
             await cardlessRegistryService.exportToExcel(rows, {
-                startDate: startDate || undefined,
-                endDate: endDate || undefined,
-                reason: reasonFilter || undefined,
-                dependency: dependencyFilter || undefined,
-                search: searchFilter || undefined,
+                startDate: cardlessRegistryState.filters.startDate || undefined,
+                endDate: cardlessRegistryState.filters.endDate || undefined,
+                reason: cardlessRegistryState.filters.reason || undefined,
+                dependency: depNameFilter || undefined,
+                search: cardlessRegistryState.filters.search || undefined,
             });
             toast.success(`Reporte exportado (${rows.length} registros)`);
         } catch {
@@ -205,10 +178,10 @@
             await exportCardlessRegistryAllDependenciesAsZip(
                 dependencies,
                 {
-                    startDate: startDate || undefined,
-                    endDate: endDate || undefined,
-                    reason: reasonFilter || undefined,
-                    search: searchFilter || undefined,
+                    startDate: cardlessRegistryState.filters.startDate || undefined,
+                    endDate: cardlessRegistryState.filters.endDate || undefined,
+                    reason: cardlessRegistryState.filters.reason || undefined,
+                    search: cardlessRegistryState.filters.search || undefined,
                 },
                 (_current, _total, label) => {
                     toast.loading(`Procesando: ${label}`, { id: loadingToast });
@@ -225,7 +198,7 @@
 
     function changePage(page: number) {
         if (page === currentPage) return;
-        cardlessRegistryState.setPage(page);
+        cardlessRegistryState.pagination.currentPage = page;
         refreshData();
     }
 
@@ -384,9 +357,8 @@
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha Inicio</span>
                 <Input
                     type="date"
-                    bind:value={startDate}
-                    max={endDate || undefined}
-                    onchange={applyFiltersAndRefresh}
+                    bind:value={cardlessRegistryState.filters.startDate}
+                    max={cardlessRegistryState.filters.endDate || undefined}
                     class="h-9 text-xs font-bold {dateRangeError ? 'border-rose-400' : ''}"
                 />
             </div>
@@ -394,9 +366,8 @@
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha Fin</span>
                 <Input
                     type="date"
-                    bind:value={endDate}
-                    min={startDate || undefined}
-                    onchange={applyFiltersAndRefresh}
+                    bind:value={cardlessRegistryState.filters.endDate}
+                    min={cardlessRegistryState.filters.startDate || undefined}
                     class="h-9 text-xs font-bold {dateRangeError ? 'border-rose-400' : ''}"
                 />
             </div>
@@ -404,22 +375,20 @@
                 label="Dependencia"
                 options={dependencyNames}
                 placeholder="Todas"
-                bind:value={dependencyFilter}
-                onchange={applyFiltersAndRefresh}
+                bind:value={depNameFilter}
             />
             <FilterSelect
                 label="Motivo"
                 options={reasons}
                 placeholder="Todos"
-                bind:value={reasonFilter}
-                onchange={applyFiltersAndRefresh}
+                bind:value={cardlessRegistryState.filters.reason}
             />
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Búsqueda</span>
                 <SearchInput
                     placeholder="Nombre o # empleado..."
-                    bind:value={searchFilter}
-                    oninput={handleSearchInput}
+                    bind:value={cardlessRegistryState.filters.search}
+                    oninput={() => {}}
                     class="h-9 text-xs font-bold w-48"
                 />
             </div>

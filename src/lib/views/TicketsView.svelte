@@ -18,49 +18,60 @@
         Download,
         FolderArchive,
         ClipboardList,
-        FilterX,
     } from "lucide-svelte";
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
     import { personnelService } from "../services/personnel";
     import { toast } from "svelte-sonner";
-    import { handleError, exportResponsivasToExcel, exportResponsivasAllDependenciesAsZip, createSimpleDebounce, appEvents, EVENTS } from "../utils";
+    import { handleError, exportResponsivasToExcel, exportResponsivasAllDependenciesAsZip } from "../utils";
     import {
         ImportPreviewModal, ConfirmAltaModal, TicketImportedDetailsModal,
     } from "../components";
     import { networkStore } from "../stores/network.svelte";
 
-    // Tickets paginados del servidor (reemplaza filtrado del lado del cliente)
-    let tickets = $state<any[]>([]);
-    let currentPage = $state(1);
-    let pageSize = $state(50);
-    let totalRecords = $state(0);
-    let isLoading = $state(false);
+    // Tickets paginados del servidor vía TicketState
+    let tickets = $derived(ticketState.pagination.items);
+    let currentPage = $derived(ticketState.pagination.currentPage);
+    let pageSize = $derived(ticketState.pagination.pageSize);
+    let totalRecords = $derived(ticketState.pagination.totalRecords);
+    let isLoading = $derived(ticketState.pagination.isLoading);
     let isZipExporting = $state(false);
 
-    // Secciones
-    let currentSection = $state<"General" | "Responsivas">("General");
+    // Filtros de UI que mapean nombre → ID antes de aplicar
+    let depNameFilter = $state("Todas");
 
-    // Filtros
-    let typeFilter = $state("Todos");
-    let priorityFilter = $state("Todas");
-    let searchQuery = $state("");
-    let dependencyFilter = $state("Todas");
+    // Sincronizar nombre de dependencia → ID en el store
+    $effect(() => {
+        const depId = depNameFilter === "Todas"
+            ? ""
+            : catalogState.dependencies.find((d) => d.name === depNameFilter)?.id || "";
+        ticketState.filters.dependencyId = depId;
+    });
+
+    // Debounced auto-refresh cuando cambian los filtros
+    let filterDebounce: ReturnType<typeof setTimeout>;
+    $effect(() => {
+        ticketState.filters.type;
+        ticketState.filters.priority;
+        ticketState.filters.search;
+        ticketState.filters.dependencyId;
+        ticketState.filters.section;
+
+        clearTimeout(filterDebounce);
+        filterDebounce = setTimeout(() => ticketState.refresh(1), 400);
+    });
+
+    // Secciones
+    let currentSection = $derived(ticketState.filters.section);
 
     function switchSection(section: "General" | "Responsivas") {
-        if (currentSection !== section) {
-            currentSection = section;
-            typeFilter = "Todos";
-            priorityFilter = "Todas";
-            searchQuery = "";
-            dependencyFilter = "Todas";
-            // Reiniciar campo de búsqueda si existe
-            const searchInput = document.getElementById(
-                "ticket-search",
-            ) as HTMLInputElement;
-            if (searchInput) searchInput.value = "";
-            refreshData(1);
-        }
+        if (ticketState.filters.section === section) return;
+        ticketState.filters.section = section;
+        ticketState.filters.type = "Todos";
+        ticketState.filters.priority = "Todas";
+        ticketState.filters.search = "";
+        depNameFilter = "Todas";
+        // El $effect debounced dispara refresh(1) automáticamente
     }
 
     // Estado del modal
@@ -87,7 +98,7 @@
     let isCompareOpen = $state(false);
     let compareTicket = $state<any>(null);
 
-    let personnel = $derived(personnelState.personnel);
+    let personnel = $derived(personnelState.pagination.items);
     let dependencies = $derived(catalogState.dependencies);
 
     // Datos paginados del servidor con resolución de nombre de persona
@@ -97,7 +108,6 @@
             if (t.personnel) {
                 personName = `${t.personnel.first_name} ${t.personnel.last_name}`;
             } else if (t.payload?.nombres || t.payload?.apellidos) {
-                // Resolución para tickets importados (altas, modificaciones, etc.)
                 personName =
                     `${t.payload.apellidos || ""}, ${t.payload.nombres || ""}`.trim();
                 if (personName.startsWith(","))
@@ -108,14 +118,8 @@
                 personName = t.payload.relatedPerson.name;
             }
 
-            // También resolver info de tarjeta desde payload si es importación (ej. Reposición)
-            let cardType = t.card_type;
-            let cardFolio = t.card_folio;
-
-            if (t.cards) {
-                cardType = t.cards.type || cardType;
-                cardFolio = t.cards.folio || cardFolio;
-            }
+            let cardType = t.cards?.type || t.cardType;
+            let cardFolio = t.cards?.folio || t.cardFolio;
 
             if (!cardFolio && t.payload) {
                 if (t.payload.folio_p2000) {
@@ -148,8 +152,6 @@
         "Reporte de Falla",
         "Otro",
     ];
-
-    import { onMount, onDestroy } from "svelte";
 
     import { supabase } from "../supabase";
 
@@ -217,67 +219,14 @@
         }
     }
 
-    async function refreshData(page: number = 1) {
-        isLoading = true;
-        currentPage = page;
-        try {
-            const depId =
-                dependencyFilter === "Todas"
-                    ? ""
-                    : catalogState.dependencies.find(
-                          (d) => d.name === dependencyFilter,
-                      )?.id || "";
-
-            const [result, extraCards] = await Promise.all([
-                ticketService.fetchPaginated(
-                    currentPage,
-                    pageSize,
-                    typeFilter,
-                    priorityFilter,
-                    searchQuery,
-                    currentSection,
-                    depId,
-                ),
-                cardService.fetchExtra(),
-            ]);
-            tickets = result.data;
-            totalRecords = result.count;
-            // Actualizar también el store global para el conteo de pendientes del Dashboard
-            ticketState.setTickets(result.data);
-            personnelState.setCards(extraCards);
-            await validateOpenModalsAgainstDb();
-        } finally {
-            isLoading = false;
-        }
+    /** Refresca los datos paginados y datos auxiliares. */
+    async function refreshData(page?: number) {
+        await Promise.all([
+            ticketState.refresh(page ?? ticketState.pagination.currentPage),
+            cardService.fetchExtra().then((cards) => personnelState.setCards(cards)),
+        ]);
+        await validateOpenModalsAgainstDb();
     }
-
-    // Búsqueda con debounce
-    const debouncedSearch = createSimpleDebounce(() => {
-        refreshData(1);
-    }, 300);
-
-    function onSearch(e: Event) {
-        const value = (e.target as HTMLInputElement).value;
-        searchQuery = value;
-        debouncedSearch();
-    }
-
-    function onFilterChange() {
-        refreshData(1);
-    }
-
-    let unsubs: (() => void)[] = [];
-
-    onMount(() => {
-        refreshData();
-        unsubs.push(
-            appEvents.on(EVENTS.TICKETS_CHANGED, () =>
-                refreshData(currentPage),
-            ),
-        );
-    });
-
-    onDestroy(() => unsubs.forEach((fn) => fn()));
 
     // Manejadores
     const IMPORTED_TYPES = new Set([
@@ -289,7 +238,6 @@
     ]);
 
     function onManageTicket(ticket: any) {
-        // Enrutar tipos de ticket importados a modales dedicados
         if (ticket.type === "Alta de Persona") {
             altaTicket = ticket;
             isAltaOpen = true;
@@ -308,14 +256,13 @@
             return;
         }
 
-        // Predeterminado: detalles manuales
         manualTicket = ticket;
         isManualDetailsOpen = true;
     }
 
     function onOpenAddTicket() {
         editingTicket = null;
-        isModalOpen = true; // Still use TicketModal for creating new tickets
+        isModalOpen = true;
     }
 
     function onStartCompletion(ticket: any) {
@@ -344,12 +291,7 @@
             return;
         }
 
-        // Para otros tipos, usar flujo manual o completado rápido
-        // Por defecto, modal manual para experiencia consistente de revisión desde banner
-        // onStartCompletion se dispara con el botón de verificar en banner
-
         ticketToComplete = ticket;
-        // Llamar directamente a handleFinalConfirm para tickets simples
         handleFinalConfirm();
     }
 
@@ -359,34 +301,25 @@
         const ticket = ticketToComplete;
         ticketToComplete = null;
 
-        // Optimista: eliminar del array local inmediatamente (sin parpadeo)
         const prevTickets = tickets;
-        tickets = tickets.filter((t) => t.id !== ticket.id);
-        totalRecords = Math.max(0, totalRecords - 1);
+        ticketState.pagination.items = ticketState.pagination.items.filter((t) => t.id !== ticket.id);
+        ticketState.pagination.totalRecords = Math.max(0, ticketState.pagination.totalRecords - 1);
 
         try {
             await ticketService.delete(ticket.id);
             toast.success("Ticket completado");
         } catch (e) {
             handleError(e, "Completar Ticket");
-            // Reversión en caso de error
-            tickets = prevTickets;
-            totalRecords = totalRecords + 1;
+            ticketState.pagination.items = prevTickets;
+            ticketState.pagination.totalRecords = ticketState.pagination.totalRecords + 1;
         }
     }
 
     async function handleExportResponsivas() {
         const loadingToast = toast.loading("Preparando exportación...");
         try {
-            const depId =
-                dependencyFilter === "Todas"
-                    ? ""
-                    : catalogState.dependencies.find(
-                          (d) => d.name === dependencyFilter,
-                      )?.id || "";
-
             const data =
-                await ticketService.fetchResponsivasForExport(depId);
+                await ticketService.fetchResponsivasForExport(ticketState.filters.dependencyId);
 
             if (data.length === 0) {
                 toast.info("No hay responsivas pendientes para exportar", {
@@ -395,7 +328,7 @@
                 return;
             }
 
-            await exportResponsivasToExcel(data, dependencyFilter);
+            await exportResponsivasToExcel(data, depNameFilter);
             toast.success("Exportación completada", { id: loadingToast });
         } catch (error) {
             toast.dismiss(loadingToast);
@@ -467,8 +400,7 @@
                             label="Tipo"
                             options={ticketTypes}
                             placeholder=""
-                            bind:value={typeFilter}
-                            onchange={onFilterChange}
+                            bind:value={ticketState.filters.type}
                         />
                     </div>
                 {/if}
@@ -479,8 +411,7 @@
                         label="Prioridad"
                         options={["Todas", "Alta", "Media", "Baja"]}
                         placeholder=""
-                        bind:value={priorityFilter}
-                        onchange={onFilterChange}
+                        bind:value={ticketState.filters.priority}
                     />
                 </div>
 
@@ -491,8 +422,7 @@
                             label="Dependencia"
                             options={["Todas", ...dependencies.map((d) => d.name)]}
                             placeholder=""
-                            bind:value={dependencyFilter}
-                            onchange={onFilterChange}
+                            bind:value={depNameFilter}
                         />
                     </div>
                 {/if}
@@ -507,8 +437,7 @@
                         id="ticket-search"
                         placeholder="Buscar por folio, persona..."
                         class="pl-10 h-9 text-xs font-bold"
-                        value={searchQuery}
-                        oninput={onSearch}
+                        bind:value={ticketState.filters.search}
                     />
                 </div>
             </div>
@@ -571,8 +500,6 @@
         {/snippet}
     </SectionHeader>
 
-    <!-- Top Pagination removed per request -->
-
     <ContentView
         isLoading={isLoading}
         data={filteredTickets}
@@ -582,14 +509,13 @@
         emptyDescriptionFiltered="No encontramos tickets con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={ClipboardList}
         emptyIconBgClass="from-amber-50 to-amber-100 ring-1 ring-amber-200/50 text-amber-400"
-        hasFilters={!!(typeFilter !== "Todos" || priorityFilter !== "Todas" || searchQuery)}
+        hasFilters={!!(ticketState.filters.type !== "Todos" || ticketState.filters.priority !== "Todas" || ticketState.filters.search)}
         onClearFilters={() => {
-            typeFilter = 'Todos';
-            priorityFilter = 'Todas';
-            searchQuery = '';
-            const searchInput = document.getElementById('ticket-search') as HTMLInputElement;
-            if (searchInput) searchInput.value = '';
-            refreshData(1);
+            ticketState.filters.type = 'Todos';
+            ticketState.filters.priority = 'Todas';
+            ticketState.filters.search = '';
+            depNameFilter = 'Todas';
+            // El $effect debounced dispara refresh(1) automáticamente
         }}
         skeletonColumns={4}
         skeletonRows={6}
@@ -620,9 +546,9 @@
         {currentPage}
         {pageSize}
         totalRecords={totalRecords}
-        onPrevPage={() => refreshData(currentPage - 1)}
-        onNextPage={() => refreshData(currentPage + 1)}
-        onGoToPage={(page) => refreshData(page)}
+        onPrevPage={() => ticketState.prevPage()}
+        onNextPage={() => ticketState.nextPage()}
+        onGoToPage={(page) => ticketState.goToPage(page)}
         {isLoading}
     />
 </div>
@@ -632,27 +558,27 @@
 <ManualTicketDetailsModal
     bind:isOpen={isManualDetailsOpen}
     ticket={manualTicket}
-    onComplete={refreshData}
+    onComplete={() => refreshData()}
 />
 
 <ModificationCompareModal
     bind:isOpen={isCompareOpen}
     ticket={compareTicket}
-    onComplete={refreshData}
+    onComplete={() => refreshData()}
 />
 
-<ImportPreviewModal bind:isOpen={isImportOpen} onComplete={refreshData} />
+<ImportPreviewModal bind:isOpen={isImportOpen} onComplete={() => refreshData()} />
 
 <ConfirmAltaModal
     bind:isOpen={isAltaOpen}
     ticket={altaTicket}
-    onComplete={refreshData}
+    onComplete={() => refreshData()}
 />
 
 <TicketImportedDetailsModal
     bind:isOpen={isImportedOpen}
     ticket={importedTicket}
-    onComplete={refreshData}
+    onComplete={() => refreshData()}
 />
 
 <PermissionGuard requireEdit>

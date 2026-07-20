@@ -1,5 +1,4 @@
 import { supabase } from "../supabase";
-import { appEvents, EVENTS } from "./appEvents";
 import { networkStore } from "../stores/network.svelte";
 
 let globalRealtimeStarted = false;
@@ -100,7 +99,6 @@ function createChannel(channelName: string) {
                 { event: "*", schema: "public", table: "tickets" },
                 (payload) => {
                     console.log("[Realtime: Tickets]", payload.eventType, payload);
-                    appEvents.emit(EVENTS.TICKETS_CHANGED);
                 },
             )
             .on(
@@ -108,7 +106,6 @@ function createChannel(channelName: string) {
                 { event: "*", schema: "public", table: "cards" },
                 (payload) => {
                     console.log("[Realtime: Cards]", payload.eventType, payload);
-                    appEvents.emit(EVENTS.CARDS_CHANGED);
                 },
             )
             .on(
@@ -116,7 +113,6 @@ function createChannel(channelName: string) {
                 { event: "*", schema: "public", table: "history_logs" },
                 (payload) => {
                     console.log("[Realtime: history_logs]", payload.eventType, payload);
-                    appEvents.emit(EVENTS.HISTORY_CHANGED);
                 },
             )
             .subscribe((status, err) => logSubscribeStatus(channelName, status, err));

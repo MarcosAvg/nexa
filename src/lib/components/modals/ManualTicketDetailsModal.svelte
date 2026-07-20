@@ -44,7 +44,7 @@
     let relatedPerson = $derived.by(() => {
         if (!ticket?.person_id) return null;
         return (
-            personnelState.personnel.find((p) => p.id === ticket.person_id) ||
+            personnelState.pagination.items.find((p) => p.id === ticket.person_id) ||
             fetchedPerson ||
             null
         );
@@ -52,7 +52,7 @@
 
     $effect(() => {
         if (isOpen && ticket?.person_id) {
-            const inStore = personnelState.personnel.find(
+            const inStore = personnelState.pagination.items.find(
                 (p) => p.id === ticket.person_id,
             );
             if (
@@ -78,7 +78,7 @@
 
     let displayPersonName = $derived.by(() => {
         if (ticket?.person_id) {
-            const person = personnelState.personnel.find(
+            const person = personnelState.pagination.items.find(
                 (p) => p.id === ticket.person_id,
             );
             if (person) return person.name;

@@ -12,28 +12,15 @@
         BarChart3,
         TrendingUp,
     } from "lucide-svelte";
-    import { onMount, onDestroy } from "svelte";
-    import { appEvents, EVENTS } from "../utils";
-
-    let unsubs: (() => void)[] = [];
+    import { onMount } from "svelte";
 
     onMount(() => {
         personnelState.refreshDashboardStats();
         personnelState.refreshDashboardMetrics();
-
-        unsubs.push(
-            appEvents.on(EVENTS.PERSONNEL_CHANGED, () => {
-                personnelState.refreshDashboardStats();
-                personnelState.refreshDashboardMetrics();
-            }),
-            appEvents.on(EVENTS.CARDS_CHANGED, () => {
-                personnelState.refreshDashboardStats();
-                personnelState.refreshDashboardMetrics();
-            }),
-        );
     });
-
-    onDestroy(() => unsubs.forEach((fn) => fn()));
+    // Las métricas se actualizan automáticamente vía Realtime:
+    // PersonnelState.initRealtime() refresca dashboardStats y dashboardMetrics
+    // en cada cambio detectado en la tabla personnel.
 
     let pendingItems = $derived(ticketState.pendingItems);
 

@@ -241,12 +241,11 @@
 
 {#if isOpen}
     <!-- Fondo con desenfoque premium -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
         class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] p-4 flex justify-center items-start pt-[12vh]"
-        role="button"
-        tabindex="-1"
+        role="presentation"
         onclick={close}
-        onkeydown={(e) => e.key === "Escape" && close()}
     >
         <div
             class="w-full max-w-2xl bg-white/90 backdrop-blur-xl rounded-3xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.3)] border border-white/20 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200"

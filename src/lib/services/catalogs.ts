@@ -55,11 +55,11 @@ export const catalogService = {
             if (id) {
                 const { error } = await supabase.from("buildings").update(payload).eq("id", id);
                 if (error) throw error;
-                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Edificio actualizado: ${payload.name}` });
+                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Edificio actualizado: ${payload.name}`, entityName: `Edificio: ${payload.name}` });
             } else {
                 const { data, error } = await supabase.from("buildings").insert([payload]).select().single();
                 if (error) throw error;
-                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Edificio creado: ${payload.name}` });
+                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Edificio creado: ${payload.name}`, entityName: `Edificio: ${payload.name}` });
             }
             catalogCache.invalidate('buildings');
         }, "Save Building");
@@ -70,11 +70,11 @@ export const catalogService = {
             if (id) {
                 const { error } = await supabase.from("dependencies").update(payload).eq("id", id);
                 if (error) throw error;
-                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Dependencia actualizada: ${payload.name}` });
+                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Dependencia actualizada: ${payload.name}`, entityName: `Dependencia: ${payload.name}` });
             } else {
                 const { data, error } = await supabase.from("dependencies").insert([payload]).select().single();
                 if (error) throw error;
-                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Dependencia creada: ${payload.name}` });
+                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Dependencia creada: ${payload.name}`, entityName: `Dependencia: ${payload.name}` });
             }
             catalogCache.invalidate('dependencies');
         }, "Save Dependency");
@@ -85,11 +85,11 @@ export const catalogService = {
             if (id) {
                 const { error } = await supabase.from("special_accesses").update(payload).eq("id", id);
                 if (error) throw error;
-                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Acceso especial actualizado: ${payload.name}` });
+                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Acceso especial actualizado: ${payload.name}`, entityName: `Acceso especial: ${payload.name}` });
             } else {
                 const { data, error } = await supabase.from("special_accesses").insert([payload]).select().single();
                 if (error) throw error;
-                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Acceso especial creado: ${payload.name}` });
+                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Acceso especial creado: ${payload.name}`, entityName: `Acceso especial: ${payload.name}` });
             }
             catalogCache.invalidate('special_accesses');
         }, "Save Access");
@@ -100,11 +100,11 @@ export const catalogService = {
             if (id) {
                 const { error } = await supabase.from("schedules").update(payload).eq("id", id);
                 if (error) throw error;
-                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Horario actualizado: ${payload.name}` });
+                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Horario actualizado: ${payload.name}`, entityName: `Horario: ${payload.name}` });
             } else {
                 const { data, error } = await supabase.from("schedules").insert([payload]).select().single();
                 if (error) throw error;
-                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Horario creado: ${payload.name}` });
+                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Horario creado: ${payload.name}`, entityName: `Horario: ${payload.name}` });
             }
             catalogCache.invalidate('schedules');
         }, "Save Schedule");
@@ -115,7 +115,7 @@ export const catalogService = {
         return withErrorHandling(async () => {
             const { error } = await supabase.from(table).delete().eq("id", id);
             if (error) throw error;
-            await HistoryService.log("SYSTEM", id, "DELETE_CATALOG", { message: `Eliminado de ${table}: ${itemName}` });
+            await HistoryService.log("SYSTEM", id, "DELETE_CATALOG", { message: `Eliminado de ${table}: ${itemName}`, entityName: `${table}: ${itemName}` });
             catalogCache.invalidate(table);
         }, "Delete Catalog Item");
     }

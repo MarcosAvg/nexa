@@ -28,7 +28,35 @@ export const ACTION_NAMES: Record<string, string> = {
     DELETE_CATALOG: "Catálogo Eliminado",
     CANCEL: "Cancelación",
     COMPLETE: "Completado",
+    // Agregados que se usan pero faltaban:
+    REJECT_ALTA: "Alta Rechazada",
 };
+
+/**
+ * Solo las acciones que efectivamente se registran en HistoryService.log().
+ * Usado en el dropdown del filtro para evitar opciones que siempre devuelven 0.
+ */
+export const FILTERED_ACTIONS: [string, string][] = [
+    ["CREATE", "Registro"],
+    ["UPDATE", "Actualización"],
+    ["DELETE", "Eliminación"],
+    ["ASSIGN_CARD", "Asignación de Tarjeta"],
+    ["REPLACE_CARD", "Reposición de Tarjeta"],
+    ["REPLACE_OLD", "Baja por Reposición"],
+    ["UNASSIGN", "Desvinculación"],
+    ["SIGN_RESPONSIVA", "Firma de Responsiva"],
+    ["DELETE_RESPONSIVA", "Eliminación de Responsiva"],
+    ["UPDATE_STATUS", "Cambio de Estado"],
+    ["CREATE_CATALOG", "Catálogo Creado"],
+    ["UPDATE_CATALOG", "Catálogo Actualizado"],
+    ["DELETE_CATALOG", "Catálogo Eliminado"],
+    ["APPLY_MODIFICATION", "Modificación Aprobada"],
+    ["REJECT_MODIFICATION", "Modificación Rechazada"],
+    ["COMPLETE", "Completado"],
+    ["CANCEL", "Cancelación"],
+    ["UPDATE_ROLE", "Cambio de Rol"],
+    ["REJECT_ALTA", "Alta Rechazada"],
+];
 
 export const ACTION_COLORS: Record<string, string> = {
     CREATE: "emerald",
@@ -60,6 +88,7 @@ export const ACTION_COLORS: Record<string, string> = {
     DELETE_CATALOG: "rose",
     CANCEL: "rose",
     COMPLETE: "emerald",
+    REJECT_ALTA: "rose",
 };
 
 export function translateDetails(text: string) {
@@ -71,14 +100,15 @@ export function translateDetails(text: string) {
         .replace(/\bcomplete\b/gi, "completado")
         .replace(/\bcompleted\b/gi, "completado")
         .replace(/\bpending\b/gi, "pendiente")
-        .replace(/\bdone\b/gi, "listo")
+        .replace(/\bdone\b/gi, "realizada")
         .replace(/\bsigned\b/gi, "firmado/a")
         .replace(/\bunsigned\b/gi, "sin firmar")
         .replace(/\bavailable\b/gi, "disponible")
+        .replace(/\blegacy\b/gi, "heredada")
         .replace(/\burgente\b/gi, "URGENTE")
-        .replace(/\balta\b/gi, "ALTA")
-        .replace(/\bmedia\b/gi, "MEDIA")
-        .replace(/\bbaja\b/gi, "BAJA")
+        .replace(/\balta\b/gi, "alta")
+        .replace(/\bmedia\b/gi, "media")
+        .replace(/\bbaja\b/gi, "baja")
         .replace(/\bnull\b/gi, "N/A");
 }
 

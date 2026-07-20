@@ -363,8 +363,9 @@
                     />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Dependencia <span class="text-rose-500">*</span></label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-dependency">Dependencia <span class="text-rose-500">*</span></label>
                     <Select
+                        id="reg-dependency"
                         options={dependencyNames}
                         bind:value={manualDependency}
                         placeholder="Seleccionar dependencia"
@@ -452,20 +453,20 @@
         <!-- ── Location ──────────────────────────────────────────── -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Edificio <span class="text-rose-500">*</span></label>
-                <Select options={buildingNames} bind:value={manualBuilding} placeholder="Seleccionar edificio" disabled={!!selectedPerson} />
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-building">Edificio <span class="text-rose-500">*</span></label>
+                <Select id="reg-building" options={buildingNames} bind:value={manualBuilding} placeholder="Seleccionar edificio" disabled={!!selectedPerson} />
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Piso Base <span class="text-rose-500">*</span></label>
-                <Select options={availableFloors} bind:value={manualFloor} placeholder="Seleccionar piso" disabled={!manualBuilding || !!selectedPerson} />
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-floor">Piso Base <span class="text-rose-500">*</span></label>
+                <Select id="reg-floor" options={availableFloors} bind:value={manualFloor} placeholder="Seleccionar piso" disabled={!manualBuilding || !!selectedPerson} />
             </div>
         </div>
 
         <!-- ── Reason + date ─────────────────────────────────────── -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Motivo <span class="text-rose-500">*</span></label>
-                <Select options={reasons} bind:value={selectedReason} placeholder="Seleccionar motivo" />
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-reason">Motivo <span class="text-rose-500">*</span></label>
+                <Select id="reg-reason" options={reasons} bind:value={selectedReason} placeholder="Seleccionar motivo" />
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1" for="recorded-at">Fecha y Hora</label>

@@ -5,7 +5,9 @@
 export { AppError, handleError, withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout } from './error';
 export { batchPaginate, batchForEach, batchCollectIds } from './batchPaginate';
 export type { DbError } from './batchPaginate';
-export { appEvents, EVENTS } from './appEvents';
+// NOTA: appEvents.ts fue eliminado — las suscripciones ahora se manejan
+// directamente vía Supabase Realtime y llamadas a stores.
+
 export { dbCache } from './dbCache';
 export { catalogCache } from './catalogCache';
 export { generateLegalHash } from './crypto';

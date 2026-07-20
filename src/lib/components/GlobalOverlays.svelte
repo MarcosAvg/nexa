@@ -7,7 +7,7 @@
     import AddCardModal from "./modals/AddCardModal.svelte";
     import ConfirmationModal from "./modals/ConfirmationModal.svelte";
     import DeletePersonnelModal from "./modals/DeletePersonnelModal.svelte";
-    import { personnelActions, appEvents, EVENTS } from "../utils";
+    import { personnelActions } from "../utils";
     import { uiState } from "../stores/ui.svelte";
     import { confirm } from "../utils/confirmModal.svelte";
 
@@ -19,7 +19,7 @@
 
     let selectedPerson = $derived.by(() => {
         if (!selectedPersonId) return null;
-        const pInStore = personnelState.personnel.find(
+        const pInStore = personnelState.pagination.items.find(
             (p) => p.id === selectedPersonId,
         );
         if (pInStore) return pInStore;
@@ -30,7 +30,7 @@
 
     $effect(() => {
         if (isDetailsOpen && selectedPersonId) {
-            const pInStore = personnelState.personnel.find(
+            const pInStore = personnelState.pagination.items.find(
                 (p) => p.id === selectedPersonId,
             );
             if (
@@ -47,32 +47,8 @@
         }
     });
 
-    $effect(() => {
-        const unsub = appEvents.on(EVENTS.TRIGGER_DEACTIVATE, (payload: any) => {
-            if (payload?.person) {
-                // 1. Abrimos el panel lateral de la persona
-                personnelState.selectPerson(payload.person.id);
-                // 2. Preparamos y abrimos el modal de confirmación
-                confirm.open({
-                    title: "¿DAR DE BAJA?",
-                    description:
-                        "Esta persona dejará de tener acceso, pero sus datos se conservarán en el sistema. Las tarjetas pasarán a estar bloqueadas.",
-                    variant: "danger",
-                    confirmText: "Dar de Baja",
-                    onConfirm: async () => {
-                        await personnelActions.handleDeactivatePerson(
-                            payload.person,
-                            refreshData,
-                        );
-                        if (payload.onSuccess) {
-                            await payload.onSuccess();
-                        }
-                    },
-                });
-            }
-        });
-        return () => unsub();
-    });
+    // La desactivación ahora se maneja directamente desde PersonnelView
+    // sin necesidad del bus de eventos.
 
     // Estado local para overlays globales (acciones disparadas desde aquí)
     let isCardModalOpen = $state(false);
@@ -88,12 +64,7 @@
     // Auxiliar de actualización de datos
     async function refreshData() {
         await Promise.all([
-            personnelState.refresh(
-                personnelState.currentPage,
-                personnelState.searchQuery,
-                personnelState.statusFilter,
-                personnelState.dependencyId,
-            ),
+            personnelState.refresh(personnelState.pagination.currentPage),
             cardService
                 .fetchExtra()
                 .then((cards) => personnelState.setCards(cards)),

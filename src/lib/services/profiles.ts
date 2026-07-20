@@ -14,7 +14,10 @@ export const profileService = {
         return withErrorHandling(async () => {
             const { error } = await supabase.from('profiles').update({ role }).eq('id', userId);
             if (error) throw error;
-            await HistoryService.log('SYSTEM', userId, 'UPDATE_ROLE', { message: `Rol actualizado a ${role}` });
+            await HistoryService.log('SYSTEM', userId, 'UPDATE_ROLE', {
+                message: `Rol actualizado a ${role}`,
+                entityName: `Usuario (${userId.slice(0, 8)}...) — ${role}`
+            });
         }, "Update Role");
     }
 };

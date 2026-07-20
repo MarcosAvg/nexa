@@ -34,7 +34,7 @@
         if (!ticket?.person_id) return null;
         // Priorizar datos del store para consistencia, fallback a datos consultados
         return (
-            personnelState.personnel.find((p) => p.id === ticket.person_id) ||
+            personnelState.pagination.items.find((p) => p.id === ticket.person_id) ||
             fetchedPerson ||
             null
         );
@@ -42,7 +42,7 @@
 
     $effect(() => {
         if (isOpen && ticket?.person_id) {
-            const inStore = personnelState.personnel.find(
+            const inStore = personnelState.pagination.items.find(
                 (p) => p.id === ticket.person_id,
             );
             if (
@@ -215,6 +215,7 @@
                 "APPLY_MODIFICATION",
                 {
                     message: `Modificación de datos aprobada para ${currentPerson.name}`,
+                    entityName: currentPerson.name,
                 },
             );
 
@@ -223,7 +224,7 @@
                 personnelService.fetchAll(),
                 cardService.fetchExtra(),
             ]);
-            personnelState.setPersonnel(
+            personnelState.pagination.setItems(
                 updatedPersonnel.data,
                 updatedPersonnel.count,
             );
@@ -253,12 +254,14 @@
             );
 
             // Registrar el rechazo
+            const rejectName = currentPerson?.name || 'Desconocido';
             await HistoryService.log(
                 "PERSONNEL",
                 ticket.person_id || "",
                 "REJECT_MODIFICATION",
                 {
-                    message: `Modificación de datos rechazada`,
+                    message: `Modificación de datos rechazada para ${rejectName}`,
+                    entityName: rejectName,
                 },
             );
             toast.info("Ticket rechazado", {

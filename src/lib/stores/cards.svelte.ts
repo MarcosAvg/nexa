@@ -1,81 +1,74 @@
 import { cardService } from "../services/cards";
-import { appEvents, EVENTS } from "../utils";
 import type { Card } from "../types";
+import { PaginatedListState } from "./paginatedList.svelte";
+
+export type CardFilters = {
+    type: string;
+    status: string;
+    search: string;
+    dependencyId: string;
+};
 
 export class CardState {
-    cards = $state<Card[]>([]);
-    currentPage = $state(1);
-    pageSize = $state(50);
-    totalRecords = $state(0);
-    isLoading = $state(false);
+    pagination = new PaginatedListState<Card>();
 
-    // Filtros
-    statusFilter = $state("Todas");
-    typeFilter = $state("Todos");
-    searchQuery = $state("");
-    dependencyFilter = $state("");
+    /** Filtros unificados. */
+    filters: CardFilters = $state({
+        type: "Todos",
+        status: "Todas",
+        search: "",
+        dependencyId: "",
+    });
 
-    totalPages = $derived(Math.ceil(this.totalRecords / this.pageSize));
+    /** Carga la primera página con los filtros actuales. */
+    async init() {
+        await this.refresh();
+    }
+
+    /** Libera recursos. */
+    destroy() {
+        // sin suscripciones propias que limpiar
+    }
 
     async refresh(page?: number) {
-        this.isLoading = true;
-        if (page !== undefined) this.currentPage = page;
-        try {
-            const result = await cardService.fetchAll(
-                this.currentPage,
-                this.pageSize,
-                this.searchQuery,
-                this.typeFilter,
-                this.statusFilter,
-                this.dependencyFilter,
-            );
-            this.cards = result.data;
-            this.totalRecords = result.count;
-        } finally {
-            this.isLoading = false;
-        }
+        await this.pagination.fetchPage(
+            (p, s) => cardService.fetchAll(p, s, this.filters.search, this.filters.type, this.filters.status, this.filters.dependencyId),
+            page,
+        );
     }
 
     setFilters(type: string, status: string, depId: string = "") {
-        this.typeFilter = type;
-        this.statusFilter = status;
-        this.dependencyFilter = depId;
-        this.currentPage = 1;
+        this.filters.type = type;
+        this.filters.status = status;
+        this.filters.dependencyId = depId;
+        this.pagination.currentPage = 1;
     }
 
     setSearch(query: string) {
-        this.searchQuery = query;
-        this.currentPage = 1;
+        this.filters.search = query;
+        this.pagination.currentPage = 1;
     }
 
     nextPage() {
-        if (this.currentPage < this.totalPages) {
-            this.refresh(this.currentPage + 1);
+        if (this.pagination.nextPage()) {
+            this.refresh(this.pagination.currentPage);
         }
     }
 
     prevPage() {
-        if (this.currentPage > 1) {
-            this.refresh(this.currentPage - 1);
+        if (this.pagination.prevPage()) {
+            this.refresh(this.pagination.currentPage);
         }
     }
 
     goToPage(page: number) {
-        if (page >= 1 && page <= this.totalPages) {
-            this.refresh(page);
+        if (this.pagination.goToPage(page)) {
+            this.refresh(this.pagination.currentPage);
         }
     }
 
-    initSubscriptions() {
-        const unsubs: (() => void)[] = [];
-
-        unsubs.push(
-            appEvents.on(EVENTS.CARDS_CHANGED, () => this.refresh(this.currentPage)),
-            appEvents.on(EVENTS.PERSONNEL_CHANGED, () => this.refresh(this.currentPage)),
-        );
-
-        return () => unsubs.forEach(fn => fn());
-    }
+    // Las suscripciones se manejan vía Supabase Realtime
+    // en initGlobalRealtime() + PersonnelState.initRealtime()
 }
 
 export const cardState = new CardState();

@@ -16,7 +16,8 @@
     import { HistoryService } from "../../services/history";
     import { catalogState, personnelState } from "../../stores";
     import { toast } from "svelte-sonner";
-    import { handleError, parseFloors, appEvents, EVENTS } from "../../utils";
+    import { handleError, parseFloors, personnelActions } from "../../utils";
+import { confirm } from "../../utils/confirmModal.svelte";
     import {
         AlertCircle,
         CheckCircle2,
@@ -247,28 +248,24 @@
     // ── BAJA ─────────────────────────────────────────────
     async function handleBaja() {
         if (!selectedPerson || !ticket) return;
-        
-        appEvents.emit(EVENTS.TRIGGER_DEACTIVATE, {
-            person: selectedPerson,
-            onSuccess: async () => {
-                isSubmitting = true;
+
+        isOpen = false;
+        confirm.open({
+            title: "¿DAR DE BAJA?",
+            description: `Se desactivarán ${(selectedPerson.cards ?? []).filter((c: any) => c.status === "active").length} tarjeta(s) asociadas.`,
+            variant: "danger",
+            confirmText: "Dar de Baja",
+            onConfirm: async () => {
+                await personnelActions.handleDeactivatePerson(selectedPerson, async () => {});
                 try {
-                    await ticketService.delete(
-                        ticket.id,
-                        "Baja procesada y completada desde plantilla",
-                    );
-                    toast.success("Ticket de baja cerrado exitosamente.");
+                    await ticketService.delete(ticket.id, "Baja procesada y completada desde plantilla");
+                    toast.success("Baja completada exitosamente.");
                     onComplete?.();
                 } catch (err) {
                     handleError(err, "Cerrar Ticket de Baja");
-                } finally {
-                    isSubmitting = false;
                 }
-            }
+            },
         });
-
-        // Cerramos el modal local para dar paso a la confirmación de baja
-        isOpen = false;
     }
 
     // ── REPOSICIÓN: folio validation ──────────────────────
@@ -328,7 +325,6 @@
     function handleGoToFirmaResponsiva(card: any) {
         if (!selectedPerson || !card?.id) return;
         personnelState.selectPerson(selectedPerson.id);
-        personnelState.highlightedCardId = card.id;
         isOpen = false;
     }
 
@@ -411,6 +407,9 @@
                 "REJECT_TICKET",
                 {
                     message: `Ticket de ${ticketType} rechazado`,
+                    entityName: selectedPerson
+                        ? `${selectedPerson.last_name}, ${selectedPerson.first_name}`
+                        : `Ticket rechazado (${ticketType})`,
                 },
             );
             toast.info("Ticket rechazado.");

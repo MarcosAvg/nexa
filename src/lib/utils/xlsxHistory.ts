@@ -1,5 +1,10 @@
 import type * as ExcelJSTypes from 'exceljs';
 import { addLogoToSheet } from './xlsxShared';
+import {
+    displayEntityName as fmtEntityName,
+    cleanMessage as fmtCleanMessage,
+    ACTION_NAMES,
+} from './historyFormat';
 
 export async function exportHistoryToExcel(data: any[], options?: { filters?: { status?: string; dependency?: string; search?: string } }) {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
@@ -22,36 +27,7 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
         slate: { head: 'FFF1F5F9', sub: 'FF334155', fill: 'FFF8FAFC' }
     };
 
-    const actionNames: Record<string, string> = {
-        CREATE: "Registro", UPDATE: "Actualización", DELETE: "Eliminación",
-        BLOCK: "Bloqueo de Acceso", ACTIVATE: "Activación de Acceso", DEACTIVATE: "Desactivación de Personal",
-        ASSIGN_CARD: "Asignación de Tarjeta", UNASSIGN_CARD: "Desvinculación de Tarjeta", UPSERT: "Guardado/Actualización",
-        UPDATE_STATUS: "Cambio de Estado", UNASSIGN: "Desvinculación", UPDATE_PROGRAMMING: "Programación de Acceso",
-        UPDATE_RESPONSIVA: "Estatus de Responsiva", REPLACE_CARD: "Reposición de Tarjeta", TICKET: "Ticket de Sistema",
-        CREATE_TICKET: "Creación de Ticket", SIGN_RESPONSIVA: "Firma de Responsiva", DELETE_RESPONSIVA: "Eliminación de Responsiva",
-        COMPLETE_TICKET: "Ticket Completado", APPLY_MODIFICATION: "Modificación Aprobada", REJECT_MODIFICATION: "Modificación Rechazada",
-        REPLACE_OLD: "Baja por Reposición", DELETE_TICKET_CASCADE: "Eliminación en Cascada",
-        CANCEL: "Cancelación", COMPLETE: "Completado"
-    };
-
-    function translateText(text: string) {
-        if (!text) return text;
-        return text
-            .replace(/\bblocked\b/gi, "bloqueado/a")
-            .replace(/\bactive\b/gi, "activo/a")
-            .replace(/\binactive\b/gi, "inactivo/a")
-            .replace(/\bcomplete\b/gi, "completado")
-            .replace(/\bcompleted\b/gi, "completado")
-            .replace(/\bpending\b/gi, "pendiente")
-            .replace(/\bdone\b/gi, "listo")
-            .replace(/\bsigned\b/gi, "firmado/a")
-            .replace(/\bunsigned\b/gi, "sin firmar")
-            .replace(/\bavailable\b/gi, "disponible")
-            .replace(/\burgente\b/gi, "URGENTE")
-            .replace(/\balta\b/gi, "ALTA")
-            .replace(/\bmedia\b/gi, "MEDIA")
-            .replace(/\bbaja\b/gi, "BAJA");
-    }
+    const actionNames = ACTION_NAMES;
 
     worksheet.columns = [
         { key: 'date', width: 24 },
@@ -125,19 +101,14 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
     worksheet.autoFilter = 'A4:D4';
 
     data.forEach((log) => {
-        const message = log.details?.message || (typeof log.details === 'string' ? log.details : JSON.stringify(log.details));
-        let cleanMessage = (message || '').replace(/\sID:?\s?[a-f0-9-]{8,}/gi, '').replace(/\s(de|ID)\s?[a-f0-9-]{8,}/gi, '');
-        cleanMessage = translateText(cleanMessage);
-
-        const fallbackName = (message || '').match(/(?:Actualización de|Registro de|para tarjeta \w+ folio|con folio)\s+([^,.(]+)/i)?.[1]?.trim();
-        const displayName = log.entity_name || log.resolvedName || fallbackName || `${log.entity_type} (${(log.entity_id || '').slice(0, 8)}...)`;
-        const entityLabel = log.entity_type === "PERSONNEL" || log.entity_type === "PERSON" ? "PERSONAL" : log.entity_type === "CARD" ? "TARJETA" : log.entity_type;
+        const displayName = fmtEntityName(log);
+        const desc = fmtCleanMessage(log);
 
         const rowData = {
             date: new Date(log.timestamp).toLocaleString('es-MX'),
             entity: displayName,
             actionLabel: actionNames[log.action] || log.action,
-            description: cleanMessage
+            description: desc
         };
 
         const row = worksheet.addRow(rowData);

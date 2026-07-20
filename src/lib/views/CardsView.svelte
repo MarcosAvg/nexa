@@ -1,12 +1,11 @@
 <script lang="ts">
     import { personnelState, userState, uiState, cardState, catalogState } from "../stores";
     import { confirm } from "../utils/confirmModal.svelte";
-    import { onMount, onDestroy } from "svelte";
-    import { appEvents, EVENTS, handleError, createSimpleDebounce } from "../utils";
+    import { handleError } from "../utils";
     import {
         SectionHeader, FilterGroup, FilterSelect, Button, Card,
         DataTable, Badge, PermissionGuard, FloatingActionButton,
-        ContentView, SearchInput, Pagination, SkeletonTable, EmptyState,
+        ContentView, SearchInput, Pagination,
         AddCardModal, DetectMissingCardsModal, ConfirmationModal,
     } from "../components";
     import {
@@ -19,7 +18,6 @@
         FileSpreadsheet,
         FileSearch,
         CreditCard,
-        FilterX,
     } from "lucide-svelte";
 
     import { cardService } from "../services/cards";
@@ -30,11 +28,16 @@
     let dependencies = $derived(catalogState.dependencies);
     let dependencyNames = $derived(dependencies.map((d) => d.name));
 
-    // Filtros locales de UI (vinculados al store)
-    let cardStatusFilter = $state(cardState.statusFilter);
-    let cardTypeFilter = $state(cardState.typeFilter);
-    let cardDependencyFilter = $state(cardState.dependencyFilter);
-    let cardSearch = $state(cardState.searchQuery);
+    // Filtros de UI que mapean nombre → ID antes de aplicar
+    let depNameFilter = $state("");
+
+    // Sincronizar nombre de dependencia → ID en el store
+    $effect(() => {
+        const depId = depNameFilter
+            ? String(dependencies.find((d) => d.name === depNameFilter)?.id ?? "")
+            : "";
+        cardState.filters.dependencyId = depId;
+    });
 
     // Estado del modal
     let isModalOpen = $state(false);
@@ -43,48 +46,30 @@
     let isDetectModalOpen = $state(false);
 
     // Estado derivado del store
-    let cards = $derived(cardState.cards);
-    let currentPage = $derived(cardState.currentPage);
-    let pageSize = $derived(cardState.pageSize);
-    let totalRecords = $derived(cardState.totalRecords);
-    let isLoading = $derived(cardState.isLoading);
+    let cards = $derived(cardState.pagination.items);
+    let currentPage = $derived(cardState.pagination.currentPage);
+    let pageSize = $derived(cardState.pagination.pageSize);
+    let totalRecords = $derived(cardState.pagination.totalRecords);
+    let isLoading = $derived(cardState.pagination.isLoading);
 
-    // Inicializar subscripciones
-    let cleanup: (() => void) | null = null;
+    // No onMount necesario: el $effect debounced dispara la carga inicial automáticamente
 
-    onMount(() => {
-        cardState.refresh();
-        cleanup = cardState.initSubscriptions();
-    });
+    // Debounced auto-refresh cuando cambian los filtros
+    let filterDebounce: ReturnType<typeof setTimeout>;
+    $effect(() => {
+        cardState.filters.type;
+        cardState.filters.status;
+        cardState.filters.search;
+        cardState.filters.dependencyId;
 
-    onDestroy(() => {
-        cleanup?.();
+        clearTimeout(filterDebounce);
+        filterDebounce = setTimeout(() => cardState.refresh(1), 300);
     });
 
     // Manejadores
     function onOpenAddCard() {
         editingCard = null;
         isModalOpen = true;
-    }
-
-    // Búsqueda con debounce
-    const debouncedSearch = createSimpleDebounce(() => {
-        cardState.setSearch(cardSearch);
-        cardState.refresh(1);
-    }, 300);
-
-    function onSearch(e: Event) {
-        const value = (e.target as HTMLInputElement).value;
-        cardSearch = value;
-        debouncedSearch();
-    }
-
-    function onFilterChange() {
-        const depId = cardDependencyFilter
-            ? String(dependencies.find((d) => d.name === cardDependencyFilter)?.id ?? "")
-            : "";
-        cardState.setFilters(cardTypeFilter, cardStatusFilter, depId);
-        cardState.refresh(1);
     }
 
     async function onBlockCard(card: any) {
@@ -206,32 +191,28 @@
 
 <div class="space-y-6">
     <SectionHeader title="Gestión de tarjetas">
-        {#snippet filters()}
-            <FilterGroup
+        {#snippet filters()}                <FilterGroup
                 label="Tipo"
                 options={["Todos", "KONE", "P2000"]}
-                bind:value={cardTypeFilter}
-                onchange={() => onFilterChange()}
+                bind:value={cardState.filters.type}
             />
             <FilterGroup
                 label="Estado"
                 options={["Todas", "Disponible", "Activa", "Bloqueada", "Baja"]}
-                bind:value={cardStatusFilter}
-                onchange={() => onFilterChange()}
+                bind:value={cardState.filters.status}
             />
             <FilterSelect
                 label="Dependencia"
                 options={dependencyNames}
                 placeholder="Todas"
-                bind:value={cardDependencyFilter}
-                onchange={() => onFilterChange()}
+                bind:value={depNameFilter}
             />
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
                 <SearchInput
                     placeholder="Folio..."
-                    bind:value={cardSearch}
-                    oninput={onSearch}
+                    bind:value={cardState.filters.search}
+                    oninput={() => {}}
                     class="h-9 text-xs font-bold"
                 />
             </div>
@@ -245,12 +226,14 @@
                 onclick={async () => {
                     const loadingToast = toast.loading("Preparando exportación...");
                     try {
-                        const depId = cardDependencyFilter
-                        ? String(dependencies.find((d) => d.name === cardDependencyFilter)?.id ?? "")
-                        : "";
-                    const data = await cardService.fetchForExport(cardSearch, cardTypeFilter, cardStatusFilter, depId);
+                        const data = await cardService.fetchForExport(
+                            cardState.filters.search,
+                            cardState.filters.type,
+                            cardState.filters.status,
+                            cardState.filters.dependencyId,
+                        );
                         const m = await import("../utils/xlsxExport");
-                        m.exportCardsToExcel(data, { filters: { status: cardStatusFilter, search: cardSearch } });
+                        m.exportCardsToExcel(data, { filters: { status: cardState.filters.status, search: cardState.filters.search } });
                         toast.success("Exportación completada", { id: loadingToast });
                     } catch (e) {
                         toast.dismiss(loadingToast);
@@ -292,16 +275,14 @@
         emptyDescription="El inventario de tarjetas está vacío. Comienza registrando la primera tarjeta P2000 o KONE."
         emptyDescriptionFiltered="No encontramos tarjetas con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={CreditCard}
-        emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"
-        hasFilters={!!(cardSearch || cardTypeFilter !== "Todos" || cardStatusFilter !== "Todas" || cardDependencyFilter)}
-        onClearFilters={() => {
-            cardSearch = '';
-            cardTypeFilter = 'Todos';
-            cardStatusFilter = 'Todas';
-            cardDependencyFilter = '';
-            cardState.setSearch('');
-            cardState.setFilters('Todos', 'Todas', '');
-            cardState.refresh(1);
+        emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"                    hasFilters={!!(cardState.filters.search || cardState.filters.type !== "Todos" || cardState.filters.status !== "Todas" || cardState.filters.dependencyId)}
+                    onClearFilters={() => {
+            depNameFilter = '';
+            cardState.filters.type = 'Todos';
+            cardState.filters.status = 'Todas';
+            cardState.filters.search = '';
+            cardState.filters.dependencyId = '';
+            // El $effect se encarga de refrescar
         }}
         skeletonColumns={4}
         skeletonRows={5}

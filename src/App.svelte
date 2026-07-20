@@ -115,7 +115,7 @@ import { fade } from "svelte/transition";
           ]);
           personnelState.setCards(_c);
           ticketState.setTickets(_t);
-          historyState.setHistory(_h.data, _h.count);
+          historyState.pagination.setItems(_h.data, _h.count);
 
           // Actualizar métricas del dashboard con el nuevo RPC eficiente
           personnelState.refreshDashboardMetrics();

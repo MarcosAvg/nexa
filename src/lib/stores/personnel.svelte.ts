@@ -1,8 +1,17 @@
 import type { Person, Card, DashboardMetrics } from "../types";
 import { handleError } from "../utils";
+import { PaginatedListState } from "./paginatedList.svelte";
+
+export type PersonnelFilters = {
+    search: string;
+    status: string;
+    dependencyId: string;
+    buildingId: string;
+};
 
 export class PersonnelState {
-    personnel = $state<Person[]>([]);
+    pagination = new PaginatedListState<Person>();
+
     personnelOptions = $state<{ id: string, name: string, employee_no: string }[]>([]);
     selectedPersonId = $state<string | null>(null);
     extraCards = $state<Card[]>([]);
@@ -11,14 +20,14 @@ export class PersonnelState {
     isEditModalOpen = $state(false);
     highlightedCardId = $state<string | null>(null);
 
-    currentPage = $state(1);
-    pageSize = $state(50);
-    totalRecords = $state(0);
-    searchQuery = $state("");
-    statusFilter = $state("Todos");
-    dependencyId = $state("");
-    buildingId = $state("");
-    isLoading = $state(false);
+    /** Filtros unificados. Las vistas pueden bindear directamente. */
+    filters: PersonnelFilters = $state({
+        search: "",
+        status: "Todos",
+        dependencyId: "",
+        buildingId: "",
+    });
+
     dashboardStats = $state({
         activePersonnel: 0,
         koneStock: 0,
@@ -33,11 +42,6 @@ export class PersonnelState {
         dataQuality: { sinEmail: 0, sinSchedule: 0, sinPosition: 0, sinArea: 0, total: 0 },
     });
     metricsLoading = $state(false);
-
-    setPersonnel(data: Person[], count: number) {
-        this.personnel = data;
-        this.totalRecords = count;
-    }
 
     setPersonnelOptions(data: { id: string, name: string, employee_no: string }[]) {
         this.personnelOptions = data;
@@ -76,52 +80,40 @@ export class PersonnelState {
         }
     }
 
-    async refresh(page: number = 1, search: string = "", status: string = "Todos", depId: string = "", bldgId: string = "") {
-        this.isLoading = true;
-        this.currentPage = page;
-        this.searchQuery = search;
-        this.statusFilter = status;
-        this.dependencyId = depId;
-        this.buildingId = bldgId;
+    /** Carga la primera página con los filtros actuales. */
+    async init() {
+        await this.refresh();
+    }
 
-        try {
-            const { personnelService } = await import("../services/personnel");
-            const { data, count } = await personnelService.fetchAll(
-                this.currentPage,
-                this.pageSize,
-                this.searchQuery,
-                this.statusFilter,
-                this.dependencyId,
-                this.buildingId
-            );
-            this.setPersonnel(data, count);
-        } finally {
-            this.isLoading = false;
-        }
+    /** Libera recursos (por ahora no hay suscripciones que limpiar). */
+    destroy() {
+        // las suscripciones Realtime se manejan en initRealtime()
+    }
+
+    async refresh(page?: number) {
+        const { personnelService } = await import("../services/personnel");
+        await this.pagination.fetchPage(
+            (p, s) => personnelService.fetchAll(p, s, this.filters.search, this.filters.status, this.filters.dependencyId, this.filters.buildingId),
+            page,
+        );
     }
 
     async nextPage() {
-        if (this.currentPage * this.pageSize < this.totalRecords) {
-            await this.refresh(this.currentPage + 1, this.searchQuery, this.statusFilter, this.dependencyId, this.buildingId);
+        if (this.pagination.nextPage()) {
+            await this.refresh(this.pagination.currentPage);
         }
     }
 
     async prevPage() {
-        if (this.currentPage > 1) {
-            await this.refresh(this.currentPage - 1, this.searchQuery, this.statusFilter, this.dependencyId, this.buildingId);
+        if (this.pagination.prevPage()) {
+            await this.refresh(this.pagination.currentPage);
         }
     }
 
     async goToPage(page: number) {
-        await this.refresh(page, this.searchQuery, this.statusFilter, this.dependencyId, this.buildingId);
-    }
-
-    async search(query: string) {
-        await this.refresh(1, query, this.statusFilter, this.dependencyId, this.buildingId);
-    }
-
-    async filter(status: string, depId: string, bldgId: string = "") {
-        await this.refresh(1, this.searchQuery, status, depId, bldgId);
+        if (this.pagination.goToPage(page)) {
+            await this.refresh(this.pagination.currentPage);
+        }
     }
 
     setCards(data: Card[]) {
@@ -160,11 +152,11 @@ export class PersonnelState {
                 if (payload.eventType === 'UPDATE') {
                     // Actualizar el array local de personal de forma óptima
                     const newData = payload.new as Record<string, unknown>;
-                    const index = this.personnel.findIndex(p => p.id === newData.id);
+                    const index = this.pagination.items.findIndex(p => p.id === newData.id);
                     if (index !== -1) {
                         // Aplicar cambios optimistas para campos básicos
-                        const current = this.personnel[index];
-                        this.personnel[index] = {
+                        const current = this.pagination.items[index];
+                        this.pagination.items[index] = {
                             ...current,
                             first_name: String(newData.first_name ?? current.first_name),
                             last_name: String(newData.last_name ?? current.last_name),
@@ -180,12 +172,12 @@ export class PersonnelState {
                     // Solo actualizar lista completa para INSERT/DELETE si estamos en página 1
                     // O si el registro que cambia es el actualmente seleccionado
                     const isRelevant =
-                        this.currentPage === 1 ||
+                        this.pagination.currentPage === 1 ||
                         this.selectedPersonId === payload.new?.id ||
                         this.selectedPersonId === payload.old?.id;
 
-                    if (isRelevant && !this.isLoading) {
-                        this.refresh(this.currentPage, this.searchQuery, this.statusFilter, this.dependencyId, this.buildingId);
+                    if (isRelevant && !this.pagination.isLoading) {
+                        this.refresh(this.pagination.currentPage);
                     }
                 }
             });
@@ -199,9 +191,9 @@ export class PersonnelState {
             const { personnelService } = await import("../services/personnel");
             const updated = await personnelService.fetchById(id);
             if (updated) {
-                const index = this.personnel.findIndex(p => p.id === id);
+                const index = this.pagination.items.findIndex(p => p.id === id);
                 if (index !== -1) {
-                    this.personnel[index] = updated;
+                    this.pagination.items[index] = updated;
                 }
                 if (this.editingPerson?.id === id) {
                     this.editingPerson = { ...updated };

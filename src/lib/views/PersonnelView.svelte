@@ -26,9 +26,7 @@
     import { networkStore } from "../stores/network.svelte";
     import { getPersonnelStatusVariant } from "../constants/status";
 
-    import { onMount } from "svelte";
-
-    let personnel = $derived(personnelState.personnel);
+    let personnel = $derived(personnelState.pagination.items);
     let dependencies = $derived(catalogState.dependencies);
     let buildings = $derived(catalogState.buildings);
 
@@ -38,11 +36,21 @@
         "Sin Edificio",
     ]);
 
-    // Filtros locales de UI
-    let statusFilter = $state("Todos");
+    // Filtros de UI que mapean nombre → ID antes de aplicar
     let dependencyFilter = $state("");
     let buildingFilter = $state("");
-    let personSearch = $state("");
+
+    // Sincronizar los filtros de nombre → ID con el store
+    $effect(() => {
+        const bldgId = buildingFilter === "Sin Edificio"
+            ? "__none__"
+            : buildings.find((b) => b.name === buildingFilter)?.id || "";
+        personnelState.filters.buildingId = bldgId;
+    });
+    $effect(() => {
+        const depId = dependencies.find((d) => d.name === dependencyFilter)?.id || "";
+        personnelState.filters.dependencyId = depId;
+    });
 
     // Estado del modal
     let isDetailsOpen = $derived(personnelState.isDetailsOpen);
@@ -51,48 +59,22 @@
         personnel.find((p) => p.id === selectedPersonId) || null,
     );
 
-    onMount(() => {
-        personnelState.refresh();
-    });
-
-    // Lógica de filtrado
-    function handleFilterChange() {
-        const depId =
-            dependencies.find((d) => d.name === dependencyFilter)?.id || "";
-        personnelState.filter(statusFilter, depId);
-    }
-
+    const FILTER_DEBOUNCE_MS = 300;
+    let filterDebounce: ReturnType<typeof setTimeout>;
     $effect(() => {
-        const depId =
-            dependencies.find((d) => d.name === dependencyFilter)?.id || "";
-        const bldgId =
-            buildingFilter === "Sin Edificio"
-                ? "__none__"
-                : buildings.find((b) => b.name === buildingFilter)?.id || "";
-        if (
-            statusFilter !== personnelState.statusFilter ||
-            depId !== personnelState.dependencyId ||
-            bldgId !== personnelState.buildingId
-        ) {
-            personnelState.filter(statusFilter, depId, bldgId);
-        }
+        personnelState.filters.search;
+        personnelState.filters.status;
+        personnelState.filters.dependencyId;
+        personnelState.filters.buildingId;
+
+        clearTimeout(filterDebounce);
+        filterDebounce = setTimeout(() => personnelState.refresh(1), FILTER_DEBOUNCE_MS);
     });
-
-    // Lógica de búsqueda (Debounced)
-    const debouncedSearch = createSimpleDebounce((value: string) => {
-        personnelState.search(value);
-    }, 300);
-
-    function onSearch(e: Event) {
-        const value = (e.target as HTMLInputElement).value;
-        personSearch = value;
-        debouncedSearch(value);
-    }
 
     /* Pagination Helpers */
-    let currentPage = $derived(personnelState.currentPage);
-    let pageSize = $derived(personnelState.pageSize);
-    let totalRecords = $derived(personnelState.totalRecords);
+    let currentPage = $derived(personnelState.pagination.currentPage);
+    let pageSize = $derived(personnelState.pagination.pageSize);
+    let totalRecords = $derived(personnelState.pagination.totalRecords);
 
     let currentUser = $derived(userState.currentUser);
 
@@ -117,16 +99,16 @@
             const depId =
                 dependencies.find((d) => d.name === dependencyFilter)?.id || "";
             const data = await personnelService.fetchForExport(
-                personSearch,
-                statusFilter,
+                personnelState.filters.search,
+                personnelState.filters.status,
                 depId,
             );
 
             exportPersonnelToExcel(data as any[], {
                 filters: {
-                    status: statusFilter,
+                    status: personnelState.filters.status,
                     dependency: dependencyFilter,
-                    search: personSearch,
+                    search: personnelState.filters.search,
                 },
                 splitByDependency,
             });
@@ -147,7 +129,7 @@
         try {
             await exportPersonnelAllDependenciesAsZip(
                 dependencies,
-                { status: statusFilter, search: personSearch },
+                { status: personnelState.filters.status, search: personnelState.filters.search },
                 (_current, _total, label) => {
                     toast.loading(`Procesando: ${label}`, { id: loadingToast });
                 },
@@ -256,7 +238,7 @@
                     "Bloqueado/a",
                     "Baja",
                 ]}
-                bind:value={statusFilter}
+                bind:value={personnelState.filters.status}
             />
             <FilterSelect
                 label="Dependencia"
@@ -274,8 +256,8 @@
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
                 <SearchInput
                     placeholder="Nombre, No. Empleado..."
-                    bind:value={personSearch}
-                    oninput={onSearch}
+                    bind:value={personnelState.filters.search}
+                    oninput={() => {}}
                     class="h-9 text-xs font-bold"
                 />
             </div>
@@ -360,7 +342,7 @@
     <!-- Top Pagination removed per request -->
 
     <ContentView
-        isLoading={personnelState.isLoading}
+        isLoading={personnelState.pagination.isLoading}
         data={personnel}
         emptyTitle="Aún no hay personal registrado"
         emptyDescription="Comienza registrando la primera persona en el sistema."

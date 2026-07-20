@@ -18,7 +18,6 @@
         Mail,
         Send,
         Link2,
-        FilterX,
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
 

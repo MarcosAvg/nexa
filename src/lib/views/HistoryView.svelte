@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { historyState, personnelState, ticketState } from "../stores";
+    import { historyState } from "../stores";
+    import type { HistoryLog } from "../types";
     import {
         SectionHeader, DataTable, Badge, Button, HistoryFilters,
         Pagination, ContentView,
@@ -13,92 +14,69 @@
     import { handleError } from "../utils";
     import { HistoryService } from "../services/history";
     import { networkStore } from "../stores/network.svelte";
+    import {
+        ACTION_NAMES as actionNames,
+        ACTION_COLORS as actionColors,
+        entityTypeLabel,
+        displayEntityName,
+        cleanMessage,
+    } from "../utils/historyFormat";
 
-    const PAGE_SIZE = 50;
-
-    // Debounce para evitar consultas en cada pulsación de tecla en filtros
+    // ── Debounce para filtros con tecleo ──
     let filterDebounce: ReturnType<typeof setTimeout>;
+
     $effect(() => {
-        // Rastrear dependencias
-        historyState.filters.person;
-        historyState.filters.cardType;
-        historyState.filters.folio;
-        historyState.filters.action;
+        // Rastrear dependencias reactivas para que el effect se dispare
+        // cuando cambie cualquier filtro (incluyendo date range).
+        const f = historyState.filters;
+        f.person;
+        f.cardType;
+        f.folio;
+        f.action;
+        f.startDate;
+        f.endDate;
 
         clearTimeout(filterDebounce);
         filterDebounce = setTimeout(() => {
             historyState.refresh(1);
         }, 400);
+
+        // Cleanup: si el componente se desmonta mientras hay un timeout pendiente,
+        // evitamos refrescar datos en un componente destruido.
+        return () => {
+            clearTimeout(filterDebounce);
+        };
     });
 
-    // Obtener datos directamente del Store (already paginated by server)
-    let historyLogs = $derived(historyState.historyLogs);
-    let totalRecords = $derived(historyState.totalRecords);
-    let currentPage = $derived(historyState.currentPage);
-    let pageSize = $derived(historyState.pageSize);
-
-    import {
-        ACTION_NAMES as actionNames,
-        ACTION_COLORS as actionColors,
-        translateDetails,
-    } from "../constants/history";
+    // ── Datos derivados del store ──
+    let historyLogs = $derived(historyState.pagination.items);
+    let totalRecords = $derived(historyState.pagination.totalRecords);
+    let currentPage = $derived(historyState.pagination.currentPage);
+    let pageSize = $derived(historyState.pagination.pageSize);
 </script>
 
-{#snippet renderEntity(row: any)}
-    {@const entityLabel =
-        row.entity_type === "PERSONNEL" || row.entity_type === "PERSON"
-            ? "PERSONAL"
-            : row.entity_type === "CARD"
-              ? "TARJETA"
-              : row.entity_type}
-
-    <!-- Heuristic for old logs or missing names -->
-    {@const fallbackName = (row.details?.message || "")
-        .match(
-            /(?:Actualización de|Registro de|para tarjeta \w+ folio|con folio)\s+([^,.(]+)/i,
-        )?.[1]
-        ?.trim()}
-
-    {@const displayName =
-        row.entity_name ||
-        row.resolvedName ||
-        fallbackName ||
-        (row.entity_id?.length > 15
-            ? `${row.entity_type} (${row.entity_id.slice(0, 8)}...)`
-            : `${row.entity_type} (${row.entity_id})`)}
+{#snippet renderEntity(row: HistoryLog)}
+    {@const label = entityTypeLabel(row.entity_type)}
+    {@const name = displayEntityName(row)}
 
     <div class="flex flex-col">
-        <span
-            class="font-medium text-slate-500 text-[10px] tracking-wider uppercase"
-            >{entityLabel}</span
-        >
-        <span
-            class="text-xs text-slate-900 font-bold leading-tight mt-0.5 break-words max-w-[220px]"
-        >
-            {displayName}
+        <span class="font-medium text-slate-500 text-[10px] tracking-wider uppercase">
+            {label}
+        </span>
+        <span class="text-xs text-slate-900 font-bold leading-tight mt-0.5 break-words max-w-[220px]">
+            {name}
         </span>
     </div>
 {/snippet}
 
-{#snippet renderDetails(row: any)}
-    {@const message =
-        row.details?.message ||
-        (typeof row.details === "string"
-            ? row.details
-            : JSON.stringify(row.details))}
+{#snippet renderDetails(row: HistoryLog)}
     <span class="text-slate-600 text-sm">
-        {translateDetails(
-            row.entity_type === "TICKET"
-                ? message
-                : message
-                      .replace(/\sID:?\s?[a-f0-9-]{8,}/gi, "")
-                      .replace(/\s(de|ID)\s?[a-f0-9-]{8,}/gi, ""),
-        )}
+        {cleanMessage(row)}
     </span>
 {/snippet}
 
-{#snippet renderDate(row: any)}
-    <span class="text-slate-500 text-xs">
+{#snippet renderDate(row: HistoryLog)}
+    <span class="text-slate-500 text-xs whitespace-nowrap">
         {new Date(row.timestamp).toLocaleString("es-MX", {
             day: "2-digit",
             month: "2-digit",
@@ -109,7 +87,7 @@
     </span>
 {/snippet}
 
-{#snippet renderHistoryAction(row: any)}
+{#snippet renderHistoryAction(row: HistoryLog)}
     <Badge variant={(actionColors[row.action] as any) || "slate"}>
         {actionNames[row.action] || row.action}
     </Badge>
@@ -123,6 +101,8 @@
                 bind:cardType={historyState.filters.cardType}
                 bind:cardFolio={historyState.filters.folio}
                 bind:action={historyState.filters.action}
+                bind:startDate={historyState.filters.startDate}
+                bind:endDate={historyState.filters.endDate}
             />
         {/snippet}
 
@@ -130,12 +110,12 @@
             <Button
                 variant="outline"
                 class="flex items-center gap-2.5 h-10 px-4 group"
-                disabled={historyState.isLoading}
+                disabled={historyState.pagination.isLoading}
                 onclick={() => historyState.refresh(1)}
             >
                 <RotateCw
                     size={16}
-                    class="text-slate-500 transition-transform duration-700 {historyState.isLoading
+                    class="text-slate-500 transition-transform duration-700 {historyState.pagination.isLoading
                         ? 'animate-spin'
                         : 'group-hover:rotate-180'}"
                 />
@@ -175,10 +155,8 @@
         {/snippet}
     </SectionHeader>
 
-    <!-- Top Pagination removed per request -->
-
     <ContentView
-        isLoading={historyState.isLoading}
+        isLoading={historyState.pagination.isLoading}
         data={historyLogs}
         emptyTitle="No hay registros de historial"
         emptyDescription="Los cambios realizados en el personal, tarjetas y tickets aparecerán aquí."
@@ -228,6 +206,6 @@
         onPrevPage={() => historyState.prevPage()}
         onNextPage={() => historyState.nextPage()}
         onGoToPage={(page) => historyState.goToPage(page)}
-        isLoading={historyState.isLoading}
+        isLoading={historyState.pagination.isLoading}
     />
 </div>

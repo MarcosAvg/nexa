@@ -64,6 +64,10 @@ export interface Ticket {
     person_id: string | null;
     card_id: string | null;
     payload: any;
+
+    // Propiedades de join (retornadas por Supabase en queries con select anidado)
+    cards?: { id: string; folio: string; type: string };
+
     // Propiedades calculadas/combinadas
     personName?: string;
     cardType?: string;
@@ -72,7 +76,13 @@ export interface Ticket {
         first_name: string;
         last_name: string;
         status?: string;
+        created_at?: string;
+        dependency_id?: string;
     };
+
+    // Propiedades enriquecidas por ticketService
+    movementType?: string;
+    assignmentDate?: string;
 }
 
 export interface UserProfile {

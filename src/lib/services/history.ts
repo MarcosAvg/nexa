@@ -4,6 +4,46 @@ import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional,
 // Caché de userId a nivel de módulo — evita llamar a getSession() en cada registro
 let _cachedUserId: string | undefined;
 
+/** Filtros comunes aceptados por fetchAll y fetchForExport. */
+export type HistoryFilters = {
+    person?: string;
+    cardType?: string;
+    folio?: string;
+    action?: string;
+    startDate?: string;
+    endDate?: string;
+};
+
+/**
+ * Aplica filtros de historial a una query de Supabase.
+ * Función standalone para evitar duplicación entre fetchAll y fetchForExport.
+ */
+function applyFilters(q: any, filters: HistoryFilters) {
+    if (filters.person) {
+        q = q.ilike('entity_name', `%${filters.person}%`);
+    }
+    if (filters.cardType && filters.cardType !== 'Todos') {
+        q = q
+            .eq('entity_type', 'CARD')
+            .ilike('entity_name', `${filters.cardType}%`);
+    }
+    if (filters.folio) {
+        q = q.ilike('entity_name', `%${filters.folio}%`);
+    }
+    if (filters.action && filters.action !== 'Todas') {
+        q = q.eq('action', filters.action);
+    }
+    if (filters.startDate) {
+        q = q.gte('timestamp', filters.startDate);
+    }
+    if (filters.endDate) {
+        const end = new Date(filters.endDate);
+        end.setDate(end.getDate() + 1);
+        q = q.lt('timestamp', end.toISOString());
+    }
+    return q;
+}
+
 export const HistoryService = {
     /**
      * Log an action to the history table.
@@ -67,12 +107,7 @@ export const HistoryService = {
     async fetchAll(
         page: number = 1,
         limit: number = 50,
-        filters: {
-            person?: string;
-            cardType?: string;
-            folio?: string;
-            action?: string;
-        } = {},
+        filters: HistoryFilters = {},
         throwOnError: boolean = false
     ) {
         return withErrorHandlingConditional(async () => {
@@ -81,10 +116,7 @@ export const HistoryService = {
                 .from("history_logs")
                 .select("id, timestamp, entity_type, entity_id, entity_name, action, details, performed_by", { count: "exact" });
 
-            if (filters.person) query = query.ilike("entity_name", `%${filters.person}%`);
-            if (filters.cardType && filters.cardType !== "Todos") query = query.ilike("entity_name", `%${filters.cardType}%`);
-            if (filters.folio) query = query.ilike("entity_name", `%${filters.folio}%`);
-            if (filters.action && filters.action !== "Todas") query = query.eq("action", filters.action);
+            query = applyFilters(query, filters);
 
             const { data, count, error } = await query
                 .order("timestamp", { ascending: false })
@@ -96,20 +128,12 @@ export const HistoryService = {
     },
 
     async fetchForExport(
-        filters: {
-            person?: string;
-            cardType?: string;
-            folio?: string;
-            action?: string;
-        } = {}
+        filters: HistoryFilters = {}
     ) {
         return withErrorHandlingSafe(async () => {
             return await batchPaginate<any>(async (from, to) => {
                 let q = supabase.from("history_logs").select("*");
-                if (filters.person) q = q.ilike("entity_name", `%${filters.person}%`);
-                if (filters.cardType && filters.cardType !== "Todos") q = q.ilike("entity_name", `%${filters.cardType}%`);
-                if (filters.folio) q = q.ilike("entity_name", `%${filters.folio}%`);
-                if (filters.action && filters.action !== "Todas") q = q.eq("action", filters.action);
+                q = applyFilters(q, filters);
                 return q.order("timestamp", { ascending: false }).range(from, to);
             });
         }, "Fetch History for Export", []);

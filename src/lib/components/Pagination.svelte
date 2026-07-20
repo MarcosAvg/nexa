@@ -85,7 +85,8 @@
             registros
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="grid grid-cols-[auto_1fr_auto] items-center gap-4 w-full sm:w-auto">
+            <!-- Anterior — columna izquierda fija -->
             <Button
                 variant="soft-blue"
                 size="sm"
@@ -95,13 +96,14 @@
                 Anterior
             </Button>
 
-            <div class="flex items-center gap-1">
+            <!-- Páginas — columna central que se centra y no mueve los botones laterales -->
+            <div class="flex items-center justify-center gap-1">
                 {#each getPageRange(currentPage, totalPages) as page}
                     {#if page === "..."}
-                        <span class="px-2 text-slate-400">...</span>
+                        <span class="w-8 text-center text-slate-400 select-none">...</span>
                     {:else}
                         <button
-                            class="w-8 h-8 rounded-lg text-sm font-medium transition-colors {currentPage ===
+                            class="w-8 h-8 rounded-lg text-sm font-medium transition-colors flex-shrink-0 {currentPage ===
                             page
                                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                                 : 'text-slate-600 hover:bg-slate-100'}"
@@ -114,6 +116,7 @@
                 {/each}
             </div>
 
+            <!-- Siguiente — columna derecha fija -->
             <Button
                 variant="soft-blue"
                 size="sm"

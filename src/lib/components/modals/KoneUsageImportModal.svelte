@@ -213,9 +213,10 @@
                     >
                         <label
                             class="block text-xs font-bold text-slate-700 mb-1"
-                            >Inactividad (Fecha Límite)</label
-                        >
+                            for="kone-inactivity-date"
+                        >Inactividad (Fecha Límite)</label>
                         <input
+                            id="kone-inactivity-date"
                             type="date"
                             bind:value={inactivityLimitDate}
                             class="w-full h-9 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 text-sm outline-none bg-slate-50"
@@ -232,9 +233,10 @@
                     >
                         <label
                             class="block text-xs font-bold text-slate-700 mb-1"
-                            >Cortesía (Límite Creación)</label
-                        >
+                            for="kone-creation-date"
+                        >Cortesía (Límite Creación)</label>
                         <input
+                            id="kone-creation-date"
                             type="date"
                             bind:value={creationLimitDate}
                             class="w-full h-9 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 text-sm outline-none bg-slate-50"

@@ -1,6 +1,6 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
-import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, appEvents, EVENTS, dbCache, batchPaginate, batchCollectIds } from "../utils";
+import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate, batchCollectIds } from "../utils";
 import type { Person, Card, DashboardMetrics } from "../types";
 import { networkStore } from "../stores/network.svelte";
 
@@ -382,7 +382,6 @@ export const personnelService = {
                 const { cardService } = await import("./cards");
                 for (const card of cards) await cardService.save({ ...card, person_id: personId });
             }
-            appEvents.emit(EVENTS.PERSONNEL_CHANGED);
         }, "Save Personnel");
     },
 
@@ -407,8 +406,6 @@ export const personnelService = {
                 message: `Estado actualizado a ${statusLabel} (incluye tarjetas)`,
                 entityName: personName
             });
-            appEvents.emit(EVENTS.PERSONNEL_CHANGED);
-            appEvents.emit(EVENTS.CARDS_CHANGED);
         }, "Update Personnel Status");
     },
 
@@ -431,7 +428,6 @@ export const personnelService = {
 
             const { error } = await supabase.from("personnel").delete().eq("id", id);
             if (error) throw error;
-            appEvents.emit(EVENTS.PERSONNEL_CHANGED);
         }, "Delete Personnel");
     },
 

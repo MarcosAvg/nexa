@@ -1,7 +1,7 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import type { Ticket } from "../types";
-import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, appEvents, EVENTS, batchPaginate, handleError } from "../utils";
+import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, batchPaginate, handleError } from "../utils";
 import { ticketState } from "../stores";
 
 type CardAssignmentInfo = {
@@ -282,7 +282,6 @@ export const ticketService = {
             });
 
             ticketState.addTicket(newTicket as Ticket);
-            appEvents.emit(EVENTS.TICKETS_CHANGED);
         }, "Create Ticket");
     },
 
@@ -324,7 +323,6 @@ export const ticketService = {
             // Actualizar store
             const fresh = await ticketService.fetchAll();
             ticketState.setTickets(fresh);
-            appEvents.emit(EVENTS.TICKETS_CHANGED);
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Error desconocido';
             tickets.forEach((_, i) => errors.push({ index: i, message: msg }));
@@ -346,7 +344,6 @@ export const ticketService = {
             const { error } = await supabase.from("tickets").delete().eq("id", id);
             if (error) throw error;
             ticketState.removeTicket(id);
-            appEvents.emit(EVENTS.TICKETS_CHANGED);
         }, "Delete Ticket");
     },
 
@@ -375,7 +372,6 @@ export const ticketService = {
             const { error } = await query;
             if (error) throw error;
             ticketState.removeByCard(cardId, types);
-            appEvents.emit(EVENTS.TICKETS_CHANGED);
         }, "Delete Tickets by Card");
     },
 
@@ -397,7 +393,6 @@ export const ticketService = {
             const { error } = await supabase.from("tickets").delete().eq("person_id", personId);
             if (error) throw error;
             ticketState.removeByPerson(personId);
-            appEvents.emit(EVENTS.TICKETS_CHANGED);
         }, "Delete Tickets by Person");
     },
 

@@ -1,7 +1,7 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import type { Card } from "../types";
-import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, appEvents, EVENTS, dbCache, batchPaginate } from "../utils";
+import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate } from "../utils";
 import { networkStore } from "../stores/network.svelte";
 
 export const cardService = {
@@ -320,7 +320,6 @@ export const cardService = {
                     });
                 }
             }
-            appEvents.emit(EVENTS.CARDS_CHANGED);
         }, "Save Card");
     },
 
@@ -343,7 +342,6 @@ export const cardService = {
                     title: `Firma: ${card.folio}`
                 });
             }
-            appEvents.emit(EVENTS.CARDS_CHANGED);
         }, "Update Programming Status");
     },
 
@@ -359,7 +357,6 @@ export const cardService = {
             }
 
             await supabase.from("cards").select("folio, type").eq("id", cardId).single();
-            appEvents.emit(EVENTS.CARDS_CHANGED);
         }, "Update Responsiva Status");
     },
 
@@ -376,7 +373,6 @@ export const cardService = {
             if (error) throw error;
 
             await supabase.from("cards").select("folio, type").eq("id", cardId).single();
-            appEvents.emit(EVENTS.CARDS_CHANGED);
         }, "Update Card Status");
     },
 
@@ -395,7 +391,6 @@ export const cardService = {
                 message: `Tarjeta desvinculada de la persona`,
                 entityName: card ? `${card.type} (Folio: ${card.folio})` : `Tarjeta (${cardId})`
             });
-            appEvents.emit(EVENTS.CARDS_CHANGED);
         }, "Unassign Card");
     },
 
@@ -414,7 +409,6 @@ export const cardService = {
 
             const { error } = await supabase.from("cards").delete().eq("id", id);
             if (error) throw error;
-            appEvents.emit(EVENTS.CARDS_CHANGED);
         }, "Delete Card");
     },
 

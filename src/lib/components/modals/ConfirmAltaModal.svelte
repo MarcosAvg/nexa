@@ -131,8 +131,10 @@
         isRejecting = true;
         try {
             await ticketService.delete(ticket.id, "Alta rechazada");
+            const altaName = `${p.apellidos ?? ''}, ${p.nombres ?? ''}`.replace(/^,\s*/, '').trim() || 'Desconocido';
             await HistoryService.log("PERSONNEL", "", "REJECT_ALTA", {
                 message: `Solicitud de alta rechazada: ${p.apellidos}, ${p.nombres}`,
+                entityName: altaName,
             });
             toast.info("Solicitud rechazada.");
             isRejectOpen = false;

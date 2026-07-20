@@ -84,6 +84,7 @@
     let computedClass = $derived(twMerge(baseStyles, className));
 </script>
 
+<!-- svelte-ignore a11y_autofocus -->
 <input
     {type}
     {name}

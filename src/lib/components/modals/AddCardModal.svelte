@@ -55,7 +55,7 @@
         onclose,
     }: Props = $props();
 
-    let personnel = $derived(personnelState.personnel);
+    let personnel = $derived(personnelState.pagination.items);
     let extraCards = $derived(personnelState.extraCards);
 
     let cardType = $state<"P2000" | "KONE">("P2000");

@@ -11,7 +11,7 @@ export const personnelActions = {
         const newStatus = oldStatusRaw === "blocked" ? "active" : "blocked";
 
         // Actualización optimista de UI
-        const localPerson = personnelState.personnel.find(p => p.id === person.id);
+        const localPerson = personnelState.pagination.items.find(p => p.id === person.id);
         if (localPerson) localPerson.status_raw = newStatus;
 
         try {
@@ -31,7 +31,7 @@ export const personnelActions = {
         const oldStatusRaw = person.status_raw;
 
         // Actualización optimista de UI
-        const localPerson = personnelState.personnel.find(p => p.id === person.id);
+        const localPerson = personnelState.pagination.items.find(p => p.id === person.id);
         if (localPerson) localPerson.status_raw = "inactive";
 
         try {
@@ -49,7 +49,7 @@ export const personnelActions = {
         const oldStatusRaw = person.status_raw;
 
         // Actualización optimista de UI
-        const localPerson = personnelState.personnel.find(p => p.id === person.id);
+        const localPerson = personnelState.pagination.items.find(p => p.id === person.id);
         if (localPerson) localPerson.status_raw = "active";
 
         try {
