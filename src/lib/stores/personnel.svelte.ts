@@ -19,6 +19,8 @@ export class PersonnelState {
     editingPerson = $state<Person | null>(null);
     isEditModalOpen = $state(false);
     highlightedCardId = $state<string | null>(null);
+    /** ID de la persona que se está revisando para baja (desde ticket). */
+    bajaContextPersonId = $state<string | null>(null);
 
     /** Filtros unificados. Las vistas pueden bindear directamente. */
     filters: PersonnelFilters = $state({

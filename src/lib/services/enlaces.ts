@@ -19,6 +19,7 @@ export const enlaceService = {
                         last_name, 
                         email, 
                         floor, 
+                        building_id, 
                         dependency_id,
                         employee_no,
                         status
@@ -47,6 +48,7 @@ export const enlaceService = {
                         last_name, 
                         email, 
                         floor, 
+                        building_id, 
                         dependency_id,
                         employee_no,
                         status

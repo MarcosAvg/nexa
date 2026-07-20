@@ -26,6 +26,8 @@ export { default as DataTable } from './DataTable.svelte';
 export { default as ExportDropdown } from './ExportDropdown.svelte';
 export { default as TaskBanner } from './TaskBanner.svelte';
 export { default as HistoryFilters } from './HistoryFilters.svelte';
+export { default as InfoCard } from './InfoCard.svelte';
+export { default as CardCheckItem } from './CardCheckItem.svelte';
 export { default as SignaturePad } from './SignaturePad.svelte';
 
 // ─── Layout ────────────────────────────────────────────────

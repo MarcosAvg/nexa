@@ -5,7 +5,7 @@
     import { confirm } from "../utils/confirmModal.svelte";
     import {
         SectionHeader, FloatingActionButton, PermissionGuard,
-        DataTable, Select, Button, ContentView, SearchInput,
+        DataTable, FilterSelect, Button, ContentView, SearchInput,
         AddEnlaceModal, EditEnlaceModal, ConfirmationModal,
     } from "../components";
     import { catalogState } from "../stores";
@@ -32,6 +32,8 @@
     let selectedEnlaceForEdit = $state<Enlace | null>(null);
 
     let dependencies = $derived(catalogState.dependencies);
+    let buildings = $derived(catalogState.buildings);
+    let dependencyNames = $derived(dependencies.map((d) => d.name));
 
     let availableFloors = $derived.by(() => {
         const floors = new Set(enlaces.map(e => e.personnel?.floor).filter(Boolean).filter(f => f !== "N/A"));
@@ -57,10 +59,15 @@
             const dep = dependencies.find((d) => d.id === depId);
             const dependencyName = dep ? dep.name : "N/A";
 
+            const bldgId = (e.personnel as any)?.building_id;
+            const bldg = buildings.find((b) => b.id === bldgId);
+            const buildingName = bldg ? bldg.name : "";
+
             return {
                 ...e,
                 name: `${e.personnel?.first_name || ""} ${e.personnel?.last_name || ""}`.trim() || "Desconocido",
                 dependency: dependencyName,
+                building: buildingName,
                 floor: e.personnel?.floor || "N/A",
                 email: e.personnel?.email || "N/A",
             };
@@ -108,30 +115,28 @@
             label: "Nombre completo",
             render: renderName,
             sortable: true,
+            width: "220px",
         },
         {
             key: "dependency",
-            label: "Dependencia",
+            label: "Dependencia / Ubicación",
             render: renderDependency,
             sortable: true,
-        },
-        {
-            key: "floor",
-            label: "Piso base",
-            render: renderFloor,
-            sortable: true,
+            width: "280px",
         },
         {
             key: "email",
             label: "Correo",
             render: renderEmail,
             sortable: true,
+            width: "220px",
         },
         {
             key: "extension",
             label: "Extensión",
             render: renderExtension,
             sortable: true,
+            width: "100px",
         },
     ];
 
@@ -188,24 +193,27 @@
 </script>
 
 {#snippet renderName(row: Enlace)}
-    <span
+    <span class="font-bold text-slate-900"
         >{`${row.personnel?.first_name || ""} ${row.personnel?.last_name || ""}`.trim() ||
             "Desconocido"}</span
     >
 {/snippet}
 
 {#snippet renderDependency(row: Enlace)}
-    <span
-        >{(() => {
-            const depId = (row.personnel as any)?.dependency_id;
-            const dep = dependencies.find((d) => d.id === depId);
-            return dep ? dep.name : "N/A";
-        })()}</span
-    >
-{/snippet}
-
-{#snippet renderFloor(row: Enlace)}
-    <span>{row.personnel?.floor || "N/A"}</span>
+    {@const depId = (row.personnel as any)?.dependency_id}
+    {@const dep = dependencies.find((d) => d.id === depId)}
+    <div class="flex flex-col">
+        <span class="font-medium text-slate-900"
+            >{dep ? dep.name : "N/A"}</span
+        >
+        {#if row.building || row.floor}
+            <span class="text-xs text-slate-500"
+                >{row.building || ""}{row.building && row.floor
+                    ? ` (${row.floor})`
+                    : ""}</span
+            >
+        {/if}
+    </div>
 {/snippet}
 
 {#snippet renderEmail(row: Enlace)}
@@ -219,35 +227,28 @@
 <div class="space-y-6">
     <SectionHeader title="Directorio de Enlaces">
         {#snippet filters()}
-            <div class="flex flex-col xl:flex-row gap-3 w-full flex-wrap xl:flex-nowrap items-end">
-                <div class="flex-1 min-w-[200px] w-full sm:max-w-xs flex flex-col gap-1.5">
-                    <label for="enlaces-search" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Buscar Enlace</label>
-                    <SearchInput
-                        id="enlaces-search"
-                        placeholder="Nombre, dependencia, correo o ext..."
-                        class="h-9 text-xs font-bold w-full"
-                        bind:value={searchQuery}
-                    />
-                </div>
-                <div class="flex flex-wrap gap-3">
-                    <div class="flex flex-col gap-1.5">
-                        <label for="filter-dependency" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dependencia</label>
-                        <Select id="filter-dependency" bind:value={filterDependency} placeholder="Todas" class="w-full sm:w-auto min-w-[160px] h-9 text-xs font-bold">
-                            {#each dependencies as dep}
-                                <option value={dep.name}>{dep.name}</option>
-                            {/each}
-                        </Select>
-                    </div>
-                    
-                    <div class="flex flex-col gap-1.5">
-                        <label for="filter-floor" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Piso Base</label>
-                        <Select id="filter-floor" bind:value={filterFloor} placeholder="Todos" class="w-full sm:w-auto min-w-[120px] h-9 text-xs font-bold">
-                            {#each availableFloors as floor}
-                                <option value={floor}>{floor}</option>
-                            {/each}
-                        </Select>
-                    </div>
-                </div>
+            <FilterSelect
+                label="Dependencia"
+                options={dependencyNames}
+                placeholder="Todas"
+                bind:value={filterDependency}
+            />
+            <FilterSelect
+                label="Piso Base"
+                options={availableFloors}
+                placeholder="Todos"
+                bind:value={filterFloor}
+            />
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                <span
+                    class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap"
+                    >Buscar</span
+                >
+                <SearchInput
+                    placeholder="Nombre, correo o ext..."
+                    bind:value={searchQuery}
+                    class="h-9 text-xs font-bold"
+                />
             </div>
         {/snippet}
         {#snippet actions()}
@@ -294,13 +295,13 @@
             filterDependency = '';
             filterFloor = '';
         }}
-        skeletonColumns={5}
+        skeletonColumns={4}
         skeletonRows={5}
         skeletonHasActions={true}
         cardClass="overflow-hidden"
     >
         {#snippet children()}
-            <DataTable data={filteredEnlaces} {columns}>
+            <DataTable data={filteredEnlaces} {columns} actionsWidth="220px">
                 {#snippet actions(row: Enlace)}
                     <div class="flex items-center gap-1 justify-end">
                         {#if row.personnel?.email && row.personnel?.email !== "N/A"}

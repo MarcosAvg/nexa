@@ -1,19 +1,17 @@
 <script lang="ts">
     import {
         ticketState,
-        userState,
         personnelState,
         catalogState,
     } from "../stores";
     import {
         SectionHeader, TaskBanner, Button, FilterGroup, FilterSelect,
-        Input, PermissionGuard, ContentView, FloatingActionButton,
+        Input, PermissionGuard, ContentView,
         Pagination, ExportDropdown,
-        TicketModal, ModificationCompareModal, ManualTicketDetailsModal,
+        ModificationCompareModal,
     } from "../components";
     import {
         Search,
-        Plus,
         FileSpreadsheet,
         Download,
         FolderArchive,
@@ -21,7 +19,6 @@
     } from "lucide-svelte";
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
-    import { personnelService } from "../services/personnel";
     import { toast } from "svelte-sonner";
     import { handleError, exportResponsivasToExcel, exportResponsivasAllDependenciesAsZip } from "../utils";
     import {
@@ -74,14 +71,6 @@
         // El $effect debounced dispara refresh(1) automáticamente
     }
 
-    // Estado del modal
-    let isModalOpen = $state(false);
-    let editingTicket = $state<any>(null);
-
-    // Estado de detalles manuales
-    let isManualDetailsOpen = $state(false);
-    let manualTicket = $state<any>(null);
-
     // Modal de importación
     let isImportOpen = $state(false);
 
@@ -98,7 +87,6 @@
     let isCompareOpen = $state(false);
     let compareTicket = $state<any>(null);
 
-    let personnel = $derived(personnelState.pagination.items);
     let dependencies = $derived(catalogState.dependencies);
 
     // Datos paginados del servidor con resolución de nombre de persona
@@ -166,12 +154,6 @@
             }
         };
 
-        if (isManualDetailsOpen && manualTicket) {
-            add(manualTicket.id, () => {
-                isManualDetailsOpen = false;
-                manualTicket = null;
-            });
-        }
         if (isCompareOpen && compareTicket) {
             add(compareTicket.id, () => {
                 isCompareOpen = false;
@@ -190,13 +172,6 @@
                 importedTicket = null;
             });
         }
-        if (isModalOpen && editingTicket?.id != null) {
-            add(editingTicket.id, () => {
-                isModalOpen = false;
-                editingTicket = null;
-            });
-        }
-
         const seen = new Set<number>();
         let closedAny = false;
         for (const { id, onGone } of entries) {
@@ -256,13 +231,9 @@
             return;
         }
 
-        manualTicket = ticket;
-        isManualDetailsOpen = true;
-    }
-
-    function onOpenAddTicket() {
-        editingTicket = null;
-        isModalOpen = true;
+        // Para tickets automáticos/sistema (Programación, etc.),
+        // delegar al flujo de completado correspondiente
+        onStartCompletion(ticket);
     }
 
     function onStartCompletion(ticket: any) {
@@ -486,17 +457,6 @@
                     Importar Plantilla
                 </Button>
             </PermissionGuard>
-            <PermissionGuard requireEdit>
-                <Button
-                    variant="primary"
-                    onclick={onOpenAddTicket}
-                    class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
-                    disabled={!networkStore.isOnline}
-                >
-                    <Plus size={18} strokeWidth={3} />
-                    Nuevo Ticket
-                </Button>
-            </PermissionGuard>
         {/snippet}
     </SectionHeader>
 
@@ -532,14 +492,6 @@
             </div>
         {/snippet}
 
-        {#snippet emptyActions()}
-            <PermissionGuard requireEdit>
-                <Button variant="primary" size="sm" class="h-11 px-7 rounded-xl shadow-lg shadow-blue-500/20" onclick={onOpenAddTicket}>
-                    <Plus size={18} strokeWidth={3} class="mr-2" />
-                    Crear nuevo ticket
-                </Button>
-            </PermissionGuard>
-        {/snippet}
     </ContentView>
 
     <Pagination
@@ -552,14 +504,6 @@
         {isLoading}
     />
 </div>
-
-<TicketModal bind:isOpen={isModalOpen} {editingTicket} />
-
-<ManualTicketDetailsModal
-    bind:isOpen={isManualDetailsOpen}
-    ticket={manualTicket}
-    onComplete={() => refreshData()}
-/>
 
 <ModificationCompareModal
     bind:isOpen={isCompareOpen}
@@ -580,7 +524,3 @@
     ticket={importedTicket}
     onComplete={() => refreshData()}
 />
-
-<PermissionGuard requireEdit>
-    <FloatingActionButton onclick={onOpenAddTicket} label="Nuevo Ticket" />
-</PermissionGuard>

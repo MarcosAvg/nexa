@@ -87,12 +87,18 @@
         onCardProgram,
     }: Props = $props();
 
-    // Restablecer resaltado al cerrar
+    // Restablecer resaltado y contexto de baja al cerrar
     $effect(() => {
         if (!isOpen) {
             personnelState.highlightedCardId = null;
+            personnelState.bajaContextPersonId = null;
         }
     });
+
+    // Contexto activo de baja
+    let isBajaContext = $derived(
+        person?.id != null && personnelState.bajaContextPersonId === person.id,
+    );
 
     let responsivaData = $state<any>(null);
     let selectedShowCard = $state<any>(null);
@@ -576,7 +582,9 @@
                                 </button>
                                 <button
                                     type="button"
-                                    class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-white transition-all active:scale-95 disabled:opacity-50"
+                                    class="flex-1 flex flex-col items-center gap-1.5 p-3.5 rounded-lg transition-all active:scale-95 disabled:opacity-50 {isBajaContext
+                                        ? 'text-rose-600 bg-rose-50 ring-2 ring-rose-400/50 animate-pulse'
+                                        : 'text-slate-500 hover:text-rose-600 hover:bg-white'}"
                                     onclick={() => onDeactivate?.(person)}
                                     {disabled}
                                 >

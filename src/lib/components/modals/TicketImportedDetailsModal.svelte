@@ -15,9 +15,10 @@
     import { ticketService } from "../../services/tickets";
     import { HistoryService } from "../../services/history";
     import { catalogState, personnelState } from "../../stores";
+    import InfoCard from "../InfoCard.svelte";
+    import CardCheckItem from "../CardCheckItem.svelte";
     import { toast } from "svelte-sonner";
-    import { handleError, parseFloors, personnelActions } from "../../utils";
-import { confirm } from "../../utils/confirmModal.svelte";
+    import { handleError, parseFloors } from "../../utils";
     import {
         AlertCircle,
         CheckCircle2,
@@ -25,7 +26,11 @@ import { confirm } from "../../utils/confirmModal.svelte";
         XCircle,
         CreditCard,
         Loader2,
-        AlertTriangle
+        AlertTriangle,
+        ArrowRight,
+        MapPin,
+        Calendar,
+        FileText,
     } from "lucide-svelte";
 
 
@@ -246,26 +251,15 @@ import { confirm } from "../../utils/confirmModal.svelte";
     }
 
     // ── BAJA ─────────────────────────────────────────────
-    async function handleBaja() {
+    function handleBaja() {
         if (!selectedPerson || !ticket) return;
 
+        // Marcar contexto de baja para señalar el botón en el sidepanel
+        personnelState.bajaContextPersonId = selectedPerson.id;
+
+        // Abrir el sidepanel de la persona para gestionar su baja
+        personnelState.selectPerson(selectedPerson.id);
         isOpen = false;
-        confirm.open({
-            title: "¿DAR DE BAJA?",
-            description: `Se desactivarán ${(selectedPerson.cards ?? []).filter((c: any) => c.status === "active").length} tarjeta(s) asociadas.`,
-            variant: "danger",
-            confirmText: "Dar de Baja",
-            onConfirm: async () => {
-                await personnelActions.handleDeactivatePerson(selectedPerson, async () => {});
-                try {
-                    await ticketService.delete(ticket.id, "Baja procesada y completada desde plantilla");
-                    toast.success("Baja completada exitosamente.");
-                    onComplete?.();
-                } catch (err) {
-                    handleError(err, "Cerrar Ticket de Baja");
-                }
-            },
-        });
     }
 
     // ── REPOSICIÓN: folio validation ──────────────────────
@@ -324,6 +318,8 @@ import { confirm } from "../../utils/confirmModal.svelte";
 
     function handleGoToFirmaResponsiva(card: any) {
         if (!selectedPerson || !card?.id) return;
+        // Resaltar la tarjeta a reponer (como Programación resalta su tarjeta)
+        personnelState.highlightedCardId = card.id;
         personnelState.selectPerson(selectedPerson.id);
         isOpen = false;
     }
@@ -344,21 +340,104 @@ import { confirm } from "../../utils/confirmModal.svelte";
     }
 
     // ── REPORTE DE FALLA ──────────────────────────────────
-    let reportRows = $derived.by(() => {
+    type AffectedCardCheck = {
+        type: string;
+        folio: string;
+        status: "found" | "mismatch" | "nocard" | "noperson";
+        cardId: string | null;
+    };
+
+    /** Normaliza tipo_tarjeta del Excel a tipos del sistema.
+     *  "Tarjeta P2000" → ["P2000"]
+     *  "Tarjeta KONE"  → ["KONE"]
+     *  "Ambas tarjetas" → ["P2000", "KONE"]
+     */
+    function resolveTipos(raw: string): string[] {
+        const t = raw.toLowerCase().trim();
+        if (t.includes("ambas")) return ["P2000", "KONE"];
+        if (t.includes("p2000")) return ["P2000"];
+        if (t.includes("kone")) return ["KONE"];
+        return [raw];
+    }
+
+    let affectedCardChecks = $derived.by((): AffectedCardCheck[] => {
         if (ticketType !== "Reporte de Falla") return [];
-        return [
-            { label: "Apellidos", value: p.apellidos },
-            { label: "Nombres", value: p.nombres },
-            { label: "Dependencia", value: p.dependencia },
-            { label: "Tipo de Tarjeta", value: p.tipo_tarjeta },
-            { label: "Folio de Tarjeta", value: p.folio },
-            { label: "Lugar donde falla", value: p.ubicacion },
-            { label: "Descripción", value: p.descripcion },
-            { label: "¿Desde cuándo?", value: p.desde_cuando },
-            { label: "Urgencia", value: p.urgencia },
-            { label: "Observaciones", value: p.observaciones },
-        ].filter((r) => r.value);
+        const rawTipo = (p.tipo_tarjeta ?? "").trim();
+        const folio = (p.folio ?? "").trim();
+        if (!rawTipo && !folio) return [];
+
+        const tipos = resolveTipos(rawTipo);
+
+        if (!selectedPerson) {
+            return tipos.map((t) => ({
+                type: t,
+                folio,
+                status: "noperson" as const,
+                cardId: null,
+            }));
+        }
+
+        const cards: any[] = selectedPerson.cards ?? [];
+        const checks: AffectedCardCheck[] = [];
+
+        for (const tipo of tipos) {
+            const exact = cards.find(
+                (c: any) =>
+                    c.folio?.toString() === folio &&
+                    c.type?.toLowerCase() === tipo.toLowerCase(),
+            );
+            if (exact) {
+                checks.push({
+                    type: exact.type,
+                    folio: exact.folio,
+                    status: "found",
+                    cardId: exact.id,
+                });
+                continue;
+            }
+
+            const sameType = cards.find(
+                (c: any) =>
+                    c.status === "active" &&
+                    c.type?.toLowerCase() === tipo.toLowerCase(),
+            );
+            if (sameType) {
+                checks.push({
+                    type: sameType.type,
+                    folio: sameType.folio,
+                    status: "mismatch",
+                    cardId: sameType.id,
+                });
+                continue;
+            }
+
+            checks.push({
+                type: tipo,
+                folio,
+                status: "nocard",
+                cardId: null,
+            });
+        }
+
+        return checks;
     });
+
+    let affectedCardId = $derived(
+        affectedCardChecks.find((c) => c.cardId != null)?.cardId ?? null,
+    );
+
+    function handleViewPersonProfile() {
+        if (!selectedPerson) return;
+        personnelState.selectPerson(selectedPerson.id);
+        isOpen = false;
+    }
+
+    function handleGoToAffectedCard(cardId: string) {
+        if (!selectedPerson) return;
+        personnelState.highlightedCardId = cardId;
+        personnelState.selectPerson(selectedPerson.id);
+        isOpen = false;
+    }
 
     async function handleComplete(note?: string) {
         if (!ticket) return;
@@ -379,6 +458,22 @@ import { confirm } from "../../utils/confirmModal.svelte";
         if (!ticket) return;
         isSubmitting = true;
         try {
+            // Mapear campos de Reporte de Falla → campos que entiende el modal de Reposición
+            const rawTipo = (p.tipo_tarjeta ?? "").trim();
+            const folio = (p.folio ?? "").trim();
+            const repoPayload: Record<string, any> = { ...p, origen: "Reporte de Falla" };
+
+            // Usar resolveTipos para manejar "Tarjeta P2000", "Tarjeta KONE" y "Ambas tarjetas"
+            const tipos = resolveTipos(rawTipo);
+            if (tipos.includes("P2000")) {
+                repoPayload.reponer_p2000 = "sí";
+                repoPayload.folio_p2000 = folio;
+            }
+            if (tipos.includes("KONE")) {
+                repoPayload.reponer_kone = "sí";
+                repoPayload.folio_kone = folio;
+            }
+
             await ticketService.create({
                 type: "Reposición",
                 title: `Reposición — ${p.apellidos ?? ""}, ${p.nombres ?? ""}`,
@@ -386,8 +481,17 @@ import { confirm } from "../../utils/confirmModal.svelte";
                 priority: p.urgencia?.toLowerCase().includes("alta")
                     ? "alta"
                     : "media",
-                payload: { ...p, origen: "Reporte de Falla" },
+                payload: repoPayload,
             });
+
+            // Si hay persona identificada, navegar al perfil + resaltar tarjeta
+            if (selectedPerson) {
+                if (affectedCardId) {
+                    personnelState.highlightedCardId = affectedCardId;
+                }
+                personnelState.selectPerson(selectedPerson.id);
+            }
+
             await handleComplete("Reposición creada desde reporte de falla");
         } catch (err) {
             handleError(err, "Crear Ticket de Reposición");
@@ -454,8 +558,7 @@ import { confirm } from "../../utils/confirmModal.svelte";
     onclose={closeModal}
 >
     <div class="space-y-4">
-        <!-- ── Person detection (all except Reporte de Falla) ── -->
-        {#if ticketType !== "Reporte de Falla"}
+        <!-- ── Person detection ── -->
             <div class="rounded-xl border border-slate-200 p-3">
                 <p
                     class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"
@@ -554,242 +657,399 @@ import { confirm } from "../../utils/confirmModal.svelte";
                     </div>
                 {/if}
             </div>
-        {/if}
 
         <!-- ── MODIFICACIÓN: summary + open compare button ── -->
-        {#if ticketType === "Modificación"}
-            {#if selectedPerson}
-                <div
-                    class="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2"
-                >
-                    <p
-                        class="text-xs font-bold text-amber-700 uppercase tracking-widest"
-                    >
-                        Cambios solicitados
-                    </p>
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                        {#if p.nuevo_apellido}<div class="text-slate-500">
-                                Apellidos
-                            </div>
-                            <div class="text-amber-800 font-medium">
-                                {p.nuevo_apellido}
-                            </div>{/if}
-                        {#if p.nuevo_nombre}<div class="text-slate-500">
-                                Nombres
-                            </div>
-                            <div class="text-amber-800 font-medium">
-                                {p.nuevo_nombre}
-                            </div>{/if}
-                        {#if p.nueva_dep}<div class="text-slate-500">
-                                Dependencia
-                            </div>
-                            <div class="text-amber-800 font-medium">
-                                {p.nueva_dep}
-                            </div>{/if}
-                        {#if p.nuevo_edificio}<div class="text-slate-500">
-                                Edificio
-                            </div>
-                            <div class="text-amber-800 font-medium">
-                                {p.nuevo_edificio}
-                            </div>{/if}
-                        {#if p.nuevo_piso}<div class="text-slate-500">
-                                Piso Base
-                            </div>
-                            <div class="text-amber-800 font-medium">
-                                {p.nuevo_piso}
-                            </div>{/if}
-                        {#if p.nueva_area}<div class="text-slate-500">Área</div>
-                            <div class="text-amber-800 font-medium">
-                                {p.nueva_area}
-                            </div>{/if}
-                        {#if p.nuevo_puesto}<div class="text-slate-500">
-                                Puesto
-                            </div>
-                            <div class="text-amber-800 font-medium">
-                                {p.nuevo_puesto}
-                            </div>{/if}
-                        {#if p.hora_entrada}<div class="text-slate-500">
-                                Hora Entrada
-                            </div>
-                            <div class="text-amber-800 font-medium">
-                                {p.hora_entrada}
-                            </div>{/if}
-                        {#if p.hora_salida}<div class="text-slate-500">
-                                Hora Salida
-                            </div>
-                            <div class="text-amber-800 font-medium">
-                                {p.hora_salida}
-                            </div>{/if}
-                        {#if p.accion_p2000}<div class="text-slate-500">
-                                Acción P2000
-                            </div>
-                            <div class="text-amber-800 font-medium">
-                                {p.accion_p2000}: {p.pisos_p2000 || "N/A"}
-                            </div>{/if}
-                        {#if p.accion_kone}<div class="text-slate-500">
-                                Acción KONE
-                            </div>
-                            <div class="text-amber-800 font-medium">
-                                {p.accion_kone}: {p.pisos_kone || "N/A"}
-                            </div>{/if}
-                        {#if p.accion_acc}<div class="text-slate-500">
-                                Acción Acc. Esp.
-                            </div>
-                            <div
-                                class="text-amber-800 font-medium whitespace-nowrap overflow-hidden text-ellipsis"
-                            >
-                                {p.accion_acc}: {[
-                                    p.acceso1,
-                                    p.acceso2,
-                                    p.acceso3,
-                                ]
-                                    .filter(Boolean)
-                                    .join(", ") || "N/A"}
-                            </div>{/if}
-                    </div>
-                    <p class="text-[10px] text-amber-600 mt-1">
-                        Al hacer clic en "Revisar Cambios" se abrirá el panel de
-                        comparación completo con los datos actuales vs.
-                        propuestos.
-                    </p>
+        {#if ticketType === "Modificación" && selectedPerson}
+            <InfoCard
+                variant="amber"
+                icon={ArrowRight}
+                title="Cambios solicitados"
+                hint='Al hacer clic en "Revisar Cambios" se abrirá el panel de comparación completo con los datos actuales vs. propuestos.'
+            >
+                <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    {#if p.nuevo_apellido}<div class="text-slate-500">
+                            Apellidos
+                        </div>
+                        <div class="text-amber-800 font-medium">
+                            {p.nuevo_apellido}
+                        </div>{/if}
+                    {#if p.nuevo_nombre}<div class="text-slate-500">Nombres</div>
+                        <div class="text-amber-800 font-medium">
+                            {p.nuevo_nombre}
+                        </div>{/if}
+                    {#if p.nueva_dep}<div class="text-slate-500">Dependencia</div>
+                        <div class="text-amber-800 font-medium">
+                            {p.nueva_dep}
+                        </div>{/if}
+                    {#if p.nuevo_edificio}<div class="text-slate-500">Edificio</div>
+                        <div class="text-amber-800 font-medium">
+                            {p.nuevo_edificio}
+                        </div>{/if}
+                    {#if p.nuevo_piso}<div class="text-slate-500">Piso Base</div>
+                        <div class="text-amber-800 font-medium">
+                            {p.nuevo_piso}
+                        </div>{/if}
+                    {#if p.nueva_area}<div class="text-slate-500">Área</div>
+                        <div class="text-amber-800 font-medium">
+                            {p.nueva_area}
+                        </div>{/if}
+                    {#if p.nuevo_puesto}<div class="text-slate-500">Puesto</div>
+                        <div class="text-amber-800 font-medium">
+                            {p.nuevo_puesto}
+                        </div>{/if}
+                    {#if p.hora_entrada}<div class="text-slate-500">Hora Entrada</div>
+                        <div class="text-amber-800 font-medium">
+                            {p.hora_entrada}
+                        </div>{/if}
+                    {#if p.hora_salida}<div class="text-slate-500">Hora Salida</div>
+                        <div class="text-amber-800 font-medium">
+                            {p.hora_salida}
+                        </div>{/if}
+                    {#if p.accion_p2000}<div class="text-slate-500">
+                            Acción P2000
+                        </div>
+                        <div class="text-amber-800 font-medium">
+                            {p.accion_p2000}: {p.pisos_p2000 || "N/A"}
+                        </div>{/if}
+                    {#if p.accion_kone}<div class="text-slate-500">
+                            Acción KONE
+                        </div>
+                        <div class="text-amber-800 font-medium">
+                            {p.accion_kone}: {p.pisos_kone || "N/A"}
+                        </div>{/if}
+                    {#if p.accion_acc}<div class="text-slate-500">
+                            Acción Acc. Esp.
+                        </div>
+                        <div
+                            class="text-amber-800 font-medium whitespace-nowrap overflow-hidden text-ellipsis"
+                        >
+                            {p.accion_acc}: {[
+                                p.acceso1,
+                                p.acceso2,
+                                p.acceso3,
+                            ]
+                                .filter(Boolean)
+                                .join(", ") || "N/A"}
+                        </div>{/if}
                 </div>
-            {/if}
+            </InfoCard>
         {/if}
 
-        <!-- ── BAJA: confirmation card ── -->
+        <!-- ── BAJA: guidance card ── -->
         {#if ticketType === "Baja de Persona" && selectedPerson}
-            <div
-                class="rounded-xl border border-rose-200 bg-rose-50 p-4 space-y-2"
+            <InfoCard
+                variant="rose"
+                hint='Al hacer clic en "Revisar perfil →" se abrirá el perfil completo de la persona donde podrás gestionar su baja y revisar tarjetas asociadas.'
             >
-                <p class="text-sm font-bold text-rose-700">
-                    ¿Confirmar baja de esta persona?
-                </p>
-                <p class="text-xs text-rose-600">
-                    Se desactivarán <strong
-                        >{(selectedPerson.cards ?? []).filter(
-                            (c: any) => c.status === "active",
-                        ).length}</strong
-                    > tarjeta(s) asociadas.
-                </p>
-                {#if p.tipo_baja}<p class="text-xs text-rose-600">
-                        Tipo: <strong>{p.tipo_baja}</strong>
-                    </p>{/if}
-                {#if p.motivo}<p class="text-xs text-rose-600">
-                        Motivo: <strong>{p.motivo}</strong>
-                    </p>{/if}
-            </div>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <div
+                            class="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0"
+                        >
+                            <User size={20} />
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-slate-900">
+                                {selectedPerson.last_name}, {selectedPerson.first_name}
+                            </p>
+                            <p class="text-xs text-slate-500">
+                                {selectedPerson.dependency} · {selectedPerson.building}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="text-sm text-rose-700 font-medium">
+                        Se desactivarán <strong
+                            >{(selectedPerson.cards ?? []).filter(
+                                (c: any) => c.status === "active",
+                            ).length}</strong
+                        > tarjeta(s) asociadas.
+                    </div>
+
+                    {#if p.tipo_baja || p.motivo}
+                        <div
+                            class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs bg-white/60 rounded-lg p-3"
+                        >
+                            {#if p.tipo_baja}
+                                <span class="text-slate-500">Tipo de baja</span>
+                                <span class="text-rose-700 font-medium"
+                                    >{p.tipo_baja}</span
+                                >
+                            {/if}
+                            {#if p.motivo}
+                                <span class="text-slate-500">Motivo</span>
+                                <span class="text-rose-700 font-medium"
+                                    >{p.motivo}</span
+                                >
+                            {/if}
+                        </div>
+                    {/if}
+
+                    <div
+                        class="flex items-start gap-2.5 p-3 rounded-lg bg-rose-100/50 border border-rose-200/50"
+                    >
+                        <AlertTriangle
+                            size={16}
+                            class="text-rose-500 shrink-0 mt-0.5"
+                        />
+                        <p class="text-xs text-rose-700 leading-relaxed">
+                            Revisa la información de
+                            <strong>{selectedPerson.first_name}</strong> en el
+                            panel lateral para confirmar sus datos y tarjetas
+                            antes de procesar la baja.
+                        </p>
+                    </div>
+                </div>
+            </InfoCard>
         {/if}
 
         <!-- ── REPOSICIÓN: folio validation + cards ── -->
         {#if ticketType === "Reposición" && selectedPerson}
-            <div class="space-y-2">
-                {#each folioChecks as check}
-                    <div
-                        class="rounded-xl border {check.warning
-                            ? 'border-amber-300 bg-amber-50'
-                            : 'border-slate-200 bg-white'} p-3 flex items-center gap-3"
-                    >
-                        <div
-                            class="w-8 h-8 rounded-full {check.warning
-                                ? 'bg-amber-100 text-amber-600'
-                                : 'bg-slate-100 text-slate-500'} flex items-center justify-center shrink-0"
+            <InfoCard
+                variant="amber"
+                hint='Al hacer clic en "Ir →" se te llevará al perfil de la persona con la tarjeta preseleccionada para el flujo de Firma Responsiva.'
+            >
+                <div class="space-y-2">
+                    {#each folioChecks as check}
+                        <CardCheckItem
+                            type={check.card.type}
+                            folio={check.card.folio ?? "—"}
+                            warning={check.warning}
+                            navColor="amber"
+                            showNav={!!check.card.id}
+                            onNavigate={() =>
+                                handleGoToFirmaResponsiva(check.card)}
                         >
-                            <CreditCard size={16} />
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2 mb-0.5">
-                                <span
-                                    class="text-[10px] font-black text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded tracking-wider"
-                                    >{check.card.type}</span
-                                >
-                                <span
-                                    class="text-sm font-semibold text-slate-700 truncate"
-                                    >{check.card.folio ?? "—"}</span
-                                >
-                            </div>
-                            {#if check.warning}
-                                <div
-                                    class="text-xs text-amber-700 flex items-start gap-2 mt-1"
-                                >
-                                    <AlertTriangle
-                                        size={14}
-                                        class="shrink-0 mt-0.5"
-                                    />
-                                    <div class="leading-snug">
-                                        {#if !check.card.id}
-                                            No hay tarjeta {check.card.type} activa
-                                            asignada.
-                                        {:else}
-                                            Folio en plantilla (<strong
-                                                >{check.card.type === "P2000"
-                                                    ? p.folio_p2000
-                                                    : p.folio_kone}</strong
-                                            >) no coincide con la tarjeta
-                                            asignada (<strong
-                                                >{check.card.folio}</strong
-                                            >). Verifique antes de continuar.
-                                        {/if}
+                            {#snippet status()}
+                                {#if check.warning}
+                                    <div
+                                        class="text-xs text-amber-700 flex items-start gap-2"
+                                    >
+                                        <AlertTriangle
+                                            size={14}
+                                            class="shrink-0 mt-0.5"
+                                        />
+                                        <div class="leading-snug">
+                                            {#if !check.card.id}
+                                                No hay tarjeta {check.card.type} activa
+                                                asignada.
+                                            {:else}
+                                                Folio en plantilla (<strong
+                                                    >{check.card.type === "P2000"
+                                                        ? p.folio_p2000
+                                                        : p.folio_kone}</strong
+                                                >) no coincide con la tarjeta
+                                                asignada (<strong
+                                                    >{check.card.folio}</strong
+                                                >). Verifique antes de continuar.
+                                            {/if}
+                                        </div>
                                     </div>
-                                </div>
-                            {:else}
-                                <p
-                                    class="text-xs text-emerald-600 flex items-center gap-1.5 mt-0.5 font-medium"
-                                >
-                                    <CheckCircle2 size={13} /> Folio coincide correctamente.
-                                </p>
-                            {/if}
-                        </div>
-                        {#if check.card.id}
-                            <button
-                                class="text-xs text-blue-500 hover:underline font-medium shrink-0"
-                                onclick={() =>
-                                    handleGoToFirmaResponsiva(check.card)}
-                            >
-                                Ir →
-                            </button>
-                        {/if}
-                    </div>
-                {/each}
-                {#if folioChecks.length === 0 && selectedPerson}
-                    <div
-                        class="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2"
-                    >
-                        <AlertCircle size={14} class="mt-0.5 shrink-0" />
-                        <span
-                            >No se identificaron tarjetas a reponer según el
-                            payload. Revise los campos "¿Reponer P2000/KONE?".</span
+                                {:else}
+                                    <p
+                                        class="text-xs text-emerald-600 flex items-center gap-1.5 font-medium"
+                                    >
+                                        <CheckCircle2 size={13} /> Folio coincide correctamente.
+                                    </p>
+                                {/if}
+                            {/snippet}
+                        </CardCheckItem>
+                    {/each}
+                    {#if folioChecks.length === 0 && selectedPerson}
+                        <div
+                            class="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2"
                         >
-                    </div>
-                {/if}
-            </div>
-            <p class="text-[10px] text-slate-400">
-                Al hacer clic en "Ir →" se te llevará al perfil de la persona
-                con la tarjeta preseleccionada para el flujo de Firma
-                Responsiva.
-            </p>
+                            <AlertCircle size={14} class="mt-0.5 shrink-0" />
+                            <span
+                                >No se identificaron tarjetas a reponer según el
+                                payload. Revise los campos "¿Reponer P2000/KONE?".</span
+                            >
+                        </div>
+                    {/if}
+                </div>
+            </InfoCard>
         {/if}
 
         <!-- ── REPORTE DE FALLA: detail view ── -->
         {#if ticketType === "Reporte de Falla"}
-            <div class="rounded-xl border border-slate-200 overflow-hidden">
-                <table class="w-full text-xs">
-                    <tbody class="divide-y divide-slate-100">
-                        {#each reportRows as row, i}
-                            <tr
-                                class={i % 2 === 0 ? "bg-white" : "bg-slate-50"}
+            <InfoCard
+                variant="orange"
+                hint='Selecciona "Requiere Reposición" para crear un ticket de reemplazo, o "Falla Resuelta" si el problema ya fue solucionado.'
+            >
+                <!-- ── Severity banner ── -->
+                {#if p.urgencia}
+                    <div
+                        class="flex items-center gap-3 p-3 rounded-xl {p.urgencia?.toLowerCase().includes('alta')
+                            ? 'bg-red-50 border border-red-200'
+                            : 'bg-amber-50 border border-amber-200'}"
+                    >
+                        <div
+                            class="w-9 h-9 rounded-full {p.urgencia?.toLowerCase().includes('alta')
+                                ? 'bg-red-100 text-red-600'
+                                : 'bg-amber-100 text-amber-600'} flex items-center justify-center shrink-0"
+                        >
+                            <AlertCircle size={18} />
+                        </div>
+                        <div>
+                            <p
+                                class="text-xs font-bold {p.urgencia?.toLowerCase().includes('alta')
+                                    ? 'text-red-700'
+                                    : 'text-amber-700'} uppercase tracking-widest"
                             >
-                                <td
-                                    class="px-4 py-2 font-semibold text-slate-500 w-40"
-                                    >{row.label}</td
+                                Urgencia {p.urgencia}
+                            </p>
+                            <p
+                                class="text-[10px] {p.urgencia?.toLowerCase().includes('alta')
+                                    ? 'text-red-500'
+                                    : 'text-amber-600'}"
+                            >
+                                {p.urgencia?.toLowerCase().includes('alta')
+                                    ? 'Se requiere atención inmediata'
+                                    : 'Requiere atención en los próximos días'}
+                            </p>
+                        </div>
+                    </div>
+                {/if}
+
+                <!-- ── Affected card (with navigation like Reposición) ── -->
+                {#each affectedCardChecks as check}
+                    <CardCheckItem
+                        type={check.type}
+                        folio={check.folio || "Folio no especificado"}
+                        warning={check.status !== "found"}
+                        navColor="orange"
+                        showNav={!!check.cardId && !!selectedPerson}
+                        onNavigate={() =>
+                            handleGoToAffectedCard(check.cardId!)}
+                    >
+                        {#snippet status()}
+                            {#if check.status === "found"}
+                                <p
+                                    class="text-[11px] text-emerald-600 font-medium flex items-center gap-1"
                                 >
-                                <td class="px-4 py-2 text-slate-800"
-                                    >{row.value}</td
+                                    <CheckCircle2 size={12} />
+                                    Tarjeta encontrada en el sistema
+                                </p>
+                            {:else if check.status === "mismatch"}
+                                <p
+                                    class="text-[11px] text-amber-600 font-medium flex items-center gap-1"
                                 >
-                            </tr>
-                        {/each}
-                    </tbody>
-                </table>
-            </div>
+                                    <AlertTriangle size={12} />
+                                    Folio no coincide con tarjeta activa
+                                </p>
+                            {:else if check.status === "nocard"}
+                                <p
+                                    class="text-[11px] text-amber-600 font-medium flex items-center gap-1"
+                                >
+                                    <AlertTriangle size={12} />
+                                    Sin tarjeta activa de este tipo
+                                </p>
+                            {:else}
+                                <p
+                                    class="text-[11px] text-slate-500 flex items-center gap-1"
+                                >
+                                    Tarjeta reportada (sin persona asociada)
+                                </p>
+                            {/if}
+                        {/snippet}
+                    </CardCheckItem>
+                {/each}
+
+                <!-- ── Report details (icon + label cards) ── -->
+                <div>
+                    <p
+                        class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"
+                    >
+                        <FileText size={11} />
+                        Detalles del reporte
+                    </p>
+                    <div class="space-y-2">
+                        {#if p.ubicacion}
+                            <div
+                                class="flex items-center gap-2.5 p-2.5 rounded-lg bg-white/60 border border-slate-100"
+                            >
+                                <MapPin
+                                    size={14}
+                                    class="text-slate-400 shrink-0"
+                                />
+                                <div>
+                                    <p
+                                        class="text-[10px] font-semibold text-slate-400"
+                                    >
+                                        Ubicación
+                                    </p>
+                                    <p
+                                        class="text-xs font-medium text-slate-700"
+                                    >
+                                        {p.ubicacion}
+                                    </p>
+                                </div>
+                            </div>
+                        {/if}
+                        {#if p.desde_cuando}
+                            <div
+                                class="flex items-center gap-2.5 p-2.5 rounded-lg bg-white/60 border border-slate-100"
+                            >
+                                <Calendar
+                                    size={14}
+                                    class="text-slate-400 shrink-0"
+                                />
+                                <div>
+                                    <p
+                                        class="text-[10px] font-semibold text-slate-400"
+                                    >
+                                        Desde
+                                    </p>
+                                    <p
+                                        class="text-xs font-medium text-slate-700"
+                                    >
+                                        {p.desde_cuando}
+                                    </p>
+                                </div>
+                            </div>
+                        {/if}
+                        {#if p.descripcion}
+                            <div
+                                class="flex items-start gap-2.5 p-2.5 rounded-lg bg-white/60 border border-slate-100"
+                            >
+                                <FileText
+                                    size={14}
+                                    class="text-slate-400 shrink-0 mt-0.5"
+                                />
+                                <div>
+                                    <p
+                                        class="text-[10px] font-semibold text-slate-400"
+                                    >
+                                        Descripción
+                                    </p>
+                                    <p
+                                        class="text-xs text-slate-700 leading-relaxed"
+                                    >
+                                        {p.descripcion}
+                                    </p>
+                                </div>
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+
+                <!-- ── Observaciones ── -->
+                {#if p.observaciones}
+                    <div class="pt-2 border-t border-orange-200/50">
+                        <p
+                            class="text-[10px] font-semibold text-orange-600 mb-1.5 flex items-center gap-1.5"
+                        >
+                            <AlertTriangle size={11} />
+                            Observaciones
+                        </p>
+                        <p
+                            class="text-xs text-slate-700 bg-white/60 rounded-lg p-3 leading-relaxed border border-orange-100"
+                        >
+                            {p.observaciones}
+                        </p>
+                    </div>
+                {/if}
+            </InfoCard>
         {/if}
     </div>
 
@@ -821,36 +1081,62 @@ import { confirm } from "../../utils/confirmModal.svelte";
                 {:else if ticketType === "Baja de Persona"}
                     <Button
                         variant="outline"
-                        class="border-rose-200 text-rose-600 hover:bg-rose-50"
+                        class="border-rose-200 text-rose-600 hover:bg-rose-50 group"
                         disabled={!selectedPerson}
-                        loading={isSubmitting}
                         onclick={handleBaja}
                     >
-                        <XCircle size={15} class="mr-1.5" />
-                        Ir a gestionar baja
+                        <User size={15} class="mr-1.5" />
+                        Revisar perfil
+                        <ArrowRight
+                            size={16}
+                            class="ml-1.5 group-hover:translate-x-0.5 transition-transform"
+                        />
                     </Button>
 
                     <!-- REPOSICIÓN -->
                 {:else if ticketType === "Reposición"}
                     <Button
                         variant="outline"
+                        class="border-amber-200 text-amber-600 hover:bg-amber-50 group"
                         disabled={!selectedPerson}
                         loading={isSubmitting}
                         onclick={handleMarkReposicionDone}
                     >
+                        <CheckCircle2 size={15} class="mr-1.5" />
                         Marcar como gestionado
+                        <ArrowRight
+                            size={16}
+                            class="ml-1.5 group-hover:translate-x-0.5 transition-transform"
+                        />
                     </Button>
 
                     <!-- REPORTE DE FALLA -->
                 {:else if ticketType === "Reporte de Falla"}
                     <Button
                         variant="outline"
-                        class="border-amber-200 text-amber-700 hover:bg-amber-50"
+                        class="border-orange-200 text-orange-600 hover:bg-orange-50 group"
+                        disabled={!selectedPerson}
+                        onclick={handleViewPersonProfile}
+                    >
+                        <User size={15} class="mr-1.5" />
+                        Ver perfil
+                        <ArrowRight
+                            size={16}
+                            class="ml-1.5 group-hover:translate-x-0.5 transition-transform"
+                        />
+                    </Button>
+                    <Button
+                        variant="outline"
+                        class="border-amber-200 text-amber-700 hover:bg-amber-50 group"
                         loading={isSubmitting}
                         onclick={handleCreateReposicionTicket}
                     >
                         <CreditCard size={15} class="mr-1.5" />
                         Requiere Reposición
+                        <ArrowRight
+                            size={16}
+                            class="ml-1.5 group-hover:translate-x-0.5 transition-transform"
+                        />
                     </Button>
                     <Button
                         variant="primary"

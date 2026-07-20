@@ -36,7 +36,7 @@
     />
     <Input
         {placeholder}
-        {value}
+        bind:value
         {oninput}
         {id}
         class="pl-9 {className}"
