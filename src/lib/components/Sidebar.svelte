@@ -26,6 +26,14 @@
     let { items, user, onLogout }: Props = $props();
 
     let isUpdateModalOpen = $state(false);
+
+    // Abrir el modal automáticamente cuando se detecte una actualización,
+    // a menos que el usuario ya haya descartado esta versión específica.
+    $effect(() => {
+        if (versionState.isUpdateAvailable && !versionState.dismissedBuildTime) {
+            isUpdateModalOpen = true;
+        }
+    });
 </script>
 
 <aside
@@ -259,7 +267,10 @@
         {#snippet footer()}
             <button
                 class="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-all active:scale-95"
-                onclick={() => isUpdateModalOpen = false}
+                onclick={() => {
+                    versionState.dismissUpdate();
+                    isUpdateModalOpen = false;
+                }}
             >
                 Después
             </button>

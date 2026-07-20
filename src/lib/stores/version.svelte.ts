@@ -9,6 +9,8 @@ export class VersionState {
     /** true cuando la primera verificación ya se completó. */
     hasChecked = $state(false);
     lastCheckTime = $state<number>(0);
+    /** Build-time de la última versión disponible que el usuario descartó. */
+    dismissedBuildTime = $state<string | null>(null);
     /** Build-time formateado para mostrar al usuario. */
     formattedBuildTime = $derived.by(() => {
         if (!this.localBuildTime) return null;
@@ -25,6 +27,9 @@ export class VersionState {
             return this.localBuildTime.slice(0, 10);
         }
     });
+
+    /** Último serverBuildTime detectado (para saber si es una versión nueva al descartar). */
+    #latestServerBuildTime: string | null = null;
 
     private checkInterval: ReturnType<typeof setInterval> | null = null;
     private initialized = false;
@@ -61,6 +66,17 @@ export class VersionState {
 
             if (serverBuildTime && serverBuildTime !== this.localBuildTime) {
                 this.isUpdateAvailable = true;
+                this.#latestServerBuildTime = serverBuildTime;
+
+                // Si el usuario había descartado una versión anterior y ahora hay
+                // una versión distinta, reseteamos el descarte para que el modal
+                // se muestre automáticamente de nuevo.
+                if (
+                    this.dismissedBuildTime &&
+                    this.dismissedBuildTime !== serverBuildTime
+                ) {
+                    this.dismissedBuildTime = null;
+                }
             }
             this.lastCheckTime = Date.now();
             this.hasChecked = true;
@@ -69,8 +85,34 @@ export class VersionState {
         }
     }
 
+    /**
+     * El usuario descartó la actualización actual — guardamos qué build
+     * era para no volver a mostrar el modal automáticamente hasta que
+     * llegue una versión distinta.
+     */
+    dismissUpdate() {
+        // Si no hay serverBuildTime aún (no se ha completado la primera verificación),
+        // simplemente ignoramos el descarte.
+        if (this.#latestServerBuildTime) {
+            this.dismissedBuildTime = this.#latestServerBuildTime;
+        }
+    }
+
+    /**
+     * Recarga la aplicación forzando la actualización desde el servidor.
+     * Usa navegación con cache-busting (query param único) en lugar de
+     * location.reload() para evitar que el navegador sirva la página desde
+     * bfcache (back-forward cache) o que el Service Worker entregue recursos
+     * cacheados de la versión anterior.
+     */
     refreshPage() {
-        window.location.reload();
+        const url = new URL(window.location.href);
+        url.searchParams.set(
+            '_cb',
+            `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        );
+        // replace en vez de href para no contaminar el historial del navegador
+        window.location.replace(url.toString());
     }
 
     destroy() {
