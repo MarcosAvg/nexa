@@ -190,8 +190,21 @@
 
     const priorityColor = $derived(getTicketPriorityVariant(ticket.priority));
 
-    // Configuración de badge de urgencia para Firma Responsiva
-    // Usa valores reactivos del store de configuración
+    // Colores para texto/metadatos de urgencia (Firma Responsiva)
+    const URGENCY_COLORS: Record<string, string> = {
+        rose: "#f43f5e",
+        emerald: "#10b981",
+        amber: "#f59e0b",
+    };
+
+    // Clases de borde completo con opacidad para integrarse al estilo existente
+    const URGENCY_BORDER_CLASSES: Record<string, string> = {
+        rose: "border-rose-200/80",
+        emerald: "border-emerald-200/80",
+        amber: "border-amber-200/80",
+    };
+
+    // Configuración de urgencia para Firma Responsiva
     const responsivaUrgency = $derived(
         ticket.type === "Firma Responsiva" && ticket.daysElapsed != null
             ? ticket.needsBaja
@@ -201,10 +214,16 @@
                     : { variant: "amber" as const, label: "Pendiente" }
             : null
     );
+
+    // Borde completo de la card teñido según urgencia
+    const urgencyBorderClass = $derived(
+        responsivaUrgency ? URGENCY_BORDER_CLASSES[responsivaUrgency.variant] : null
+    );
 </script>
 
 <article
-    class="group relative flex flex-col h-full {config.cardBg} rounded-2xl border {config.cardBorder} overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/60 hover:-translate-y-1"
+    class="group relative flex flex-col h-full {config.cardBg} rounded-2xl border {urgencyBorderClass ?? config.cardBorder} overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/60 hover:-translate-y-1"
+    class:border-2={!!responsivaUrgency}
 >
     <!-- Encabezado: Icono de tipo y prioridad -->
     <div class="p-4 flex items-start justify-between gap-4">
@@ -224,19 +243,13 @@
                     {ticket.type}
                 </p>
                 {#if ticket.type === "Firma Responsiva" && ticket.movementType && movementStyle}
-                    <span
-                        class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide border {movementStyle.bg} {movementStyle.color} {movementStyle.border} mb-1"
-                    >
-                        {ticket.movementType}
-                    </span>
-                    {#if responsivaUrgency}
-                        <Badge
-                            variant={responsivaUrgency.variant}
-                            class="ml-1.5 px-2 py-0.5 text-[9px] uppercase font-black tracking-tight rounded-lg"
+                    <div class="flex flex-wrap items-center gap-1.5 mb-1 min-h-[1.25rem]">
+                        <span
+                            class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide border {movementStyle.bg} {movementStyle.color} {movementStyle.border}"
                         >
-                            {ticket.daysElapsed} día{ticket.daysElapsed !== 1 ? "s" : ""} · {responsivaUrgency.label}
-                        </Badge>
-                    {/if}
+                            {ticket.movementType}
+                        </span>
+                    </div>
                 {/if}
                 <div class="flex items-center gap-1.5 text-slate-300">
                     <Hash size={10} />
@@ -293,9 +306,24 @@
         <div
             class="flex items-center justify-between text-[10px] font-bold px-1"
         >
-            <div class="flex items-center gap-1.5 text-slate-400">
-                <Calendar size={12} />
-                <span>{formatDate(ticket.created_at)}</span>
+            <div class="flex items-center gap-2 text-slate-400">
+                <div class="flex items-center gap-1.5">
+                    <Calendar size={12} />
+                    <span>{formatDate(ticket.created_at)}</span>
+                </div>
+
+                {#if responsivaUrgency}
+                    <span
+                        class="flex items-center gap-1"
+                        style="color: {URGENCY_COLORS[responsivaUrgency.variant]}"
+                    >
+                        <span
+                            class="w-1.5 h-1.5 rounded-full shrink-0"
+                            style="background-color: {URGENCY_COLORS[responsivaUrgency.variant]}"
+                        ></span>
+                        {ticket.daysElapsed} día{ticket.daysElapsed !== 1 ? "s" : ""} · {responsivaUrgency.label}
+                    </span>
+                {/if}
             </div>
 
             {#if ticket.cardFolio}

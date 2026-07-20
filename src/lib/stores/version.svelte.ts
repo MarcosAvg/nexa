@@ -100,15 +100,69 @@ export class VersionState {
 
     /**
      * Recarga la aplicación forzando la actualización desde el servidor.
-     * Usa navegación con cache-busting (query param único) en lugar de
-     * location.reload() para evitar que el navegador sirva la página desde
-     * bfcache (back-forward cache) o que el Service Worker entregue recursos
-     * cacheados de la versión anterior.
+     *
+     * Antes de navegar:
+     * 1. Fuerza al Service Worker a buscar actualizaciones (`registration.update()`).
+     * 2. Si se está instalando un nuevo SW, espera brevemente a que termine.
+     * 3. Si hay un SW esperando (`waiting`), le pide que se active (`SKIP_WAITING`).
+     * 4. Da un breve margen para que el mensaje se procese.
+     * 5. Navega con cache-busting para evitar bfcache.
+     *
+     * Nota: No se espera `controllerchange` porque el SW generado por
+     * vite-plugin-pwa con registerType:autoUpdate solo llama a
+     * self.skipWaiting() sin clients.claim(), por lo que el controlador
+     * de la página actual no cambia hasta la siguiente navegación.
      */
-    refreshPage() {
+    async refreshPage() {
+        try {
+            const registration =
+                await navigator.serviceWorker?.getRegistration();
+            if (registration) {
+                // Forzar la comprobación de actualización del SW
+                await registration.update();
+
+                // Si el nuevo SW aún se está instalando, esperar a que termine
+                const installing = registration.installing;
+                if (installing) {
+                    await new Promise<void>((resolve) => {
+                        const timeout = setTimeout(resolve, 3000);
+                        const onStateChange = () => {
+                            if (
+                                installing.state === "installed" ||
+                                installing.state === "activated"
+                            ) {
+                                clearTimeout(timeout);
+                                installing.removeEventListener(
+                                    "statechange",
+                                    onStateChange,
+                                );
+                                resolve();
+                            }
+                        };
+                        installing.addEventListener(
+                            "statechange",
+                            onStateChange,
+                        );
+                    });
+                }
+
+                // Si hay un nuevo SW esperando, pedirle que se active
+                if (registration.waiting) {
+                    registration.waiting.postMessage({
+                        type: "SKIP_WAITING",
+                    });
+                }
+
+                // Breve pausa para que el SW procese el mensaje antes de navegar
+                await new Promise((r) => setTimeout(r, 500));
+            }
+        } catch {
+            // Si falla la comunicación con el SW, recargar de todas formas
+        }
+
         const url = new URL(window.location.href);
         url.searchParams.set(
-            '_cb',
+            "_cb",
             `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         );
         // replace en vez de href para no contaminar el historial del navegador

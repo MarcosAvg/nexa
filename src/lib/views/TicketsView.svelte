@@ -39,6 +39,9 @@
     // Filtros de UI que mapean nombre → ID antes de aplicar
     let depNameFilter = $state("Todas");
 
+    let responsivaFilter = $state("Todas");
+    let movementTypeFilter = $state("Todas");
+
     // Sincronizar nombre de dependencia → ID en el store
     $effect(() => {
         const depId = depNameFilter === "Todas"
@@ -51,7 +54,6 @@
     let filterDebounce: ReturnType<typeof setTimeout>;
     $effect(() => {
         ticketState.filters.type;
-        ticketState.filters.priority;
         ticketState.filters.search;
         ticketState.filters.dependencyId;
         ticketState.filters.section;
@@ -67,9 +69,10 @@
         if (ticketState.filters.section === section) return;
         ticketState.filters.section = section;
         ticketState.filters.type = "Todos";
-        ticketState.filters.priority = "Todas";
         ticketState.filters.search = "";
         depNameFilter = "Todas";
+        movementTypeFilter = "Todas";
+        responsivaFilter = "Todas";
         // El $effect debounced dispara refresh(1) automáticamente
     }
 
@@ -139,6 +142,14 @@
             }
 
             return { ...t, personName, cardType, cardFolio, movementType: t.movementType, needsBaja, daysElapsed };
+        })
+        .filter((t) => {
+            if (movementTypeFilter !== "Todas" && t.movementType !== movementTypeFilter) return false;
+            if (responsivaFilter === "Todas") return true;
+            if (t.type !== "Firma Responsiva" || t.daysElapsed == null) return false;
+            if (t.needsBaja) return responsivaFilter === "Baja de Registro";
+            if (t.daysElapsed >= settingsState.responsivaWarnDays) return responsivaFilter === "Por vencer";
+            return responsivaFilter === "Pendiente";
         }),
     );
 
@@ -392,15 +403,28 @@
                     </div>
                 {/if}
 
-                <!-- Priority -->
-                <div class="w-full xl:w-auto">
-                    <FilterSelect
-                        label="Prioridad"
-                        options={["Todas", "Alta", "Media", "Baja"]}
-                        placeholder=""
-                        bind:value={ticketState.filters.priority}
-                    />
-                </div>
+                <!-- Tipo de movimiento (solo Responsivas) -->
+                {#if currentSection === "Responsivas"}
+                    <div class="w-full xl:w-auto">
+                        <FilterSelect
+                            label="Tipo"
+                            options={["Todas", "Alta de Personal", "Reposición", "Asignación", "Sin clasificar"]}
+                            placeholder=""
+                            bind:value={movementTypeFilter}
+                        />
+                    </div>
+                {/if}
+
+                <!-- Urgency (solo Responsivas) -->
+                {#if currentSection === "Responsivas"}
+                    <div class="w-full xl:w-auto">
+                        <FilterGroup
+                            label="Estado"
+                            options={["Todas", "Pendiente", "Por vencer", "Baja de Registro"]}
+                            bind:value={responsivaFilter}
+                        />
+                    </div>
+                {/if}
 
                 <!-- Dependency -->
                 {#if currentSection === "Responsivas"}
@@ -485,11 +509,12 @@
         emptyDescriptionFiltered="No encontramos tickets con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={ClipboardList}
         emptyIconBgClass="from-amber-50 to-amber-100 ring-1 ring-amber-200/50 text-amber-400"
-        hasFilters={!!(ticketState.filters.type !== "Todos" || ticketState.filters.priority !== "Todas" || ticketState.filters.search)}
+        hasFilters={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || depNameFilter !== "Todas")}
         onClearFilters={() => {
             ticketState.filters.type = 'Todos';
-            ticketState.filters.priority = 'Todas';
             ticketState.filters.search = '';
+            responsivaFilter = 'Todas';
+            movementTypeFilter = 'Todas';
             depNameFilter = 'Todas';
             // El $effect debounced dispara refresh(1) automáticamente
         }}
