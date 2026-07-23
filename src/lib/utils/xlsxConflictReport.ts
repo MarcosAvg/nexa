@@ -62,8 +62,8 @@ const C = {
     fallaGroup: { head: 'FFEDE9FE', sub: 'FF5B21B6', fill: 'FFFAF5FF' },
     // Grupos para ALTAS
     altasGroup: { head: 'FFE0E7FF', sub: 'FF3730A3', fill: 'FFEEF2FF' },
-    p2000Group: { head: 'FFDBEAFE', sub: 'FF1E40AF', fill: 'FFEFF6FF' },
-    koneGroup: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
+    p2000Group: { head: 'FFFEF3C7', sub: 'FF92400E', fill: 'FFFEFCE8' },
+    koneGroup: { head: 'FFE0F2FE', sub: 'FF075985', fill: 'FFF0F9FF' },
 };
 
 // ─────────────────────────────────────────
