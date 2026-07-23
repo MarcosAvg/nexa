@@ -1,5 +1,5 @@
 import type * as ExcelJSTypes from 'exceljs';
-import { addLogoToSheet } from './xlsxShared';
+import { addLogoToSheet, autoRowHeight } from './xlsxShared';
 import { batchPaginate } from './batchPaginate';
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -584,7 +584,6 @@ async function addCardlessReincidenceSheet(
         };
 
         const dataRow = ws.addRow(rowData);
-        dataRow.height = person.count >= 2 ? 28 : 22;
 
         dataRow.eachCell((cell, colNumber) => {
             const subHeader = subHeaders.find((s) => s.col === colNumber);
@@ -667,6 +666,8 @@ async function addCardlessReincidenceSheet(
                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
             }
         });
+        // Auto height: calculate row height based on wrapped text content
+        autoRowHeight(ws, dataRow.number, 22);
     });
 
     if (people.length === 0) {
@@ -848,7 +849,6 @@ export async function exportCardlessRegistryToExcel(
             pending_kone: !isLinked ? 'N/A' : (reg.pendingKoneResponsiva ? 'PENDIENTE DE RECOGER' : 'ENTREGADA'),
             signed_at: !isLinked ? '' : (signedAt || ''),
         });
-        excelRow.height = 24;
 
         excelRow.eachCell((cell, colNumber) => {
             const colLetter = String.fromCharCode(64 + colNumber);
@@ -937,6 +937,8 @@ export async function exportCardlessRegistryToExcel(
                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
             }
         });
+        // Auto height: calculate row height based on wrapped text content
+        autoRowHeight(worksheet, excelRow.number, 24);
     });
 
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];

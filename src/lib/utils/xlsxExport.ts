@@ -49,6 +49,7 @@ import {
     addKpiCard,
     addTableHeader,
     addTableRow,
+    autoRowHeight,
 } from './xlsxShared';
 
 async function addKoneSummarySheet(
@@ -497,7 +498,6 @@ export async function exportKoneUsageToExcel(
         };
 
         const row = worksheet.addRow(rowData);
-        row.height = 24;
 
         row.eachCell((cell, colNumber) => {
             const subHeader = subHeaders.find((s) => s.col === colNumber);
@@ -508,7 +508,7 @@ export async function exportKoneUsageToExcel(
                 vertical: 'middle',
                 horizontal: [1, 4, 9, 10, 11, 12, 13, 14].includes(colNumber) ? 'center' : 'left',
                 indent: [2, 3, 5, 6, 7, 8, 15].includes(colNumber) ? 1 : 0,
-                wrapText: colNumber === 8 || colNumber === 15,
+                wrapText: true,
             };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
             cell.border = {
@@ -543,6 +543,8 @@ export async function exportKoneUsageToExcel(
                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
             }
         });
+        // Auto height: calculate row height based on wrapped text content
+        autoRowHeight(worksheet, row.number, 22);
     });
 
     // ── Summary Row ──
@@ -705,7 +707,6 @@ export async function exportKoneUsageToExcel(
         };
 
         const row = ws2.addRow(rowData);
-        row.height = 24;
 
         row.eachCell((cell, colNumber) => {
             const subHeader = subHeaders2.find((s) => s.col === colNumber);
@@ -716,7 +717,7 @@ export async function exportKoneUsageToExcel(
                 vertical: 'middle',
                 horizontal: [1, 4, 9, 10, 11, 12, 13, 14].includes(colNumber) ? 'center' : 'left',
                 indent: [2, 3, 5, 6, 7, 8, 15].includes(colNumber) ? 1 : 0,
-                wrapText: colNumber === 8 || colNumber === 15,
+                wrapText: true,
             };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
             cell.border = {
@@ -748,6 +749,8 @@ export async function exportKoneUsageToExcel(
                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
             }
         });
+        // Auto height: calculate row height based on wrapped text content
+        autoRowHeight(ws2, row.number, 22);
     });
 
     const summaryIdx2 = ws2.rowCount + 1;

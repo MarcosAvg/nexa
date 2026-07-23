@@ -5,7 +5,8 @@
     import { ticketService } from "../../services/tickets";
     import { personnelService } from "../../services/personnel";
     import { toast } from "svelte-sonner";
-    import { handleError } from "../../utils";
+    import { handleError, exportConflictReportToExcel } from "../../utils";
+    import type { ConflictReportInput } from "../../utils";
     import {
         FileSpreadsheet,
         CheckCircle2,
@@ -18,6 +19,7 @@
         Loader2,
         Search,
         ArrowLeft,
+        ArrowRight,
         AlertTriangle,
     } from "lucide-svelte";
     import {
@@ -29,6 +31,15 @@
         type ParsedRow,
     } from "../../utils";
     import type { Person } from "../../types";
+    import {
+        analyzeAltaConflicts,
+        analyzeModificacionConflicts,
+    } from "../../utils/matchAnalysis";
+    import type {
+        AltaConflictAnalysis,
+        ModificacionConflictAnalysis,
+        AltaCardConflict,
+    } from "../../utils/matchAnalysis";
 
     /**
      * ImportPreviewModal — Modal de importación de personal vía Excel.
@@ -73,6 +84,35 @@
     /** Which rows are expanded in the review step */
     let expandedReviewRows = $state<Set<string>>(new Set());
 
+    /** Conflict analyses for ALTAS rows */
+    let altaAnalyses = $state<Map<string, AltaConflictAnalysis>>(new Map());
+    /** Conflict analyses for MODIFICACIONES rows */
+    let modAnalyses = $state<Map<string, ModificacionConflictAnalysis>>(new Map());
+
+    // ── Review tab state ────────────────────────────────
+    let reviewTab = $state<'conflict' | 'ok'>('conflict');
+    let reviewSheetTab = $state<string>('altas');
+
+    function rowMatchesTab(sheetKey: string, row: ParsedRow, tab: string): boolean {
+        const rk = `${sheetKey}-${row.rowNumber}`;
+        if (sheetKey === 'altas') {
+            const ana = altaAnalyses.get(rk);
+            const hasConflict = ana ? ana.hasConflicts : false;
+            return tab === 'conflict' ? hasConflict : !hasConflict;
+        }
+        if (sheetKey === 'modificaciones') {
+            const ana = modAnalyses.get(rk);
+            const hasChange = ana ? ana.hasChanges : false;
+            // Invertido: cambios → OK (proceder), sin cambios → conflicto (innecesaria)
+            return tab === 'conflict' ? !hasChange : hasChange;
+        }
+        // Other types (baja, reposicion, reporte_falla):
+        // persona no encontrada → conflicto, encontrada → ok
+        const matches = matchResults.get(rk) ?? [];
+        const hasMatch = matches.length > 0;
+        return tab === 'conflict' ? !hasMatch : hasMatch;
+    }
+
     // ── Helpers ────────────────────────────────────────
 
     function reset() {
@@ -82,6 +122,8 @@
         expandedSheets = new Set();
         matchResults = new Map();
         expandedReviewRows = new Set();
+        altaAnalyses = new Map();
+        modAnalyses = new Map();
     }
 
     function closeModal() {
@@ -171,6 +213,37 @@
         }
 
         matchResults = newMatches;
+
+        // ── Computar análisis de conflictos para ALTAS y MODIFICACIONES ──
+        const newAltaAnalyses = new Map<string, AltaConflictAnalysis>();
+        const newModAnalyses = new Map<string, ModificacionConflictAnalysis>();
+
+        for (const sheet of parseResult.sheets) {
+            for (const row of sheet.rows) {
+                if (!row.isValid) continue;
+                const rk = `${sheet.key}-${row.rowNumber}`;
+                if (!selectedRows.has(rk)) continue;
+                const matches = newMatches.get(rk) ?? [];
+                if (matches.length === 0) continue;
+                const person = matches[0];
+
+                if (sheet.key === "altas") {
+                    newAltaAnalyses.set(
+                        rk,
+                        analyzeAltaConflicts(rk, person, row.fields),
+                    );
+                } else if (sheet.key === "modificaciones") {
+                    newModAnalyses.set(
+                        rk,
+                        analyzeModificacionConflicts(rk, person, row.fields),
+                    );
+                }
+            }
+        }
+
+        altaAnalyses = newAltaAnalyses;
+        modAnalyses = newModAnalyses;
+
         // Expandir todas las filas automáticamente
         expandedReviewRows = new Set(newMatches.keys());
         isReviewing = false;
@@ -262,6 +335,99 @@
         );
     }
 
+    // ── Resolution Helpers ────────────────────────────
+
+    /**
+     * Construye un ticket definition a partir de una hoja/fila.
+     * fieldsOverride permite modificar campos antes de crear el ticket.
+     */
+    function buildTicketDef(
+        sheetKey: string,
+        row: ParsedRow,
+        fieldsOverride?: Record<string, string>,
+    ) {
+        const fields = fieldsOverride ?? row.fields;
+        const type = SHEET_TO_TICKET_TYPE[sheetKey] ?? sheetKey;
+        let priority = "media";
+        if (fields.urgencia) {
+            const urg = fields.urgencia.toLowerCase();
+            if (urg.includes("alta") || urg.includes("urgente"))
+                priority = "alta";
+            else if (urg.includes("baja")) priority = "baja";
+        }
+        return {
+            type,
+            title: buildTicketTitle(sheetKey, { ...row, fields }),
+            description: buildTicketDescription({ ...row, fields }),
+            priority,
+            payload: fields,
+        };
+    }
+
+    /**
+     * Aplica las resoluciones del análisis de ALTAS y devuelve
+     * uno o más tickets a crear (p.ej. alta + reposiciones adicionales).
+     */
+    function applyAltaResolutions(
+        row: ParsedRow,
+        analysis: AltaConflictAnalysis,
+    ): any[] {
+        const modifiedFields = { ...row.fields };
+        const extraTickets: any[] = [];
+
+        for (const conflict of analysis.conflicts) {
+            if (!conflict.requested) continue;
+
+            if (
+                conflict.resolution === "skip_card" ||
+                conflict.resolution === "convert_to_reposicion"
+            ) {
+                // Remover esta tarjeta del payload de alta
+                if (conflict.cardType === "P2000") {
+                    delete modifiedFields.p2000_req;
+                    delete modifiedFields.pisos_p2000;
+                } else {
+                    delete modifiedFields.kone_req;
+                    delete modifiedFields.pisos_kone;
+                }
+
+                // Si es conversión a reposición, crear ticket adicional
+                if (conflict.resolution === "convert_to_reposicion") {
+                    const lowerType = conflict.cardType.toLowerCase();
+                    extraTickets.push({
+                        type: "Reposición",
+                        title: `Reposición ${conflict.cardType} — ${row.fields.apellidos}, ${row.fields.nombres}`,
+                        description: `Reposición automática desde importación de Altas (${conflict.cardType} existente: ${conflict.existingFolio || "N/A"})`,
+                        priority: "media",
+                        payload: {
+                            ...row.fields,
+                            [`reponer_${lowerType}`]: "sí",
+                            [`folio_${lowerType}`]:
+                                conflict.existingFolio || "",
+                            origen:
+                                "Conversión desde Alta (matching inteligente)",
+                        },
+                    });
+                }
+            }
+            // "proceed" → mantener como está en modifiedFields
+        }
+
+        // Verificar si aún quedan tarjetas solicitadas
+        const stillWantsP2000 = ["sí", "si"].includes(
+            (modifiedFields.p2000_req ?? "").toLowerCase(),
+        );
+        const stillWantsKONE = ["sí", "si"].includes(
+            (modifiedFields.kone_req ?? "").toLowerCase(),
+        );
+
+        if (stillWantsP2000 || stillWantsKONE) {
+            extraTickets.unshift(buildTicketDef("altas", row, modifiedFields));
+        }
+
+        return extraTickets;
+    }
+
     // ── Import ─────────────────────────────────────────
 
     function buildTicketTitle(sheetKey: string, row: ParsedRow): string {
@@ -310,33 +476,31 @@
         isImporting = true;
         step = "importing";
 
-        const tickets = parseResult.sheets.flatMap((sheet) =>
-            sheet.rows
-                .filter(
-                    (r) =>
-                        r.isValid &&
-                        selectedRows.has(`${sheet.key}-${r.rowNumber}`),
-                )
-                .map((r) => {
-                    const type = SHEET_TO_TICKET_TYPE[sheet.key] ?? sheet.key;
-                    let priority = "media";
+        // ── Construir lista de tickets aplicando resoluciones ──
+        const tickets: any[] = [];
 
-                    if (r.fields.urgencia) {
-                        const urg = r.fields.urgencia.toLowerCase();
-                        if (urg.includes("alta") || urg.includes("urgente"))
-                            priority = "alta";
-                        else if (urg.includes("baja")) priority = "baja";
-                    }
+        for (const sheet of parseResult.sheets) {
+            for (const row of sheet.rows) {
+                if (!row.isValid) continue;
+                const rowKey = `${sheet.key}-${row.rowNumber}`;
+                if (!selectedRows.has(rowKey)) continue;
 
-                    return {
-                        type,
-                        title: buildTicketTitle(sheet.key, r),
-                        description: buildTicketDescription(r),
-                        priority,
-                        payload: r.fields,
-                    };
-                }),
-        );
+                if (sheet.key === "altas" && altaAnalyses.has(rowKey)) {
+                    const analysis = altaAnalyses.get(rowKey)!;
+                    const result = applyAltaResolutions(row, analysis);
+                    tickets.push(...result);
+                } else if (
+                    sheet.key === "modificaciones" &&
+                    modAnalyses.has(rowKey)
+                ) {
+                    const analysis = modAnalyses.get(rowKey)!;
+                    if (analysis.resolution === "reject") continue;
+                    tickets.push(buildTicketDef(sheet.key, row));
+                } else {
+                    tickets.push(buildTicketDef(sheet.key, row));
+                }
+            }
+        }
 
         try {
             const result = await ticketService.createBatch(tickets);
@@ -359,6 +523,31 @@
             step = "review";
         } finally {
             isImporting = false;
+        }
+    }
+
+    // ── Export Report ──────────────────────────────────
+
+    let isExportingReport = $state(false);
+
+    async function handleExportReport() {
+        if (!parseResult) return;
+        isExportingReport = true;
+        try {
+            const input: ConflictReportInput = {
+                parseResult,
+                altaAnalyses,
+                modAnalyses,
+                matchResults,
+                selectedRows,
+                totalSelected,
+            };
+            await exportConflictReportToExcel(input);
+            toast.success("Reporte exportado correctamente");
+        } catch (err) {
+            handleError(err, "Exportar Reporte de Conflictos");
+        } finally {
+            isExportingReport = false;
         }
     }
 
@@ -658,7 +847,10 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                 {@const totalNoMatch = [...matchResults.values()].filter(
                     (v) => v.length === 0,
                 ).length}
-                <div class="flex items-center gap-3 text-xs">
+                {@const totalConflicts = [...altaAnalyses.values()].filter(
+                    (a) => a.hasConflicts,
+                ).length}
+                <div class="flex items-center gap-3 text-xs flex-wrap">
                     <div
                         class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium"
                     >
@@ -671,34 +863,80 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                         <AlertTriangle size={12} />
                         {totalNoMatch} sin coincidencia
                     </div>
+                    {#if totalConflicts > 0}
+                        <div
+                            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-medium"
+                        >
+                            <AlertCircle size={12} />
+                            {totalConflicts} con conflicto
+                        </div>
+                    {/if}
                     <div
                         class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 font-medium"
                     >
                         {totalSelected} total
                     </div>
-                </div>                            <!-- Filas de revisión por hoja -->
-                <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-                    {#each parseResult.sheets as sheet}
-                        {@const sheetRows = sheet.rows.filter(
-                            (r) =>
-                                r.isValid &&
-                                selectedRows.has(`${sheet.key}-${r.rowNumber}`),
-                        )}
-                        {#if sheetRows.length > 0}
-                            <div>
-                                <div class="flex items-center gap-2 mb-2">
-                                    <Badge
-                                        variant={SHEET_COLORS[sheet.key] ??
-                                            "slate"}>{sheet.label}</Badge
+                </div>
+
+                            <!-- Tabs por tipo de solicitud -->
+                            {@const sheetTabs = [
+                                { key: 'altas', label: 'ALTAS' },
+                                { key: 'modificaciones', label: 'MODIFICACIONES' },
+                                { key: 'baja_persona', label: 'BAJA' },
+                                { key: 'reposicion', label: 'REPOSICIÓN' },
+                                { key: 'reporte_falla', label: 'REPORTE FALLA' },
+                            ]}
+                            <div class="flex gap-1.5 flex-wrap pb-2 px-1">
+                                {#each sheetTabs as tab}
+                                    {@const tabCount = parseResult.sheets.find(s => s.key === tab.key)?.rows.filter(r => r.isValid && selectedRows.has(`${tab.key}-${r.rowNumber}`)).length ?? 0}
+                                    {#if tabCount > 0}
+                                        <button
+                                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {reviewSheetTab === tab.key ? 'bg-blue-100 text-blue-800 border border-blue-300 shadow-sm' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}"
+                                            onclick={() => reviewSheetTab = tab.key}
+                                        >
+                                            {tab.label}
+                                            <span class="text-[10px] opacity-70">({tabCount})</span>
+                                        </button>
+                                    {/if}
+                                {/each}
+                            </div>
+
+                            <!-- Sub-filtro: Con Conflicto / Sin Conflicto -->
+                            {@const currentSheet = parseResult.sheets.find(s => s.key === reviewSheetTab)}
+                            {@const sheetConflictCount = currentSheet?.rows.filter(r => r.isValid && selectedRows.has(`${reviewSheetTab}-${r.rowNumber}`) && rowMatchesTab(reviewSheetTab, r, 'conflict')).length ?? 0}
+                            {@const sheetOkCount = currentSheet?.rows.filter(r => r.isValid && selectedRows.has(`${reviewSheetTab}-${r.rowNumber}`) && rowMatchesTab(reviewSheetTab, r, 'ok')).length ?? 0}
+                            {#if sheetConflictCount > 0 || sheetOkCount > 0}
+                                <div class="flex gap-2 px-1 pb-2">
+                                    <button
+                                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {reviewTab === 'conflict' ? 'bg-rose-100 text-rose-800 border border-rose-300 shadow-sm' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}"
+                                        onclick={() => reviewTab = 'conflict'}
                                     >
-                                    <span
-                                        class="text-[10px] text-slate-400 font-medium"
-                                        >{sheetRows.length} fila(s)</span
+                                        <AlertCircle size={13} />
+                                        Con Conflicto ({sheetConflictCount})
+                                    </button>
+                                    <button
+                                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {reviewTab === 'ok' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}"
+                                        onclick={() => reviewTab = 'ok'}
                                     >
+                                        <CheckCircle2 size={13} />
+                                        Sin Conflicto ({sheetOkCount})
+                                    </button>
                                 </div>
-                                <div class="space-y-2">
+                            {/if}
+
+                            <!-- Filas de revisión por tipo seleccionado -->
+                            <div class="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
+                                {#if currentSheet}
+                                    {@const sheetRows = currentSheet.rows.filter(
+                                        (r) =>
+                                            r.isValid &&
+                                            selectedRows.has(`${reviewSheetTab}-${r.rowNumber}`) &&
+                                            rowMatchesTab(reviewSheetTab, r, reviewTab),
+                                    )}
+                                    {#if sheetRows.length > 0}
+                                        <div class="space-y-2">
                                     {#each sheetRows as row}
-                                        {@const rowKey = `${sheet.key}-${row.rowNumber}`}
+                                        {@const rowKey = `${reviewSheetTab}-${row.rowNumber}`}
                                         {@const matches =
                                             matchResults.get(rowKey) ?? []}
                                         {@const isExpanded =
@@ -720,6 +958,14 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                     class="flex items-center gap-3 min-w-0"
                                                 >
                                                     {#if matches.length > 0}
+                                                        <div
+                                                            class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0"
+                                                        >
+                                                            <CheckCircle2
+                                                                size={13}
+                                                            />
+                                                        </div>
+                                                    {:else if reviewSheetTab === "altas"}
                                                         <div
                                                             class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0"
                                                         >
@@ -761,6 +1007,13 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                     >{matches.length}
                                                                     coincidencia(s)</span
                                                                 >
+                                                            {:else if reviewSheetTab === "altas"}
+                                                                · <span
+                                                                    class="text-emerald-600 font-medium"
+                                                                    >Persona nueva
+                                                                    — Sin
+                                                                    conflictos</span
+                                                                >
                                                             {:else}
                                                                 · <span
                                                                     class="text-amber-600 font-medium"
@@ -792,23 +1045,650 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                 <div
                                                     class="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3"
                                                 >
-                                                    <!-- ── TYPE: ALTAS ── -->
-                                                    {#if sheet.key === "altas"}
+                                                    <!-- ── TYPE: ALTAS (SMART) ── -->
+                                                    {#if reviewSheetTab === "altas" && altaAnalyses.has(rowKey)}
+                                                        {@const analysis =
+                                                            altaAnalyses.get(
+                                                                rowKey,
+                                                            )!}
+                                                        <div
+                                                            class="space-y-3"
+                                                        >
+                                                            <!-- Tabla comparativa -->
+                                                            <div
+                                                                class="rounded-lg border border-slate-200 overflow-hidden"
+                                                            >
+                                                                <div
+                                                                    class="grid grid-cols-[1fr_1fr_1fr_auto] gap-px bg-slate-200 text-[10px]"
+                                                                >
+                                                                    <div
+                                                                        class="bg-slate-50 px-3 py-2 font-bold text-slate-500 uppercase tracking-wider"
+                                                                    >
+                                                                        Tarjeta
+                                                                    </div>
+                                                                    <div
+                                                                        class="bg-slate-50 px-3 py-2 font-bold text-slate-500 uppercase tracking-wider text-center"
+                                                                    >
+                                                                        Solicitado
+                                                                    </div>
+                                                                    <div
+                                                                        class="bg-slate-50 px-3 py-2 font-bold text-slate-500 uppercase tracking-wider text-center"
+                                                                    >
+                                                                        Tiene
+                                                                    </div>
+                                                                    <div
+                                                                        class="bg-slate-50 px-3 py-2 font-bold text-slate-500 uppercase tracking-wider text-center"
+                                                                    >
+                                                                        Estado
+                                                                    </div>
+
+                                                                    {#each analysis.conflicts as conflict}
+                                                                        <div
+                                                                            class="bg-white px-3 py-2.5 font-semibold text-slate-700"
+                                                                        >
+                                                                            {conflict.cardType}
+                                                                        </div>
+                                                                        <div
+                                                                            class="bg-white px-3 py-2.5 text-center"
+                                                                        >
+                                                                            {#if conflict.requested}
+                                                                                <span
+                                                                                    class="inline-flex items-center gap-1 text-xs font-bold text-green-600"
+                                                                                >
+                                                                                    <CheckCircle2
+                                                                                        size={11}
+                                                                                    />
+                                                                                    Sí
+                                                                                </span>
+                                                                            {:else}
+                                                                                <span
+                                                                                    class="text-xs text-slate-400"
+                                                                                >
+                                                                                    —
+                                                                                </span>
+                                                                            {/if}
+                                                                        </div>
+                                                                        <div
+                                                                            class="bg-white px-3 py-2.5 text-center"
+                                                                        >
+                                                                            {#if conflict.hasCard}
+                                                                                <span
+                                                                                    class="inline-flex items-center gap-1 text-xs font-medium"
+                                                                                >
+                                                                                    <CreditCard
+                                                                                        size={10}
+                                                                                        class="text-slate-400"
+                                                                                    />
+                                                                                    {conflict.existingFolio}
+                                                                                </span>
+                                                                            {:else}
+                                                                                <span
+                                                                                    class="text-xs text-slate-400"
+                                                                                >
+                                                                                    —
+                                                                                </span>
+                                                                            {/if}
+                                                                        </div>
+                                                                        <div
+                                                                            class="bg-white px-3 py-2.5 text-center"
+                                                                        >
+                                                                            {#if conflict.conflict}
+                                                                                <span
+                                                                                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold"
+                                                                                >
+                                                                                    <AlertTriangle
+                                                                                        size={10}
+                                                                                    />
+                                                                                    Conflicto
+                                                                                </span>
+                                                                            {:else}
+                                                                                <span
+                                                                                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold"
+                                                                                >
+                                                                                    <CheckCircle2
+                                                                                        size={10}
+                                                                                    />
+                                                                                    OK
+                                                                                </span>
+                                                                            {/if}
+                                                                        </div>
+                                                                    {/each}
+                                                                </div>
+                                                            </div>
+
+                                                            <!-- Pisos solicitados -->
+                                                            {#each analysis.conflicts as conflict}
+                                                                {#if conflict.requested && conflict.requestedFloors}
+                                                                    <p
+                                                                        class="text-[10px] text-slate-500"
+                                                                    >
+                                                                        <span
+                                                                            class="font-semibold"
+                                                                            >Pisos
+                                                                            {conflict.cardType}:</span
+                                                                        >
+                                                                        {conflict.requestedFloors}
+                                                                    </p>
+                                                                {/if}
+                                                            {/each}
+
+                                                            <!-- Acciones por conflicto -->
+                                                            {#if analysis.hasConflicts}
+                                                                {#each analysis.conflicts as conflict}
+                                                                    {#if conflict.conflict}
+                                                                        <div
+                                                                            class="rounded-lg border border-amber-200 bg-amber-50/80 p-3 space-y-2"
+                                                                        >
+                                                                            <div
+                                                                                class="flex items-center gap-2 text-xs font-bold text-amber-800"
+                                                                            >
+                                                                                <AlertTriangle
+                                                                                    size={14}
+                                                                                />
+                                                                                Conflicto:
+                                                                                {conflict.description}
+                                                                            </div>
+                                                                            <div
+                                                                                class="space-y-1.5"
+                                                                            >
+                                                                                <p
+                                                                                    class="text-[10px] font-medium text-amber-700"
+                                                                                >
+                                                                                    Acción
+                                                                                    para
+                                                                                    {conflict.cardType}:
+                                                                                </p>
+                                                                                <label
+                                                                                    class="flex items-center gap-2 p-2 rounded-lg bg-white border border-amber-200 cursor-pointer hover:bg-amber-50 transition-colors"
+                                                                                >
+                                                                                    <input
+                                                                                        type="radio"
+                                                                                        name="alta-resolve-{rowKey}-{conflict.cardType}"
+                                                                                        checked={conflict.resolution ===
+                                                                                            "skip_card"}
+                                                                                        onchange={() => {
+                                                                                            conflict.resolution =
+                                                                                                "skip_card";
+                                                                                        }}
+                                                                                        class="w-3.5 h-3.5 text-amber-600 focus:ring-amber-500"
+                                                                                    />
+                                                                                    <div
+                                                                                        class="flex-1 min-w-0"
+                                                                                    >
+                                                                                        <p
+                                                                                            class="text-xs font-semibold text-slate-800"
+                                                                                        >
+                                                                                            Omitir
+                                                                                            esta
+                                                                                            tarjeta
+                                                                                        </p>
+                                                                                        <p
+                                                                                            class="text-[10px] text-slate-500"
+                                                                                        >
+                                                                                            Dar
+                                                                                            alta
+                                                                                            solo
+                                                                                            de
+                                                                                            la(s)
+                                                                                            otra(s)
+                                                                                            tarjeta(s)
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </label>
+                                                                                <label
+                                                                                    class="flex items-center gap-2 p-2 rounded-lg bg-white border border-amber-200 cursor-pointer hover:bg-amber-50 transition-colors"
+                                                                                >
+                                                                                    <input
+                                                                                        type="radio"
+                                                                                        name="alta-resolve-{rowKey}-{conflict.cardType}"
+                                                                                        checked={conflict.resolution ===
+                                                                                            "convert_to_reposicion"}
+                                                                                        onchange={() => {
+                                                                                            conflict.resolution =
+                                                                                                "convert_to_reposicion";
+                                                                                        }}
+                                                                                        class="w-3.5 h-3.5 text-amber-600 focus:ring-amber-500"
+                                                                                    />
+                                                                                    <div
+                                                                                        class="flex-1 min-w-0"
+                                                                                    >
+                                                                                        <p
+                                                                                            class="text-xs font-semibold text-slate-800"
+                                                                                        >
+                                                                                            Convertir
+                                                                                            a
+                                                                                            Reposición
+                                                                                        </p>
+                                                                                        <p
+                                                                                            class="text-[10px] text-slate-500"
+                                                                                        >
+                                                                                            Crear
+                                                                                            ticket
+                                                                                            de
+                                                                                            reposición
+                                                                                            para
+                                                                                            {conflict.cardType}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </label>
+                                                                                <label
+                                                                                    class="flex items-center gap-2 p-2 rounded-lg bg-white border border-amber-200 cursor-pointer hover:bg-amber-50 transition-colors"
+                                                                                >
+                                                                                    <input
+                                                                                        type="radio"
+                                                                                        name="alta-resolve-{rowKey}-{conflict.cardType}"
+                                                                                        checked={conflict.resolution ===
+                                                                                            "proceed"}
+                                                                                        onchange={() => {
+                                                                                            conflict.resolution =
+                                                                                                "proceed";
+                                                                                        }}
+                                                                                        class="w-3.5 h-3.5 text-amber-600 focus:ring-amber-500"
+                                                                                    />
+                                                                                    <div
+                                                                                        class="flex-1 min-w-0"
+                                                                                    >
+                                                                                        <p
+                                                                                            class="text-xs font-semibold text-slate-800"
+                                                                                        >
+                                                                                            Proceder
+                                                                                            igual
+                                                                                        </p>
+                                                                                        <p
+                                                                                            class="text-[10px] text-slate-500"
+                                                                                        >
+                                                                                            Crear
+                                                                                            alta
+                                                                                            duplicada
+                                                                                            (no
+                                                                                            recomendado)
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </label>
+                                                                            </div>
+                                                                        </div>
+                                                                    {/if}
+                                                                {/each}
+                                                            {:else}
+                                                                <div
+                                                                    class="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700"
+                                                                >
+                                                                    <CheckCircle2
+                                                                        size={14}
+                                                                        class="shrink-0"
+                                                                    />
+                                                                    <span
+                                                                        >Sin
+                                                                        conflictos
+                                                                        — la
+                                                                        persona
+                                                                        no
+                                                                        tiene
+                                                                        tarjetas
+                                                                        activas
+                                                                        de
+                                                                        los
+                                                                        tipos
+                                                                        solicitados.</span
+                                                                    >
+                                                                </div>
+                                                            {/if}
+                                                        </div>
+
+                                                        <!-- ── TYPE: MODIFICACIONES (SMART) ── -->
+                                                    {:else if reviewSheetTab === "modificaciones" && modAnalyses.has(rowKey)}
+                                                        {@const analysis =
+                                                            modAnalyses.get(
+                                                                rowKey,
+                                                            )!}
+                                                        <div
+                                                            class="space-y-3"
+                                                        >
+                                                            <!-- Tabla de cambios -->
+                                                            <div
+                                                                class="rounded-lg border border-amber-200 overflow-hidden"
+                                                            >
+                                                                <div
+                                                                    class="grid grid-cols-[1fr_1fr_1fr_auto] gap-px bg-amber-200 text-[10px]"
+                                                                >
+                                                                    <div
+                                                                        class="bg-amber-50 px-3 py-2 font-bold text-amber-700 uppercase tracking-wider"
+                                                                    >
+                                                                        Campo
+                                                                    </div>
+                                                                    <div
+                                                                        class="bg-amber-50 px-3 py-2 font-bold text-amber-700 uppercase tracking-wider text-center"
+                                                                    >
+                                                                        Actual
+                                                                    </div>
+                                                                    <div
+                                                                        class="bg-amber-50 px-3 py-2 font-bold text-amber-700 uppercase tracking-wider text-center"
+                                                                    >
+                                                                        Nuevo
+                                                                    </div>
+                                                                    <div
+                                                                        class="bg-amber-50 px-3 py-2"
+                                                                    ></div>
+
+                                                                    {#each analysis.changes as change}
+                                                                        <div
+                                                                            class="bg-white px-3 py-2 font-medium text-slate-700"
+                                                                        >
+                                                                            {change.label}
+                                                                        </div>
+                                                                        <div
+                                                                            class="bg-white px-3 py-2 text-center text-slate-500"
+                                                                        >
+                                                                            {change.currentValue}
+                                                                        </div>
+                                                                        <div
+                                                                            class="bg-white px-3 py-2 text-center font-medium"
+                                                                        >
+                                                                            {#if change.changed}
+                                                                                <span
+                                                                                    class="text-amber-700"
+                                                                                >
+                                                                                    {change.newValue}
+                                                                                </span>
+                                                                            {:else}
+                                                                                <span
+                                                                                    class="text-slate-400"
+                                                                                >
+                                                                                    {change.newValue}
+                                                                                </span>
+                                                                            {/if}
+                                                                        </div>
+                                                                        <div
+                                                                            class="bg-white px-3 py-2 flex items-center justify-center"
+                                                                        >
+                                                                            {#if change.changed}
+                                                                                <span
+                                                                                    class="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700"
+                                                                                >
+                                                                                    <ArrowRight
+                                                                                        size={10}
+                                                                                    />
+                                                                                    Cambio
+                                                                                </span>
+                                                                            {:else}
+                                                                                <span
+                                                                                    class="text-[10px] text-slate-400"
+                                                                                >
+                                                                                    =
+                                                                                </span>
+                                                                            {/if}
+                                                                        </div>
+                                                                    {/each}
+                                                                </div>
+                                                            </div>
+
+                                                            <!-- Cambios de pisos/accesos -->
+                                                            {#if analysis.floorChanges}
+                                                                {#if analysis.floorChanges.p2000}
+                                                                    {@const fc =
+                                                                        analysis
+                                                                            .floorChanges
+                                                                            .p2000}
+                                                                    {#if fc.added.length > 0 || fc.removed.length > 0}
+                                                                        <div
+                                                                            class="rounded-lg bg-amber-50/50 border border-amber-100 p-3 space-y-1.5"
+                                                                        >
+                                                                            <p
+                                                                                class="text-[10px] font-bold text-amber-700 uppercase tracking-widest flex items-center gap-1.5"
+                                                                            >
+                                                                                P2000
+                                                                                —
+                                                                                Cambio
+                                                                                de
+                                                                                Pisos
+                                                                            </p>
+                                                                            {#if fc.added.length > 0}
+                                                                                <p
+                                                                                    class="text-[11px] text-emerald-600 flex items-center gap-1"
+                                                                                >
+                                                                                    <span
+                                                                                        class="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center text-[9px] font-bold"
+                                                                                    >
+                                                                                        +
+                                                                                    </span>
+                                                                                    Se
+                                                                                    añadirán:
+                                                                                    {fc.added.join(
+                                                                                        ", ",
+                                                                                    )}
+                                                                                </p>
+                                                                            {/if}
+                                                                            {#if fc.removed.length > 0}
+                                                                                <p
+                                                                                    class="text-[11px] text-rose-600 flex items-center gap-1"
+                                                                                >
+                                                                                    <span
+                                                                                        class="w-4 h-4 rounded-full bg-rose-100 flex items-center justify-center text-[9px] font-bold"
+                                                                                    >
+                                                                                        −
+                                                                                    </span>
+                                                                                    Se
+                                                                                    quitarán:
+                                                                                    {fc.removed.join(
+                                                                                        ", ",
+                                                                                    )}
+                                                                                </p>
+                                                                            {/if}
+                                                                        </div>
+                                                                    {/if}
+                                                                {/if}
+
+                                                                {#if analysis.floorChanges.kone}
+                                                                    {@const fc =
+                                                                        analysis
+                                                                            .floorChanges
+                                                                            .kone}
+                                                                    {#if fc.added.length > 0 || fc.removed.length > 0}
+                                                                        <div
+                                                                            class="rounded-lg bg-amber-50/50 border border-amber-100 p-3 space-y-1.5"
+                                                                        >
+                                                                            <p
+                                                                                class="text-[10px] font-bold text-amber-700 uppercase tracking-widest flex items-center gap-1.5"
+                                                                            >
+                                                                                KONE
+                                                                                —
+                                                                                Cambio
+                                                                                de
+                                                                                Pisos
+                                                                            </p>
+                                                                            {#if fc.added.length > 0}
+                                                                                <p
+                                                                                    class="text-[11px] text-emerald-600 flex items-center gap-1"
+                                                                                >
+                                                                                    <span
+                                                                                        class="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center text-[9px] font-bold"
+                                                                                    >
+                                                                                        +
+                                                                                    </span>
+                                                                                    Se
+                                                                                    añadirán:
+                                                                                    {fc.added.join(
+                                                                                        ", ",
+                                                                                    )}
+                                                                                </p>
+                                                                            {/if}
+                                                                            {#if fc.removed.length > 0}
+                                                                                <p
+                                                                                    class="text-[11px] text-rose-600 flex items-center gap-1"
+                                                                                >
+                                                                                    <span
+                                                                                        class="w-4 h-4 rounded-full bg-rose-100 flex items-center justify-center text-[9px] font-bold"
+                                                                                    >
+                                                                                        −
+                                                                                    </span>
+                                                                                    Se
+                                                                                    quitarán:
+                                                                                    {fc.removed.join(
+                                                                                        ", ",
+                                                                                    )}
+                                                                                </p>
+                                                                            {/if}
+                                                                        </div>
+                                                                    {/if}
+                                                                {/if}
+
+                                                                {#if analysis.floorChanges.accesses}
+                                                                    {@const fc =
+                                                                        analysis
+                                                                            .floorChanges
+                                                                            .accesses}
+                                                                    {#if fc.added.length > 0 || fc.removed.length > 0}
+                                                                        <div
+                                                                            class="rounded-lg bg-amber-50/50 border border-amber-100 p-3 space-y-1.5"
+                                                                        >
+                                                                            <p
+                                                                                class="text-[10px] font-bold text-amber-700 uppercase tracking-widest flex items-center gap-1.5"
+                                                                            >
+                                                                                Accesos
+                                                                                Especiales
+                                                                            </p>
+                                                                            {#if fc.added.length > 0}
+                                                                                <p
+                                                                                    class="text-[11px] text-emerald-600 flex items-center gap-1"
+                                                                                >
+                                                                                    <span
+                                                                                        class="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center text-[9px] font-bold"
+                                                                                    >
+                                                                                        +
+                                                                                    </span>
+                                                                                    Se
+                                                                                    añadirán:
+                                                                                    {fc.added.join(
+                                                                                        ", ",
+                                                                                    )}
+                                                                                </p>
+                                                                            {/if}
+                                                                            {#if fc.removed.length > 0}
+                                                                                <p
+                                                                                    class="text-[11px] text-rose-600 flex items-center gap-1"
+                                                                                >
+                                                                                    <span
+                                                                                        class="w-4 h-4 rounded-full bg-rose-100 flex items-center justify-center text-[9px] font-bold"
+                                                                                    >
+                                                                                        −
+                                                                                    </span>
+                                                                                    Se
+                                                                                    quitarán:
+                                                                                    {fc.removed.join(
+                                                                                        ", ",
+                                                                                    )}
+                                                                                </p>
+                                                                            {/if}
+                                                                        </div>
+                                                                    {/if}
+                                                                {/if}
+                                                            {/if}
+
+                                                            <!-- Acción global -->
+                                                            <div
+                                                                class="flex items-center gap-2 p-3 rounded-lg border bg-white"
+                                                            >
+                                                                <span
+                                                                    class="text-[10px] font-bold text-slate-500 uppercase tracking-wider"
+                                                                    >Acción:</span
+                                                                >
+                                                                <label
+                                                                    class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 cursor-pointer hover:bg-emerald-100 transition-colors"
+                                                                >
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="mod-resolve-{rowKey}"
+                                                                        checked={analysis.resolution ===
+                                                                            "apply" ||
+                                                                            analysis.resolution ===
+                                                                                null}
+                                                                        onchange={() => {
+                                                                            analysis.resolution =
+                                                                                "apply";
+                                                                        }}
+                                                                        class="w-3 h-3 text-emerald-600 focus:ring-emerald-500"
+                                                                    />
+                                                                    <span
+                                                                        class="text-xs font-semibold text-emerald-700"
+                                                                        >Crear
+                                                                        Ticket
+                                                                        de
+                                                                        Modificación</span
+                                                                    >
+                                                                </label>
+                                                                <label
+                                                                    class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-rose-200 bg-rose-50 cursor-pointer hover:bg-rose-100 transition-colors"
+                                                                >
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="mod-resolve-{rowKey}"
+                                                                        checked={analysis.resolution ===
+                                                                            "reject"}
+                                                                        onchange={() => {
+                                                                            analysis.resolution =
+                                                                                "reject";
+                                                                        }}
+                                                                        class="w-3 h-3 text-rose-600 focus:ring-rose-500"
+                                                                    />
+                                                                    <span
+                                                                        class="text-xs font-semibold text-rose-700"
+                                                                        >Rechazar
+                                                                        y
+                                                                        omitir</span
+                                                                    >
+                                                                </label>
+                                                            </div>
+                                                        </div>
+
+                                                        <!-- ── TYPE: ALTAS (NUEVA / SIN CONFLICTOS) ── -->
+                                                    {:else if reviewSheetTab === "altas"}
                                                         {@const requestedCards =
                                                             getRequestedCards(
                                                                 row.fields,
                                                             )}
-                                                        {#if requestedCards.length > 0}
+                                                        <div
+                                                            class="rounded-lg bg-emerald-50 border border-emerald-200 p-4 space-y-3"
+                                                        >
                                                             <div
-                                                                class="flex items-center gap-2 p-2.5 rounded-lg bg-blue-50 border border-blue-100"
+                                                                class="flex items-center gap-2"
                                                             >
-                                                                <span
-                                                                    class="text-[10px] font-bold text-blue-600 uppercase tracking-widest"
-                                                                    >Solicita:</span
-                                                                >
                                                                 <div
-                                                                    class="flex gap-1.5"
+                                                                    class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0"
                                                                 >
+                                                                    <CheckCircle2
+                                                                        size={18}
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <p
+                                                                        class="text-sm font-bold text-emerald-800"
+                                                                    >
+                                                                        Persona
+                                                                        nueva
+                                                                    </p>
+                                                                    <p
+                                                                        class="text-[10px] text-emerald-600"
+                                                                    >
+                                                                        No se
+                                                                        encontró
+                                                                        en el
+                                                                        sistema —
+                                                                        el alta
+                                                                        puede
+                                                                        continuar
+                                                                        sin
+                                                                        conflictos.
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            {#if requestedCards.length > 0}
+                                                                <div
+                                                                    class="flex flex-wrap items-center gap-2"
+                                                                >
+                                                                    <span
+                                                                        class="text-[10px] font-bold text-emerald-700 uppercase tracking-widest"
+                                                                        >Solicita:</span
+                                                                    >
                                                                     {#each requestedCards as type}
                                                                         <span
                                                                             class="text-[10px] font-bold px-2 py-0.5 rounded border {CARD_TYPE_COLORS[
@@ -819,36 +1699,11 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                         >
                                                                     {/each}
                                                                 </div>
-                                                            </div>
                                                         {/if}
-                                                        {#if row.fields.pisos_p2000}
-                                                            <p
-                                                                class="text-[10px] text-slate-500"
-                                                            >
-                                                                <span
-                                                                    class="font-semibold"
-                                                                    >Pisos
-                                                                    P2000:</span
-                                                                >
-                                                                {row.fields
-                                                                    .pisos_p2000}
-                                                            </p>
-                                                        {/if}
-                                                        {#if row.fields.pisos_kone}
-                                                            <p
-                                                                class="text-[10px] text-slate-500"
-                                                            >
-                                                                <span
-                                                                    class="font-semibold"
-                                                                    >Pisos KONE:</span
-                                                                >
-                                                                {row.fields
-                                                                    .pisos_kone}
-                                                            </p>
-                                                        {/if}
+                                                        </div>
 
-                                                        <!-- ── TYPE: MODIFICACIONES ── -->
-                                                    {:else if sheet.key === "modificaciones"}
+                                                        <!-- ── TYPE: MODIFICACIONES (OLD) ── -->
+                                                    {:else if reviewSheetTab === "modificaciones"}
                                                         {@const changes =
                                                             getModificationChanges(
                                                                 row.fields,
@@ -892,7 +1747,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         {/if}
 
                                                         <!-- ── TYPE: BAJA ── -->
-                                                    {:else if sheet.key === "baja_persona"}
+                                                    {:else if reviewSheetTab === "baja_persona"}
                                                         <div
                                                             class="rounded-lg bg-rose-50 border border-rose-100 p-3 space-y-1"
                                                         >
@@ -923,7 +1778,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         </div>
 
                                                         <!-- ── TYPE: REPOSICIÓN ── -->
-                                                    {:else if sheet.key === "reposicion"}
+                                                    {:else if reviewSheetTab === "reposicion"}
                                                         {@const repoCards =
                                                             getReposicionCards(
                                                                 row.fields,
@@ -978,7 +1833,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         {/if}
 
                                                         <!-- ── TYPE: REPORTE DE FALLA ── -->
-                                                    {:else if sheet.key === "reporte_falla"}
+                                                    {:else if reviewSheetTab === "reporte_falla"}
                                                         <div
                                                             class="rounded-lg bg-violet-50 border border-violet-100 p-3 space-y-1"
                                                         >
@@ -1035,169 +1890,208 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                 </p>
                                                             {/if}
                                                         </div>
-                                                    {/if}
-
-                                                    <!-- ── MATCH RESULTS (all types) ── -->
-                                                    {#if matches.length > 0}
-                                                        <div
-                                                            class="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3"
-                                                        >
-                                                            <p
-                                                                class="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-2 flex items-center gap-1.5"
-                                                            >
-                                                                <User
-                                                                    size={11}
-                                                                />
-                                                                {matches.length ===
-                                                                1
-                                                                    ? "Coincidencia encontrada"
-                                                                    : `${matches.length} coincidencias`}
-                                                            </p>
+                                                    {/if}                                                    <!-- ── MATCH RESULTS (only for types WITHOUT smart analysis) ── -->
+                                                    {#if !(reviewSheetTab === "altas") && !(reviewSheetTab === "modificaciones" && modAnalyses.has(rowKey))}
+                                                        {#if matches.length > 0}
                                                             <div
-                                                                class="space-y-2"
+                                                                class="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3"
                                                             >
-                                                                {#each matches.slice(0, 3) as person}
-                                                                    {@const activeCards =
-                                                                        getActiveCards(
-                                                                            person,
-                                                                        )}
-                                                                    <div
-                                                                        class="p-2.5 rounded-lg bg-white border border-emerald-100"
-                                                                    >
+                                                                <p
+                                                                    class="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-2 flex items-center gap-1.5"
+                                                                >
+                                                                    <User
+                                                                        size={11}
+                                                                    />
+                                                                    {matches.length ===
+                                                                    1
+                                                                        ? "Coincidencia encontrada"
+                                                                        : `${matches.length} coincidencias`}
+                                                                </p>
+                                                                <div
+                                                                    class="space-y-2"
+                                                                >
+                                                                    {#each matches.slice(0, 3) as person}
+                                                                        {@const activeCards =
+                                                                            getActiveCards(
+                                                                                person,
+                                                                            )}
                                                                         <div
-                                                                            class="flex items-center gap-2.5 mb-1.5"
+                                                                            class="p-2.5 rounded-lg bg-white border border-emerald-100"
                                                                         >
                                                                             <div
-                                                                                class="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0"
+                                                                                class="flex items-center gap-2.5 mb-1.5"
                                                                             >
-                                                                                <User
-                                                                                    size={13}
-                                                                                />
-                                                                            </div>
-                                                                            <div
-                                                                                class="min-w-0"
-                                                                            >
-                                                                                <p
-                                                                                    class="text-xs font-bold text-slate-800 truncate"
+                                                                                <div
+                                                                                    class="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0"
                                                                                 >
-                                                                                    {person.last_name},
-                                                                                    {person.first_name}
-                                                                                </p>
-                                                                                <p
-                                                                                    class="text-[10px] text-slate-400 truncate"
+                                                                                    <User
+                                                                                        size={13}
+                                                                                    />
+                                                                                </div>
+                                                                                <div
+                                                                                    class="min-w-0"
                                                                                 >
-                                                                                    {person.dependency}
-                                                                                    ·
-                                                                                    {person.building}{person.employee_no
-                                                                                        ? ` · #${person.employee_no}`
-                                                                                        : ""}
-                                                                                </p>
-                                                                            </div>
-                                                                        </div>
-                                                                        <!-- Visualización de tarjetas -->
-                                                                        {#if activeCards.length > 0}
-                                                                            <div
-                                                                                class="flex flex-wrap gap-1.5 mt-1.5 ml-9"
-                                                                            >
-                                                                                {#each activeCards as card}
-                                                                                    {@const statusInfo =
-                                                                                        cardStatusBadge(
-                                                                                            card.status,
-                                                                                        )}
-                                                                                    <div
-                                                                                        class="flex items-center gap-1 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded text-[10px] font-medium text-slate-600"
+                                                                                    <p
+                                                                                        class="text-xs font-bold text-slate-800 truncate"
                                                                                     >
-                                                                                        <CreditCard
-                                                                                            size={9}
-                                                                                            class="text-slate-400"
-                                                                                        />
-                                                                                        <span
-                                                                                            class="font-bold"
-                                                                                            >{card.type}:</span
-                                                                                        >
-                                                                                        <span
-                                                                                            >{card.folio}</span
-                                                                                        >
-                                                                                        <Badge
-                                                                                            variant={statusInfo.color}
-                                                                                            class="scale-[0.75] origin-left"
-                                                                                            >{statusInfo.text}</Badge
-                                                                                        >
-                                                                                    </div>
-                                                                                {/each}
+                                                                                        {person.last_name},
+                                                                                        {person.first_name}
+                                                                                    </p>
+                                                                                    <p
+                                                                                        class="text-[10px] text-slate-400 truncate"
+                                                                                    >
+                                                                                        {person.dependency}
+                                                                                        ·
+                                                                                        {person.building}{person.employee_no
+                                                                                            ? ` · #${person.employee_no}`
+                                                                                            : ""}
+                                                                                    </p>
+                                                                                </div>
                                                                             </div>
-                                                                        {:else}
-                                                                            <p
-                                                                                class="text-[10px] text-slate-400 italic ml-9 flex items-center gap-1"
-                                                                            >
-                                                                                <CreditCard
-                                                                                    size={9}
-                                                                                />
-                                                                                Sin
-                                                                                tarjetas
-                                                                                activas
-                                                                            </p>
-                                                                        {/if}
+                                                                            <!-- Visualización de tarjetas -->
+                                                                            {#if activeCards.length > 0}
+                                                                                <div
+                                                                                    class="flex flex-wrap gap-1.5 mt-1.5 ml-9"
+                                                                                >
+                                                                                    {#each activeCards as card}
+                                                                                        {@const statusInfo =
+                                                                                            cardStatusBadge(
+                                                                                                card.status,
+                                                                                            )}
+                                                                                        <div
+                                                                                            class="flex items-center gap-1 px-2 py-0.5 bg-slate-50 border border-slate-100 rounded text-[10px] font-medium text-slate-600"
+                                                                                        >
+                                                                                            <CreditCard
+                                                                                                size={9}
+                                                                                                class="text-slate-400"
+                                                                                            />
+                                                                                            <span
+                                                                                                class="font-bold"
+                                                                                                >{card.type}:</span
+                                                                                            >
+                                                                                            <span
+                                                                                                >{card.folio}</span
+                                                                                            >
+                                                                                            <Badge
+                                                                                                variant={statusInfo.color}
+                                                                                                class="scale-[0.75] origin-left"
+                                                                                                >{statusInfo.text}</Badge
+                                                                                            >
+                                                                                        </div>
+                                                                                    {/each}
+                                                                                </div>
+                                                                            {:else}
+                                                                                <p
+                                                                                    class="text-[10px] text-slate-400 italic ml-9 flex items-center gap-1"
+                                                                                >
+                                                                                    <CreditCard
+                                                                                        size={9}
+                                                                                    />
+                                                                                    Sin
+                                                                                    tarjetas
+                                                                                    activas
+                                                                                </p>
+                                                                            {/if}
 
-                                                                        <!-- Contexto específico por tipo en persona coincidente -->
-                                                                        {#if sheet.key === "baja_persona" && activeCards.length > 0}
-                                                                            <p
-                                                                                class="text-[10px] text-rose-500 font-medium mt-1.5 ml-9"
-                                                                            >
-                                                                                ⚠
-                                                                                Se
-                                                                                desactivarán
-                                                                                {activeCards.length}
-                                                                                tarjeta(s)
-                                                                                con
-                                                                                la
-                                                                                baja.
-                                                                            </p>
-                                                                        {/if}
+                                                                            <!-- Contexto específico por tipo en persona coincidente -->
+                                                                            {#if reviewSheetTab === "baja_persona" && activeCards.length > 0}
+                                                                                <p
+                                                                                    class="text-[10px] text-rose-500 font-medium mt-1.5 ml-9"
+                                                                                >
+                                                                                    ⚠
+                                                                                    Se
+                                                                                    desactivarán
+                                                                                    {activeCards.length}
+                                                                                    tarjeta(s)
+                                                                                    con
+                                                                                    la
+                                                                                    baja.
+                                                                                </p>
+                                                                            {/if}
 
-                                                                        {#if sheet.key === "reposicion"}
-                                                                            {@const repoCards =
-                                                                                getReposicionCards(
-                                                                                    row.fields,
-                                                                                )}
-                                                                            {#each repoCards as rc}
-                                                                                {@const existingCard =
-                                                                                    activeCards.find(
-                                                                                        (
-                                                                                            c,
-                                                                                        ) =>
-                                                                                            c.type ===
-                                                                                            rc.type,
+                                                                            {#if reviewSheetTab === "reposicion"}
+                                                                                {@const repoCards =
+                                                                                    getReposicionCards(
+                                                                                        row.fields,
                                                                                     )}
-                                                                                {#if existingCard}
-                                                                                    {#if rc.folio && rc.folio !== existingCard.folio}
+                                                                                {#each repoCards as rc}
+                                                                                    {@const existingCard =
+                                                                                        activeCards.find(
+                                                                                            (
+                                                                                                c,
+                                                                                            ) =>
+                                                                                                c.type ===
+                                                                                                rc.type,
+                                                                                        )}
+                                                                                    {#if existingCard}
+                                                                                        {#if rc.folio && rc.folio !== existingCard.folio}
+                                                                                            <p
+                                                                                                class="text-[10px] text-amber-600 font-medium mt-1 ml-9 flex items-center gap-1"
+                                                                                            >
+                                                                                                <AlertTriangle
+                                                                                                    size={10}
+                                                                                                />
+                                                                                                Folio
+                                                                                                en
+                                                                                                plantilla
+                                                                                                ({rc.folio})
+                                                                                                ≠
+                                                                                                folio
+                                                                                                asignado
+                                                                                                ({existingCard.folio})
+                                                                                            </p>
+                                                                                        {:else}
+                                                                                            <p
+                                                                                                class="text-[10px] text-emerald-600 font-medium mt-1 ml-9 flex items-center gap-1"
+                                                                                            >
+                                                                                                <CheckCircle2
+                                                                                                    size={10}
+                                                                                                />
+                                                                                                Folio
+                                                                                                {rc.type}
+                                                                                                coincide.
+                                                                                            </p>
+                                                                                        {/if}
+                                                                                    {:else}
                                                                                         <p
                                                                                             class="text-[10px] text-amber-600 font-medium mt-1 ml-9 flex items-center gap-1"
                                                                                         >
                                                                                             <AlertTriangle
                                                                                                 size={10}
                                                                                             />
-                                                                                            Folio
-                                                                                            en
-                                                                                            plantilla
-                                                                                            ({rc.folio})
-                                                                                            ≠
-                                                                                            folio
-                                                                                            asignado
-                                                                                            ({existingCard.folio})
-                                                                                        </p>
-                                                                                    {:else}
-                                                                                        <p
-                                                                                            class="text-[10px] text-emerald-600 font-medium mt-1 ml-9 flex items-center gap-1"
-                                                                                        >
-                                                                                            <CheckCircle2
-                                                                                                size={10}
-                                                                                            />
-                                                                                            Folio
+                                                                                            No
+                                                                                            tiene
+                                                                                            tarjeta
                                                                                             {rc.type}
-                                                                                            coincide.
+                                                                                            activa.
                                                                                         </p>
                                                                                     {/if}
+                                                                                {/each}
+                                                                            {/if}
+
+                                                                            {#if reviewSheetTab === "reporte_falla" && row.fields.folio}
+                                                                                {@const reportCard =
+                                                                                    activeCards.find(
+                                                                                        (
+                                                                                            c,
+                                                                                        ) =>
+                                                                                            c.folio ===
+                                                                                            row
+                                                                                                .fields
+                                                                                                .folio,
+                                                                                    )}
+                                                                                {#if reportCard}
+                                                                                    <p
+                                                                                        class="text-[10px] text-emerald-600 font-medium mt-1 ml-9 flex items-center gap-1"
+                                                                                    >
+                                                                                        <CheckCircle2
+                                                                                            size={10}
+                                                                                        />
+                                                                                        Tarjeta
+                                                                                        {reportCard.type}
+                                                                                        ({reportCard.folio})
+                                                                                        encontrada.
+                                                                                    </p>
                                                                                 {:else}
                                                                                     <p
                                                                                         class="text-[10px] text-amber-600 font-medium mt-1 ml-9 flex items-center gap-1"
@@ -1205,113 +2099,73 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                                         <AlertTriangle
                                                                                             size={10}
                                                                                         />
-                                                                                        No
-                                                                                        tiene
+                                                                                        Folio
+                                                                                        "{row
+                                                                                            .fields
+                                                                                            .folio}"
+                                                                                        no
+                                                                                        coincide
+                                                                                        con
+                                                                                        ninguna
                                                                                         tarjeta
-                                                                                        {rc.type}
                                                                                         activa.
                                                                                     </p>
                                                                                 {/if}
-                                                                            {/each}
-                                                                        {/if}
-
-                                                                        {#if sheet.key === "reporte_falla" && row.fields.folio}
-                                                                            {@const reportCard =
-                                                                                activeCards.find(
-                                                                                    (
-                                                                                        c,
-                                                                                    ) =>
-                                                                                        c.folio ===
-                                                                                        row
-                                                                                            .fields
-                                                                                            .folio,
-                                                                                )}
-                                                                            {#if reportCard}
-                                                                                <p
-                                                                                    class="text-[10px] text-emerald-600 font-medium mt-1 ml-9 flex items-center gap-1"
-                                                                                >
-                                                                                    <CheckCircle2
-                                                                                        size={10}
-                                                                                    />
-                                                                                    Tarjeta
-                                                                                    {reportCard.type}
-                                                                                    ({reportCard.folio})
-                                                                                    encontrada.
-                                                                                </p>
-                                                                            {:else}
-                                                                                <p
-                                                                                    class="text-[10px] text-amber-600 font-medium mt-1 ml-9 flex items-center gap-1"
-                                                                                >
-                                                                                    <AlertTriangle
-                                                                                        size={10}
-                                                                                    />
-                                                                                    Folio
-                                                                                    "{row
-                                                                                        .fields
-                                                                                        .folio}"
-                                                                                    no
-                                                                                    coincide
-                                                                                    con
-                                                                                    ninguna
-                                                                                    tarjeta
-                                                                                    activa.
-                                                                                </p>
                                                                             {/if}
-                                                                        {/if}
-                                                                    </div>
-                                                                {/each}
-                                                                {#if matches.length > 3}
-                                                                    <p
-                                                                        class="text-[10px] text-emerald-600 italic mt-1"
-                                                                    >
-                                                                        …y {matches.length -
-                                                                            3} más
-                                                                    </p>
-                                                                {/if}
+                                                                        </div>
+                                                                    {/each}
+                                                                    {#if matches.length > 3}
+                                                                        <p
+                                                                            class="text-[10px] text-emerald-600 italic mt-1"
+                                                                        >
+                                                                            …y {matches.length -
+                                                                                3} más
+                                                                        </p>
+                                                                    {/if}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    {:else}
-                                                        <div
-                                                            class="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700"
-                                                        >
-                                                            <AlertTriangle
-                                                                size={13}
-                                                                class="shrink-0"
-                                                            />
-                                                            <span
-                                                                >No se encontró
-                                                                a "<strong
-                                                                    >{row.fields
-                                                                        .apellidos},
-                                                                    {row.fields
-                                                                        .nombres}</strong
-                                                                >" en la base de
-                                                                datos.
-                                                                {#if sheet.key === "altas"}
-                                                                    Se creará
-                                                                    como persona
-                                                                    nueva al
-                                                                    procesar el
-                                                                    ticket.
-                                                                {:else}
-                                                                    Será
-                                                                    necesario
-                                                                    vincular
-                                                                    manualmente
-                                                                    al procesar
-                                                                    el ticket.
-                                                                {/if}
-                                                            </span>
-                                                        </div>
+                                                        {:else}
+                                                            <div
+                                                                class="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700"
+                                                            >
+                                                                <AlertTriangle
+                                                                    size={13}
+                                                                    class="shrink-0"
+                                                                />
+                                                                <span
+                                                                    >No se encontró
+                                                                    a "<strong
+                                                                        >{row.fields
+                                                                            .apellidos},
+                                                                        {row.fields
+                                                                            .nombres}</strong
+                                                                    >" en la base de
+                                                                    datos.
+                                                                    {#if reviewSheetTab === "altas"}
+                                                                        Se creará
+                                                                        como persona
+                                                                        nueva al
+                                                                        procesar el
+                                                                        ticket.
+                                                                    {:else}
+                                                                        Será
+                                                                        necesario
+                                                                        vincular
+                                                                        manualmente
+                                                                        al procesar
+                                                                        el ticket.
+                                                                    {/if}
+                                                                </span>
+                                                            </div>
+                                                        {/if}
                                                     {/if}
                                                 </div>
                                             {/if}
                                         </div>
                                     {/each}
                                 </div>
-                            </div>
                         {/if}
-                    {/each}
+                            {/if}
                 </div>
             {/if}
         {/if}
@@ -1387,26 +2241,40 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                     </Button>
                 </div>
             {:else if step === "review"}
-                <div class="flex items-center gap-3">
+                <div class="flex items-center justify-between w-full">
                     <Button
                         variant="outline"
-                        onclick={() => {
-                            step = "parsed";
-                            matchResults = new Map();
-                            expandedReviewRows = new Set();
-                        }}
-                    >
-                        <ArrowLeft size={14} class="mr-1.5" />
-                        Volver
-                    </Button>
-                    <Button
-                        variant="primary"
+                        class="border-slate-200 text-slate-500 hover:text-slate-700"
+                        loading={isExportingReport}
                         disabled={totalSelected === 0 || isReviewing}
-                        onclick={handleImport}
+                        onclick={handleExportReport}
                     >
-                        <Upload size={16} class="mr-2" />
-                        Importar {totalSelected} ticket(s)
+                        <FileSpreadsheet size={14} class="mr-1.5" />
+                        Exportar Reporte
                     </Button>
+                    <div class="flex items-center gap-3">
+                        <Button
+                            variant="outline"
+                            onclick={() => {
+                                step = "parsed";
+                                matchResults = new Map();
+                                expandedReviewRows = new Set();
+                                altaAnalyses = new Map();
+                                modAnalyses = new Map();
+                            }}
+                        >
+                            <ArrowLeft size={14} class="mr-1.5" />
+                            Volver
+                        </Button>
+                        <Button
+                            variant="primary"
+                            disabled={totalSelected === 0 || isReviewing}
+                            onclick={handleImport}
+                        >
+                            <Upload size={16} class="mr-2" />
+                            Importar {totalSelected} ticket(s)
+                        </Button>
+                    </div>
                 </div>
             {:else if step === "importing"}
                 <Button variant="primary" loading={true}>Importando…</Button>

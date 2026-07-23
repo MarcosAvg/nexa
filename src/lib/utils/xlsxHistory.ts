@@ -1,5 +1,5 @@
 import type * as ExcelJSTypes from 'exceljs';
-import { addLogoToSheet } from './xlsxShared';
+import { addLogoToSheet, autoRowHeight } from './xlsxShared';
 import {
     displayEntityName as fmtEntityName,
     cleanMessage as fmtCleanMessage,
@@ -112,7 +112,6 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
         };
 
         const row = worksheet.addRow(rowData);
-        row.height = 24;
 
         row.eachCell((cell, colNumber) => {
             const colLetter = String.fromCharCode(64 + colNumber);
@@ -153,6 +152,8 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
         });
 
         row.getCell('date').alignment = { horizontal: 'center', vertical: 'middle' };
+        // Auto height: calculate row height based on wrapped text content
+        autoRowHeight(worksheet, row.number, 22);
     });
 
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];

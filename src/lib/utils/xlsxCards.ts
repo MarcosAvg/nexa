@@ -1,4 +1,4 @@
-import { addLogoToSheet } from './xlsxShared';
+import { addLogoToSheet, autoRowHeight } from './xlsxShared';
 
 export async function exportCardsToExcel(data: any[], options?: { filters?: { status?: string; dependency?: string; search?: string } }) {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
@@ -117,7 +117,6 @@ export async function exportCardsToExcel(data: any[], options?: { filters?: { st
         };
 
         const row = worksheet.addRow(rowData);
-        row.height = 24;
 
         row.eachCell((cell, colNumber) => {
             const colLetter = String.fromCharCode(64 + colNumber);
@@ -127,7 +126,7 @@ export async function exportCardsToExcel(data: any[], options?: { filters?: { st
             }) || groups[0];
 
             cell.font = { name: 'Arial', size: 9 };
-            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
 
             const isGroupEnd = [2, 3, 4, 6].includes(colNumber);
@@ -155,6 +154,8 @@ export async function exportCardsToExcel(data: any[], options?: { filters?: { st
                 cell.font = { ...cell.font, color: { argb: statusColors.sub }, bold: true };
             }
         });
+        // Auto height: calculate row height based on wrapped text content
+        autoRowHeight(worksheet, row.number, 22);
     });
 
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];

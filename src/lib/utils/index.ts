@@ -59,4 +59,7 @@ export type { KoneUsageEntry, KoneUsageMatchedEntry, KoneUsageMatchResult, Dupli
 
 export { generateRequestTemplate, generateKoneUsageTemplate } from './xlsxTemplate';
 
+export { exportConflictReportToExcel } from './xlsxConflictReport';
+export type { ConflictReportInput } from './xlsxConflictReport';
+
 

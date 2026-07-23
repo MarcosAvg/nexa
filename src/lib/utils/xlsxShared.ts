@@ -50,8 +50,8 @@ export async function createExcelWorkbook(): Promise<{
         import('exceljs'),
         import('file-saver')
     ]);
-    const Workbook = ExcelJSModule.default || ExcelJSModule;
-    const workbook = new (Workbook as unknown as { new(): any })();
+    const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+    const workbook = new ExcelJS.Workbook();
     return { workbook, saveAsFunction };
 }
 
@@ -331,6 +331,49 @@ export function addTableHeader(
         addBorder(cell, colors.fg);
     });
     ws.getRow(row).height = 26;
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// Auto Row Height Calculator
+// ═════════════════════════════════════════════════════════════════════
+
+/**
+ * Calculates and sets an appropriate row height for data rows based on cell content.
+ * When wrapText is enabled, long text needs taller rows to display all content.
+ * Without this, text gets clipped/clipped when wrapText is true with a fixed row height.
+ *
+ * Formula (for Arial 8-9pt):
+ *   - Excel column width unit ~= 1 character of the default font
+ *   - Each line of wrapped text ≈ 14 points
+ *   - Base: 18pt for 1 line, +13pt for each additional line
+ *   - Minimum: minHeight (default 22)
+ */
+export function autoRowHeight(
+    worksheet: ExcelJSTypes.Worksheet,
+    rowNum: number,
+    minHeight: number = 22
+): void {
+    const row = worksheet.getRow(rowNum);
+    let maxLines = 1;
+
+    row.eachCell((cell) => {
+        if (
+            cell.value &&
+            typeof cell.value === 'string' &&
+            cell.alignment?.wrapText &&
+            cell.value.length > 0
+        ) {
+            const colWidth = worksheet.getColumn(cell.col).width || 10;
+            // ~1 char fits per column width unit for Arial 9pt
+            const charsPerLine = Math.max(1, colWidth * 0.85);
+            const lines = Math.ceil(cell.value.length / charsPerLine);
+            maxLines = Math.max(maxLines, lines);
+        }
+    });
+
+    // ~14pt per line: 18pt base for first line + 13pt for each additional
+    const computedHeight = 18 + (maxLines - 1) * 13;
+    row.height = Math.ceil(Math.max(minHeight, computedHeight));
 }
 
 /**

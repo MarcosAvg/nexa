@@ -1,5 +1,5 @@
 import type * as ExcelJSTypes from 'exceljs';
-import { addLogoToSheet } from './xlsxShared';
+import { addLogoToSheet, autoRowHeight } from './xlsxShared';
 
 export const RESPONSIVA_PICKUP_DAYS = 7;
 /** Días a partir de los cuales se muestra advertencia "Por vencer" (ámbar) en la UI. */
@@ -214,7 +214,6 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
         };
 
         const row = worksheet.addRow(rowData);
-        row.height = 26;
 
         row.eachCell((cell, colNumber) => {
             const group = groups[colGroupMap[colNumber - 1]];
@@ -261,6 +260,8 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
                 }
             }
         });
+        // Auto height: calculate row height based on wrapped text content
+        autoRowHeight(worksheet, row.number, 22);
     });
 
     const summaryRowNum = worksheet.rowCount + 1;

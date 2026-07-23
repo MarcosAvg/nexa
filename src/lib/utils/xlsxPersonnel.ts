@@ -7,6 +7,7 @@ import {
     addKpiCard,
     addTableHeader,
     addTableRow,
+    autoRowHeight,
 } from './xlsxShared';    // Re-exportar tipos desde aquí
 export interface ExportPersonnelData {
     first_name: string;
@@ -421,7 +422,6 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
             };
 
             const row = worksheet.addRow(rowData);
-            row.height = 24;
 
             const isInactive = person.status === 'Baja' || person.status === 'Sin Acceso';
 
@@ -457,6 +457,9 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
                 }
             });
+
+            // Auto height: calculate row height based on wrapped text content
+            autoRowHeight(worksheet, row.number, 22);
 
             const statusCell = row.getCell('status');
             if (person.status === 'Activo/a' && !isInactive) {
