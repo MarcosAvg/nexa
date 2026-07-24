@@ -36,7 +36,7 @@
 
 <CatalogSelect
     catalog={dependencies}
-    {value}
+    bind:value
     {placeholder}
     {disabled}
     class={className}

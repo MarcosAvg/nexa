@@ -36,7 +36,7 @@
 
 <CatalogSelect
     catalog={buildings}
-    {value}
+    bind:value
     {placeholder}
     {disabled}
     class={className}

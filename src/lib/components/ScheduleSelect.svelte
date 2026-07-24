@@ -36,7 +36,7 @@
 
 <CatalogSelect
     catalog={schedules}
-    {value}
+    bind:value
     {placeholder}
     {disabled}
     class={className}

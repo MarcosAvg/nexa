@@ -36,7 +36,7 @@
 </script>
 
 <Select
-    {value}
+    bind:value
     {placeholder}
     {disabled}
     class={className}
