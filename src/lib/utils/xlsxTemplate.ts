@@ -739,10 +739,10 @@ function buildAccessProInstructionsSheet(wb: ExcelJS.Workbook) {
     space();
 
     sectionTitle('📑  DESCRIPCIÓN DE CADA HOJA');
-    addRow('✅ ALTAS ACCESSPRO', 'Para dar de alta a personas que requieren tarjeta AccessPRO (acceso de entrada al edificio).\nEl campo "Folio AccessPRO" es OPCIONAL: si la persona ya tiene folio asignado, anótelo para que quede pre-cargado; si no, se le asignará uno en el proceso.');
-    addRow('🚫 BAJA ACCESSPRO', 'Para dar de baja a una persona del sistema de accesos AccessPRO.\nEsta acción desactiva todos sus accesos.');
-    addRow('🔄 REPOSICIÓN ACCESSPRO', 'Para solicitar la reposición de una tarjeta AccessPRO extraviada, dañada o robada.\nIndique el folio anterior de la tarjeta si lo conoce.');
-    addRow('🔧 REPORTE FALLA ACCESSPRO', 'Para reportar cuando una tarjeta AccessPRO no funciona correctamente\n(no abre la entrada, el lector no la lee). El área de accesos verificará antes de determinar si se requiere reposición.');
+    addRow('✅ ALTAS', 'Para dar de alta a personas que requieren tarjeta AccessPRO (acceso de entrada al edificio).\nEl campo "Folio AccessPRO" es OPCIONAL: si la persona ya tiene folio asignado, anótelo para que quede pre-cargado; si no, se le asignará uno en el proceso.');
+    addRow('🚫 BAJA', 'Para dar de baja a una persona del sistema de accesos AccessPRO.\nEsta acción desactiva todos sus accesos.');
+    addRow('🔄 REPOSICIÓN', 'Para solicitar la reposición de una tarjeta AccessPRO extraviada, dañada o robada.\nIndique el folio anterior de la tarjeta si lo conoce.');
+    addRow('🔧 REPORTE FALLA', 'Para reportar cuando una tarjeta AccessPRO no funciona correctamente\n(no abre la entrada, el lector no la lee). El área de accesos verificará antes de determinar si se requiere reposición.');
     space();
 
     sectionTitle('⚠️  REGLAS Y ACLARACIONES IMPORTANTES');
@@ -765,7 +765,7 @@ function buildAccessProInstructionsSheet(wb: ExcelJS.Workbook) {
 // ─────────────────────────────────────────
 
 function buildBajaAccessProSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
-    const ws = wb.addWorksheet('🚫 BAJA ACCESSPRO');
+    const ws = wb.addWorksheet('🚫 BAJA');
     ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 4, showGridLines: true }];
 
     ws.columns = [
@@ -815,7 +815,7 @@ function buildBajaAccessProSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 // ─────────────────────────────────────────
 
 function buildReposicionAccessProSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
-    const ws = wb.addWorksheet('🔄 REPOSICIÓN ACCESSPRO');
+    const ws = wb.addWorksheet('🔄 REPOSICIÓN');
     ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 4, showGridLines: true }];
 
     ws.columns = [
@@ -865,7 +865,7 @@ function buildReposicionAccessProSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) 
 // ─────────────────────────────────────────
 
 function buildReporteFallaAccessProSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
-    const ws = wb.addWorksheet('🔧 REPORTE FALLA ACCESSPRO');
+    const ws = wb.addWorksheet('🔧 REPORTE FALLA');
     ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 4, showGridLines: true }];
 
     ws.columns = [
@@ -1005,7 +1005,7 @@ export async function generateAccessProTemplate(catalogs: TemplateCatalogs) {
 // ─────────────────────────────────────────
 
 function buildAltasAccessProSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
-    const ws = wb.addWorksheet('✅ ALTAS ACCESSPRO');
+    const ws = wb.addWorksheet('✅ ALTAS');
     ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 4, showGridLines: true }];
 
     ws.columns = [
