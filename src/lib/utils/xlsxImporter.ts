@@ -44,16 +44,27 @@ export interface ImportParseResult {
 
 type ColDef = { field: string; label: string; required?: boolean };
 
-const SHEET_CONFIG: Record<SheetKey, {
+type SheetConfig = {
     name: string;
     label: string;
     dataStartRow: number;
     cols: ColDef[];
-}> = {
+    /**
+     * Columna de encabezados que identifica de forma inequívoca esta hoja
+     * cuando su nombre se comparte entre plantillas
+     * (p. ej. '✅ ALTAS' existe en la plantilla general y en la de AccessPRO).
+     */
+    signature?: { col: number; contains: string };
+    /** Nombres alternativos de la hoja (plantillas generadas con nomenclatura anterior). */
+    aliases?: string[];
+};
+
+const SHEET_CONFIG: Record<SheetKey, SheetConfig> = {
     altas: {
         name: '✅ ALTAS',
         label: 'Altas',
         dataStartRow: 5,
+        signature: { col: 3, contains: 'Tipo de Personal' },
         cols: [
             { field: 'apellidos', label: 'Apellidos', required: true },
             { field: 'nombres', label: 'Nombres', required: true },
@@ -156,9 +167,11 @@ const SHEET_CONFIG: Record<SheetKey, {
         ],
     },
     altas_accesspro: {
-        name: '✅ ALTAS ACCESSPRO',
+        name: '✅ ALTAS',
         label: 'Altas AccessPRO',
         dataStartRow: 5,
+        signature: { col: 9, contains: 'Folio AccessPRO' },
+        aliases: ['✅ ALTAS ACCESSPRO'],
         cols: [
             { field: 'apellidos', label: 'Apellidos', required: true },
             { field: 'nombres', label: 'Nombres', required: true },
@@ -178,9 +191,10 @@ const SHEET_CONFIG: Record<SheetKey, {
         ],
     },
     baja_accesspro: {
-        name: '🚫 BAJA ACCESSPRO',
+        name: '🚫 BAJA',
         label: 'Bajas AccessPRO',
         dataStartRow: 5,
+        aliases: ['🚫 BAJA ACCESSPRO'],
         cols: [
             { field: 'apellidos', label: 'Apellidos', required: true },
             { field: 'nombres', label: 'Nombres', required: true },
@@ -192,9 +206,10 @@ const SHEET_CONFIG: Record<SheetKey, {
         ],
     },
     reposicion_accesspro: {
-        name: '🔄 REPOSICIÓN ACCESSPRO',
+        name: '🔄 REPOSICIÓN',
         label: 'Reposiciones AccessPRO',
         dataStartRow: 5,
+        aliases: ['🔄 REPOSICIÓN ACCESSPRO'],
         cols: [
             { field: 'apellidos', label: 'Apellidos', required: true },
             { field: 'nombres', label: 'Nombres', required: true },
@@ -206,9 +221,10 @@ const SHEET_CONFIG: Record<SheetKey, {
         ],
     },
     reporte_falla_accesspro: {
-        name: '🔧 REPORTE FALLA ACCESSPRO',
+        name: '🔧 REPORTE FALLA',
         label: 'Reportes Falla AccessPRO',
         dataStartRow: 5,
+        aliases: ['🔧 REPORTE FALLA ACCESSPRO'],
         cols: [
             { field: 'apellidos', label: 'Apellidos', required: true },
             { field: 'nombres', label: 'Nombres', required: true },
@@ -361,11 +377,38 @@ export async function parseTemplateFile(file: File): Promise<ImportParseResult> 
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buffer);
 
+    // Nombre de hoja → claves que lo reclaman. Cuando varias configuraciones
+    // comparten el mismo nombre (p. ej. '✅ ALTAS' en la plantilla general y en
+    // la de AccessPRO), se desambigua con la firma de encabezados de cada una.
+    const claims = new Map<string, SheetKey[]>();
+    for (const [key, cfg] of Object.entries(SHEET_CONFIG) as [SheetKey, SheetConfig][]) {
+        for (const candidate of [cfg.name, ...(cfg.aliases ?? [])]) {
+            const list = claims.get(candidate) ?? [];
+            if (!list.includes(key)) list.push(key);
+            claims.set(candidate, list);
+        }
+    }
+
+    const resolveWorksheet = (key: SheetKey): ExcelJS.Worksheet | undefined => {
+        const cfg = SHEET_CONFIG[key];
+        for (const candidate of [cfg.name, ...(cfg.aliases ?? [])]) {
+            const ws = wb.getWorksheet(candidate);
+            if (!ws) continue;
+            const shared = (claims.get(candidate) ?? []).length > 1;
+            if (shared && cfg.signature) {
+                const headerRow = cfg.dataStartRow - 1;
+                const header = cellText(ws.getCell(headerRow, cfg.signature.col)).toLowerCase();
+                if (!header.includes(cfg.signature.contains.toLowerCase())) continue;
+            }
+            return ws;
+        }
+        return undefined;
+    };
+
     const sheets: ParsedSheet[] = [];
 
     for (const key of Object.keys(SHEET_CONFIG) as SheetKey[]) {
-        const cfg = SHEET_CONFIG[key];
-        const ws = wb.getWorksheet(cfg.name);
+        const ws = resolveWorksheet(key);
         if (!ws) continue;
         const parsed = parseSheet(ws, key);
         if (parsed.rows.length > 0) {
