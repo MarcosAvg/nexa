@@ -10,6 +10,7 @@
 export type {
     ExportPersonnelData,
     ExportOptions,
+    CardType,
 } from './xlsxPersonnel';
 
 export {

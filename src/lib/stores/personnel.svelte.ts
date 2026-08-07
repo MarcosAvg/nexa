@@ -33,7 +33,8 @@ export class PersonnelState {
     dashboardStats = $state({
         activePersonnel: 0,
         koneStock: 0,
-        p2000Stock: 0
+        p2000Stock: 0,
+        accessproStock: 0
     });
     dashboardMetrics = $state<DashboardMetrics>({
         totalPersonnel: 0,

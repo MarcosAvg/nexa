@@ -12,6 +12,7 @@
     import { HistoryService } from "../../services/history";
     import { toast } from "svelte-sonner";
     import { handleError, parseFloors } from "../../utils";
+    import { wantsAccessProCard } from "../../utils/matchAnalysis";
     import Badge from "../Badge.svelte";
     import {
         AlertTriangle,
@@ -61,6 +62,7 @@
             specialAccesses: [p.acceso1, p.acceso2, p.acceso3]
                 .map((s: string) => s?.trim())
                 .filter(Boolean),
+            folioAccessPro: p.folio_accesspro,
         };
     });
 
@@ -73,8 +75,10 @@
         const wantsKONE = ["sí", "si"].includes(
             (p.kone_req ?? "").toLowerCase(),
         );
+        const wantsAccessPro = wantsAccessProCard(p);
         if (wantsP2000) types.push("P2000");
         if (wantsKONE) types.push("KONE");
+        if (wantsAccessPro) types.push("AccessPRO");
         return types.length > 0 ? types : null; // null = allow all
     });
 
@@ -171,8 +175,12 @@
                 >
                 <div class="flex gap-1.5">
                     {#each allowedCardTypes as type}
-                        <Badge variant={type === "KONE" ? "blue" : "amber"}
-                            >{type}</Badge
+                        <Badge
+                            variant={type === "KONE"
+                                ? "blue"
+                                : type === "AccessPRO"
+                                  ? "emerald"
+                                  : "amber"}>{type}</Badge
                         >
                     {/each}
                 </div>

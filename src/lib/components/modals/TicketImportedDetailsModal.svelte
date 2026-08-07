@@ -276,6 +276,10 @@
         const wantsKONE = ["sí", "si"].includes(
             (p.reponer_kone ?? "").toLowerCase(),
         );
+        const wantsAccessPro =
+            ["sí", "si"].includes(
+                (p.reponer_accesspro ?? "").toLowerCase(),
+            ) || (p.folio_accesspro ?? "").trim().length > 0;
 
         const checks: FolioCheck[] = [];
 
@@ -307,6 +311,24 @@
                 });
             } else {
                 for (const c of koneCards) {
+                    const match = !folioSought || c.folio === folioSought;
+                    checks.push({ card: c, match, warning: !match });
+                }
+            }
+        }
+        if (wantsAccessPro) {
+            const folioSought = (p.folio_accesspro_repo ?? p.folio_accesspro)?.trim();
+            const accessproCards = cards.filter(
+                (c: any) => c.type === "AccessPRO",
+            );
+            if (accessproCards.length === 0) {
+                checks.push({
+                    card: { type: "AccessPRO", folio: folioSought ?? "—" },
+                    match: false,
+                    warning: true,
+                });
+            } else {
+                for (const c of accessproCards) {
                     const match = !folioSought || c.folio === folioSought;
                     checks.push({ card: c, match, warning: !match });
                 }
@@ -351,12 +373,16 @@
      *  "Tarjeta P2000" → ["P2000"]
      *  "Tarjeta KONE"  → ["KONE"]
      *  "Ambas tarjetas" → ["P2000", "KONE"]
+     *  "AccessPRO"     → ["AccessPRO"]
      */
     function resolveTipos(raw: string): string[] {
         const t = raw.toLowerCase().trim();
         if (t.includes("ambas")) return ["P2000", "KONE"];
         if (t.includes("p2000")) return ["P2000"];
         if (t.includes("kone")) return ["KONE"];
+        if (t.includes("accesspro") || t.includes("access pro")) {
+            return ["AccessPRO"];
+        }
         return [raw];
     }
 
@@ -472,6 +498,10 @@
             if (tipos.includes("KONE")) {
                 repoPayload.reponer_kone = "sí";
                 repoPayload.folio_kone = folio;
+            }
+            if (tipos.includes("AccessPRO")) {
+                repoPayload.reponer_accesspro = "sí";
+                repoPayload.folio_accesspro = folio;
             }
 
             await ticketService.create({

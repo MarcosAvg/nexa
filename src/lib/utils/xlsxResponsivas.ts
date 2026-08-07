@@ -35,6 +35,25 @@ function formatPickupTrackingLabel(
     return `Restan ${formatDaysRemaining(daysRemaining)} para recoger`;
 }
 
+/**
+ * Evalúa los filtros de la sección Responsivas (tipo de movimiento + estado) para un ticket
+ * ya enriquecido con movementType, needsBaja y daysElapsed. Usado por la vista y la exportación
+ * para mantener el mismo criterio en ambos lugares.
+ */
+export function matchesResponsivaFilters(
+    t: { type?: string; movementType?: string; needsBaja?: boolean; daysElapsed?: number | null },
+    movementTypeFilter: string,
+    responsivaFilter: string,
+    warnDays: number
+): boolean {
+    if (movementTypeFilter !== "Todas" && t.movementType !== movementTypeFilter) return false;
+    if (responsivaFilter === "Todas") return true;
+    if (t.type !== "Firma Responsiva" || t.daysElapsed == null) return false;
+    if (t.needsBaja) return responsivaFilter === "Baja de Registro";
+    if (t.daysElapsed >= warnDays) return responsivaFilter === "Por vencer";
+    return responsivaFilter === "Pendiente";
+}
+
 export function computeResponsivaManagement(
     movementType: string,
     referenceDate: string,

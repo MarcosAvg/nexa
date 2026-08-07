@@ -18,7 +18,9 @@
         FileStack,
         FolderArchive,
         Users,
+        Check,
     } from "lucide-svelte";
+    import type { CardType } from "../utils/xlsxPersonnel";
     import { personnelService } from "../services/personnel";
     import { cardService } from "../services/cards";
     import { exportPersonnelToExcel, exportPersonnelAllDependenciesAsZip, handleError, createSimpleDebounce } from "../utils";
@@ -37,6 +39,19 @@
     ]);
 
     // Filtros de UI que mapean nombre → ID antes de aplicar
+    /** Tipos de tarjeta a incluir en las columnas/KPIs de la exportación Excel. */
+    let exportCardTypes = $state<CardType[]>(["P2000", "KONE", "AccessPRO"]);
+
+    function toggleExportCardType(type: CardType) {
+        if (exportCardTypes.includes(type) && exportCardTypes.length === 1) {
+            // Siempre al menos un tipo seleccionado (el exportador no puede omitir todos)
+            return;
+        }
+        exportCardTypes = exportCardTypes.includes(type)
+            ? exportCardTypes.filter((t) => t !== type)
+            : [...exportCardTypes, type];
+    }
+
     let dependencyFilter = $state("");
     let buildingFilter = $state("");
 
@@ -98,19 +113,26 @@
         try {
             const depId =
                 dependencies.find((d) => d.name === dependencyFilter)?.id || "";
+            const bldgId =
+                buildingFilter === "Sin Edificio"
+                    ? "__none__"
+                    : buildings.find((b) => b.name === buildingFilter)?.id || "";
             const data = await personnelService.fetchForExport(
                 personnelState.filters.search,
                 personnelState.filters.status,
                 depId,
+                bldgId,
             );
 
             exportPersonnelToExcel(data as any[], {
                 filters: {
                     status: personnelState.filters.status,
                     dependency: dependencyFilter,
+                    building: buildingFilter,
                     search: personnelState.filters.search,
                 },
                 splitByDependency,
+                cardTypes: exportCardTypes,
             });
             toast.success("Exportación completada", { id: loadingToast });
         } catch (error) {
@@ -124,15 +146,25 @@
             toast.error("No hay dependencias registradas");
             return;
         }
+        const zipBldgId =
+            buildingFilter === "Sin Edificio"
+                ? "__none__"
+                : buildings.find((b) => b.name === buildingFilter)?.id || "";
         isZipExporting = true;
         const loadingToast = toast.loading("Preparando ZIP...");
         try {
             await exportPersonnelAllDependenciesAsZip(
                 dependencies,
-                { status: personnelState.filters.status, search: personnelState.filters.search },
+                {
+                    status: personnelState.filters.status,
+                    search: personnelState.filters.search,
+                    buildingId: zipBldgId,
+                    buildingName: buildingFilter,
+                },
                 (_current, _total, label) => {
                     toast.loading(`Procesando: ${label}`, { id: loadingToast });
                 },
+                exportCardTypes,
             );
             toast.success("ZIP descargado", { id: loadingToast });
         } catch (error) {
@@ -181,7 +213,11 @@
     <div class="flex flex-wrap gap-1">
         {#each row.cards || [] as card}
             <Badge
-                variant={card.type === "KONE" ? "blue" : "amber"}
+                variant={card.type === "KONE"
+                    ? "blue"
+                    : card.type === "AccessPRO"
+                      ? "emerald"
+                      : "amber"}
                 class="px-1.5 py-0"
             >
                 {card.type}
@@ -309,6 +345,40 @@
                         </span>
                         Separado por Dependencia
                     </button>
+                    <div class="mx-3 my-1 border-t border-slate-100"></div>
+                    <div class="px-4 py-2">
+                        <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1.5">
+                            Tipos de tarjeta
+                        </p>
+                        <div class="flex flex-col gap-0.5">
+                            {#each [
+                                { t: "P2000" as CardType, label: "P2000", dot: "bg-amber-400" },
+                                { t: "KONE" as CardType, label: "KONE", dot: "bg-sky-400" },
+                                { t: "AccessPRO" as CardType, label: "AccessPRO", dot: "bg-emerald-400" },
+                            ] as opt}
+                                <button
+                                    type="button"
+                                    class="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-[12px] font-bold transition-colors {exportCardTypes.includes(opt.t)
+                                        ? 'bg-slate-50 text-slate-800'
+                                        : 'text-slate-400 hover:text-slate-600'}"
+                                    onclick={() => toggleExportCardType(opt.t)}
+                                >
+                                    <span
+                                        class="w-4 h-4 rounded flex items-center justify-center border transition-colors {exportCardTypes.includes(opt.t)
+                                            ? 'bg-blue-600 border-blue-600 text-white'
+                                            : 'border-slate-300 text-transparent'}"
+                                    >
+                                        <Check size={11} strokeWidth={3.5} />
+                                    </span>
+                                    <span class="w-2 h-2 rounded-full {opt.dot}"></span>
+                                    {opt.label}
+                                </button>
+                            {/each}
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1.5">
+                            Solo se incluirán las columnas de los tipos seleccionados.
+                        </p>
+                    </div>
                     <div class="mx-3 my-1 border-t border-slate-100"></div>
                     <button
                         class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"

@@ -32,7 +32,7 @@
         /** Snapshot del texto legal guardado en BD. */
         legalSnapshot?: string;
         /** Tipo de tarjeta (determina el texto legal). */
-        cardType?: "KONE" | "P2000";
+        cardType?: "KONE" | "P2000" | "AccessPRO";
     };
 
     let {
@@ -46,7 +46,11 @@
 
     const paragraphs = $derived.by(() => {
         if (legalSnapshot) return legalSnapshot.split("\n");
-        const typeKey = cardType?.toUpperCase() === "P2000" ? "P2000" : "KONE";
+        const typeKey = cardType?.toUpperCase() === "P2000"
+            ? "P2000"
+            : cardType?.toUpperCase() === "AccessPRO"
+              ? "AccessPRO"
+              : "KONE";
         return RESPONSIVA_LEGAL_TEXTS[typeKey];
     });
 </script>

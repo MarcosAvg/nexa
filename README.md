@@ -5,7 +5,7 @@ Plataforma para la gestión de accesos, personal operativo y auditoría de regis
 ## Funcionalidades
 
 - **Gestión de Personal**: Administración de expedientes y perfiles de usuario.
-- **Control de Accesos**: Asignación y monitoreo de tarjetas físicas (P2000, KONE).
+- **Control de Accesos**: Asignación y monitoreo de tarjetas físicas (P2000, KONE, AccessPRO).
 - **Sistema de Tickets**: Seguimiento de incidencias y tareas.
 - **Reportes**: Generación de documentos en formato Excel y PDF.
 - **Auditoría**: Registro detallado de movimientos e historial de cambios.

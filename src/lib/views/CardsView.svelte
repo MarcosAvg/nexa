@@ -136,7 +136,13 @@
 </script>
 
 {#snippet renderCardType(row: any)}
-    <Badge variant={row.type === "KONE" ? "blue" : "amber"}>
+    <Badge
+        variant={row.type === "KONE"
+            ? "blue"
+            : row.type === "AccessPRO"
+              ? "emerald"
+              : "amber"}
+    >
         {row.type}
     </Badge>
 {/snippet}
@@ -190,7 +196,7 @@
     <SectionHeader title="Gestión de tarjetas">
         {#snippet filters()}                <FilterGroup
                 label="Tipo"
-                options={["Todos", "KONE", "P2000"]}
+                options={["Todos", "KONE", "P2000", "AccessPRO"]}
                 bind:value={cardState.filters.type}
             />
             <FilterGroup
@@ -230,7 +236,14 @@
                             cardState.filters.dependencyId,
                         );
                         const m = await import("../utils/xlsxExport");
-                        m.exportCardsToExcel(data, { filters: { status: cardState.filters.status, search: cardState.filters.search } });
+                        m.exportCardsToExcel(data, {
+                            filters: {
+                                type: cardState.filters.type,
+                                status: cardState.filters.status,
+                                dependency: depNameFilter,
+                                search: cardState.filters.search,
+                            },
+                        });
                         toast.success("Exportación completada", { id: loadingToast });
                     } catch (e) {
                         toast.dismiss(loadingToast);
@@ -260,7 +273,7 @@
         data={cards}
         emptyTitle="Aún no hay tarjetas registradas"
         emptyTitleFiltered="Sin resultados"
-        emptyDescription="El inventario de tarjetas está vacío. Comienza registrando la primera tarjeta P2000 o KONE."
+        emptyDescription="El inventario de tarjetas está vacío. Comienza registrando la primera tarjeta P2000, KONE o AccessPRO."
         emptyDescriptionFiltered="No encontramos tarjetas con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={CreditCard}
         emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"                    hasFilters={!!(cardState.filters.search || cardState.filters.type !== "Todos" || cardState.filters.status !== "Todas" || cardState.filters.dependencyId)}
