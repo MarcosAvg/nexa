@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import { supabase } from '../supabase';
 import type { ExportPersonnelData } from './xlsxExport';
 import { batchPaginate } from './batchPaginate';
+import { computePersonStatus } from './personStatus';
 
 // ─────────────────────────────────────────
 // Tipos
@@ -331,21 +332,7 @@ export async function matchKoneUsageToPersonnel(
 
             // Mapear a ExportPersonnelData
             const allCards = (p.cards || []);
-            const activeCards = allCards.filter((c: any) => c.status === 'active');
-            const readyCards = activeCards.filter(
-                (c: any) => c.programming_status === 'done' && (c.responsiva_status === 'signed' || c.responsiva_status === 'legacy')
-            );
-            const readyTypes = new Set(readyCards.map((c: any) => c.type));
-
-            let displayStatus = 'Baja';
-            if (p.status === 'active') {
-                if (readyTypes.size >= 2) displayStatus = 'Activo/a';
-                else if (readyTypes.size === 1) displayStatus = 'Parcial';
-                else if (allCards.length > 0) displayStatus = 'Bloqueado/a';
-                else displayStatus = 'Sin Acceso';
-            } else if (p.status === 'blocked') {
-                displayStatus = 'Bloqueado/a';
-            }
+            const displayStatus = computePersonStatus(p.status, allCards);
 
             const person: ExportPersonnelData = {
                 first_name: p.first_name || '',

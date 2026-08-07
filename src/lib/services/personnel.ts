@@ -1,6 +1,7 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate, batchCollectIds } from "../utils";
+import { computePersonStatus } from "../utils/personStatus";
 import type { Person, Card, DashboardMetrics } from "../types";
 import { networkStore } from "../stores/network.svelte";
 
@@ -43,30 +44,9 @@ interface PersonnelRow {
 
 const mapPersonRecord = (p: PersonnelRow): Person => {
     const allCards = (p.cards || []);
-    const activeCards = allCards.filter((c) => c.status === "active");
-    const readyCards = activeCards.filter(
-        (c) => c.programming_status === "done" && (c.responsiva_status === "signed" || c.responsiva_status === "legacy")
-    );
 
-    const readyTypes = new Set(readyCards.map((c) => c.type));
-
-    let displayStatus = p.computed_status;
-    if (!displayStatus) {
-        displayStatus = "Baja";
-        if (p.status === "active") {
-            if (readyTypes.size >= 2) {
-                displayStatus = "Activo/a";
-            } else if (readyTypes.size === 1) {
-                displayStatus = "Parcial";
-            } else if (allCards.length > 0) {
-                displayStatus = "Bloqueado/a";
-            } else {
-                displayStatus = "Sin Acceso";
-            }
-        } else if (p.status === "blocked") {
-            displayStatus = "Bloqueado/a";
-        }
-    }
+    const displayStatus = p.computed_status
+        || computePersonStatus(p.status, allCards);
 
     return {
         id: p.id,
@@ -219,7 +199,7 @@ export const personnelService = {
         }, "Fetch Personnel Options", throwOnError, []);
     },
 
-    async fetchForExport(search: string = "", statusFilter: string = "Todos", dependencyId: string = ""): Promise<Person[]> {
+    async fetchForExport(search: string = "", statusFilter: string = "Todos", dependencyId: string = "", buildingId: string = ""): Promise<Person[]> {
         return withErrorHandlingSafe(async () => {
             const isComputedStatus = ["Activo/a", "Parcial", "Sin Acceso"].includes(statusFilter);
             const dbStatusMap: Record<string, string> = { "Bloqueado/a": "blocked", "Baja": "inactive" };
@@ -232,6 +212,8 @@ export const personnelService = {
                 }
                 if (statusFilter !== "Todos") q = dbStatusMap[statusFilter] ? q.eq("status", dbStatusMap[statusFilter]) : q.eq("status", "active");
                 if (dependencyId) q = q.eq("dependency_id", dependencyId);
+                if (buildingId === "__none__") q = q.is("building_id", null);
+                else if (buildingId) q = q.eq("building_id", buildingId);
                 return q.order("first_name", { ascending: true }).range(from, to);
             });
 
@@ -455,8 +437,12 @@ export const personnelService = {
                 .select("*", { count: "exact", head: true }).is("person_id", null).eq("status", "available").eq("type", "P2000");
             if (p2Error) throw p2Error;
 
-            return { activePersonnel: activePersonnelCount, koneStock: koneStock || 0, p2000Stock: p2000Stock || 0 };
-        }, "Fetch Dashboard Stats", { activePersonnel: 0, koneStock: 0, p2000Stock: 0 });
+            const { count: accessproStock, error: aError } = await supabase.from("cards")
+                .select("*", { count: "exact", head: true }).is("person_id", null).eq("status", "available").eq("type", "AccessPRO");
+            if (aError) throw aError;
+
+            return { activePersonnel: activePersonnelCount, koneStock: koneStock || 0, p2000Stock: p2000Stock || 0, accessproStock: accessproStock || 0 };
+        }, "Fetch Dashboard Stats", { activePersonnel: 0, koneStock: 0, p2000Stock: 0, accessproStock: 0 });
     },
 
     async fetchDashboardMetrics(): Promise<DashboardMetrics> {

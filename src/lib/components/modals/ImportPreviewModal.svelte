@@ -34,6 +34,7 @@
     import {
         analyzeAltaConflicts,
         analyzeModificacionConflicts,
+        wantsAccessProCard,
     } from "../../utils/matchAnalysis";
     import type {
         AltaConflictAnalysis,
@@ -95,7 +96,7 @@
 
     function rowMatchesTab(sheetKey: string, row: ParsedRow, tab: string): boolean {
         const rk = `${sheetKey}-${row.rowNumber}`;
-        if (sheetKey === 'altas') {
+        if (sheetKey === 'altas' || sheetKey === 'altas_accesspro') {
             const ana = altaAnalyses.get(rk);
             const hasConflict = ana ? ana.hasConflicts : false;
             return tab === 'conflict' ? hasConflict : !hasConflict;
@@ -232,6 +233,14 @@
                         rk,
                         analyzeAltaConflicts(rk, person, row.fields),
                     );
+                } else if (sheet.key === "altas_accesspro") {
+                    // La hoja AccessPRO solo solicita esa tarjeta
+                    newAltaAnalyses.set(
+                        rk,
+                        analyzeAltaConflicts(rk, person, row.fields, [
+                            "AccessPRO",
+                        ]),
+                    );
                 } else if (sheet.key === "modificaciones") {
                     newModAnalyses.set(
                         rk,
@@ -246,6 +255,26 @@
 
         // Expandir todas las filas automáticamente
         expandedReviewRows = new Set(newMatches.keys());
+
+        // Auto-seleccionar la primera hoja con filas seleccionadas
+        // (p.ej. un archivo con solo ALTAS ACCESSPRO no debe abrir en ALTAS)
+        const firstSheetWithRows = parseResult.sheets.find((s) =>
+            s.rows.some(
+                (r) =>
+                    r.isValid && selectedRows.has(`${s.key}-${r.rowNumber}`),
+            ),
+        );
+        const currentTabHasRows = parseResult.sheets
+            .find((s) => s.key === reviewSheetTab)
+            ?.rows.some(
+                (r) =>
+                    r.isValid &&
+                    selectedRows.has(`${reviewSheetTab}-${r.rowNumber}`),
+            );
+        if (!currentTabHasRows && firstSheetWithRows) {
+            reviewSheetTab = firstSheetWithRows.key;
+        }
+
         isReviewing = false;
     }
 
@@ -266,12 +295,14 @@
             types.push("P2000");
         if (yes.includes((fields.kone_req ?? "").toLowerCase()))
             types.push("KONE");
+        if (wantsAccessProCard(fields)) types.push("AccessPRO");
         return types;
     }
 
     /** For Reposición: which card types to replace */
     function getReposicionCards(
         fields: Record<string, string>,
+        implicitType?: string,
     ): { type: string; folio: string }[] {
         const cards: { type: string; folio: string }[] = [];
         const yes = ["sí", "si"];
@@ -280,6 +311,27 @@
         }
         if (yes.includes((fields.reponer_kone ?? "").toLowerCase())) {
             cards.push({ type: "KONE", folio: fields.folio_kone ?? "" });
+        }
+        if (
+            yes.includes((fields.reponer_accesspro ?? "").toLowerCase()) ||
+            (fields.folio_accesspro_repo ?? "").trim().length > 0 ||
+            (fields.folio_accesspro ?? "").trim().length > 0
+        ) {
+            cards.push({
+                type: "AccessPRO",
+                folio:
+                    fields.folio_accesspro_repo ||
+                    fields.folio_accesspro ||
+                    "",
+            });
+        }
+        // Hoja dedicada (REPOSICIÓN ACCESSPRO): la tarjeta se repone siempre
+        // aunque el folio venga vacío.
+        if (implicitType && cards.length === 0) {
+            cards.push({
+                type: implicitType,
+                folio: fields.folio_accesspro_repo || "",
+            });
         }
         return cards;
     }
@@ -346,8 +398,22 @@
         row: ParsedRow,
         fieldsOverride?: Record<string, string>,
     ) {
-        const fields = fieldsOverride ?? row.fields;
+        const fields = { ...(fieldsOverride ?? row.fields) };
         const type = SHEET_TO_TICKET_TYPE[sheetKey] ?? sheetKey;
+
+        // La hoja ALTAS ACCESSPRO siempre solicita la tarjeta AccessPRO:
+        // se inyecta accesspro_req para que ConfirmAltaModal la incluya.
+        if (sheetKey === "altas_accesspro" && !fields.accesspro_req) {
+            fields.accesspro_req = "sí";
+        }
+        // Las hojas AccessPRO de reposición/reporte fijan el tipo de tarjeta
+        if (sheetKey === "reposicion_accesspro" && !fields.reponer_accesspro) {
+            fields.reponer_accesspro = "sí";
+        }
+        if (sheetKey === "reporte_falla_accesspro" && !fields.tipo_tarjeta) {
+            fields.tipo_tarjeta = "AccessPRO";
+        }
+
         let priority = "media";
         if (fields.urgencia) {
             const urg = fields.urgencia.toLowerCase();
@@ -371,9 +437,17 @@
     function applyAltaResolutions(
         row: ParsedRow,
         analysis: AltaConflictAnalysis,
+        sheetKey: string,
     ): any[] {
         const modifiedFields = { ...row.fields };
         const extraTickets: any[] = [];
+
+        // La hoja ALTAS ACCESSPRO solicita la tarjeta implícitamente:
+        // se normaliza el campo para que el ticket la incluya siempre
+        // (a menos que el usuario elija omitirla en la resolución).
+        if (sheetKey === "altas_accesspro" && !modifiedFields.accesspro_req) {
+            modifiedFields.accesspro_req = "sí";
+        }
 
         for (const conflict of analysis.conflicts) {
             if (!conflict.requested) continue;
@@ -386,9 +460,12 @@
                 if (conflict.cardType === "P2000") {
                     delete modifiedFields.p2000_req;
                     delete modifiedFields.pisos_p2000;
-                } else {
+                } else if (conflict.cardType === "KONE") {
                     delete modifiedFields.kone_req;
                     delete modifiedFields.pisos_kone;
+                } else if (conflict.cardType === "AccessPRO") {
+                    delete modifiedFields.accesspro_req;
+                    delete modifiedFields.folio_accesspro;
                 }
 
                 // Si es conversión a reposición, crear ticket adicional
@@ -420,9 +497,10 @@
         const stillWantsKONE = ["sí", "si"].includes(
             (modifiedFields.kone_req ?? "").toLowerCase(),
         );
+        const stillWantsAccessPro = wantsAccessProCard(modifiedFields);
 
-        if (stillWantsP2000 || stillWantsKONE) {
-            extraTickets.unshift(buildTicketDef("altas", row, modifiedFields));
+        if (stillWantsP2000 || stillWantsKONE || stillWantsAccessPro) {
+            extraTickets.unshift(buildTicketDef(sheetKey, row, modifiedFields));
         }
 
         return extraTickets;
@@ -485,9 +563,17 @@
                 const rowKey = `${sheet.key}-${row.rowNumber}`;
                 if (!selectedRows.has(rowKey)) continue;
 
-                if (sheet.key === "altas" && altaAnalyses.has(rowKey)) {
+                if (
+                    (sheet.key === "altas" ||
+                        sheet.key === "altas_accesspro") &&
+                    altaAnalyses.has(rowKey)
+                ) {
                     const analysis = altaAnalyses.get(rowKey)!;
-                    const result = applyAltaResolutions(row, analysis);
+                    const result = applyAltaResolutions(
+                        row,
+                        analysis,
+                        sheet.key,
+                    );
                     tickets.push(...result);
                 } else if (
                     sheet.key === "modificaciones" &&
@@ -558,6 +644,7 @@
         "emerald" | "amber" | "rose" | "blue" | "violet" | "slate"
     > = {
         altas: "emerald",
+        altas_accesspro: "emerald",
         modificaciones: "amber",
         baja_persona: "rose",
         reposicion: "blue",
@@ -567,6 +654,7 @@
     const CARD_TYPE_COLORS: Record<string, string> = {
         P2000: "bg-amber-100 text-amber-700 border-amber-200",
         KONE: "bg-blue-100 text-blue-700 border-blue-200",
+        AccessPRO: "bg-emerald-100 text-emerald-700 border-emerald-200",
     };
 
 function cardStatusBadge(status: string): { text: string; color: "emerald" | "rose" | "slate" } {
@@ -881,10 +969,14 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                             <!-- Tabs por tipo de solicitud -->
                             {@const sheetTabs = [
                                 { key: 'altas', label: 'ALTAS' },
+                                { key: 'altas_accesspro', label: 'ALTAS ACCESSPRO' },
                                 { key: 'modificaciones', label: 'MODIFICACIONES' },
                                 { key: 'baja_persona', label: 'BAJA' },
+                                { key: 'baja_accesspro', label: 'BAJA ACCESSPRO' },
                                 { key: 'reposicion', label: 'REPOSICIÓN' },
+                                { key: 'reposicion_accesspro', label: 'REPO ACCESSPRO' },
                                 { key: 'reporte_falla', label: 'REPORTE FALLA' },
+                                { key: 'reporte_falla_accesspro', label: 'FALLA ACCESSPRO' },
                             ]}
                             <div class="flex gap-1.5 flex-wrap pb-2 px-1">
                                 {#each sheetTabs as tab}
@@ -965,7 +1057,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                 size={13}
                                                             />
                                                         </div>
-                                                    {:else if reviewSheetTab === "altas"}
+                                                    {:else if reviewSheetTab === "altas" || reviewSheetTab === "altas_accesspro"}
                                                         <div
                                                             class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0"
                                                         >
@@ -1007,7 +1099,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                     >{matches.length}
                                                                     coincidencia(s)</span
                                                                 >
-                                                            {:else if reviewSheetTab === "altas"}
+                                                            {:else if reviewSheetTab === "altas" || reviewSheetTab === "altas_accesspro"}
                                                                 · <span
                                                                     class="text-emerald-600 font-medium"
                                                                     >Persona nueva
@@ -1046,7 +1138,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                     class="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3"
                                                 >
                                                     <!-- ── TYPE: ALTAS (SMART) ── -->
-                                                    {#if reviewSheetTab === "altas" && altaAnalyses.has(rowKey)}
+                                                    {#if (reviewSheetTab === "altas" || reviewSheetTab === "altas_accesspro") && altaAnalyses.has(rowKey)}
                                                         {@const analysis =
                                                             altaAnalyses.get(
                                                                 rowKey,
@@ -1156,19 +1248,32 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                 </div>
                                                             </div>
 
-                                                            <!-- Pisos solicitados -->
+                                                            <!-- Pisos solicitados / Folio solicitado -->
                                                             {#each analysis.conflicts as conflict}
                                                                 {#if conflict.requested && conflict.requestedFloors}
-                                                                    <p
-                                                                        class="text-[10px] text-slate-500"
-                                                                    >
-                                                                        <span
-                                                                            class="font-semibold"
-                                                                            >Pisos
-                                                                            {conflict.cardType}:</span
+                                                                    {#if conflict.cardType === "AccessPRO"}
+                                                                        <p
+                                                                            class="text-[10px] text-slate-500"
                                                                         >
-                                                                        {conflict.requestedFloors}
-                                                                    </p>
+                                                                            <span
+                                                                                class="font-semibold"
+                                                                                >Folio
+                                                                                AccessPRO:</span
+                                                                            >
+                                                                            {conflict.requestedFloors}
+                                                                        </p>
+                                                                    {:else}
+                                                                        <p
+                                                                            class="text-[10px] text-slate-500"
+                                                                        >
+                                                                            <span
+                                                                                class="font-semibold"
+                                                                                >Pisos
+                                                                                {conflict.cardType}:</span
+                                                                            >
+                                                                            {conflict.requestedFloors}
+                                                                        </p>
+                                                                    {/if}
                                                                 {/if}
                                                             {/each}
 
@@ -1225,16 +1330,28 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                                         <p
                                                                                             class="text-[10px] text-slate-500"
                                                                                         >
-                                                                                            Dar
-                                                                                            alta
-                                                                                            solo
-                                                                                            de
-                                                                                            la(s)
-                                                                                            otra(s)
-                                                                                            tarjeta(s)
+                                                                                            {#if conflict.cardType === "AccessPRO"}
+                                                                                                La
+                                                                                                fila
+                                                                                                de
+                                                                                                alta
+                                                                                                se
+                                                                                                omitirá
+                                                                                                por
+                                                                                                completo
+                                                                                            {:else}
+                                                                                                Dar
+                                                                                                alta
+                                                                                                solo
+                                                                                                de
+                                                                                                la(s)
+                                                                                                otra(s)
+                                                                                                tarjeta(s)
+                                                                                            {/if}
                                                                                         </p>
                                                                                     </div>
                                                                                 </label>
+                                                                                {#if conflict.cardType !== "AccessPRO"}
                                                                                 <label
                                                                                     class="flex items-center gap-2 p-2 rounded-lg bg-white border border-amber-200 cursor-pointer hover:bg-amber-50 transition-colors"
                                                                                 >
@@ -1271,6 +1388,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                                         </p>
                                                                                     </div>
                                                                                 </label>
+                                                                                {/if}
                                                                                 <label
                                                                                     class="flex items-center gap-2 p-2 rounded-lg bg-white border border-amber-200 cursor-pointer hover:bg-amber-50 transition-colors"
                                                                                 >
@@ -1641,7 +1759,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         </div>
 
                                                         <!-- ── TYPE: ALTAS (NUEVA / SIN CONFLICTOS) ── -->
-                                                    {:else if reviewSheetTab === "altas"}
+                                                    {:else if reviewSheetTab === "altas" || reviewSheetTab === "altas_accesspro"}
                                                         {@const requestedCards =
                                                             getRequestedCards(
                                                                 row.fields,
@@ -1747,7 +1865,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         {/if}
 
                                                         <!-- ── TYPE: BAJA ── -->
-                                                    {:else if reviewSheetTab === "baja_persona"}
+                                                    {:else if reviewSheetTab === "baja_persona" || reviewSheetTab === "baja_accesspro"}
                                                         <div
                                                             class="rounded-lg bg-rose-50 border border-rose-100 p-3 space-y-1"
                                                         >
@@ -1778,10 +1896,14 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         </div>
 
                                                         <!-- ── TYPE: REPOSICIÓN ── -->
-                                                    {:else if reviewSheetTab === "reposicion"}
+                                                    {:else if reviewSheetTab === "reposicion" || reviewSheetTab === "reposicion_accesspro"}
                                                         {@const repoCards =
                                                             getReposicionCards(
                                                                 row.fields,
+                                                                reviewSheetTab ===
+                                                                    "reposicion_accesspro"
+                                                                    ? "AccessPRO"
+                                                                    : undefined,
                                                             )}
                                                         {#if repoCards.length > 0}
                                                             <div
@@ -1833,11 +1955,11 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         {/if}
 
                                                         <!-- ── TYPE: REPORTE DE FALLA ── -->
-                                                    {:else if reviewSheetTab === "reporte_falla"}
+                                                    {:else if reviewSheetTab === "reporte_falla" || reviewSheetTab === "reporte_falla_accesspro"}
                                                         <div
                                                             class="rounded-lg bg-violet-50 border border-violet-100 p-3 space-y-1"
                                                         >
-                                                            {#if row.fields.tipo_tarjeta}
+                                                            {#if row.fields.tipo_tarjeta || reviewSheetTab === "reporte_falla_accesspro"}
                                                                 <p
                                                                     class="text-xs text-violet-700"
                                                                 >
@@ -1845,8 +1967,11 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                         class="font-semibold"
                                                                         >Tarjeta:</span
                                                                     >
-                                                                    {row.fields
-                                                                        .tipo_tarjeta}
+                                                                    {reviewSheetTab ===
+                                                                    "reporte_falla_accesspro"
+                                                                        ? "AccessPRO"
+                                                                        : row.fields
+                                                                              .tipo_tarjeta}
                                                                     {row.fields
                                                                         .folio
                                                                         ? `(${row.fields.folio})`
@@ -1891,7 +2016,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                             {/if}
                                                         </div>
                                                     {/if}                                                    <!-- ── MATCH RESULTS (only for types WITHOUT smart analysis) ── -->
-                                                    {#if !(reviewSheetTab === "altas") && !(reviewSheetTab === "modificaciones" && modAnalyses.has(rowKey))}
+                                                    {#if !(reviewSheetTab === "altas") && !(reviewSheetTab === "altas_accesspro") && !(reviewSheetTab === "modificaciones" && modAnalyses.has(rowKey))}
                                                         {#if matches.length > 0}
                                                             <div
                                                                 class="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3"
@@ -2141,7 +2266,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                             .nombres}</strong
                                                                     >" en la base de
                                                                     datos.
-                                                                    {#if reviewSheetTab === "altas"}
+                                                                    {#if reviewSheetTab === "altas" || reviewSheetTab === "altas_accesspro"}
                                                                         Se creará
                                                                         como persona
                                                                         nueva al

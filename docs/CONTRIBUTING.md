@@ -145,7 +145,7 @@ scripts/supabase_setup.sql
 | Tabla | Propósito |
 |---|---|
 | `personnel` | Registro de personal operativo |
-| `cards` | Tarjetas de acceso (P2000, KONE) |
+| `cards` | Tarjetas de acceso (P2000, KONE, AccessPRO) |
 | `tickets` | Solicitudes (altas, bajas, modificaciones, reportes) |
 | `history_logs` | Auditoría de operaciones |
 | `profiles` | Perfiles de usuario vinculados a `auth.users` |
@@ -461,7 +461,7 @@ personnelState.highlightedCardId   // tarjeta resaltada (desde tickets)
 personnelState.extraCards          // tarjetas disponibles en inventario
 
 // Dashboard
-personnelState.dashboardStats      // { activePersonnel, koneStock, p2000Stock }
+personnelState.dashboardStats      // { activePersonnel, koneStock, p2000Stock, accessproStock }
 personnelState.dashboardMetrics    // DashboardMetrics (statusCounts, cardCoverage, etc.)
 personnelState.metricsLoading      // flag de carga de métricas
 
@@ -1034,7 +1034,7 @@ Usado en todas las vistas para búsqueda con debounce de 300ms.
 
 | Exportador | Archivo | Propósito |
 |---|---|---|
-| `exportPersonnelToExcel` | `xlsxPersonnel.ts` | Exportar personal a Excel |
+| `exportPersonnelToExcel` | `xlsxPersonnel.ts` | Exportar personal a Excel (columnas/KPIs por tipo de tarjeta vía `cardTypes`) |
 | `exportCardsToExcel` | `xlsxCards.ts` | Exportar tarjetas a Excel |
 | `exportHistoryToExcel` | `xlsxHistory.ts` | Exportar historial a Excel |
 | `exportResponsivasToExcel` | `xlsxResponsivas.ts` | Exportar responsivas a Excel |
@@ -1048,6 +1048,7 @@ Usado en todas las vistas para búsqueda con debounce de 300ms.
 | `parseTemplateFile` | `xlsxImporter.ts` | Parsear plantilla de tickets desde Excel |
 | `parseKoneUsageFile` | `xlsxKoneUsage.ts` | Parsear archivo de conteo KONE |
 | `generateRequestTemplate` | `xlsxTemplate.ts` | Generar plantilla Excel descargable |
+| `generateAccessProTemplate` | `xlsxTemplate.ts` | Generar plantilla completa AccessPRO (INSTRUCCIONES + ALTAS + BAJA + REPOSICIÓN + REPORTE FALLA) |
 
 **Utilidades ZIP:**
 
@@ -1689,7 +1690,7 @@ import { ACTION_NAMES, ACTION_COLORS, translateDetails } from "../constants/hist
 import { RESPONSIVA_LEGAL_TEXTS } from "../constants/legal";
 ```
 
-`RESPONSIVA_LEGAL_TEXTS` contiene arrays de párrafos para `KONE` y `P2000`, con placeholders `{nombre}`, `{numEmpleado}`, `{dependencia}`, `{folio}` que se reemplazan al generar el documento.
+`RESPONSIVA_LEGAL_TEXTS` contiene arrays de párrafos para `KONE`, `P2000` y `AccessPRO`, con placeholders `{nombre}`, `{numEmpleado}`, `{dependencia}`, `{folio}` que se reemplazan al generar el documento.
 
 ---
 

@@ -99,20 +99,28 @@ BEGIN
     SELECT COUNT(*) INTO total_count FROM personnel;
 
     WITH person_ready_cards AS (
-        SELECT p.id, p.status as db_status, COUNT(DISTINCT c.type) as ready_types
+        SELECT p.id, p.status as db_status,
+            COUNT(DISTINCT c.type) FILTER (
+                WHERE c.type IN ('P2000', 'KONE')
+                  AND c.status = 'active'
+                  AND c.programming_status = 'done'
+                  AND c.responsiva_status IN ('signed', 'legacy')
+            ) as core_ready_types,
+            BOOL_OR(c.type IN ('P2000', 'KONE')) as has_core_cards,
+            BOOL_OR(c.type = 'AccessPRO' AND c.status = 'active') as has_active_accesspro
         FROM personnel p
         LEFT JOIN cards c ON c.person_id = p.id
-            AND c.status = 'active'
-            AND c.programming_status = 'done'
-            AND c.responsiva_status IN ('signed', 'legacy')
         GROUP BY p.id, p.status
     ),
     computed_statuses AS (
         SELECT
             CASE
-                WHEN db_status = 'active' AND ready_types >= 2 THEN 'activo'
-                WHEN db_status = 'active' AND ready_types = 1 THEN 'parcial'
-                WHEN db_status = 'active' AND ready_types = 0 THEN 'inactivo'
+                WHEN db_status = 'active' AND core_ready_types >= 2 THEN 'activo'
+                WHEN db_status = 'active' AND core_ready_types = 1 THEN 'parcial'
+                WHEN db_status = 'active' AND core_ready_types = 0
+                     AND COALESCE(has_core_cards, false) = false
+                     AND COALESCE(has_active_accesspro, false) = true THEN 'activo'
+                WHEN db_status = 'active' AND core_ready_types = 0 THEN 'inactivo'
                 WHEN db_status = 'blocked' THEN 'bloqueado'
                 ELSE 'baja'
             END as final_status
@@ -213,6 +221,13 @@ AS $$
             SELECT COUNT(*)
             FROM cards
             WHERE type = 'P2000'
+              AND status = 'available'
+              AND person_id IS NULL
+        ),
+        'accessproStock', (
+            SELECT COUNT(*)
+            FROM cards
+            WHERE type = 'AccessPRO'
               AND status = 'available'
               AND person_id IS NULL
         )
@@ -670,14 +685,16 @@ CREATE INDEX IF NOT EXISTS "idx_enlaces_person_id"    ON "public"."enlaces" USIN
 CREATE OR REPLACE VIEW "public"."personnel_with_status" AS
 WITH "person_ready_cards" AS (
     SELECT "p_1"."id",
-        "count"(DISTINCT "c"."type") AS "ready_types"
+        "count"(DISTINCT "c"."type") FILTER (
+            WHERE ("c"."type" = ANY (ARRAY['P2000'::"text", 'KONE'::"text"]))
+              AND ("c"."status" = 'active'::"text")
+              AND ("c"."programming_status" = 'done'::"text")
+              AND ("c"."responsiva_status" = ANY (ARRAY['signed'::"text", 'legacy'::"text"]))
+        ) AS "core_ready_types",
+        "bool_or"("c"."type" = ANY (ARRAY['P2000'::"text", 'KONE'::"text"])) AS "has_core_cards",
+        "bool_or"(("c"."type" = 'AccessPRO'::"text") AND ("c"."status" = 'active'::"text")) AS "has_active_accesspro"
     FROM ("public"."personnel" "p_1"
-        LEFT JOIN "public"."cards" "c" ON (
-            ("c"."person_id" = "p_1"."id")
-            AND ("c"."status" = 'active'::"text")
-            AND ("c"."programming_status" = 'done'::"text")
-            AND ("c"."responsiva_status" = ANY (ARRAY['signed'::"text", 'legacy'::"text"]))
-        ))
+        LEFT JOIN "public"."cards" "c" ON ("c"."person_id" = "p_1"."id"))
     GROUP BY "p_1"."id"
 )
 SELECT "p"."id",
@@ -703,9 +720,12 @@ SELECT "p"."id",
     COALESCE("d"."name", 'N/A'::"text") AS "dependency_name",
     COALESCE("s"."name", 'Sin Horario'::"text") AS "schedule_name",
     CASE
-        WHEN (("p"."status" = 'active'::"text") AND ("prc"."ready_types" >= 2)) THEN 'Activo/a'::"text"
-        WHEN (("p"."status" = 'active'::"text") AND ("prc"."ready_types" = 1)) THEN 'Parcial'::"text"
-        WHEN (("p"."status" = 'active'::"text") AND ("prc"."ready_types" = 0)) THEN 'Sin Acceso'::"text"
+        WHEN (("p"."status" = 'active'::"text") AND ("prc"."core_ready_types" >= 2)) THEN 'Activo/a'::"text"
+        WHEN (("p"."status" = 'active'::"text") AND ("prc"."core_ready_types" = 1)) THEN 'Parcial'::"text"
+        WHEN (("p"."status" = 'active'::"text") AND ("prc"."core_ready_types" = 0)
+              AND (COALESCE("prc"."has_core_cards", false) = false)
+              AND (COALESCE("prc"."has_active_accesspro", false) = true)) THEN 'Activo/a'::"text"
+        WHEN (("p"."status" = 'active'::"text") AND ("prc"."core_ready_types" = 0)) THEN 'Sin Acceso'::"text"
         WHEN ("p"."status" = 'blocked'::"text") THEN 'Bloqueado/a'::"text"
         ELSE 'Baja'::"text"
     END AS "computed_status"

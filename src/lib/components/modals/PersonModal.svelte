@@ -57,6 +57,7 @@
             pisosP2000?: string[];
             pisosKone?: string[];
             specialAccesses?: string[];
+            folioAccessPro?: string;
         } | null;
         /** If set, only these card types can be added ('P2000', 'KONE') */
         allowedCardTypes?: string[] | null;
@@ -246,6 +247,24 @@
                     if (prefill.horario) diasHorario = prefill.horario;
                     if (prefill.horaEntrada) horaEntrada = prefill.horaEntrada;
                     if (prefill.horaSalida) horaSalida = prefill.horaSalida;
+
+                    // Tarjeta AccessPRO solicitada en el ticket de alta
+                    if (
+                        prefill.folioAccessPro &&
+                        !tarjetasAsignadas.some(
+                            (c) =>
+                                c.type === "AccessPRO" &&
+                                c.folio === prefill.folioAccessPro,
+                        )
+                    ) {
+                        tarjetasAsignadas = [
+                            ...tarjetasAsignadas,
+                            {
+                                type: "AccessPRO",
+                                folio: prefill.folioAccessPro,
+                            },
+                        ];
+                    }
                 }
 
                 lastLoadedPersonId = editingPerson.id;
@@ -278,6 +297,9 @@
                 pisosP2000 = prefill.pisosP2000 ?? [];
                 pisosKone = prefill.pisosKone ?? [];
                 accesosEspeciales = prefill.specialAccesses ?? [];
+                tarjetasAsignadas = prefill.folioAccessPro
+                    ? [{ type: "AccessPRO", folio: prefill.folioAccessPro }]
+                    : [];
                 lastLoadedPersonId = "__prefill__";
             });
         } else if (
@@ -772,7 +794,9 @@
                                     <Badge
                                         variant={card.type === "KONE"
                                             ? "blue"
-                                            : "amber"}>{card.type}</Badge
+                                            : card.type === "AccessPRO"
+                                              ? "emerald"
+                                              : "amber"}>{card.type}</Badge
                                     >
                                     <span
                                         class="text-sm font-bold text-slate-700"

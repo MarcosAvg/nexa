@@ -23,8 +23,8 @@
      * <CardItem type="KONE" folio="KNE-001" status="active" onBlock={handleBlock} />
      */
     type Props = {
-        /** Tipo de tarjeta: P2000 (puertas) o KONE (elevadores). */
-        type: "P2000" | "KONE";
+        /** Tipo de tarjeta: P2000 (puertas), KONE (elevadores) o AccessPRO (entrada). */
+        type: "P2000" | "KONE" | "AccessPRO";
         /** Folio único de la tarjeta. */
         folio: string;
         /** Estado de la tarjeta. @default "active" */
@@ -86,7 +86,13 @@
 >
     <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-3 flex-wrap">
-            <Badge variant={type === "KONE" ? "blue" : "amber"}>
+            <Badge
+                variant={type === "KONE"
+                    ? "blue"
+                    : type === "AccessPRO"
+                      ? "emerald"
+                      : "amber"}
+            >
                 {type}
             </Badge>
             <span class="text-sm font-bold text-slate-800">{folio}</span>

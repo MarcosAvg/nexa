@@ -22,7 +22,7 @@ export type CardConflictAction = "proceed" | "skip_card" | "convert_to_reposicio
 
 /** Análisis individual por tipo de tarjeta (ALTAS) */
 export interface AltaCardConflict {
-    cardType: "P2000" | "KONE";
+    cardType: "P2000" | "KONE" | "AccessPRO";
     /** Si la persona solicitó esta tarjeta en la plantilla */
     requested: boolean;
     /** Si la persona ya tiene una tarjeta de este tipo activa */
@@ -91,6 +91,18 @@ export type RowAnalysis = AltaConflictAnalysis | ModificacionConflictAnalysis;
 
 const YES_VALUES = ["sí", "si"];
 
+/**
+ * Detecta si una fila de alta solicita tarjeta AccessPRO.
+ * Puede ser explícito (columna accesspro_req = sí) o implícito
+ * (la hoja ALTAS ACCESSPRO solo pide el folio de la tarjeta).
+ */
+export function wantsAccessProCard(fields: Record<string, string>): boolean {
+    return (
+        YES_VALUES.includes((fields.accesspro_req ?? "").toLowerCase()) ||
+        (fields.folio_accesspro ?? "").trim().length > 0
+    );
+}
+
 function parseFloors(floorsStr: string | null | undefined): string[] {
     if (!floorsStr) return [];
     return String(floorsStr)
@@ -105,59 +117,94 @@ function parseFloors(floorsStr: string | null | undefined): string[] {
 /**
  * Analiza conflictos entre lo que se solicita en la fila de ALTAS
  * y lo que la persona coincidente ya tiene.
+ *
+ * @param onlyTypes Si se pasa, solo se analizan esos tipos de tarjeta
+ * (útil para la hoja ALTAS ACCESSPRO, que solo solicita AccessPRO).
  */
 export function analyzeAltaConflicts(
     rowKey: string,
     person: Person,
     fields: Record<string, string>,
+    onlyTypes?: Array<"P2000" | "KONE" | "AccessPRO">,
 ): AltaConflictAnalysis {
     const activeCards = (person.cards ?? []).filter((c) => c.status === "active");
 
     const wantsP2000 = YES_VALUES.includes((fields.p2000_req ?? "").toLowerCase());
     const wantsKONE = YES_VALUES.includes((fields.kone_req ?? "").toLowerCase());
+    // En la hoja ALTAS ACCESSPRO la tarjeta se solicita SIEMPRE
+    // (la hoja está dedicada a ese tipo); el folio es opcional.
+    const wantsAccessPro = onlyTypes?.includes("AccessPRO")
+        ? true
+        : wantsAccessProCard(fields);
 
     const p2000Card = activeCards.find((c) => c.type === "P2000");
     const koneCard = activeCards.find((c) => c.type === "KONE");
+    const accessproCard = activeCards.find((c) => c.type === "AccessPRO");
 
     const conflicts: AltaCardConflict[] = [];
 
     // P2000 analysis
-    const hasP2000Conflict = wantsP2000 && !!p2000Card;
-    conflicts.push({
-        cardType: "P2000",
-        requested: wantsP2000,
-        hasCard: !!p2000Card,
-        existingFolio: p2000Card?.folio,
-        existingCardId: p2000Card?.id,
-        existingStatus: p2000Card?.status,
-        requestedFloors: fields.pisos_p2000,
-        conflict: hasP2000Conflict,
-        description: hasP2000Conflict
-            ? `Ya tiene P2000 activa (${p2000Card!.folio})`
-            : wantsP2000
-              ? "No tiene P2000 — sin conflicto"
-              : "No solicitó P2000",
-        resolution: hasP2000Conflict ? "skip_card" : "proceed",
-    });
+    if (!onlyTypes || onlyTypes.includes("P2000")) {
+        const hasP2000Conflict = wantsP2000 && !!p2000Card;
+        conflicts.push({
+            cardType: "P2000",
+            requested: wantsP2000,
+            hasCard: !!p2000Card,
+            existingFolio: p2000Card?.folio,
+            existingCardId: p2000Card?.id,
+            existingStatus: p2000Card?.status,
+            requestedFloors: fields.pisos_p2000,
+            conflict: hasP2000Conflict,
+            description: hasP2000Conflict
+                ? `Ya tiene P2000 activa (${p2000Card!.folio})`
+                : wantsP2000
+                  ? "No tiene P2000 — sin conflicto"
+                  : "No solicitó P2000",
+            resolution: hasP2000Conflict ? "skip_card" : "proceed",
+        });
+    }
 
     // KONE analysis
-    const hasKONEConflict = wantsKONE && !!koneCard;
-    conflicts.push({
-        cardType: "KONE",
-        requested: wantsKONE,
-        hasCard: !!koneCard,
-        existingFolio: koneCard?.folio,
-        existingCardId: koneCard?.id,
-        existingStatus: koneCard?.status,
-        requestedFloors: fields.pisos_kone,
-        conflict: hasKONEConflict,
-        description: hasKONEConflict
-            ? `Ya tiene KONE activa (${koneCard!.folio})`
-            : wantsKONE
-              ? "No tiene KONE — sin conflicto"
-              : "No solicitó KONE",
-        resolution: hasKONEConflict ? "skip_card" : "proceed",
-    });
+    if (!onlyTypes || onlyTypes.includes("KONE")) {
+        const hasKONEConflict = wantsKONE && !!koneCard;
+        conflicts.push({
+            cardType: "KONE",
+            requested: wantsKONE,
+            hasCard: !!koneCard,
+            existingFolio: koneCard?.folio,
+            existingCardId: koneCard?.id,
+            existingStatus: koneCard?.status,
+            requestedFloors: fields.pisos_kone,
+            conflict: hasKONEConflict,
+            description: hasKONEConflict
+                ? `Ya tiene KONE activa (${koneCard!.folio})`
+                : wantsKONE
+                  ? "No tiene KONE — sin conflicto"
+                  : "No solicitó KONE",
+            resolution: hasKONEConflict ? "skip_card" : "proceed",
+        });
+    }
+
+    // AccessPRO analysis
+    if (!onlyTypes || onlyTypes.includes("AccessPRO")) {
+        const hasAccessProConflict = wantsAccessPro && !!accessproCard;
+        conflicts.push({
+            cardType: "AccessPRO",
+            requested: wantsAccessPro,
+            hasCard: !!accessproCard,
+            existingFolio: accessproCard?.folio,
+            existingCardId: accessproCard?.id,
+            existingStatus: accessproCard?.status,
+            requestedFloors: fields.folio_accesspro,
+            conflict: hasAccessProConflict,
+            description: hasAccessProConflict
+                ? `Ya tiene AccessPRO activa (${accessproCard!.folio})`
+                : wantsAccessPro
+                  ? "No tiene AccessPRO — sin conflicto"
+                  : "No solicitó AccessPRO",
+            resolution: hasAccessProConflict ? "skip_card" : "proceed",
+        });
+    }
 
     return {
         type: "altas",

@@ -22,7 +22,7 @@
     import { toast } from "svelte-sonner";
     import { handleError, exportResponsivasToExcel, exportResponsivasAllDependenciesAsZip } from "../utils";
     import { settingsState } from "../stores";
-    import { computeResponsivaManagement } from "../utils/xlsxResponsivas";
+    import { computeResponsivaManagement, matchesResponsivaFilters } from "../utils/xlsxResponsivas";
     import {
         ImportPreviewModal, ConfirmAltaModal, TicketImportedDetailsModal,
     } from "../components";
@@ -143,14 +143,9 @@
 
             return { ...t, personName, cardType, cardFolio, movementType: t.movementType, needsBaja, daysElapsed };
         })
-        .filter((t) => {
-            if (movementTypeFilter !== "Todas" && t.movementType !== movementTypeFilter) return false;
-            if (responsivaFilter === "Todas") return true;
-            if (t.type !== "Firma Responsiva" || t.daysElapsed == null) return false;
-            if (t.needsBaja) return responsivaFilter === "Baja de Registro";
-            if (t.daysElapsed >= settingsState.responsivaWarnDays) return responsivaFilter === "Por vencer";
-            return responsivaFilter === "Pendiente";
-        }),
+        .filter((t) =>
+            matchesResponsivaFilters(t, movementTypeFilter, responsivaFilter, settingsState.responsivaWarnDays),
+        ),
     );
 
     const ticketTypes = [
@@ -316,8 +311,43 @@
     async function handleExportResponsivas() {
         const loadingToast = toast.loading("Preparando exportación...");
         try {
-            const data =
-                await ticketService.fetchResponsivasForExport(ticketState.filters.dependencyId);
+            let data =
+                await ticketService.fetchResponsivasForExport(
+                    ticketState.filters.dependencyId,
+                    ticketState.filters.search,
+                );
+
+            // Aplicar los mismos filtros de la vista (tipo de movimiento + estado de responsiva),
+            // enriqueciendo cada ticket con needsBaja/daysElapsed como hace filteredTickets.
+            if (
+                movementTypeFilter !== "Todas" ||
+                responsivaFilter !== "Todas"
+            ) {
+                data = data
+                    .map((t: any) => {
+                        let needsBaja = false;
+                        let daysElapsed = 0;
+                        if (t.type === "Firma Responsiva" && t.created_at) {
+                            const mgmt = computeResponsivaManagement(
+                                t.movementType || "Sin clasificar",
+                                t.assignmentDate || t.created_at,
+                                t.created_at,
+                                settingsState.responsivaPickupDays
+                            );
+                            needsBaja = mgmt.needsBaja;
+                            daysElapsed = mgmt.daysElapsed;
+                        }
+                        return { ...t, needsBaja, daysElapsed };
+                    })
+                    .filter((t: any) =>
+                        matchesResponsivaFilters(
+                            t,
+                            movementTypeFilter,
+                            responsivaFilter,
+                            settingsState.responsivaWarnDays
+                        )
+                    );
+            }
 
             if (data.length === 0) {
                 toast.info("No hay responsivas pendientes para exportar", {

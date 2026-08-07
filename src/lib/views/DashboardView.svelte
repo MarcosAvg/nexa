@@ -32,6 +32,7 @@
     );
     let koneStock = $derived(personnelState.dashboardStats.koneStock);
     let p2000Stock = $derived(personnelState.dashboardStats.p2000Stock);
+    let accessproStock = $derived(personnelState.dashboardStats.accessproStock);
     let pendingSignaturesCount = $derived(
         pendingItems.filter((t) => t.type === "Firma Responsiva").length,
     );
@@ -386,7 +387,7 @@
                         </div>
                     </div>                        <!-- Stock en línea -->
                     <div class="pt-4 border-t border-slate-100/60">
-                        <div class="grid grid-cols-2 gap-3">
+                        <div class="grid grid-cols-3 gap-3">
                             <div
                                 class="bg-blue-50/60 rounded-xl p-3 text-center"
                             >
@@ -413,6 +414,20 @@
                                     class="text-xl font-black text-amber-700 tabular-nums"
                                 >
                                     {p2000Stock}
+                                </div>
+                            </div>
+                            <div
+                                class="bg-emerald-50/60 rounded-xl p-3 text-center"
+                            >
+                                <div
+                                    class="text-[10px] font-extrabold text-emerald-500 uppercase tracking-wider mb-0.5"
+                                >
+                                    Stock AccessPRO
+                                </div>
+                                <div
+                                    class="text-xl font-black text-emerald-700 tabular-nums"
+                                >
+                                    {accessproStock}
                                 </div>
                             </div>
                         </div>

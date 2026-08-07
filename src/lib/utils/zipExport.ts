@@ -14,7 +14,7 @@ import {
     exportCardlessRegistryToExcel,
     exportKoneUsageToExcel,
 } from './xlsxExport';
-import type { ExportOptions } from './xlsxExport';
+import type { ExportOptions, CardType } from './xlsxExport';
 import type { KoneUsageMatchResult } from './xlsxKoneUsage';
 
 export type ZipProgressCallback = (current: number, total: number, label: string) => void;
@@ -50,8 +50,9 @@ async function buildZip(
  */
 export async function exportPersonnelAllDependenciesAsZip(
     dependencies: { id: string; name: string }[],
-    globalFilters: { status?: string; search?: string } = {},
-    onProgress?: ZipProgressCallback
+    globalFilters: { status?: string; search?: string; buildingId?: string; buildingName?: string } = {},
+    onProgress?: ZipProgressCallback,
+    cardTypes?: CardType[]
 ): Promise<void> {
     const dateStr = new Date().toISOString().split('T')[0];
     const files: { buffer: ArrayBuffer; filename: string }[] = [];
@@ -65,6 +66,7 @@ export async function exportPersonnelAllDependenciesAsZip(
             globalFilters.search ?? '',
             globalFilters.status ?? 'Todos',
             dep.id,
+            globalFilters.buildingId ?? '',
         );
 
         if (data.length === 0) continue;
@@ -73,9 +75,11 @@ export async function exportPersonnelAllDependenciesAsZip(
             filters: {
                 status: globalFilters.status,
                 dependency: dep.name,
+                ...(globalFilters.buildingName ? { building: globalFilters.buildingName } : {}),
                 search: globalFilters.search,
             },
             splitByDependency: false,
+            ...(cardTypes && cardTypes.length > 0 ? { cardTypes } : {}),
         };
 
         const result = await exportPersonnelToExcel(data as any[], options, true);

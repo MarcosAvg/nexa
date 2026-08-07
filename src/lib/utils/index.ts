@@ -57,7 +57,10 @@ export {
 } from './xlsxKoneUsage';
 export type { KoneUsageEntry, KoneUsageMatchedEntry, KoneUsageMatchResult, DuplicateFolioInfo } from './xlsxKoneUsage';
 
-export { generateRequestTemplate, generateKoneUsageTemplate } from './xlsxTemplate';
+export { generateRequestTemplate, generateKoneUsageTemplate, generateAccessProTemplate } from './xlsxTemplate';
+
+export { computePersonStatus } from './personStatus';
+export type { StatusCardInput } from './personStatus';
 
 export { exportConflictReportToExcel } from './xlsxConflictReport';
 export type { ConflictReportInput } from './xlsxConflictReport';

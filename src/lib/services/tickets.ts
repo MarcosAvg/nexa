@@ -219,12 +219,25 @@ export const ticketService = {
     },
 
     async fetchResponsivasForExport(
-        dependencyId: string = ""
+        dependencyId: string = "",
+        search: string = ""
     ): Promise<(Ticket & { movementType: string; assignmentDate: string })[]> {
         return withErrorHandlingSafe(async () => {
             const personnelSelect = dependencyId
                 ? "personnel!inner(id, first_name, last_name, employee_no, dependency_id, created_at, dependencies(name))"
                 : "personnel(id, first_name, last_name, employee_no, dependency_id, created_at, dependencies(name))";
+
+            // Resolver IDs de personas para la búsqueda una sola vez (fuera del batch)
+            let searchPersonIds: string[] = [];
+            if (search) {
+                const terms = search.trim().split(/\s+/).filter(Boolean);
+                let peopleQuery = supabase.from("personnel").select("id");
+                for (const term of terms) {
+                    peopleQuery = peopleQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
+                }
+                const { data: people } = await peopleQuery;
+                searchPersonIds = people?.map(p => p.id) || [];
+            }
 
             const allData = await batchPaginate<any>(async (from, to) => {
                 let query = supabase
@@ -235,6 +248,14 @@ export const ticketService = {
 
                 if (dependencyId) {
                     query = query.eq("personnel.dependency_id", dependencyId);
+                }
+                if (search) {
+                    const searchTerm = `%${search}%`;
+                    if (searchPersonIds.length > 0) {
+                        query = query.or(`title.ilike.${searchTerm},description.ilike.${searchTerm},person_id.in.(${searchPersonIds.join(',')})`);
+                    } else {
+                        query = query.or(`title.ilike.${searchTerm},description.ilike.${searchTerm}`);
+                    }
                 }
 
                 return query

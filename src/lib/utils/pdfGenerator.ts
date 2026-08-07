@@ -4,7 +4,7 @@ import { RESPONSIVA_LEGAL_TEXT } from "../constants/legal";
 
 export async function generateCardPdf(
     folio: string,
-    type: "P2000" | "KONE"
+    type: "P2000" | "KONE" | "AccessPRO"
 ) {
     const { jsPDF } = await import("jspdf");
 
@@ -24,8 +24,16 @@ export async function generateCardPdf(
         doc.rect(0, 0, pageWidth, pageHeight, "F");
 
         // Color del tipo de tarjeta
-        const typeColor = type === "KONE" ? [14, 165, 233] : [245, 158, 11]; // Azul para KONE, Ámbar para P2000
-        const typeLabel = type === "KONE" ? "Elevadores" : "Puertas";
+        const typeColor = type === "KONE"
+            ? [14, 165, 233]
+            : type === "AccessPRO"
+              ? [16, 185, 129]
+              : [245, 158, 11]; // Azul KONE, Esmeralda AccessPRO, Ámbar P2000
+        const typeLabel = type === "KONE"
+            ? "Elevadores"
+            : type === "AccessPRO"
+              ? "Entrada"
+              : "Puertas";
 
         // Etiqueta de tipo (grande, centrada arriba)
         doc.setTextColor(typeColor[0], typeColor[1], typeColor[2]);

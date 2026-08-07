@@ -3,7 +3,7 @@
     import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature } from "lucide-svelte";
     import { userState, catalogState, settingsState } from "../stores";
     import { networkStore } from "../stores/network.svelte";
-    import { generateRequestTemplate, generateKoneUsageTemplate, handleError } from "../utils";
+    import { generateRequestTemplate, generateKoneUsageTemplate, generateAccessProTemplate, handleError } from "../utils";
     import { toast } from "svelte-sonner";
 
     let activeTab = $state<"catalogos" | "usuarios" | "responsiva">("catalogos");
@@ -45,6 +45,7 @@
 
     let isGeneratingTemplate = $state(false);
     let isGeneratingKoneTemplate = $state(false);
+    let isGeneratingAccessProTemplate = $state(false);
 
     async function handleGenerateTemplate() {
         isGeneratingTemplate = true;
@@ -71,6 +72,20 @@
             handleError(e, "Generar Plantilla KONE");
         } finally {
             isGeneratingKoneTemplate = false;
+        }
+    }
+
+    async function handleGenerateAccessProTemplate() {
+        isGeneratingAccessProTemplate = true;
+        const loadingToast = toast.loading("Generando plantilla de AccessPRO...");
+        try {
+            await generateAccessProTemplate({ buildings: buildings as any[], dependencies: dependencies as any[], specialAccesses: specialAccesses as any[], schedules: schedules as any[] });
+            toast.success("Plantilla generada correctamente", { id: loadingToast });
+        } catch (e) {
+            toast.dismiss(loadingToast);
+            handleError(e, "Generar Plantilla AccessPRO");
+        } finally {
+            isGeneratingAccessProTemplate = false;
         }
     }
 
@@ -123,6 +138,11 @@
                     onclick={handleGenerateKoneTemplate} disabled={isGeneratingKoneTemplate || !networkStore.isOnline}>
                     <FileDown size={18} strokeWidth={2.5} class="text-sky-500" />
                     {isGeneratingKoneTemplate ? "Generando..." : "Plantilla de Uso KONE"}
+                </button>
+                <button class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                    onclick={handleGenerateAccessProTemplate} disabled={isGeneratingAccessProTemplate || !networkStore.isOnline}>
+                    <FileDown size={18} strokeWidth={2.5} class="text-emerald-500" />
+                    {isGeneratingAccessProTemplate ? "Generando..." : "Plantilla AccessPRO"}
                 </button>
             </div>
         </Card>

@@ -1,6 +1,6 @@
 import { addLogoToSheet, autoRowHeight } from './xlsxShared';
 
-export async function exportCardsToExcel(data: any[], options?: { filters?: { status?: string; dependency?: string; search?: string } }) {
+export async function exportCardsToExcel(data: any[], options?: { filters?: { type?: string; status?: string; dependency?: string; search?: string } }) {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
         import('file-saver')
@@ -26,8 +26,14 @@ export async function exportCardsToExcel(data: any[], options?: { filters?: { st
     if (options?.filters?.search) {
         filterDescription = `      -  Búsqueda: "${options.filters.search}"`;
     }
+    if (options?.filters?.type && options.filters.type !== 'Todos') {
+        filterDescription += `  |  Tipo: ${options.filters.type}`;
+    }
     if (options?.filters?.status && options.filters.status !== 'Todas') {
         filterDescription += `  |  Estado: ${options.filters.status}`;
+    }
+    if (options?.filters?.dependency) {
+        filterDescription += `  |  Dependencia: ${options.filters.dependency}`;
     }
 
     worksheet.columns = [

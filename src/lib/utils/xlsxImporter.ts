@@ -6,10 +6,14 @@ import ExcelJS from 'exceljs';
 
 export type SheetKey =
     | 'altas'
+    | 'altas_accesspro'
     | 'modificaciones'
     | 'baja_persona'
+    | 'baja_accesspro'
     | 'reposicion'
-    | 'reporte_falla';
+    | 'reposicion_accesspro'
+    | 'reporte_falla'
+    | 'reporte_falla_accesspro';
 
 export interface ParsedRow {
     rowNumber: number;
@@ -151,6 +155,73 @@ const SHEET_CONFIG: Record<SheetKey, {
             { field: 'observaciones', label: 'Observaciones adicionales' },
         ],
     },
+    altas_accesspro: {
+        name: '✅ ALTAS ACCESSPRO',
+        label: 'Altas AccessPRO',
+        dataStartRow: 5,
+        cols: [
+            { field: 'apellidos', label: 'Apellidos', required: true },
+            { field: 'nombres', label: 'Nombres', required: true },
+            { field: 'no_empleado', label: 'No. Empleado' },
+            { field: 'dependencia', label: 'Dependencia', required: true },
+            { field: 'edificio', label: 'Edificio', required: true },
+            { field: 'piso_base', label: 'Piso Base', required: true },
+            { field: 'area', label: 'Área / Equipo' },
+            { field: 'puesto', label: 'Puesto' },
+            // El folio es OPCIONAL: el alta puede ser de una persona
+            // sin tarjeta asignada aún, o con su folio ya conocido.
+            { field: 'folio_accesspro', label: 'Folio AccessPRO' },
+            { field: 'horario', label: 'Horario', required: true },
+            { field: 'hora_entrada', label: 'Hora Entrada', required: true },
+            { field: 'hora_salida', label: 'Hora Salida', required: true },
+            { field: 'correo', label: 'Correo Electrónico' },
+        ],
+    },
+    baja_accesspro: {
+        name: '🚫 BAJA ACCESSPRO',
+        label: 'Bajas AccessPRO',
+        dataStartRow: 5,
+        cols: [
+            { field: 'apellidos', label: 'Apellidos', required: true },
+            { field: 'nombres', label: 'Nombres', required: true },
+            { field: 'no_empleado', label: 'No. Empleado' },
+            { field: 'dependencia', label: 'Dependencia', required: true },
+            { field: 'tipo_baja', label: 'Tipo de Baja', required: true },
+            { field: 'motivo', label: 'Motivo de la Baja', required: true },
+            { field: 'observaciones', label: 'Observaciones' },
+        ],
+    },
+    reposicion_accesspro: {
+        name: '🔄 REPOSICIÓN ACCESSPRO',
+        label: 'Reposiciones AccessPRO',
+        dataStartRow: 5,
+        cols: [
+            { field: 'apellidos', label: 'Apellidos', required: true },
+            { field: 'nombres', label: 'Nombres', required: true },
+            { field: 'no_empleado', label: 'No. Empleado' },
+            { field: 'dependencia', label: 'Dependencia', required: true },
+            { field: 'folio_accesspro_repo', label: 'Folio AccessPRO a reponer' },
+            { field: 'motivo', label: 'Motivo', required: true },
+            { field: 'observaciones', label: 'Observaciones' },
+        ],
+    },
+    reporte_falla_accesspro: {
+        name: '🔧 REPORTE FALLA ACCESSPRO',
+        label: 'Reportes Falla AccessPRO',
+        dataStartRow: 5,
+        cols: [
+            { field: 'apellidos', label: 'Apellidos', required: true },
+            { field: 'nombres', label: 'Nombres', required: true },
+            { field: 'no_empleado', label: 'No. Empleado' },
+            { field: 'dependencia', label: 'Dependencia', required: true },
+            { field: 'folio', label: 'Folio de Tarjeta' },
+            { field: 'ubicacion', label: 'Edificio / Lugar donde falla', required: true },
+            { field: 'descripcion', label: 'Descripción del Problema', required: true },
+            { field: 'desde_cuando', label: '¿Desde cuándo ocurre?' },
+            { field: 'urgencia', label: 'Urgencia', required: true },
+            { field: 'observaciones', label: 'Observaciones adicionales' },
+        ],
+    },
 };
 
 // ─────────────────────────────────────────
@@ -159,10 +230,14 @@ const SHEET_CONFIG: Record<SheetKey, {
 
 export const SHEET_TO_TICKET_TYPE: Record<SheetKey, string> = {
     altas: 'Alta de Persona',
+    altas_accesspro: 'Alta de Persona',
     modificaciones: 'Modificación',
     baja_persona: 'Baja de Persona',
+    baja_accesspro: 'Baja de Persona',
     reposicion: 'Reposición',
+    reposicion_accesspro: 'Reposición',
     reporte_falla: 'Reporte de Falla',
+    reporte_falla_accesspro: 'Reporte de Falla',
 };
 
 /** Formats an Excel cell value as a clean string.

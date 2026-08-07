@@ -149,7 +149,9 @@
                 ? snapshot.split("\n")
                 : card?.type?.toUpperCase() === "P2000"
                   ? RESPONSIVA_LEGAL_TEXTS.P2000
-                  : RESPONSIVA_LEGAL_TEXTS.KONE;
+                  : card?.type?.toUpperCase() === "AccessPRO"
+                    ? RESPONSIVA_LEGAL_TEXTS.AccessPRO
+                    : RESPONSIVA_LEGAL_TEXTS.KONE;
 
             const bgBase64 = (await getBase64Image(bgImage)) as string;
             await generateResponsivaPdf(
@@ -179,7 +181,11 @@
         isSigning = true;
         try {
             const typeKey =
-                card?.type?.toUpperCase() === "P2000" ? "P2000" : "KONE";
+                card?.type?.toUpperCase() === "P2000"
+                    ? "P2000"
+                    : card?.type?.toUpperCase() === "AccessPRO"
+                      ? "AccessPRO"
+                      : "KONE";
             const textToUse = RESPONSIVA_LEGAL_TEXTS[typeKey];
 
             const legalSnapshot = textToUse
@@ -244,7 +250,9 @@
                 ? "KONE - Torniquetes elevadores"
                 : card?.type === "P2000"
                   ? "P2000 - Puertas y estacionamiento"
-                  : card?.type || "Acceso Electrónico";
+                  : card?.type === "AccessPRO"
+                    ? "AccessPRO - Entrada de edificio"
+                    : card?.type || "Acceso Electrónico";
 
         const body = `Estimado/a ${data.nombre},
 
@@ -281,7 +289,9 @@ Control de Accesos - Nexa`;
                 ? snapshot.split("\n")
                 : card?.type?.toUpperCase() === "P2000"
                   ? RESPONSIVA_LEGAL_TEXTS.P2000
-                  : RESPONSIVA_LEGAL_TEXTS.KONE;
+                  : card?.type?.toUpperCase() === "AccessPRO"
+                    ? RESPONSIVA_LEGAL_TEXTS.AccessPRO
+                    : RESPONSIVA_LEGAL_TEXTS.KONE;
 
             const bgBase64 = (await getBase64Image(bgImage)) as string;
 

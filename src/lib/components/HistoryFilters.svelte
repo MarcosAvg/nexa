@@ -69,6 +69,7 @@
             <option value="Todos">Todos</option>
             <option value="P2000">P2000</option>
             <option value="KONE">KONE</option>
+            <option value="AccessPRO">AccessPRO</option>
         </Select>
     </div>
 

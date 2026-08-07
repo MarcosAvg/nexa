@@ -58,7 +58,8 @@
     let personnel = $derived(personnelState.pagination.items);
     let extraCards = $derived(personnelState.extraCards);
 
-    let cardType = $state<"P2000" | "KONE">("P2000");
+    type CardType = "P2000" | "KONE" | "AccessPRO";
+    let cardType = $state<CardType>("P2000");
     let searchQuery = $state("");
     let isSubmitting = $state(false);
     let confirmCreate = $state(false);
@@ -67,9 +68,9 @@
     // Sincronizar tipo de tarjeta al reemplazar o cuando allowedCardTypes restringe a un tipo
     $effect(() => {
         if (replacingCard) {
-            cardType = replacingCard.type as "P2000" | "KONE";
+            cardType = replacingCard.type as CardType;
         } else if (allowedCardTypes?.length === 1) {
-            cardType = allowedCardTypes[0] as "P2000" | "KONE";
+            cardType = allowedCardTypes[0] as CardType;
         }
     });
 
@@ -308,7 +309,7 @@
                 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
                 >Tipo de Acceso</span
             >
-            <div class="grid grid-cols-2 gap-2">
+            <div class="grid grid-cols-3 gap-2">
                 <button
                     type="button"
                     disabled={!!replacingCard}
@@ -355,6 +356,31 @@
                     {#if cardType === "KONE"}
                         <div
                             class="absolute -top-2 -right-2 bg-sky-500 text-white rounded-full p-0.5"
+                        >
+                            <CheckCircle2 size={14} />
+                        </div>
+                    {/if}
+                </button>
+
+                <button
+                    type="button"
+                    disabled={!!replacingCard}
+                    class="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all {cardType ===
+                    'AccessPRO'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm'
+                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'} {replacingCard &&
+                    cardType !== 'AccessPRO'
+                        ? 'opacity-50 cursor-not-allowed'
+                        : ''}"
+                    onclick={() => {
+                        if (!replacingCard) cardType = "AccessPRO";
+                    }}
+                >
+                    <span class="text-sm font-bold">AccessPRO</span>
+                    <span class="text-[10px] opacity-70">Entrada</span>
+                    {#if cardType === "AccessPRO"}
+                        <div
+                            class="absolute -top-2 -right-2 bg-emerald-500 text-white rounded-full p-0.5"
                         >
                             <CheckCircle2 size={14} />
                         </div>
