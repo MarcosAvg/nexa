@@ -47,6 +47,15 @@
         actionsWidth?: string;
         /** Función que retorna clases CSS condicionales por fila. */
         rowClass?: (row: any) => string;
+        /**
+         * Habilita arrastrar filas para reordenarlas (drag & drop nativo).
+         * onDrop recibe (fromIndex, toIndex) sobre el arreglo de datos original.
+         */
+        dnd?: {
+            onDrop: (from: number, to: number) => void;
+            /** Deshabilita el arrastre (ej. mientras se guarda el orden). */
+            disabled?: boolean;
+        };
     };
     let {
         data,
@@ -55,11 +64,51 @@
         mobileCard,
         actionsWidth = "140px",
         rowClass,
+        dnd,
     }: Props = $props();
 
     // Estado de ordenamiento
     let sortKey = $state<string | null>(null);
     let sortDirection = $state<"asc" | "desc" | null>(null);
+
+    // Estado interno del drag & drop de filas
+    let dragFromIndex = $state<number | null>(null);
+    let dragOverIndex = $state<number | null>(null);
+
+    function dragStart(e: DragEvent, index: number) {
+        if (!dnd || dnd.disabled) return;
+        e.dataTransfer!.effectAllowed = "move";
+        e.dataTransfer!.setData("text/plain", String(index));
+        dragFromIndex = index;
+        dragOverIndex = null;
+    }
+
+    function dragOver(e: DragEvent, index: number) {
+        if (!dnd || dragFromIndex === null) return;
+        e.preventDefault();
+        e.dataTransfer!.dropEffect = "move";
+        if (dragOverIndex !== index) dragOverIndex = index;
+    }
+
+    function dragLeave(e: DragEvent, index: number) {
+        // No limpiar si el puntero se mueve a un hijo de la fila (evita parpadeo)
+        const related = e.relatedTarget;
+        if (related instanceof Node && e.currentTarget instanceof Node && e.currentTarget.contains(related)) return;
+        if (dragOverIndex === index) dragOverIndex = null;
+    }
+
+    function dragDrop(e: DragEvent, index: number) {
+        if (!dnd || dragFromIndex === null) return;
+        e.preventDefault();
+        if (dragFromIndex !== index) dnd.onDrop(dragFromIndex, index);
+        dragFromIndex = null;
+        dragOverIndex = null;
+    }
+
+    function dragEnd() {
+        dragFromIndex = null;
+        dragOverIndex = null;
+    }
 
     let sortedData = $derived.by(() => {
         if (!sortKey || !sortDirection) return data;
@@ -240,9 +289,16 @@
                         </tr>
                     {/if}
 
-                    {#each visibleData as row (row.id || Math.random())}
+                    {#each visibleData as row, i (row.id || Math.random())}
+                        {@const rowIndex = startIndex + i}
                         <tr
-                            class="group transition-all duration-300 hover:bg-blue-50/30 even:bg-slate-50/30 {rowClass ? rowClass(row) : ''}"
+                            class="group transition-all duration-300 hover:bg-blue-50/30 even:bg-slate-50/30 {rowClass ? rowClass(row) : ''} {dnd && !dnd.disabled ? 'cursor-grab active:cursor-grabbing select-none' : ''} {dragFromIndex === rowIndex ? 'opacity-40' : ''} {dragFromIndex !== null && dragOverIndex === rowIndex && dragFromIndex !== rowIndex ? 'bg-blue-50/80!' : ''}"
+                            draggable={!!dnd && !dnd.disabled}
+                            ondragstart={(e) => dragStart(e, rowIndex)}
+                            ondragover={(e) => dragOver(e, rowIndex)}
+                            ondragleave={(e) => dragLeave(e, rowIndex)}
+                            ondrop={(e) => dragDrop(e, rowIndex)}
+                            ondragend={dragEnd}
                         >
                             {#each columns as column}
                                 <td
@@ -304,13 +360,19 @@
 
 <!-- Vista de tarjetas para móvil/tablet (visible en pantallas pequeñas/medianas) -->
 <div class="lg:hidden space-y-4">
-    {#each sortedData as row (row.id || Math.random())}
+    {#each sortedData as row, i (row.id || Math.random())}
         {#if mobileCard}
             {@render mobileCard(row)}
         {:else}
             <!-- Componente de tarjeta con lógica de estado interno simplificada -->
             <article
-                class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5 space-y-4 relative overflow-hidden transition-all duration-200"
+                class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5 space-y-4 relative overflow-hidden transition-all duration-200 {dnd && !dnd.disabled ? 'cursor-grab active:cursor-grabbing select-none' : ''}            {dragFromIndex === i ? 'opacity-40' : ''} {dragFromIndex !== null && dragOverIndex === i && dragFromIndex !== i ? 'bg-blue-50/80! ring-1 ring-blue-200' : ''}"
+                draggable={!!dnd && !dnd.disabled}
+                ondragstart={(e) => dragStart(e, i)}
+                ondragover={(e) => dragOver(e, i)}
+                ondragleave={(e) => dragLeave(e, i)}
+                ondrop={(e) => dragDrop(e, i)}
+                ondragend={dragEnd}
             >
                 <!-- Encabezado de tarjeta -->
                 <div class="flex items-start justify-between gap-3">

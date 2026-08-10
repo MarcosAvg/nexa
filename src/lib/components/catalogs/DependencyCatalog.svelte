@@ -6,7 +6,7 @@
     import Input from "../Input.svelte";
     import Modal from "../Modal.svelte";
     import DataTable from "../DataTable.svelte";
-    import { Plus, Edit2, Trash2 } from "lucide-svelte";
+    import { Plus, Edit2, Trash2, GripVertical } from "lucide-svelte";
 
     /**
      * DependencyCatalog — Gestión de dependencias (CRUD).
@@ -23,6 +23,9 @@
 
     let dependencies = $derived(catalogState.dependencies);
 
+    // Estado de reordenamiento (evita clics consecutivos en vuelo)
+    let isReordering = $state(false);
+
     // Add/Edit modal state
     let isModalOpen = $state(false);
     let editingId = $state<number | null>(null);
@@ -36,6 +39,26 @@
     async function fetchDependencies() {
         const data = await catalogService.fetchDependencies();
         catalogState.setDependencies(data);
+    }
+
+    /** Mueve un elemento de la posición `from` a la posición `to` y persiste el orden. */
+    async function handleDrop(from: number, to: number) {
+        if (isReordering || from === to) return;
+        const next = [...dependencies];
+        const [item] = next.splice(from, 1);
+        next.splice(to, 0, item);
+        isReordering = true;
+        // Actualización optimista: los desplegables reflejan el nuevo orden al instante
+        catalogState.setDependencies(next);
+        try {
+            await catalogService.reorderCatalog("dependencies", next);
+            toast.success("Orden actualizado");
+        } catch {
+            toast.error("Error al actualizar el orden");
+            await fetchDependencies();
+        } finally {
+            isReordering = false;
+        }
     }
 
     function openModal(dep?: any) {
@@ -97,10 +120,17 @@
         {/if}
     </div>
 
-    <DataTable data={dependencies} columns={[{ key: "name", label: "Nombre" }]}>
+    <DataTable
+        data={dependencies}
+        columns={[{ key: "name", label: "Nombre", sortable: false }]}
+        dnd={{ onDrop: handleDrop, disabled: isReordering }}
+    >
         {#snippet actions(row: any)}
             {#if canEdit}
                 <div class="flex justify-end gap-1">
+                    <span class="p-1.5 text-slate-300 group-hover:text-slate-400 cursor-grab transition-colors" title="Arrastrar para reordenar" aria-hidden="true">
+                        <GripVertical size={16} />
+                    </span>
                     <button class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" onclick={() => openModal(row)} title="Editar dependencia" aria-label="Editar dependencia">
                         <Edit2 size={16} />
                     </button>

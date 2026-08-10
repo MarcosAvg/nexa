@@ -6,7 +6,7 @@
     import Input from "../Input.svelte";
     import Modal from "../Modal.svelte";
     import DataTable from "../DataTable.svelte";
-    import { Plus, Edit2, Trash2, Key } from "lucide-svelte";
+    import { Plus, Edit2, Trash2, Key, GripVertical } from "lucide-svelte";
 
     /**
      * AccessCatalog — Gestión de accesos especiales (CRUD).
@@ -23,6 +23,9 @@
 
     let specialAccesses = $derived(catalogState.specialAccesses);
 
+    // Estado de reordenamiento (evita clics consecutivos en vuelo)
+    let isReordering = $state(false);
+
     // Add/Edit modal state
     let isModalOpen = $state(false);
     let editingId = $state<number | null>(null);
@@ -36,6 +39,26 @@
     async function fetchAccesses() {
         const data = await catalogService.fetchAccesses();
         catalogState.setSpecialAccesses(data);
+    }
+
+    /** Mueve un elemento de la posición `from` a la posición `to` y persiste el orden. */
+    async function handleDrop(from: number, to: number) {
+        if (isReordering || from === to) return;
+        const next = [...specialAccesses];
+        const [item] = next.splice(from, 1);
+        next.splice(to, 0, item);
+        isReordering = true;
+        // Actualización optimista: los desplegables reflejan el nuevo orden al instante
+        catalogState.setSpecialAccesses(next);
+        try {
+            await catalogService.reorderCatalog("special_accesses", next);
+            toast.success("Orden actualizado");
+        } catch {
+            toast.error("Error al actualizar el orden");
+            await fetchAccesses();
+        } finally {
+            isReordering = false;
+        }
     }
 
     function openModal(access?: any) {
@@ -108,11 +131,15 @@
 
     <DataTable
         data={specialAccesses}
-        columns={[{ key: "name", label: "Nombre", render: renderAccessName }]}
+        columns={[{ key: "name", label: "Nombre", render: renderAccessName, sortable: false }]}
+        dnd={{ onDrop: handleDrop, disabled: isReordering }}
     >
         {#snippet actions(row: any)}
             {#if canEdit}
                 <div class="flex justify-end gap-1">
+                    <span class="p-1.5 text-slate-300 group-hover:text-slate-400 cursor-grab transition-colors" title="Arrastrar para reordenar" aria-hidden="true">
+                        <GripVertical size={16} />
+                    </span>
                     <button class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" onclick={() => openModal(row)} title="Editar acceso especial" aria-label="Editar acceso especial">
                         <Edit2 size={16} />
                     </button>
