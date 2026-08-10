@@ -149,7 +149,7 @@
                 ? snapshot.split("\n")
                 : card?.type?.toUpperCase() === "P2000"
                   ? RESPONSIVA_LEGAL_TEXTS.P2000
-                  : card?.type?.toUpperCase() === "AccessPRO"
+                  : card?.type?.toUpperCase() === "ACCESSPRO"
                     ? RESPONSIVA_LEGAL_TEXTS.AccessPRO
                     : RESPONSIVA_LEGAL_TEXTS.KONE;
 
@@ -183,7 +183,7 @@
             const typeKey =
                 card?.type?.toUpperCase() === "P2000"
                     ? "P2000"
-                    : card?.type?.toUpperCase() === "AccessPRO"
+                    : card?.type?.toUpperCase() === "ACCESSPRO"
                       ? "AccessPRO"
                       : "KONE";
             const textToUse = RESPONSIVA_LEGAL_TEXTS[typeKey];
@@ -289,7 +289,7 @@ Control de Accesos - Nexa`;
                 ? snapshot.split("\n")
                 : card?.type?.toUpperCase() === "P2000"
                   ? RESPONSIVA_LEGAL_TEXTS.P2000
-                  : card?.type?.toUpperCase() === "AccessPRO"
+                  : card?.type?.toUpperCase() === "ACCESSPRO"
                     ? RESPONSIVA_LEGAL_TEXTS.AccessPRO
                     : RESPONSIVA_LEGAL_TEXTS.KONE;
 

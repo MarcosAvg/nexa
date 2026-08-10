@@ -48,7 +48,7 @@
         if (legalSnapshot) return legalSnapshot.split("\n");
         const typeKey = cardType?.toUpperCase() === "P2000"
             ? "P2000"
-            : cardType?.toUpperCase() === "AccessPRO"
+            : cardType?.toUpperCase() === "ACCESSPRO"
               ? "AccessPRO"
               : "KONE";
         return RESPONSIVA_LEGAL_TEXTS[typeKey];
