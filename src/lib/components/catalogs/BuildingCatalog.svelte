@@ -5,7 +5,7 @@
     import Button from "../Button.svelte";
     import Input from "../Input.svelte";
     import Modal from "../Modal.svelte";
-    import { Plus, Edit2, Trash2, Building2 } from "lucide-svelte";
+    import { Plus, Edit2, Trash2, Building2, GripVertical } from "lucide-svelte";
 
     /**
      * BuildingCatalog — Gestión de edificios con pisos (CRUD).
@@ -22,6 +22,14 @@
 
     let buildings = $derived(catalogState.buildings);
 
+    // Estado de reordenamiento (evita clics consecutivos en vuelo)
+    let isReordering = $state(false);
+
+    // Estado del drag & drop de tarjetas
+    let draggingIndex = $state<number | null>(null);
+    let dragOverIndex = $state<number | null>(null);
+
+
     // Add/Edit modal state
     let isModalOpen = $state(false);
     let editingId = $state<number | null>(null);
@@ -36,6 +44,60 @@
     async function fetchBuildings() {
         const data = await catalogService.fetchBuildings();
         catalogState.setBuildings(data);
+    }
+
+    /** Intercambia la tarjeta `from` con la `to` (drag & drop en grid) y persiste el orden. */
+    async function handleDrop(from: number, to: number) {
+        if (isReordering || from === to) return;
+        const next = [...buildings];
+        [next[from], next[to]] = [next[to], next[from]];
+        isReordering = true;
+        // Actualización optimista: los desplegables reflejan el nuevo orden al instante
+        catalogState.setBuildings(next);
+        try {
+            await catalogService.reorderCatalog("buildings", next);
+            toast.success("Orden actualizado");
+        } catch {
+            toast.error("Error al actualizar el orden");
+            await fetchBuildings();
+        } finally {
+            isReordering = false;
+        }
+    }
+
+    function buildingDragStart(e: DragEvent, index: number) {
+        if (isReordering) return;
+        e.dataTransfer!.effectAllowed = "move";
+        e.dataTransfer!.setData("text/plain", String(index));
+        draggingIndex = index;
+        dragOverIndex = null;
+    }
+
+    function buildingDragOver(e: DragEvent, index: number) {
+        if (draggingIndex === null || draggingIndex === index) return;
+        e.preventDefault();
+        e.dataTransfer!.dropEffect = "move";
+        if (dragOverIndex !== index) dragOverIndex = index;
+    }
+
+    function buildingDragLeave(e: DragEvent, index: number) {
+        // No limpiar si el puntero se mueve a un hijo de la tarjeta (evita parpadeo)
+        const related = e.relatedTarget;
+        if (related instanceof Node && e.currentTarget instanceof Node && e.currentTarget.contains(related)) return;
+        if (dragOverIndex === index) dragOverIndex = null;
+    }
+
+    function buildingDrop(e: DragEvent, index: number) {
+        if (draggingIndex === null) return;
+        e.preventDefault();
+        if (draggingIndex !== index) handleDrop(draggingIndex, index);
+        draggingIndex = null;
+        dragOverIndex = null;
+    }
+
+    function buildingDragEnd() {
+        draggingIndex = null;
+        dragOverIndex = null;
     }
 
     function openModal(building?: any) {
@@ -111,9 +173,18 @@
         {/if}
     </div>
 
-    <div class="grid sm:grid-cols-2 lg:grid-cols-2 gap-6">
-        {#each buildings as building}
-            <div class="group p-6 border border-slate-200/50 rounded-[24px] bg-white/40 hover:bg-white transition-all duration-500 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-2 gap-6" role="list">
+        {#each buildings as building, i}
+            <div
+                role="listitem"
+                class="group p-6 border border-slate-200/50 rounded-[24px] bg-white/40 hover:bg-white transition-all duration-500 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden {canEdit && !isReordering ? 'cursor-grab active:cursor-grabbing' : ''} {draggingIndex === i ? 'opacity-40' : ''} {draggingIndex !== null && dragOverIndex === i && draggingIndex !== i ? 'ring-2 ring-blue-400 border-blue-200 scale-[1.02]' : ''}"
+                draggable={canEdit && !isReordering}
+                ondragstart={(e) => buildingDragStart(e, i)}
+                ondragover={(e) => buildingDragOver(e, i)}
+                ondragleave={(e) => buildingDragLeave(e, i)}
+                ondrop={(e) => buildingDrop(e, i)}
+                ondragend={buildingDragEnd}
+            >
                 <div class="flex justify-between items-start mb-5 relative z-10">
                     <div>
                         <h4 class="font-extrabold text-slate-900 text-[16px] tracking-tight group-hover:text-blue-600 transition-colors">{building.name}</h4>
@@ -124,6 +195,9 @@
                     </div>
                     {#if canEdit}
                         <div class="flex gap-1.5">
+                            <span class="p-2.5 text-slate-300 group-hover:text-slate-400 cursor-grab transition-colors" title="Arrastrar para reordenar" aria-hidden="true">
+                                <GripVertical size={16} strokeWidth={2.5} />
+                            </span>
                             <button class="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50/80 rounded-xl transition-all active:scale-95" onclick={() => openModal(building)}>
                                 <Edit2 size={16} strokeWidth={2.5} />
                             </button>

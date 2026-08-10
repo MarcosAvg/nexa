@@ -6,7 +6,7 @@
     import Input from "../Input.svelte";
     import Modal from "../Modal.svelte";
     import DataTable from "../DataTable.svelte";
-    import { Plus, Edit2, Trash2, Calendar } from "lucide-svelte";
+    import { Plus, Edit2, Trash2, Calendar, GripVertical } from "lucide-svelte";
 
     /**
      * ScheduleCatalog — Gestión de horarios con días laborales (CRUD).
@@ -23,6 +23,9 @@
 
     let schedules = $derived(catalogState.schedules);
 
+    // Estado de reordenamiento (evita clics consecutivos en vuelo)
+    let isReordering = $state(false);
+
     // Add/Edit modal state
     let isModalOpen = $state(false);
     let editingId = $state<number | null>(null);
@@ -37,6 +40,26 @@
     async function fetchSchedules() {
         const data = await catalogService.fetchSchedules();
         catalogState.setSchedules(data);
+    }
+
+    /** Mueve un elemento de la posición `from` a la posición `to` y persiste el orden. */
+    async function handleDrop(from: number, to: number) {
+        if (isReordering || from === to) return;
+        const next = [...schedules];
+        const [item] = next.splice(from, 1);
+        next.splice(to, 0, item);
+        isReordering = true;
+        // Actualización optimista: los desplegables reflejan el nuevo orden al instante
+        catalogState.setSchedules(next);
+        try {
+            await catalogService.reorderCatalog("schedules", next);
+            toast.success("Orden actualizado");
+        } catch {
+            toast.error("Error al actualizar el orden");
+            await fetchSchedules();
+        } finally {
+            isReordering = false;
+        }
     }
 
     function openModal(schedule?: any) {
@@ -128,13 +151,17 @@
     <DataTable
         data={schedules}
         columns={[
-            { key: "name", label: "Nombre" },
-            { key: "days", label: "Días", render: renderDays },
+            { key: "name", label: "Nombre", sortable: false },
+            { key: "days", label: "Días", render: renderDays, sortable: false },
         ]}
+        dnd={{ onDrop: handleDrop, disabled: isReordering }}
     >
         {#snippet actions(row: any)}
             {#if canEdit}
                 <div class="flex justify-end gap-1">
+                    <span class="p-1.5 text-slate-300 group-hover:text-slate-400 cursor-grab transition-colors" title="Arrastrar para reordenar" aria-hidden="true">
+                        <GripVertical size={16} />
+                    </span>
                     <button class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" onclick={() => openModal(row)} title="Editar horario" aria-label="Editar horario">
                         <Edit2 size={16} />
                     </button>

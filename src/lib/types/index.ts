@@ -96,6 +96,8 @@ export interface UserProfile {
 export interface CatalogItem {
     id: string; // or number depending on DB
     name: string;
+    /** Posición personalizada para las listas desplegables. */
+    sort_order?: number;
     [key: string]: any;
 }
 
