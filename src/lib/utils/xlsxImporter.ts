@@ -179,8 +179,8 @@ const SHEET_CONFIG: Record<SheetKey, SheetConfig> = {
             { field: 'dependencia', label: 'Dependencia', required: true },
             { field: 'edificio', label: 'Edificio', required: true },
             { field: 'piso_base', label: 'Piso Base', required: true },
-            { field: 'area', label: 'Área / Equipo' },
-            { field: 'puesto', label: 'Puesto' },
+            { field: 'area', label: 'Área / Equipo', required: true },
+            { field: 'puesto', label: 'Puesto', required: true },
             // El folio es OPCIONAL: el alta puede ser de una persona
             // sin tarjeta asignada aún, o con su folio ya conocido.
             { field: 'folio_accesspro', label: 'Folio AccessPRO' },

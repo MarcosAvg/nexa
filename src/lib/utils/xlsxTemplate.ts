@@ -739,7 +739,7 @@ function buildAccessProInstructionsSheet(wb: ExcelJS.Workbook) {
     space();
 
     sectionTitle('📑  DESCRIPCIÓN DE CADA HOJA');
-    addRow('✅ ALTAS', 'Para dar de alta a personas que requieren tarjeta AccessPRO (acceso de entrada al edificio).\nEl campo "Folio AccessPRO" es OPCIONAL: si la persona ya tiene folio asignado, anótelo para que quede pre-cargado; si no, se le asignará uno en el proceso.');
+    addRow('✅ ALTAS', 'Para dar de alta a personas que requieren tarjeta AccessPRO (acceso de entrada al edificio).\n"Área / Equipo" y "Puesto" son OBLIGATORIOS. El campo "Folio AccessPRO" es OPCIONAL: si la persona ya tiene folio asignado, anótelo para que quede pre-cargado; si no, se le asignará uno en el proceso.');
     addRow('🚫 BAJA', 'Para dar de baja a una persona del sistema de accesos AccessPRO.\nEsta acción desactiva todos sus accesos.');
     addRow('🔄 REPOSICIÓN', 'Para solicitar la reposición de una tarjeta AccessPRO extraviada, dañada o robada.\nIndique el folio anterior de la tarjeta si lo conoce.');
     addRow('🔧 REPORTE FALLA', 'Para reportar cuando una tarjeta AccessPRO no funciona correctamente\n(no abre la entrada, el lector no la lee). El área de accesos verificará antes de determinar si se requiere reposición.');
@@ -1048,8 +1048,8 @@ function buildAltasAccessProSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
         { label: 'Dependencia', mandatory: true },
         { label: 'Edificio', mandatory: true },
         { label: 'Piso Base', mandatory: true },
-        { label: 'Área / Equipo' },
-        { label: 'Puesto' },
+        { label: 'Área / Equipo', mandatory: true },
+        { label: 'Puesto', mandatory: true },
         { label: 'Folio AccessPRO (opcional)' },
         { label: 'Horario', mandatory: true },
         { label: 'Hora Entrada', mandatory: true },
@@ -1058,7 +1058,7 @@ function buildAltasAccessProSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
     ]);
 
     const ROWS = 200;
-    paintDataRows(ws, 5, 5 + ROWS, 13, [1, 2, 4, 5, 6, 10, 11, 12]);
+    paintDataRows(ws, 5, 5 + ROWS, 13, [1, 2, 4, 5, 6, 7, 8, 10, 11, 12]);
 
     addDropdown(ws, 'D', 5, 5 + ROWS, refs.depsRef());
     addDropdown(ws, 'E', 5, 5 + ROWS, refs.buildingsRef());
