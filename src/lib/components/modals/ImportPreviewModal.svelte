@@ -26,6 +26,7 @@
         parseTemplateFile,
         SHEET_TO_TICKET_TYPE,
         FIELD_LABELS,
+        type SheetKey,
         type ImportParseResult,
         type ParsedSheet,
         type ParsedRow,
@@ -394,7 +395,7 @@
      * fieldsOverride permite modificar campos antes de crear el ticket.
      */
     function buildTicketDef(
-        sheetKey: string,
+        sheetKey: SheetKey,
         row: ParsedRow,
         fieldsOverride?: Record<string, string>,
     ) {
@@ -437,7 +438,7 @@
     function applyAltaResolutions(
         row: ParsedRow,
         analysis: AltaConflictAnalysis,
-        sheetKey: string,
+        sheetKey: SheetKey,
     ): any[] {
         const modifiedFields = { ...row.fields };
         const extraTickets: any[] = [];

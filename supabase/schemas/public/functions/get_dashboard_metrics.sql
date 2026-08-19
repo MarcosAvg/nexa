@@ -1,68 +1,8 @@
--- =============================================================
--- UPDATE ACCESSPRO — Objetos SQL modificados para el nuevo tipo
--- de tarjeta AccessPRO. Re-ejecutar en el SQL Editor de Supabase.
--- Idempotente (CREATE OR REPLACE). Ejecutar los 3 bloques.
--- =============================================================
-
--- 1/3. Vista personnel_with_status: regla de estado con AccessPRO
-CREATE OR REPLACE VIEW "public"."personnel_with_status" AS
-WITH "person_ready_cards" AS (
-    SELECT "p_1"."id",
-        "count"(DISTINCT "c"."type") FILTER (
-            WHERE ("c"."type" = ANY (ARRAY['P2000'::"text", 'KONE'::"text"]))
-              AND ("c"."status" = 'active'::"text")
-              AND ("c"."programming_status" = 'done'::"text")
-              AND ("c"."responsiva_status" = ANY (ARRAY['signed'::"text", 'legacy'::"text"]))
-        ) AS "core_ready_types",
-        "bool_or"("c"."type" = ANY (ARRAY['P2000'::"text", 'KONE'::"text"])) AS "has_core_cards",
-        "bool_or"(("c"."type" = 'AccessPRO'::"text") AND ("c"."status" = 'active'::"text")) AS "has_active_accesspro"
-    FROM ("public"."personnel" "p_1"
-        LEFT JOIN "public"."cards" "c" ON ("c"."person_id" = "p_1"."id"))
-    GROUP BY "p_1"."id"
-)
-SELECT "p"."id",
-    "p"."first_name",
-    "p"."last_name",
-    "p"."employee_no",
-    "p"."email",
-    "p"."area",
-    "p"."position",
-    "p"."dependency_id",
-    "p"."building_id",
-    "p"."floor",
-    "p"."floors_p2000",
-    "p"."floors_kone",
-    "p"."schedule_id",
-    "p"."entry_time",
-    "p"."exit_time",
-    "p"."special_accesses",
-    "p"."status",
-    "p"."photo_url",
-    "p"."created_at",
-    COALESCE("b"."name", 'N/A'::"text") AS "building_name",
-    COALESCE("d"."name", 'N/A'::"text") AS "dependency_name",
-    COALESCE("s"."name", 'Sin Horario'::"text") AS "schedule_name",
-    CASE
-        WHEN (("p"."status" = 'active'::"text") AND ("prc"."core_ready_types" >= 2)) THEN 'Activo/a'::"text"
-        WHEN (("p"."status" = 'active'::"text") AND ("prc"."core_ready_types" = 1)) THEN 'Parcial'::"text"
-        WHEN (("p"."status" = 'active'::"text") AND ("prc"."core_ready_types" = 0)
-              AND (COALESCE("prc"."has_core_cards", false) = false)
-              AND (COALESCE("prc"."has_active_accesspro", false) = true)) THEN 'Activo/a'::"text"
-        WHEN (("p"."status" = 'active'::"text") AND ("prc"."core_ready_types" = 0)) THEN 'Sin Acceso'::"text"
-        WHEN ("p"."status" = 'blocked'::"text") THEN 'Bloqueado/a'::"text"
-        ELSE 'Baja'::"text"
-    END AS "computed_status"
-FROM (((("public"."personnel" "p"
-    LEFT JOIN "person_ready_cards" "prc" ON (("prc"."id" = "p"."id")))
-    LEFT JOIN "public"."buildings" "b" ON (("b"."id" = "p"."building_id")))
-    LEFT JOIN "public"."dependencies" "d" ON (("d"."id" = "p"."dependency_id")))
-    LEFT JOIN "public"."schedules" "s" ON (("s"."id" = "p"."schedule_id")));
-
--- 2/3. RPC get_dashboard_metrics: misma regla en statusCounts
-CREATE OR REPLACE FUNCTION "public"."get_dashboard_metrics"()
-RETURNS json
-LANGUAGE "plpgsql" SECURITY DEFINER
-AS $$
+create or replace function public.get_dashboard_metrics()
+  returns json
+  language plpgsql
+  set search_path to 'public', 'extensions'
+  AS $function$
 DECLARE
     total_count integer;
     status_counts json;
@@ -171,45 +111,8 @@ BEGIN
         'dataQuality', data_quality
     );
 END;
-$$;
+$function$;
 
+grant execute on function "public"."get_dashboard_metrics"() to "authenticated", "postgres", "service_role";
 
--- 3/3. RPC get_dashboard_stats: + accessproStock
-CREATE OR REPLACE FUNCTION "public"."get_dashboard_stats"()
-RETURNS json
-LANGUAGE "sql" STABLE SECURITY DEFINER
-AS $$
-    SELECT json_build_object(
-        'activePersonnel', (
-            SELECT COUNT(DISTINCT p.id)
-            FROM personnel p
-            INNER JOIN cards c ON c.person_id = p.id
-            WHERE p.status = 'active'
-              AND c.status = 'active'
-              AND c.programming_status = 'done'
-              AND c.responsiva_status IN ('signed', 'legacy')
-        ),
-        'koneStock', (
-            SELECT COUNT(*)
-            FROM cards
-            WHERE type = 'KONE'
-              AND status = 'available'
-              AND person_id IS NULL
-        ),
-        'p2000Stock', (
-            SELECT COUNT(*)
-            FROM cards
-            WHERE type = 'P2000'
-              AND status = 'available'
-              AND person_id IS NULL
-        ),
-        'accessproStock', (
-            SELECT COUNT(*)
-            FROM cards
-            WHERE type = 'AccessPRO'
-              AND status = 'available'
-              AND person_id IS NULL
-        )
-    );
-$$;
-
+revoke all on function "public"."get_dashboard_metrics"() from public;

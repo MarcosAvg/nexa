@@ -4,6 +4,8 @@ export interface Enlace {
     person_id: string;
     extension: string;
     created_at: string;
+    building?: string;
+    floor?: string;
     personnel?: Person;
 }
 

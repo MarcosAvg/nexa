@@ -91,6 +91,7 @@ $RECYCLE.BIN/
 .freebuff/
 
 # ─── Archivos de proyecto específicos ─────────────────────────────────────────
+.opencode/
 *.local
 *.tgz
 *.tar.gz

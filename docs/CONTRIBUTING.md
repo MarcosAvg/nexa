@@ -106,7 +106,7 @@ src/
 │   └── types/                     # Tipos compartidos
 ├── assets/                        # Imágenes, fuentes, etc.
 scripts/
-└── supabase_setup.sql             # Script completo de base de datos
+└── (scripts auxiliares no versionan el esquema)
 ```
 
 ### Capas y responsabilidades
@@ -133,11 +133,12 @@ Vista ← Store.$state    ← Service retorna datos
 
 ### Esquema
 
-El proyecto usa Supabase con PostgreSQL. Todas las tablas, funciones,
-triggers, políticas RLS y permisos están en un solo script:
+El proyecto usa Supabase con PostgreSQL. El esquema se mantiene como archivos
+declarativos y los cambios desplegables como migraciones versionadas:
 
 ```
-scripts/supabase_setup.sql
+supabase/schemas/
+supabase/migrations/
 ```
 
 ### Tablas principales
@@ -163,19 +164,17 @@ scripts/supabase_setup.sql
 - **operator** — CRUD en datos operativos, solo lectura en catálogos
 - **viewer** — solo lectura
 
-### Cómo ejecutar el setup
+### Cómo trabajar con el esquema
 
-1. Abrir el **SQL Editor** de Supabase
-2. Copiar el contenido de `scripts/supabase_setup.sql`
-3. Ejecutar como usuario `postgres` o `service_role`
-4. Configurar el trigger de nuevo usuario desde la UI:
-   - **Authentication → Triggers → Create trigger**
-   - Trigger: `on_auth_user_created`
-   - Table: `auth.users`
-   - Function: `public.handle_new_user()`
-   - Event: `INSERT`
+1. Ejecutar `supabase start` para levantar el entorno local.
+2. Revisar o editar los archivos de `supabase/schemas/`.
+3. Generar una migración con `supabase db diff -f nombre_del_cambio`.
+4. Revisar la migración antes de aplicarla.
+5. Ejecutar `supabase migration up` localmente.
+6. Desplegar con `supabase db push` únicamente después de validar.
 
-> El script es **idempotente** — se puede ejecutar múltiples veces sin errores.
+> No se debe modificar el esquema productivo directamente desde el SQL Editor
+> sin capturar después el cambio en los archivos versionados.
 
 ---
 

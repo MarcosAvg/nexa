@@ -36,8 +36,14 @@
     let dependencyNames = $derived(dependencies.map((d) => d.name));
 
     let availableFloors = $derived.by(() => {
-        const floors = new Set(enlaces.map(e => e.personnel?.floor).filter(Boolean).filter(f => f !== "N/A"));
-        return Array.from(floors).sort((a, b) => (a as string).localeCompare(b as string, undefined, { numeric: true, sensitivity: 'base' }));
+        const floors = new Set(
+            enlaces
+                .map((e) => e.personnel?.floor)
+                .filter((floor): floor is string => Boolean(floor) && floor !== "N/A"),
+        );
+        return Array.from(floors).sort((a, b) =>
+            a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+        );
     });
 
     async function loadData() {

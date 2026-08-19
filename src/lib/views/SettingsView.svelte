@@ -127,6 +127,7 @@
                     </div>
                     Responsiva
                 </button>
+            </nav>
             <div class="p-4 border-t border-slate-100/60">
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-3">Herramientas</p>
                 <button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
