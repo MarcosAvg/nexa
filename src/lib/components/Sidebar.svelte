@@ -141,7 +141,7 @@
                     class="w-full flex items-center {uiState.isSidebarCondensed ? 'justify-center px-0' : 'gap-3 px-4'} py-2.5 mb-3 rounded-xl transition-all duration-300 border {uiState.isDirectEditMode ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 shadow-[inset_0_0_12px_rgba(245,158,11,0.2)]' : 'bg-transparent border-transparent text-slate-500 hover:bg-slate-800/50 hover:text-slate-300'}"
                     title={uiState.isSidebarCondensed ? (uiState.isDirectEditMode ? 'Modo Edición Directa: ACTIVO' : 'Modo Edición Directa: INACTIVO') : undefined}
                 >
-                    <Wrench size={16} strokeWidth={2.5} class="{uiState.isDirectEditMode ? 'animate-pulse' : ''}" />
+                    <Wrench size={16} strokeWidth={2.5} class={uiState.isDirectEditMode ? "animate-pulse" : ""} />
                     {#if !uiState.isSidebarCondensed}
                         <span class="text-[11px] font-extrabold tracking-wider uppercase">Editor Directo</span>
                         <div class="ml-auto flex items-center justify-center">

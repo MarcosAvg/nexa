@@ -84,6 +84,12 @@ interface PersonSimplified {
     first_name: string;
     dependency: string;
     building: string;
+    area?: string;
+    position?: string;
+    schedule?: {
+        entry?: string;
+        exit?: string;
+    } | null;
 }
 
 // ─────────────────────────────────────────
