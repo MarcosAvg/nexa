@@ -8,32 +8,36 @@ create or replace function public.get_dashboard_stats()
         'activePersonnel', (
             SELECT COUNT(DISTINCT p.id)
             FROM personnel p
-            INNER JOIN cards c ON c.person_id = p.id
+            INNER JOIN access_media am ON am.person_id = p.id
+            INNER JOIN access_media_types t ON t.id = am.media_type_id
             WHERE p.status = 'active'
-              AND c.status = 'active'
-              AND c.programming_status = 'done'
-              AND c.responsiva_status IN ('signed', 'legacy')
+              AND am.status = 'active'
+              AND am.programming_status = 'done'
+              AND am.responsiva_status IN ('signed', 'legacy')
         ),
         'koneStock', (
             SELECT COUNT(*)
-            FROM cards
-            WHERE type = 'KONE'
-              AND status = 'available'
-              AND person_id IS NULL
+            FROM access_media am
+            INNER JOIN access_media_types t ON t.id = am.media_type_id
+            WHERE t.key = 'kone'
+              AND am.status = 'available'
+              AND am.person_id IS NULL
         ),
         'p2000Stock', (
             SELECT COUNT(*)
-            FROM cards
-            WHERE type = 'P2000'
-              AND status = 'available'
-              AND person_id IS NULL
+            FROM access_media am
+            INNER JOIN access_media_types t ON t.id = am.media_type_id
+            WHERE t.key = 'p2000'
+              AND am.status = 'available'
+              AND am.person_id IS NULL
         ),
         'accessproStock', (
             SELECT COUNT(*)
-            FROM cards
-            WHERE type = 'AccessPRO'
-              AND status = 'available'
-              AND person_id IS NULL
+            FROM access_media am
+            INNER JOIN access_media_types t ON t.id = am.media_type_id
+            WHERE t.key = 'accesspro'
+              AND am.status = 'available'
+              AND am.person_id IS NULL
         )
     );
 $function$;

@@ -111,8 +111,8 @@
                 personName = t.payload.relatedPerson.name;
             }
 
-            let cardType = t.cards?.type || t.cardType;
-            let cardFolio = t.cards?.folio || t.cardFolio;
+            let cardType = t.cardType || t.cards?.type;
+            let cardFolio = t.cardFolio || t.cards?.folio;
 
             if (!cardFolio && t.payload) {
                 if (t.payload.folio_p2000) {

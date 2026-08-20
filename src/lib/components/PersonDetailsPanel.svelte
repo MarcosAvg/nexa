@@ -25,6 +25,7 @@
 
     import { cardService } from "../services/cards";
     import { responsivaService } from "../services/responsiva";
+    import { accessAssignmentService } from "../services/accessAssignments";
     import { personnelState } from "../stores";
     import { uiState } from "../stores/ui.svelte";
     import type { Person } from "../types";
@@ -106,11 +107,31 @@
     let signedResponsivas = $state<any[]>([]);
     let selectedSignature = $state("");
 
+    // Pisos leídos del modelo nuevo (access_assignments), con fallback a las
+    // columnas legacy de personnel.
+    let floorsP2000 = $state<string[]>([]);
+    let floorsKone = $state<string[]>([]);
+
     $effect(() => {
         if (isOpen && person?.id) {
             loadResponsivas();
+            loadFloors();
         }
     });
+
+    async function loadFloors() {
+        if (!person?.id) return;
+        const legacyP2000 = person.floors_p2000 || [];
+        const legacyKone = person.floors_kone || [];
+        try {
+            const floors = await accessAssignmentService.fetchFloorsForPerson(person.id);
+            floorsP2000 = floors.p2000?.length ? floors.p2000 : legacyP2000;
+            floorsKone = floors.kone?.length ? floors.kone : legacyKone;
+        } catch {
+            floorsP2000 = legacyP2000;
+            floorsKone = legacyKone;
+        }
+    }
 
     async function loadResponsivas() {
         if (!person?.id) return;
@@ -404,7 +425,7 @@
                 </div>
 
                 <!-- Pisos Asignados -->
-                {#if (person.floors_p2000 && person.floors_p2000.length > 0) || (person.floors_kone && person.floors_kone.length > 0)}
+                {#if floorsP2000.length > 0 || floorsKone.length > 0}
                     <div class="pt-3 border-t border-slate-200 space-y-3">
                         <span
                             class="text-xs font-bold text-slate-500 uppercase tracking-wider block"
@@ -412,28 +433,28 @@
                             Pisos Asignados
                         </span>
 
-                        {#if person.floors_p2000 && person.floors_p2000.length > 0}
+                        {#if floorsP2000.length > 0}
                             <div class="space-y-1">
                                 <span
                                     class="text-[10px] font-bold text-slate-400 uppercase tracking-tight"
                                     >P2000 (Puertas)</span
                                 >
                                 <div class="flex flex-wrap gap-1.5">
-                                    {#each person.floors_p2000 as flr}
+                                    {#each floorsP2000 as flr}
                                         <Badge variant="amber">{flr}</Badge>
                                     {/each}
                                 </div>
                             </div>
                         {/if}
 
-                        {#if person.floors_kone && person.floors_kone.length > 0}
+                        {#if floorsKone.length > 0}
                             <div class="space-y-1">
                                 <span
                                     class="text-[10px] font-bold text-slate-400 uppercase tracking-tight"
                                     >KONE (Elevadores)</span
                                 >
                                 <div class="flex flex-wrap gap-1.5">
-                                    {#each person.floors_kone as flr}
+                                    {#each floorsKone as flr}
                                         <Badge variant="blue">{flr}</Badge>
                                     {/each}
                                 </div>

@@ -1,8 +1,60 @@
-create or replace function public.get_dashboard_metrics()
-  returns json
-  language plpgsql
-  set search_path to 'public', 'extensions'
-  AS $function$
+-- Rewrite dashboard metrics to read the generic access_media model instead of
+-- the legacy cards table. The return shape is unchanged so the frontend does
+-- not need changes. Both functions remain SECURITY INVOKER.
+
+BEGIN;
+
+CREATE OR REPLACE FUNCTION public.get_dashboard_stats()
+RETURNS json
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = public, extensions
+AS $function$
+    SELECT json_build_object(
+        'activePersonnel', (
+            SELECT COUNT(DISTINCT p.id)
+            FROM personnel p
+            INNER JOIN access_media am ON am.person_id = p.id
+            INNER JOIN access_media_types t ON t.id = am.media_type_id
+            WHERE p.status = 'active'
+              AND am.status = 'active'
+              AND am.programming_status = 'done'
+              AND am.responsiva_status IN ('signed', 'legacy')
+        ),
+        'koneStock', (
+            SELECT COUNT(*)
+            FROM access_media am
+            INNER JOIN access_media_types t ON t.id = am.media_type_id
+            WHERE t.key = 'kone'
+              AND am.status = 'available'
+              AND am.person_id IS NULL
+        ),
+        'p2000Stock', (
+            SELECT COUNT(*)
+            FROM access_media am
+            INNER JOIN access_media_types t ON t.id = am.media_type_id
+            WHERE t.key = 'p2000'
+              AND am.status = 'available'
+              AND am.person_id IS NULL
+        ),
+        'accessproStock', (
+            SELECT COUNT(*)
+            FROM access_media am
+            INNER JOIN access_media_types t ON t.id = am.media_type_id
+            WHERE t.key = 'accesspro'
+              AND am.status = 'available'
+              AND am.person_id IS NULL
+        )
+    );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_dashboard_metrics()
+RETURNS json
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public, extensions
+AS $function$
 DECLARE
     total_count integer;
     status_counts json;
@@ -122,6 +174,4 @@ BEGIN
 END;
 $function$;
 
-grant execute on function "public"."get_dashboard_metrics"() to "authenticated", "postgres", "service_role";
-
-revoke all on function "public"."get_dashboard_metrics"() from public;
+COMMIT;

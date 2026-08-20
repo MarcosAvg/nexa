@@ -85,6 +85,36 @@ async function fetchCardAssignmentTypes(
     return result;
 }
 
+async function enrichWithAccessMedia(tickets: any[]): Promise<any[]> {
+    const cardIds = tickets.map((t) => t.card_id).filter(Boolean) as string[];
+    if (cardIds.length === 0) return tickets;
+
+    const uniqueIds = [...new Set(cardIds)];
+    const { data } = await supabase
+        .from("access_media")
+        .select("legacy_card_id, identifier, access_media_types(name)")
+        .in("legacy_card_id", uniqueIds);
+
+    const byCardId = new Map<string, { type: string; folio: string }>();
+    for (const m of data || []) {
+        if (!m.legacy_card_id) continue;
+        const rel = m.access_media_types as { name?: string }[] | { name?: string } | null | undefined;
+        const typeName = Array.isArray(rel) ? (rel[0]?.name ?? "") : (rel?.name ?? "");
+        byCardId.set(m.legacy_card_id, {
+            type: typeName,
+            folio: m.identifier ?? "",
+        });
+    }
+
+    return tickets.map((t) => {
+        if (t.card_id && byCardId.has(t.card_id)) {
+            const info = byCardId.get(t.card_id)!;
+            return { ...t, cardType: info.type, cardFolio: info.folio };
+        }
+        return t;
+    });
+}
+
 async function enrichWithMovementType(tickets: Ticket[]): Promise<(Ticket & { movementType: string; assignmentDate: string })[]> {
     const cardIds = tickets.map((t) => t.card_id).filter(Boolean) as string[];
     const personnelCreatedAt: Record<string, string> = {};
@@ -208,13 +238,14 @@ export const ticketService = {
             if (error) throw error;
 
             const mapped = ((data || []) as any[]).map(t => ({ ...t } as unknown as Ticket));
+            const withMedia = await enrichWithAccessMedia(mapped);
 
-            if (section === "Responsivas" && mapped.length > 0) {
-                const enriched = await enrichWithMovementType(mapped);
+            if (section === "Responsivas" && withMedia.length > 0) {
+                const enriched = await enrichWithMovementType(withMedia);
                 return { data: enriched as unknown as Ticket[], count: count || 0 };
             }
 
-            return { data: mapped, count: count || 0 };
+            return { data: withMedia as unknown as Ticket[], count: count || 0 };
         }, "Fetch Tickets Paginated", { data: [], count: 0 });
     },
 
@@ -263,7 +294,8 @@ export const ticketService = {
                     .range(from, to);
             });
 
-            return enrichWithMovementType(allData);
+            const withMedia = await enrichWithAccessMedia(allData);
+            return enrichWithMovementType(withMedia);
         }, "Fetch Responsivas for Export", []);
     },
 
