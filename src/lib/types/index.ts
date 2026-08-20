@@ -227,6 +227,7 @@ export interface AccessAssignmentPermission {
     resource_type: string;
     resource_key: string;
     permission: string;
+    building_id?: number | null;
 }
 
 export interface Floor {

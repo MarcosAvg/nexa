@@ -54,6 +54,11 @@ create index idx_personnel_schedule_id on public.personnel using btree (schedule
 
 create index idx_personnel_status on public.personnel using btree (status);
 
+create trigger trigger_sync_personnel_access
+  after insert or update or delete on public.personnel
+  for each row
+  execute function public.sync_personnel_access_to_assignments();
+
 create policy "Admins/Operators delete personnel" on "public"."personnel"
   for delete
   to PUBLIC

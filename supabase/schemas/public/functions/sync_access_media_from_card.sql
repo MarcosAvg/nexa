@@ -71,6 +71,34 @@ begin
               media_type_id = excluded.media_type_id,
               revoked_at = null,
               status = 'active';
+
+        -- Inherit base-building floors + special accesses on the assignment
+        insert into public.access_assignment_permissions
+          (assignment_id, resource_type, resource_key, building_id)
+        select aa.id, 'floor', public.normalize_floor_label(f.label), p.building_id
+        from public.access_assignments aa
+        join public.personnel p on p.id = aa.person_id
+        join public.access_media_types t on t.id = aa.media_type_id
+        cross join lateral unnest(
+            case when t.key = 'p2000' then coalesce(p.floors_p2000, '{}'::text[])
+                 when t.key = 'kone'  then coalesce(p.floors_kone, '{}'::text[])
+                 else '{}'::text[] end
+        ) as f(label)
+        where aa.legacy_card_id = NEW.id
+          and p.building_id is not null
+          and btrim(f.label) <> ''
+        on conflict (assignment_id, resource_type, resource_key, building_id) do nothing;
+
+        insert into public.access_assignment_permissions
+          (assignment_id, resource_type, resource_key, building_id)
+        select aa.id, 'special_access', sa.access_name, p.building_id
+        from public.access_assignments aa
+        join public.personnel p on p.id = aa.person_id
+        cross join lateral unnest(coalesce(p.special_accesses, '{}'::text[])) as sa(access_name)
+        where aa.legacy_card_id = NEW.id
+          and p.building_id is not null
+          and btrim(sa.access_name) <> ''
+        on conflict (assignment_id, resource_type, resource_key, building_id) do nothing;
     else
         update public.access_assignments
            set revoked_at = coalesce(revoked_at, now()), status = 'revoked'

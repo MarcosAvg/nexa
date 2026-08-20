@@ -364,6 +364,24 @@ export const personnelService = {
                 const { cardService } = await import("./cards");
                 for (const card of cards) await cardService.save({ ...card, person_id: personId });
             }
+
+            // Reconciliar permisos del modelo nuevo (pisos por edificio + accesos
+            // especiales). Si no se provee floorsByBuilding, el trigger de personnel
+            // ya sincronizó los pisos del edificio base desde las columnas legacy.
+            const floorsByBuilding = (data as any).floorsByBuilding;
+            if (personId && floorsByBuilding) {
+                const { accessAssignmentService } = await import("./accessAssignments");
+                const baseBuildingId = Number(data.building_id || data.buildingId);
+                const specialAccesses = data.specialAccesses || data.special_accesses || [];
+                if (baseBuildingId) {
+                    await accessAssignmentService.savePersonAccess(
+                        personId,
+                        baseBuildingId,
+                        floorsByBuilding,
+                        specialAccesses,
+                    );
+                }
+            }
         }, "Save Personnel");
     },
 

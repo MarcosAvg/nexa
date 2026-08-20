@@ -4,14 +4,17 @@ create table "public"."access_assignment_permissions" (
   "resource_type" text   not null,
   "resource_key"  text   not null,
   "permission"    text   not null default 'allow',
+  "building_id"   bigint,
   constraint "access_assignment_permissions_pkey" primary key ("id"),
-  constraint "access_assignment_permissions_assignment_id_fkey" foreign key ("assignment_id") references public.access_assignments("id") on delete cascade
+  constraint "access_assignment_permissions_assignment_id_fkey" foreign key ("assignment_id") references public.access_assignments("id") on delete cascade,
+  constraint "access_assignment_permissions_floor_building_check" check (resource_type <> 'floor' or building_id is not null)
 );
 
 alter table "public"."access_assignment_permissions" enable row level security;
 
 create index idx_access_assignment_permissions_assignment_id on public.access_assignment_permissions using btree (assignment_id);
-create unique index idx_access_assignment_permissions_unique on public.access_assignment_permissions using btree (assignment_id, resource_type, resource_key);
+create index idx_access_assignment_permissions_building on public.access_assignment_permissions using btree (building_id);
+create unique index idx_access_assignment_permissions_unique on public.access_assignment_permissions using btree (assignment_id, resource_type, resource_key, building_id);
 
 create policy "Access assignment permissions viewable by authenticated"
   on "public"."access_assignment_permissions"

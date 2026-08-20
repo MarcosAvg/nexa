@@ -26,7 +26,7 @@
     import { cardService } from "../services/cards";
     import { responsivaService } from "../services/responsiva";
     import { accessAssignmentService } from "../services/accessAssignments";
-    import { personnelState } from "../stores";
+    import { personnelState, catalogState } from "../stores";
     import { uiState } from "../stores/ui.svelte";
     import type { Person } from "../types";
 
@@ -107,31 +107,47 @@
     let signedResponsivas = $state<any[]>([]);
     let selectedSignature = $state("");
 
-    // Pisos leídos del modelo nuevo (access_assignments), con fallback a las
-    // columnas legacy de personnel.
-    let floorsP2000 = $state<string[]>([]);
-    let floorsKone = $state<string[]>([]);
+// Pisos leídos del modelo nuevo (access_assignment_permissions), agrupados por
+// edificio, con fallback a las columnas legacy de personnel.
+let floorsByBuilding = $state<
+    Record<number, { p2000: string[]; kone: string[] }>
+>({});
 
-    $effect(() => {
-        if (isOpen && person?.id) {
-            loadResponsivas();
-            loadFloors();
-        }
-    });
-
-    async function loadFloors() {
-        if (!person?.id) return;
-        const legacyP2000 = person.floors_p2000 || [];
-        const legacyKone = person.floors_kone || [];
-        try {
-            const floors = await accessAssignmentService.fetchFloorsForPerson(person.id);
-            floorsP2000 = floors.p2000?.length ? floors.p2000 : legacyP2000;
-            floorsKone = floors.kone?.length ? floors.kone : legacyKone;
-        } catch {
-            floorsP2000 = legacyP2000;
-            floorsKone = legacyKone;
-        }
+$effect(() => {
+    if (isOpen && person?.id) {
+        loadResponsivas();
+        loadFloors();
     }
+});
+
+async function loadFloors() {
+    if (!person?.id) return;
+    const legacyP2000 = person.floors_p2000 || [];
+    const legacyKone = person.floors_kone || [];
+    const bid =
+        Number(
+            catalogState.buildings.find((b) => b.name === person.building)
+                ?.id,
+        ) || undefined;
+    try {
+        const access =
+            await accessAssignmentService.fetchPersonAccess(person.id);
+        const merged = { ...access.floorsByBuilding };
+        const hasBase =
+            !!bid &&
+            ((merged[bid]?.p2000?.length || 0) > 0 ||
+                (merged[bid]?.kone?.length || 0) > 0);
+        if (bid && !hasBase && (legacyP2000.length || legacyKone.length)) {
+            merged[bid] = { p2000: legacyP2000, kone: legacyKone };
+        }
+        floorsByBuilding = merged;
+    } catch {
+        floorsByBuilding =
+            bid && (legacyP2000.length || legacyKone.length)
+                ? { [bid]: { p2000: legacyP2000, kone: legacyKone } }
+                : {};
+    }
+}
 
     async function loadResponsivas() {
         if (!person?.id) return;
@@ -425,7 +441,7 @@
                 </div>
 
                 <!-- Pisos Asignados -->
-                {#if floorsP2000.length > 0 || floorsKone.length > 0}
+                {#if Object.keys(floorsByBuilding).length > 0}
                     <div class="pt-3 border-t border-slate-200 space-y-3">
                         <span
                             class="text-xs font-bold text-slate-500 uppercase tracking-wider block"
@@ -433,33 +449,34 @@
                             Pisos Asignados
                         </span>
 
-                        {#if floorsP2000.length > 0}
-                            <div class="space-y-1">
-                                <span
-                                    class="text-[10px] font-bold text-slate-400 uppercase tracking-tight"
-                                    >P2000 (Puertas)</span
-                                >
-                                <div class="flex flex-wrap gap-1.5">
-                                    {#each floorsP2000 as flr}
-                                        <Badge variant="amber">{flr}</Badge>
-                                    {/each}
+                        {#each Object.entries(floorsByBuilding) as [bid, floors]}
+                            {@const buildingName =
+                                catalogState.buildings.find(
+                                    (b) => Number(b.id) === Number(bid),
+                                )?.name ?? "Edificio"}
+                            {#if floors.p2000.length > 0 || floors.kone.length > 0}
+                                <div class="space-y-1">
+                                    <span
+                                        class="text-[10px] font-bold text-slate-400 uppercase tracking-tight"
+                                        >{buildingName}</span
+                                    >
+                                    {#if floors.p2000.length > 0}
+                                        <div class="flex flex-wrap gap-1.5">
+                                            {#each floors.p2000 as flr}
+                                                <Badge variant="amber">{flr}</Badge>
+                                            {/each}
+                                        </div>
+                                    {/if}
+                                    {#if floors.kone.length > 0}
+                                        <div class="flex flex-wrap gap-1.5">
+                                            {#each floors.kone as flr}
+                                                <Badge variant="blue">{flr}</Badge>
+                                            {/each}
+                                        </div>
+                                    {/if}
                                 </div>
-                            </div>
-                        {/if}
-
-                        {#if floorsKone.length > 0}
-                            <div class="space-y-1">
-                                <span
-                                    class="text-[10px] font-bold text-slate-400 uppercase tracking-tight"
-                                    >KONE (Elevadores)</span
-                                >
-                                <div class="flex flex-wrap gap-1.5">
-                                    {#each floorsKone as flr}
-                                        <Badge variant="blue">{flr}</Badge>
-                                    {/each}
-                                </div>
-                            </div>
-                        {/if}
+                            {/if}
+                        {/each}
                     </div>
                 {/if}
 

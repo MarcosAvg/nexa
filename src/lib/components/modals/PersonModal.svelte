@@ -14,7 +14,7 @@
     import BuildingSelect from "../BuildingSelect.svelte";
     import ScheduleSelect from "../ScheduleSelect.svelte";
 
-    import { personnelService, ticketService } from "../../services";
+    import { personnelService, ticketService, accessAssignmentService } from "../../services";
     import { personnelState, catalogState, userState } from "../../stores";
     import PermissionGuard from "../PermissionGuard.svelte";
     import { toast } from "svelte-sonner";
@@ -91,8 +91,7 @@
     let puestoFuncion = $state("");
     let edificio = $state("");
     let pisoBase = $state("");
-    let pisosP2000 = $state<string[]>([]);
-    let pisosKone = $state<string[]>([]);
+    let floorsByBuilding = $state<Record<number, { p2000: string[]; kone: string[] }>>({});
     let diasHorario = $state("");
     let horaEntrada = $state("08:00");
     let horaSalida = $state("17:00");
@@ -116,13 +115,39 @@
         return b?.floors || [];
     });
 
-    // Al cambiar de edificio, reiniciar selección de pisos
+    let baseBuildingId = $derived.by(() => {
+        const b = buildings.find((x) => x.name === edificio);
+        return b ? Number(b.id) : 0;
+    });
+
+    let baseP2000 = $derived(floorsByBuilding[baseBuildingId]?.p2000 ?? []);
+    let baseKone = $derived(floorsByBuilding[baseBuildingId]?.kone ?? []);
+
+    function updateBuildingFloors(
+        buildingId: number,
+        key: "p2000" | "kone",
+        value: string[],
+    ) {
+        floorsByBuilding = {
+            ...floorsByBuilding,
+            [buildingId]: {
+                p2000:
+                    key === "p2000"
+                        ? value
+                        : (floorsByBuilding[buildingId]?.p2000 ?? []),
+                kone:
+                    key === "kone"
+                        ? value
+                        : (floorsByBuilding[buildingId]?.kone ?? []),
+            },
+        };
+    }
+
+    // Al cambiar de edificio, reiniciar solo el piso base (los pisos asignados
+    // se seleccionan por edificio y no dependen del edificio de radicación).
     $effect(() => {
         if (edificio && !editingPerson && !prefill) {
-            // Solo reiniciar si no se están cargando datos iniciales (edición o precarga)
             pisoBase = "";
-            pisosP2000 = [];
-            pisosKone = [];
         }
     });
 
@@ -178,6 +203,40 @@
     // Poblar formulario
     let lastLoadedPersonId = $state("");
 
+    // Trae los pisos multi-edificio del nuevo modelo y los mezcla con los
+    // legacy del edificio base (fallback mientras no existan permisos).
+    async function refreshPersonAccess(personId: string) {
+        try {
+            const access = await accessAssignmentService.fetchPersonAccess(
+                personId,
+            );
+            const merged = { ...access.floorsByBuilding };
+            const bid =
+                        Number(
+                            buildings.find(
+                                (b) => b.name === edificio,
+                            )?.id,
+                        ) || undefined;
+            if (bid) {
+                const legacyP2000 = editingPerson?.floors_p2000 || [];
+                const legacyKone = editingPerson?.floors_kone || [];
+                if (!merged[bid]) merged[bid] = { p2000: [], kone: [] };
+                if (merged[bid].p2000.length === 0 && legacyP2000.length) {
+                    merged[bid].p2000 = legacyP2000;
+                }
+                if (merged[bid].kone.length === 0 && legacyKone.length) {
+                    merged[bid].kone = legacyKone;
+                }
+            }
+            floorsByBuilding = merged;
+            if (access.specialAccesses.length > 0) {
+                accesosEspeciales = access.specialAccesses;
+            }
+        } catch {
+            // No crítico: se mantienen los valores legacy cargados
+        }
+    }
+
     $effect(() => {
         if (
             isOpen &&
@@ -193,8 +252,20 @@
                 puestoFuncion = (editingPerson as any).position || "";
                 edificio = editingPerson.building;
                 pisoBase = editingPerson.floor || "";
-                pisosP2000 = [...(editingPerson.floors_p2000 || [])];
-                pisosKone = [...(editingPerson.floors_kone || [])];
+                const bid =
+                    Number(
+                        buildings.find(
+                            (b) => b.name === editingPerson.building,
+                        )?.id,
+                    ) || undefined;
+                floorsByBuilding = bid
+                    ? {
+                          [bid]: {
+                              p2000: [...(editingPerson.floors_p2000 || [])],
+                              kone: [...(editingPerson.floors_kone || [])],
+                          },
+                      }
+                    : {};
 
                 if (editingPerson.schedule) {
                     diasHorario = editingPerson.schedule.days;
@@ -214,21 +285,58 @@
                         !allowedCardTypes || allowedCardTypes.includes("KONE");
 
                     if (wantsP2000) {
-                        if (
-                            prefill.pisosP2000 &&
-                            prefill.pisosP2000.length > 0
-                        ) {
-                            pisosP2000 = [...prefill.pisosP2000];
-                        } else if (prefill.pisosP2000) {
-                            pisosP2000 = [];
+                        const pid =
+                            Number(
+                                buildings.find(
+                                    (b) => b.name === prefill.edificio,
+                                )?.id,
+                            ) || undefined;
+                        if (pid) {
+                            floorsByBuilding = {
+                                ...floorsByBuilding,
+                                [pid]: {
+                                    p2000: prefill.pisosP2000
+                                        ? [...prefill.pisosP2000]
+                                        : [],
+                                    kone: floorsByBuilding[pid]?.kone ?? [],
+                                },
+                            };
                         }
                     }
 
                     if (wantsKONE) {
                         if (prefill.pisosKone && prefill.pisosKone.length > 0) {
-                            pisosKone = [...prefill.pisosKone];
+                            const pid =
+                                Number(
+                                    buildings.find(
+                                        (b) => b.name === prefill.edificio,
+                                    )?.id,
+                                ) || undefined;
+                            if (pid) {
+                                floorsByBuilding = {
+                                    ...floorsByBuilding,
+                                    [pid]: {
+                                        p2000: floorsByBuilding[pid]?.p2000 ?? [],
+                                        kone: [...prefill.pisosKone],
+                                    },
+                                };
+                            }
                         } else if (prefill.pisosKone) {
-                            pisosKone = [];
+                            const pid =
+                                Number(
+                                    buildings.find(
+                                        (b) => b.name === prefill.edificio,
+                                    )?.id,
+                                ) || undefined;
+                            if (pid) {
+                                floorsByBuilding = {
+                                    ...floorsByBuilding,
+                                    [pid]: {
+                                        p2000: floorsByBuilding[pid]?.p2000 ?? [],
+                                        kone: [],
+                                    },
+                                };
+                            }
                         }
                     }
 
@@ -268,6 +376,7 @@
                 }
 
                 lastLoadedPersonId = editingPerson.id;
+                void refreshPersonAccess(editingPerson.id);
             });
         } else if (
             isOpen &&
@@ -294,8 +403,18 @@
                 horaEntrada = prefill.horaEntrada ?? "08:00";
                 horaSalida = prefill.horaSalida ?? "17:00";
                 email = prefill.correo ?? "";
-                pisosP2000 = prefill.pisosP2000 ?? [];
-                pisosKone = prefill.pisosKone ?? [];
+                const prefillBid =
+                    Number(
+                        buildings.find((b) => b.name === prefill.edificio)?.id,
+                    ) || undefined;
+                floorsByBuilding = prefillBid
+                    ? {
+                          [prefillBid]: {
+                              p2000: prefill.pisosP2000 ?? [],
+                              kone: prefill.pisosKone ?? [],
+                          },
+                      }
+                    : {};
                 accesosEspeciales = prefill.specialAccesses ?? [];
                 tarjetasAsignadas = prefill.folioAccessPro
                     ? [{ type: "AccessPRO", folio: prefill.folioAccessPro }]
@@ -377,15 +496,16 @@
                 edificio,
                 building_id: buildings.find((b) => b.name === edificio)?.id,
                 pisoBase,
-                pisosP2000,
-                pisosKone,
+                pisosP2000: baseP2000,
+                pisosKone: baseKone,
                 first_name: nombres,
                 last_name: apellidos,
                 employee_no: noEmpleado,
                 email: email?.replace(/^mailto:\s*/i, "").trim(),
                 floor: pisoBase,
-                floors_p2000: pisosP2000,
-                floors_kone: pisosKone,
+                floors_p2000: baseP2000,
+                floors_kone: baseKone,
+                floorsByBuilding,
                 schedule_id: schedules.find((s) => s.name === diasHorario)?.id,
                 entry_time: horaEntrada,
                 exit_time: horaSalida,
@@ -451,8 +571,7 @@
         puestoFuncion = "";
         edificio = "";
         pisoBase = "";
-        pisosP2000 = [];
-        pisosKone = [];
+        floorsByBuilding = {};
         diasHorario = "";
         horaEntrada = "08:00";
         horaSalida = "17:00";
@@ -731,19 +850,51 @@
             </div>
 
             {#if edificio}
-                <div class="space-y-4">
-                    <ToggleGroup
-                        label="Pisos Asignados P2000 (Puertas)"
-                        options={availableFloors}
-                        bind:value={pisosP2000}
-                        showSelectAll={true}
-                    />
-                    <ToggleGroup
-                        label="Pisos Asignados KONE (Elevadores)"
-                        options={availableFloors}
-                        bind:value={pisosKone}
-                        showSelectAll={true}
-                    />
+                <div class="space-y-6">
+                    {#each buildings as b}
+                        {@const bFloors = b.floors || []}
+                        {#if bFloors.length > 0}
+                            <div
+                                class="rounded-lg border p-3 {Number(b.id) ===
+                                baseBuildingId
+                                    ? 'border-slate-300 bg-slate-50'
+                                    : 'border-slate-200 bg-white'}"
+                            >
+                                <div class="flex items-center justify-between mb-2">
+                                    <span
+                                        class="text-xs font-bold text-slate-600 uppercase tracking-widest"
+                                    >
+                                        {b.name}
+                                        {#if Number(b.id) === baseBuildingId}
+                                            <span
+                                                class="ml-1 normal-case text-[10px] font-medium text-blue-600"
+                                            >
+                                                (Edificio base)
+                                            </span>
+                                        {/if}
+                                    </span>
+                                </div>
+                                <div class="space-y-4">
+                                    <ToggleGroup
+                                        label="Pisos P2000 (Puertas)"
+                                        options={bFloors}
+                                        value={floorsByBuilding[Number(b.id)]?.p2000 ?? []}
+                                        onchange={(v) =>
+                                            updateBuildingFloors(Number(b.id), "p2000", v)}
+                                        showSelectAll={true}
+                                    />
+                                    <ToggleGroup
+                                        label="Pisos KONE (Elevadores)"
+                                        options={bFloors}
+                                        value={floorsByBuilding[Number(b.id)]?.kone ?? []}
+                                        onchange={(v) =>
+                                            updateBuildingFloors(Number(b.id), "kone", v)}
+                                        showSelectAll={true}
+                                    />
+                                </div>
+                            </div>
+                        {/if}
+                    {/each}
                 </div>
             {/if}
         </FormSection>

@@ -11,6 +11,11 @@ create table "public"."buildings" (
 alter table "public"."buildings"
   enable row level security;
 
+create trigger trigger_sync_building_floors
+  after insert or update or delete on public.buildings
+  for each row
+  execute function public.sync_building_floors_to_catalog();
+
 create policy "Admins delete buildings" on "public"."buildings"
   for delete
   to PUBLIC
