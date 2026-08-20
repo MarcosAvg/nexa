@@ -72,10 +72,10 @@ begin
               revoked_at = null,
               status = 'active';
 
-        -- Inherit base-building floors + special accesses on the assignment
+        -- Inherit floors + special accesses on the assignment (scoped to Torre, 1)
         insert into public.access_assignment_permissions
           (assignment_id, resource_type, resource_key, building_id)
-        select aa.id, 'floor', public.normalize_floor_label(f.label), p.building_id
+        select aa.id, 'floor', public.normalize_floor_label(f.label), 1
         from public.access_assignments aa
         join public.personnel p on p.id = aa.person_id
         join public.access_media_types t on t.id = aa.media_type_id
@@ -91,7 +91,7 @@ begin
 
         insert into public.access_assignment_permissions
           (assignment_id, resource_type, resource_key, building_id)
-        select aa.id, 'special_access', sa.access_name, p.building_id
+        select aa.id, 'special_access', sa.access_name, 1
         from public.access_assignments aa
         join public.personnel p on p.id = aa.person_id
         cross join lateral unnest(coalesce(p.special_accesses, '{}'::text[])) as sa(access_name)

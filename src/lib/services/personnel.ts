@@ -366,21 +366,18 @@ export const personnelService = {
             }
 
             // Reconciliar permisos del modelo nuevo (pisos por edificio + accesos
-            // especiales). Si no se provee floorsByBuilding, el trigger de personnel
-            // ya sincronizó los pisos del edificio base desde las columnas legacy.
+            // especiales). Todo el acceso se persiste bajo Torre Administrativa
+            // (de momento); si no se provee floorsByBuilding, el trigger de
+            // personnel ya sincronizó los pisos legacy a Torre.
             const floorsByBuilding = (data as any).floorsByBuilding;
             if (personId && floorsByBuilding) {
                 const { accessAssignmentService } = await import("./accessAssignments");
-                const baseBuildingId = Number(data.building_id || data.buildingId);
                 const specialAccesses = data.specialAccesses || data.special_accesses || [];
-                if (baseBuildingId) {
-                    await accessAssignmentService.savePersonAccess(
-                        personId,
-                        baseBuildingId,
-                        floorsByBuilding,
-                        specialAccesses,
-                    );
-                }
+                await accessAssignmentService.savePersonAccess(
+                    personId,
+                    floorsByBuilding,
+                    specialAccesses,
+                );
             }
         }, "Save Personnel");
     },

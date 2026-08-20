@@ -13,12 +13,16 @@ export type CatalogTable = (typeof CATALOG_TABLES)[number];
 const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
 /** Retorna el siguiente valor de sort_order (max + 1) para que los nuevos items vayan al final. */
-async function getNextSortOrder(table: CatalogTable): Promise<number> {
-    const { data, error } = await supabase
+async function getNextSortOrder(table: CatalogTable, buildingId?: number): Promise<number> {
+    let query = supabase
         .from(table)
         .select("sort_order")
         .order("sort_order", { ascending: false })
         .limit(1);
+    // special_accesses es un catálogo por edificio: el orden se calcula dentro
+    // de cada edificio para no intercalar los items.
+    if (buildingId) query = query.eq("building_id", buildingId);
+    const { data, error } = await query;
     if (error) throw error;
     return ((data?.[0]?.sort_order as number | null | undefined) ?? 0) + 1;
 }
@@ -137,15 +141,15 @@ export const catalogService = {
         }, "Save Dependency");
     },
 
-    async saveAccess(id: number | null, payload: { name: string }) {
+    async saveAccess(id: number | null, payload: { name: string; buildingId?: number }) {
         return withErrorHandling(async () => {
             if (id) {
-                const { error } = await supabase.from("special_accesses").update(payload).eq("id", id);
+                const { error } = await supabase.from("special_accesses").update({ name: payload.name }).eq("id", id);
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Acceso especial actualizado: ${payload.name}`, entityName: `Acceso especial: ${payload.name}` });
             } else {
-                const sortOrder = await getNextSortOrder("special_accesses");
-                const { data, error } = await supabase.from("special_accesses").insert([{ ...payload, sort_order: sortOrder }]).select().single();
+                const sortOrder = await getNextSortOrder("special_accesses", payload.buildingId);
+                const { data, error } = await supabase.from("special_accesses").insert([{ name: payload.name, sort_order: sortOrder, building_id: payload.buildingId ?? null }]).select().single();
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Acceso especial creado: ${payload.name}`, entityName: `Acceso especial: ${payload.name}` });
             }

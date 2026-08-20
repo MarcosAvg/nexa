@@ -12,6 +12,13 @@ export interface PersonAccessData {
     specialAccesses: string[];
 }
 
+/**
+ * Edificio al que apunta todo el acceso del personal (pisos + accesos
+ * especiales). De momento la asignación de accesos es exclusiva de Torre
+ * Administrativa; los demás edificios solo marcan la radicación.
+ */
+export const TORRE_BUILDING_ID = 1;
+
 export const accessAssignmentService = {
     async fetchForPerson(personId: string): Promise<AccessAssignment[]> {
         return withErrorHandlingSafe(async () => {
@@ -86,13 +93,15 @@ export const accessAssignmentService = {
     },
 
     /**
-     * Reconstruye los permisos de las asignaciones activas de una persona a
-     * partir del mapa multi-edificio de pisos y sus accesos especiales.
-     * Fuente de verdad del modelo nuevo: pisos por edificio + accesos especiales.
+     * Reconstruye los permisos de las asignaciones activas de una persona.
+     *
+     * De momento todo el acceso asignado al personal (pisos de cualquier
+     * edificio + accesos especiales) se escribe bajo Torre Administrativa:
+     * los demás edificios solo diferencian radicación y piso base. Cuando se
+     * requieran accesos a pisos de otros edificios, esta función se revisita.
      */
     async savePersonAccess(
         personId: string,
-        baseBuildingId: number,
         floorsByBuilding: Record<number, PersonBuildingFloors>,
         specialAccesses: string[],
     ): Promise<void> {
@@ -111,15 +120,18 @@ export const accessAssignmentService = {
                 }[] = [];
 
                 if (isP2000 || isKone) {
-                    for (const [buildingId, floors] of Object.entries(floorsByBuilding)) {
+                    const seen = new Set<string>();
+                    for (const floors of Object.values(floorsByBuilding)) {
                         const list = isP2000 ? floors.p2000 : floors.kone;
                         for (const f of list) {
-                            if (!f || !f.trim()) continue;
+                            const key = f.trim();
+                            if (!key || seen.has(key)) continue;
+                            seen.add(key);
                             rows.push({
                                 assignment_id: assignment.id,
                                 resource_type: "floor",
-                                resource_key: f.trim(),
-                                building_id: Number(buildingId),
+                                resource_key: key,
+                                building_id: TORRE_BUILDING_ID,
                             });
                         }
                     }
@@ -131,7 +143,7 @@ export const accessAssignmentService = {
                         assignment_id: assignment.id,
                         resource_type: "special_access",
                         resource_key: s.trim(),
-                        building_id: baseBuildingId,
+                        building_id: TORRE_BUILDING_ID,
                     });
                 }
 
