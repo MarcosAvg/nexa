@@ -415,8 +415,10 @@ export const personnelService = {
 
     async fetchDashboardStats() {
         return withErrorHandlingSafe(async () => {
+            // El modelo nuevo (access_media) es la fuente; coincide con la RPC
+            // get_dashboard_stats.
             const readyPersonIds = await batchCollectIds(async (from, to) => {
-                return supabase.from("cards")
+                return supabase.from("access_media")
                     .select("person_id").eq("status", "active").eq("programming_status", "done")
                     .in("responsiva_status", ["signed", "legacy"]).not("person_id", "is", null)
                     .range(from, to);
@@ -429,19 +431,22 @@ export const personnelService = {
             let activePersonnelCount = 0;
             for (const id of readyPersonIds) { if (activePersonnelIds.has(id)) activePersonnelCount++; }
 
-            const { count: koneStock, error: kError } = await supabase.from("cards")
-                .select("*", { count: "exact", head: true }).is("person_id", null).eq("status", "available").eq("type", "KONE");
-            if (kError) throw kError;
+            const stockFor = async (key: string) => {
+                const { count, error } = await supabase
+                    .from("access_media")
+                    .select("id, access_media_types!inner(key)", { count: "exact", head: true })
+                    .eq("access_media_types.key", key)
+                    .is("person_id", null)
+                    .eq("status", "available");
+                if (error) throw error;
+                return count || 0;
+            };
 
-            const { count: p2000Stock, error: p2Error } = await supabase.from("cards")
-                .select("*", { count: "exact", head: true }).is("person_id", null).eq("status", "available").eq("type", "P2000");
-            if (p2Error) throw p2Error;
+            const koneStock = await stockFor("kone");
+            const p2000Stock = await stockFor("p2000");
+            const accessproStock = await stockFor("accesspro");
 
-            const { count: accessproStock, error: aError } = await supabase.from("cards")
-                .select("*", { count: "exact", head: true }).is("person_id", null).eq("status", "available").eq("type", "AccessPRO");
-            if (aError) throw aError;
-
-            return { activePersonnel: activePersonnelCount, koneStock: koneStock || 0, p2000Stock: p2000Stock || 0, accessproStock: accessproStock || 0 };
+            return { activePersonnel: activePersonnelCount, koneStock, p2000Stock, accessproStock };
         }, "Fetch Dashboard Stats", { activePersonnel: 0, koneStock: 0, p2000Stock: 0, accessproStock: 0 });
     },
 

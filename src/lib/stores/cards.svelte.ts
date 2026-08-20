@@ -54,6 +54,9 @@ export class CardState {
             );
             const data = res.data.map((m) => ({
                 ...m,
+                // Las acciones de la vista siguen operando sobre cards.id.
+                id: (m.legacy_card_id ?? m.id) as string,
+                access_media_id: m.id,
                 type: m.access_media_types?.name ?? (m.metadata?.legacy_type as string) ?? "",
                 folio: m.identifier ?? "",
             })) as unknown as Card[];

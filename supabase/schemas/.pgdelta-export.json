@@ -18,6 +18,7 @@
     "public/functions/handle_new_user.sql",
     "public/functions/reorder_catalog.sql",
     "public/functions/search_personnel_fuzzy.sql",
+    "public/functions/sync_access_media_from_card.sql",
     "public/schema.sql",
     "public/tables/access_assignment_permissions.sql",
     "public/tables/access_assignments.sql",

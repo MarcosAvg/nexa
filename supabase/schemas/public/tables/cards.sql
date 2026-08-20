@@ -38,6 +38,11 @@ create trigger trigger_clean_floors_on_card_management
   for each row
   execute function public.clean_personnel_floors_on_card_change();
 
+create trigger trigger_sync_access_media_from_card
+  after insert or update or delete on public.cards
+  for each row
+  execute function public.sync_access_media_from_card();
+
 create policy "Admins/Operators delete cards" on "public"."cards"
   for delete
   to PUBLIC
