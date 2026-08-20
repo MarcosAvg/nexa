@@ -3,7 +3,7 @@ import { HistoryService } from "./history";
 import { withErrorHandling, withErrorHandlingConditional, catalogCache } from "../utils";
 
 /** Tablas de catálogo que soportan orden personalizado. */
-const CATALOG_TABLES = ["buildings", "dependencies", "schedules", "special_accesses"] as const;
+const CATALOG_TABLES = ["buildings", "dependencies", "schedules", "special_accesses", "access_media_types"] as const;
 export type CatalogTable = (typeof CATALOG_TABLES)[number];
 
 /**
@@ -89,18 +89,42 @@ export const catalogService = {
             return result;
         }, "Fetch Schedules", throwOnError, []);
     },
+    async fetchMediaTypes(throwOnError: boolean = false) {
+        const cached = catalogCache.get<any[]>('access_media_types');
+        if (cached) return cached;
+        return withErrorHandlingConditional(async () => {
+            const { data, error } = await supabase
+                .from("access_media_types")
+                .select("*")
+                .order("building_id", { ascending: true })
+                .order("sort_order", { ascending: true })
+                .order("name", { ascending: true });
+            if (error) throw error;
+            const result = data || [];
+            catalogCache.set('access_media_types', result, CATALOG_CACHE_TTL_MS);
+            return result;
+        }, "Fetch Media Types", throwOnError, []);
+    },
 
     /**
      * Reordena un catálogo completo según el arreglo de items proporcionado.
      * Actualiza sort_order en una sola llamada RPC y refresca la caché local.
+     * access_media_types usa ids uuid (RPC dedicada); el resto usa bigint.
      */
     async reorderCatalog(table: CatalogTable, items: { id: number | string }[]) {
         return withErrorHandling(async () => {
-            const { error } = await supabase.rpc("reorder_catalog", {
-                p_table: table,
-                p_ids: items.map((item) => Number(item.id)),
-            });
-            if (error) throw error;
+            if (table === "access_media_types") {
+                const { error } = await supabase.rpc("reorder_media_types", {
+                    p_ids: items.map((item) => String(item.id)),
+                });
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.rpc("reorder_catalog", {
+                    p_table: table,
+                    p_ids: items.map((item) => Number(item.id)),
+                });
+                if (error) throw error;
+            }
             await HistoryService.log("SYSTEM", undefined, "UPDATE_CATALOG", {
                 message: `Orden del catálogo de ${table} actualizado`,
             });
@@ -173,12 +197,68 @@ export const catalogService = {
         }, "Save Schedule");
     },
 
+    /**
+     * Configuración por defecto de los sistemas de acceso que un edificio
+     * puede establecer. Las llaves son fijas (el frontend las usa para
+     * clasificar pisos P2000/KONE), por lo que la creación se limita a estas
+     * plantillas.
+     */
+    async saveMediaType(
+        id: string | null,
+        payload: { key?: string; name?: string; has_floors?: boolean; active?: boolean; buildingId?: number },
+    ) {
+        return withErrorHandling(async () => {
+            const TEMPLATES: Record<string, { name: string; has_floors: boolean }> = {
+                p2000: { name: "P2000", has_floors: true },
+                kone: { name: "KONE", has_floors: true },
+                accesspro: { name: "AccessPRO", has_floors: false },
+            };
+            if (id) {
+                const update: Record<string, unknown> = {};
+                if (payload.name !== undefined) update.name = payload.name;
+                if (payload.has_floors !== undefined) update.has_floors = payload.has_floors;
+                if (payload.active !== undefined) update.active = payload.active;
+                const { error } = await supabase.from("access_media_types").update(update).eq("id", id);
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Medio de acceso actualizado: ${payload.name}`, entityName: `Medio de acceso: ${payload.name}` });
+            } else {
+                const key = payload.key ?? "";
+                const template = TEMPLATES[key];
+                if (!template) throw new Error("Sistema de acceso no válido");
+                if (!payload.buildingId) throw new Error("Edificio requerido");
+                const sortOrder = await getNextSortOrder("access_media_types", payload.buildingId);
+                const { data, error } = await supabase
+                    .from("access_media_types")
+                    .insert([{
+                        key,
+                        name: payload.name?.trim() || template.name,
+                        building_id: payload.buildingId,
+                        has_floors: template.has_floors,
+                        category: "card",
+                        identifier_label: "Folio",
+                        requires_identifier: true,
+                        requires_programming: true,
+                        requires_responsiva: true,
+                        supports_replacement: true,
+                        active: true,
+                        legacy_key: null,
+                        sort_order: sortOrder,
+                    }])
+                    .select()
+                    .single();
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Medio de acceso creado: ${data.name}`, entityName: `Medio de acceso: ${data.name}` });
+            }
+            catalogCache.invalidate('access_media_types');
+        }, "Save Media Type");
+    },
+
     // --- Delete ---
-    async deleteCatalogItem(table: string, id: number, itemName: string) {
+    async deleteCatalogItem(table: string, id: number | string, itemName: string) {
         return withErrorHandling(async () => {
             const { error } = await supabase.from(table).delete().eq("id", id);
             if (error) throw error;
-            await HistoryService.log("SYSTEM", id, "DELETE_CATALOG", { message: `Eliminado de ${table}: ${itemName}`, entityName: `${table}: ${itemName}` });
+            await HistoryService.log("SYSTEM", String(id), "DELETE_CATALOG", { message: `Eliminado de ${table}: ${itemName}`, entityName: `${table}: ${itemName}` });
             catalogCache.invalidate(table);
         }, "Delete Catalog Item");
     }

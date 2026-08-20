@@ -5,6 +5,7 @@ export class CatalogState {
     buildings = $state<CatalogItem[]>([]);
     specialAccesses = $state<CatalogItem[]>([]);
     schedules = $state<CatalogItem[]>([]);
+    mediaTypes = $state<CatalogItem[]>([]);
 
     setDependencies(data: CatalogItem[]) {
         this.dependencies = data;
@@ -20,6 +21,10 @@ export class CatalogState {
 
     setSchedules(data: CatalogItem[]) {
         this.schedules = data;
+    }
+
+    setMediaTypes(data: CatalogItem[]) {
+        this.mediaTypes = data;
     }
 }
 

@@ -13,10 +13,13 @@ create table "public"."access_media_types" (
   "legacy_key"           text,
   "sort_order"           bigint,
   "created_at"           timestamp with time zone not null default now(),
-  constraint "access_media_types_key_key" unique ("key"),
+  "building_id"          bigint                   not null,
   constraint "access_media_types_legacy_key_key" unique ("legacy_key"),
-  constraint "access_media_types_pkey" primary key ("id")
+  constraint "access_media_types_pkey" primary key ("id"),
+  constraint "access_media_types_building_id_fkey" foreign key (building_id) references public.buildings(id)
 );
+
+create unique index access_media_types_building_key on public.access_media_types using btree (building_id, "key");
 
 alter table "public"."access_media_types" enable row level security;
 
