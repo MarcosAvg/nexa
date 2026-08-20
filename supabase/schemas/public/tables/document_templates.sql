@@ -1,0 +1,51 @@
+create table "public"."document_templates" (
+  "id"            uuid                     not null default gen_random_uuid(),
+  "key"           text                     not null,
+  "name"          text                     not null,
+  "document_type" text                     not null default 'responsiva',
+  "version"       integer                  not null default 1,
+  "active"        boolean                  not null default true,
+  "legacy_key"    text,
+  "content"       text,
+  "created_at"    timestamp with time zone not null default now(),
+  constraint "document_templates_key_key" unique ("key"),
+  constraint "document_templates_legacy_key_key" unique ("legacy_key"),
+  constraint "document_templates_pkey" primary key ("id")
+);
+
+alter table "public"."document_templates" enable row level security;
+
+create policy "Document templates viewable by authenticated"
+  on "public"."document_templates"
+  for select
+  to authenticated
+  using (true);
+
+create policy "Admins insert document templates"
+  on "public"."document_templates"
+  for insert
+  to authenticated
+  with check ((exists ( select 1
+    from public.profiles
+   where ((profiles.id = ( select auth.uid() as uid)) AND (profiles.role = 'admin'::public.app_role)))));
+
+create policy "Admins update document templates"
+  on "public"."document_templates"
+  for update
+  to authenticated
+  using ((exists ( select 1
+    from public.profiles
+   where ((profiles.id = ( select auth.uid() as uid)) AND (profiles.role = 'admin'::public.app_role)))))
+  with check ((exists ( select 1
+    from public.profiles
+   where ((profiles.id = ( select auth.uid() as uid)) AND (profiles.role = 'admin'::public.app_role)))));
+
+create policy "Admins delete document templates"
+  on "public"."document_templates"
+  for delete
+  to authenticated
+  using ((exists ( select 1
+    from public.profiles
+   where ((profiles.id = ( select auth.uid() as uid)) AND (profiles.role = 'admin'::public.app_role)))));
+
+grant select, insert, update, delete on table "public"."document_templates" to "authenticated";
