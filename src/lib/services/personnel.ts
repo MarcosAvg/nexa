@@ -1,6 +1,6 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
-import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate, batchCollectIds } from "../utils";
+import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate } from "../utils";
 import { computePersonStatus } from "../utils/personStatus";
 import { deriveAccessFromAssignments } from "./accessAssignments";
 import type { Person, Card, DashboardMetrics, DashboardStats } from "../types";
