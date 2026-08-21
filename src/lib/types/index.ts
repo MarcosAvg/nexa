@@ -183,12 +183,8 @@ export interface AccessMediaType {
     id: string;
     key: string;
     name: string;
-    category: string;
-    identifier_label: string;
-    requires_identifier: boolean;
     requires_programming: boolean;
     requires_responsiva: boolean;
-    supports_replacement: boolean;
     has_floors: boolean;
     active: boolean;
     sort_order: number | null;
@@ -232,7 +228,6 @@ export interface AccessAssignmentPermission {
     id: number;
     assignment_id: string;
     resource_type: string;
-    resource_key: string;
     permission: string;
     building_id?: number | null;
     floor_id?: number | null;

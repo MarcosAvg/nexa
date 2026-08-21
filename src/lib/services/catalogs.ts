@@ -282,12 +282,8 @@ export const catalogService = {
                         name,
                         building_id: payload.buildingId,
                         has_floors: payload.has_floors ?? false,
-                        category: "card",
-                        identifier_label: "Folio",
-                        requires_identifier: true,
                         requires_programming: true,
                         requires_responsiva: true,
-                        supports_replacement: true,
                         active: true,
                         sort_order: sortOrder,
                     }])

@@ -33,6 +33,8 @@ export function deriveAccessFromAssignments(assignments: any[] | null | undefine
         if (!mediaTypeId) continue;
         for (const p of a.access_assignment_permissions || []) {
             if (p.resource_type === "floor") {
+                const label = p.floors?.label ?? "";
+                if (!label) continue;
                 if (!byType.has(mediaTypeId)) {
                     byType.set(mediaTypeId, {
                         mediaTypeId,
@@ -42,11 +44,12 @@ export function deriveAccessFromAssignments(assignments: any[] | null | undefine
                     });
                 }
                 const group = byType.get(mediaTypeId)!;
-                if (!group.floors.includes(p.resource_key)) {
-                    group.floors.push(p.resource_key);
+                if (!group.floors.includes(label)) {
+                    group.floors.push(label);
                 }
             } else if (p.resource_type === "special_access") {
-                specialSet.add(p.resource_key);
+                const name = p.special_accesses?.name ?? "";
+                if (name) specialSet.add(name);
             }
         }
     }
@@ -90,7 +93,7 @@ export const accessAssignmentService = {
     },
 
     /**
-     * Devuelve los pisos por clave de tipo de medio para una persona
+     * Devuelve los pisos agrupados por tipo de medio concreto para una persona
      * (agrupados por edificio). Fuente: el nuevo modelo de permisos.
      */
     async fetchPersonAccess(personId: string): Promise<PersonAccessData> {
@@ -98,7 +101,7 @@ export const accessAssignmentService = {
             const { data, error } = await supabase
                 .from("access_assignments")
                 .select(
-                    "id, media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, resource_key, building_id)"
+                    "id, media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name), building_id)"
                 )
                 .eq("person_id", personId)
                 .eq("status", "active");
@@ -114,6 +117,8 @@ export const accessAssignmentService = {
                     if (p.resource_type === "floor") {
                         const bid = p.building_id;
                         if (!bid) continue;
+                        const label = p.floors?.label ?? "";
+                        if (!label) continue;
                         if (!byBuilding.has(bid)) byBuilding.set(bid, new Map());
                         const typesMap = byBuilding.get(bid)!;
                         if (!typesMap.has(mediaTypeId)) {
@@ -125,11 +130,12 @@ export const accessAssignmentService = {
                             });
                         }
                         const group = typesMap.get(mediaTypeId)!;
-                        if (!group.floors.includes(p.resource_key)) {
-                            group.floors.push(p.resource_key);
+                        if (!group.floors.includes(label)) {
+                            group.floors.push(label);
                         }
                     } else if (p.resource_type === "special_access") {
-                        specialSet.add(p.resource_key);
+                        const name = p.special_accesses?.name ?? "";
+                        if (name) specialSet.add(name);
                     }
                 }
             }
@@ -194,7 +200,6 @@ export const accessAssignmentService = {
                 const rows: {
                     assignment_id: string;
                     resource_type: string;
-                    resource_key: string;
                     building_id: number;
                     floor_id?: number | null;
                     special_access_id?: number | null;
@@ -209,7 +214,6 @@ export const accessAssignmentService = {
                         rows.push({
                             assignment_id: assignment.id,
                             resource_type: "floor",
-                            resource_key: key,
                             building_id: TORRE_BUILDING_ID,
                             floor_id: floorIdByLabel.get(key) ?? null,
                         });
@@ -222,7 +226,6 @@ export const accessAssignmentService = {
                     rows.push({
                         assignment_id: assignment.id,
                         resource_type: "special_access",
-                        resource_key: name,
                         building_id: TORRE_BUILDING_ID,
                         special_access_id: specialIdByName.get(name) ?? null,
                     });
