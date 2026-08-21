@@ -289,7 +289,6 @@ export const catalogService = {
                         requires_responsiva: true,
                         supports_replacement: true,
                         active: true,
-                        legacy_key: null,
                         sort_order: sortOrder,
                     }])
                     .select()

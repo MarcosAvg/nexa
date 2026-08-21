@@ -75,8 +75,8 @@ async function fetchKoneResponsivaSignDates(): Promise<Map<string, string>> {
             async (from, to) => {
                 const { data, error } = await supabase
                     .from('signed_documents')
-                    .select('person_id, created_at, document_templates!inner(legacy_key)')
-                    .eq('document_templates.legacy_key', 'KONE')
+                    .select('person_id, created_at, document_templates!inner(access_media_types!inner(key))')
+                    .eq('document_templates.access_media_types.key', 'kone')
                     .order('created_at', { ascending: false })
                     .range(from, to);
                 return { data, error };

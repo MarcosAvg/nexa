@@ -204,6 +204,7 @@
                 person_id: person.id,
                 folio: card.folio,
                 card_type: card.type,
+                access_media_id: card.id ?? null,
                 data: data,
                 signature: signature,
                 legal_hash: legalHash,

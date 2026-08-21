@@ -5,19 +5,20 @@ import type { Card } from "../types";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate } from "../utils";
 import { networkStore } from "../stores/network.svelte";
 
-/** Resuelve media_type_id a partir del "type" legacy (P2000/KONE/AccessPRO). */
+/** Resuelve el tipo de medio a partir del nombre mostrado (ej. "P2000"). */
 async function resolveMediaTypeId(type: string): Promise<string> {
-    const { data: byLegacy } = await supabase
+    const { data: byKey } = await supabase
         .from("access_media_types")
         .select("id")
-        .eq("legacy_key", type)
+        .ilike("key", type)
+        .limit(1)
         .maybeSingle();
-    if (byLegacy) return byLegacy.id;
+    if (byKey) return byKey.id;
 
     const { data: byName } = await supabase
         .from("access_media_types")
         .select("id")
-        .eq("name", type)
+        .ilike("name", type)
         .limit(1)
         .maybeSingle();
     if (byName) return byName.id;

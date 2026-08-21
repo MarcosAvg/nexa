@@ -5,11 +5,12 @@ import { RESPONSIVA_LEGAL_TEXTS } from "../constants/legal";
 import type { SignedDocument } from "../types";
 
 function normalizeDocument(d: SignedDocument) {
+    const template = d.document_templates as any;
     return {
         id: d.id,
         person_id: d.person_id,
         folio: (d.content?.folio as string) ?? d.access_media?.identifier ?? "",
-        card_type: d.document_templates?.legacy_key ?? "",
+        card_type: template?.access_media_types?.name ?? template?.name ?? "",
         data: d.content ?? {},
         signature: d.signature,
         legal_hash: d.legal_hash,
@@ -19,25 +20,43 @@ function normalizeDocument(d: SignedDocument) {
 }
 
 /**
- * Texto legal de la responsiva para un tipo de medio. Fuente:
- * document_templates.content (JSON, arreglo de párrafos); cae a las constantes
- * locales si la plantilla no tiene contenido.
+ * Texto legal de la responsiva. Acepta un id de tipo de medio (uuid) o el
+ * nombre mostrado (ej. "P2000"). Fuente: document_templates.content
+ * (JSON, arreglo de párrafos); cae a las constantes locales si la plantilla
+ * no tiene contenido.
  */
-export async function fetchLegalText(cardType: string): Promise<string[]> {
-    const key = (cardType || "").toUpperCase();
+export async function fetchLegalText(typeOrMediaTypeId: string): Promise<string[]> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        typeOrMediaTypeId || "",
+    );
     try {
-        const { data } = await supabase
-            .from("document_templates")
-            .select("content")
-            .ilike("legacy_key", key)
-            .maybeSingle();
-        if (data?.content) {
-            const parsed = JSON.parse(data.content);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed as string[];
+        if (isUuid) {
+            const { data } = await supabase
+                .from("document_templates")
+                .select("content")
+                .eq("media_type_id", typeOrMediaTypeId)
+                .limit(1)
+                .maybeSingle();
+            if (data?.content) {
+                const parsed = JSON.parse(data.content);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed as string[];
+            }
+        } else {
+            const { data } = await supabase
+                .from("document_templates")
+                .select("content, access_media_types!inner(name)")
+                .ilike("access_media_types.name", typeOrMediaTypeId)
+                .limit(1)
+                .maybeSingle();
+            if (data?.content) {
+                const parsed = JSON.parse(data.content);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed as string[];
+            }
         }
     } catch {
         // Fallback abajo
     }
+    const key = (typeOrMediaTypeId || "").toUpperCase();
     const typeKey = key === "P2000" ? "P2000" : key === "ACCESSPRO" ? "AccessPRO" : "KONE";
     return RESPONSIVA_LEGAL_TEXTS[typeKey as keyof typeof RESPONSIVA_LEGAL_TEXTS];
 }
@@ -57,26 +76,29 @@ export const responsivaService = {
         person_id: string;
         folio: string;
         card_type: string;
+        access_media_id?: string | null;
         data: any;
         signature: string;
         legal_hash?: string;
         legal_snapshot?: string;
     }) {
-        // Resolver plantilla por tipo legacy.
-        const { data: template } = await supabase
-            .from("document_templates")
-            .select("id")
-            .eq("legacy_key", payload.card_type)
-            .maybeSingle();
+        // Resolver el medio de acceso (por id directo o por folio + tipo).
+        let mediaTypeId: string | null = null;
+        let mediaId: string | null = payload.access_media_id ?? null;
 
-        // Resolver el medio de acceso asociado (opcional: se conserva el
-        // documento aunque no se encuentre un medio).
-        let mediaId: string | null = null;
-        if (payload.folio) {
+        if (mediaId) {
+            const { data: media } = await supabase
+                .from("access_media")
+                .select("id, media_type_id")
+                .eq("id", mediaId)
+                .maybeSingle();
+            mediaTypeId = media?.media_type_id ?? null;
+        } else if (payload.folio) {
             const { data: typeRow } = await supabase
                 .from("access_media_types")
                 .select("id")
-                .eq("legacy_key", payload.card_type)
+                .ilike("name", payload.card_type)
+                .limit(1)
                 .maybeSingle();
             if (typeRow) {
                 const { data: media } = await supabase
@@ -86,9 +108,21 @@ export const responsivaService = {
                     .eq("person_id", payload.person_id)
                     .eq("identifier", payload.folio)
                     .maybeSingle();
-                if (media) mediaId = media.id;
+                if (media) {
+                    mediaId = media.id;
+                    mediaTypeId = typeRow.id;
+                }
             }
         }
+
+        // Plantilla vinculada al tipo de medio concreto.
+        const { data: template } = mediaTypeId
+            ? await supabase
+                  .from("document_templates")
+                  .select("id")
+                  .eq("media_type_id", mediaTypeId)
+                  .maybeSingle()
+            : { data: null };
 
         const doc = await documentService.save({
             person_id: payload.person_id,

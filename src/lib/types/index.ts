@@ -183,7 +183,6 @@ export interface AccessMediaType {
     supports_replacement: boolean;
     has_floors: boolean;
     active: boolean;
-    legacy_key: string | null;
     sort_order: number | null;
     created_at: string;
 }
@@ -245,7 +244,6 @@ export interface DocumentTemplate {
     document_type: string;
     version: number;
     active: boolean;
-    legacy_key: string | null;
     content: string | null;
     created_at: string;
 }
