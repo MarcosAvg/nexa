@@ -21,7 +21,14 @@
 
     let { canEdit }: Props = $props();
 
+    let buildings = $derived(catalogState.buildings);
     let specialAccesses = $derived(catalogState.specialAccesses);
+
+    // Catálogo por edificio: el usuario elige qué edificio gestionar.
+    let selectedBuildingId = $state<number>(1);
+    let filteredAccesses = $derived(
+        specialAccesses.filter((a) => Number(a.building_id) === selectedBuildingId),
+    );
 
     // Estado de reordenamiento (evita clics consecutivos en vuelo)
     let isReordering = $state(false);
@@ -44,12 +51,18 @@
     /** Mueve un elemento de la posición `from` a la posición `to` y persiste el orden. */
     async function handleDrop(from: number, to: number) {
         if (isReordering || from === to) return;
-        const next = [...specialAccesses];
+        const next = [...filteredAccesses];
         const [item] = next.splice(from, 1);
         next.splice(to, 0, item);
         isReordering = true;
         // Actualización optimista: los desplegables reflejan el nuevo orden al instante
-        catalogState.setSpecialAccesses(next);
+        catalogState.setSpecialAccesses(
+            specialAccesses.map((a) => {
+                if (Number(a.building_id) !== selectedBuildingId) return a;
+                const idx = filteredAccesses.indexOf(a);
+                return idx >= 0 ? next[idx] : a;
+            }),
+        );
         try {
             await catalogService.reorderCatalog("special_accesses", next);
             toast.success("Orden actualizado");
@@ -78,7 +91,10 @@
             return;
         }
         try {
-            await catalogService.saveAccess(editingId, { name: accessName });
+            await catalogService.saveAccess(editingId, {
+                name: accessName,
+                buildingId: selectedBuildingId,
+            });
             await fetchAccesses();
             isModalOpen = false;
             toast.success(editingId ? "Acceso actualizado" : "Acceso creado");
@@ -120,6 +136,22 @@
         {/if}
     </div>
 
+    <div class="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-none">
+        {#each buildings as b}
+            <button
+                type="button"
+                class="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-extrabold whitespace-nowrap transition-all duration-300 active:scale-95 {Number(b.id) ===
+                selectedBuildingId
+                    ? 'bg-slate-900 text-white shadow-md'
+                    : 'bg-slate-100/60 text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
+                onclick={() => (selectedBuildingId = Number(b.id))}
+            >
+                <span class="w-1.5 h-1.5 rounded-full {Number(b.id) === selectedBuildingId ? 'bg-white' : 'bg-slate-300'}"></span>
+                {b.name}
+            </button>
+        {/each}
+    </div>
+
     {#snippet renderAccessName(row: any)}
         <div class="flex items-center gap-3">
             <div class="p-2 bg-slate-100 rounded-lg text-slate-500">
@@ -130,7 +162,7 @@
     {/snippet}
 
     <DataTable
-        data={specialAccesses}
+        data={filteredAccesses}
         columns={[{ key: "name", label: "Nombre", render: renderAccessName, sortable: false }]}
         dnd={{ onDrop: handleDrop, disabled: isReordering }}
     >
@@ -153,7 +185,11 @@
 </div>
 
 <!-- Add/Edit Access Modal -->
-<Modal bind:isOpen={isModalOpen} title={editingId ? "Editar Acceso Especial" : "Nuevo Acceso Especial"} description="Registra un nuevo punto de acceso especial.">
+<Modal
+    bind:isOpen={isModalOpen}
+    title={editingId ? "Editar Acceso Especial" : "Nuevo Acceso Especial"}
+    description={`Registra un nuevo punto de acceso especial para ${buildings.find((b) => Number(b.id) === selectedBuildingId)?.name ?? "el edificio seleccionado"}.`}
+>
     <div class="space-y-4">
         <div>
             <label for="access-name" class="block text-sm font-medium text-slate-700 mb-1">Nombre del Acceso</label>

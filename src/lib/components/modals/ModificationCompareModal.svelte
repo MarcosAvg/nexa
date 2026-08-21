@@ -194,10 +194,20 @@
         isSubmitting = true;
 
         try {
-            // Construir payload de guardado desde datos modificados
+            // Construir payload de guardado desde datos modificados.
+            // floorsByBuilding se deriva de las listas completas del ticket para
+            // que savePersonAccess persista los permisos en el modelo nuevo.
+            const p2000 = (modifiedData as any).floors_p2000 ?? [];
+            const kone = (modifiedData as any).floors_kone ?? [];
+            const specialAccesses =
+                (modifiedData as any).specialAccesses ??
+                (modifiedData as any).special_accesses ??
+                [];
             const saveData = {
                 id: currentPerson.id,
                 ...modifiedData,
+                floorsByBuilding: { 1: { p2000, kone } },
+                specialAccesses,
             };
 
             await personnelService.save(saveData);

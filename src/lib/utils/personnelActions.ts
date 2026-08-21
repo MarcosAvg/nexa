@@ -126,7 +126,7 @@ export const personnelActions = {
             const { data: tickets } = await sb
                 .from("tickets")
                 .select("id")
-                .eq("card_id", card.id)
+                .eq("access_media_id", card.id)
                 .eq("type", "Programación")
                 .eq("status", "pending");
 

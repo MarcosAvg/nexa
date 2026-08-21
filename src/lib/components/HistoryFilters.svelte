@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Search, Filter, Calendar } from "lucide-svelte";
     import Select from "./Select.svelte";
+    import { catalogState } from "../stores";
 
     /**
      * HistoryFilters — Filtros para la vista de Historial.
@@ -36,6 +37,8 @@
     }: Props = $props();
 
     import { FILTERED_ACTIONS } from "../constants/history";
+
+    let mediaTypeNames = $derived(catalogState.activeMediaTypeNames());
 </script>
 
 <div class="flex flex-col lg:flex-row gap-4 w-full flex-wrap">
@@ -67,9 +70,9 @@
         >Tipo de Tarjeta</label>
         <Select id="filter-type" bind:value={cardType} placeholder="">
             <option value="Todos">Todos</option>
-            <option value="P2000">P2000</option>
-            <option value="KONE">KONE</option>
-            <option value="AccessPRO">AccessPRO</option>
+            {#each mediaTypeNames as t}
+                <option value={t}>{t}</option>
+            {/each}
         </Select>
     </div>
 

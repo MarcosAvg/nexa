@@ -74,9 +74,9 @@ async function fetchKoneResponsivaSignDates(): Promise<Map<string, string>> {
         const allRows = await batchPaginate<any>(
             async (from, to) => {
                 const { data, error } = await supabase
-                    .from('signed_responsivas')
-                    .select('person_id, created_at')
-                    .eq('card_type', 'KONE')
+                    .from('signed_documents')
+                    .select('person_id, created_at, document_templates!inner(legacy_key)')
+                    .eq('document_templates.legacy_key', 'KONE')
                     .order('created_at', { ascending: false })
                     .range(from, to);
                 return { data, error };

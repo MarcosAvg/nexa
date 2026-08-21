@@ -1,4 +1,5 @@
 import { cardService } from "../services/cards";
+import { accessMediaService } from "../services/accessMedia";
 import type { Card } from "../types";
 import { PaginatedListState } from "./paginatedList.svelte";
 
@@ -32,9 +33,44 @@ export class CardState {
 
     async refresh(page?: number) {
         await this.pagination.fetchPage(
-            (p, s) => cardService.fetchAll(p, s, this.filters.search, this.filters.type, this.filters.status, this.filters.dependencyId),
+            (p, s) => this.fetch(p, s),
             page,
         );
+    }
+
+    /**
+     * Lee el modelo nuevo (access_media) y lo normaliza a la forma que espera
+     * la vista. Si falla, hace fallback al modelo legacy (cards).
+     */
+    private async fetch(page: number, size: number): Promise<{ data: Card[]; count: number }> {
+        try {
+            const res = await accessMediaService.fetchAll(
+                page,
+                size,
+                this.filters.search,
+                this.filters.type,
+                this.filters.status,
+                this.filters.dependencyId,
+            );
+            const data = res.data.map((m) => ({
+                ...m,
+                // Las acciones de la vista operan sobre access_media.id.
+                id: m.id as string,
+                access_media_id: m.id,
+                type: m.access_media_types?.name ?? (m.metadata?.legacy_type as string) ?? "",
+                folio: m.identifier ?? "",
+            })) as unknown as Card[];
+            return { data, count: res.count };
+        } catch {
+            return cardService.fetchAll(
+                page,
+                size,
+                this.filters.search,
+                this.filters.type,
+                this.filters.status,
+                this.filters.dependencyId,
+            );
+        }
     }
 
     setFilters(type: string, status: string, depId: string = "") {

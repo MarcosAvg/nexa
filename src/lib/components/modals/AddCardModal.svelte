@@ -2,7 +2,7 @@
     import Modal from "../Modal.svelte";
     import Button from "../Button.svelte";
     import Badge from "../Badge.svelte";
-    import { personnelState } from "../../stores";
+    import { personnelState, catalogState } from "../../stores";
     import {
         Search,
         CreditCard,
@@ -58,8 +58,36 @@
     let personnel = $derived(personnelState.pagination.items);
     let extraCards = $derived(personnelState.extraCards);
 
-    type CardType = "P2000" | "KONE" | "AccessPRO";
-    let cardType = $state<CardType>("P2000");
+    let cardType = $state<string>("P2000");
+    // Medios de acceso activos, para renderizar el selector dinámicamente.
+    let mediaTypes = $derived.by(() =>
+        catalogState.mediaTypes
+            .filter((m) => (m as any).active !== false)
+            .sort((a, b) => ((a as any).sort_order ?? 0) - ((b as any).sort_order ?? 0)),
+    );
+    // Clases estáticas (Tailwind JIT requiere literales completos).
+    const TYPE_ACTIVE_CLASSES = [
+        "border-amber-500 bg-amber-50 text-amber-900 shadow-sm",
+        "border-sky-500 bg-sky-50 text-sky-900 shadow-sm",
+        "border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm",
+        "border-violet-500 bg-violet-50 text-violet-900 shadow-sm",
+        "border-rose-500 bg-rose-50 text-rose-900 shadow-sm",
+        "border-indigo-500 bg-indigo-50 text-indigo-900 shadow-sm",
+    ];
+    const TYPE_DOT_CLASSES = [
+        "bg-amber-500",
+        "bg-sky-500",
+        "bg-emerald-500",
+        "bg-violet-500",
+        "bg-rose-500",
+        "bg-indigo-500",
+    ];
+    function typeActiveClass(i: number): string {
+        return TYPE_ACTIVE_CLASSES[i % TYPE_ACTIVE_CLASSES.length];
+    }
+    function typeDotClass(i: number): string {
+        return TYPE_DOT_CLASSES[i % TYPE_DOT_CLASSES.length];
+    }
     let searchQuery = $state("");
     let isSubmitting = $state(false);
     let confirmCreate = $state(false);
@@ -68,9 +96,9 @@
     // Sincronizar tipo de tarjeta al reemplazar o cuando allowedCardTypes restringe a un tipo
     $effect(() => {
         if (replacingCard) {
-            cardType = replacingCard.type as CardType;
+            cardType = replacingCard.type;
         } else if (allowedCardTypes?.length === 1) {
-            cardType = allowedCardTypes[0] as CardType;
+            cardType = allowedCardTypes[0];
         }
     });
 
@@ -310,82 +338,32 @@
                 >Tipo de Acceso</span
             >
             <div class="grid grid-cols-3 gap-2">
-                <button
-                    type="button"
-                    disabled={!!replacingCard}
-                    class="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all {cardType ===
-                    'P2000'
-                        ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-sm'
-                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'} {replacingCard &&
-                    cardType !== 'P2000'
-                        ? 'opacity-50 cursor-not-allowed'
-                        : ''}"
-                    onclick={() => {
-                        if (!replacingCard) cardType = "P2000";
-                    }}
-                >
-                    <span class="text-sm font-bold">P2000</span>
-                    <span class="text-[10px] opacity-70"
-                        >Puertas/Torniquetes</span
+                {#each mediaTypes as m, i}
+                    <button
+                        type="button"
+                        disabled={!!replacingCard}
+                        class="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all {cardType ===
+                        m.name
+                            ? typeActiveClass(i)
+                            : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'} {replacingCard &&
+                        cardType !== m.name
+                            ? 'opacity-50 cursor-not-allowed'
+                            : ''}"
+                        onclick={() => {
+                            if (!replacingCard) cardType = m.name;
+                        }}
                     >
-                    {#if cardType === "P2000"}
-                        <div
-                            class="absolute -top-2 -right-2 bg-amber-500 text-white rounded-full p-0.5"
-                        >
-                            <CheckCircle2 size={14} />
-                        </div>
-                    {/if}
-                </button>
-
-                <button
-                    type="button"
-                    disabled={!!replacingCard}
-                    class="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all {cardType ===
-                    'KONE'
-                        ? 'border-sky-500 bg-sky-50 text-sky-900 shadow-sm'
-                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'} {replacingCard &&
-                    cardType !== 'KONE'
-                        ? 'opacity-50 cursor-not-allowed'
-                        : ''}"
-                    onclick={() => {
-                        if (!replacingCard) cardType = "KONE";
-                    }}
-                >
-                    <span class="text-sm font-bold">KONE</span>
-                    <span class="text-[10px] opacity-70">Elevadores</span>
-                    {#if cardType === "KONE"}
-                        <div
-                            class="absolute -top-2 -right-2 bg-sky-500 text-white rounded-full p-0.5"
-                        >
-                            <CheckCircle2 size={14} />
-                        </div>
-                    {/if}
-                </button>
-
-                <button
-                    type="button"
-                    disabled={!!replacingCard}
-                    class="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all {cardType ===
-                    'AccessPRO'
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm'
-                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'} {replacingCard &&
-                    cardType !== 'AccessPRO'
-                        ? 'opacity-50 cursor-not-allowed'
-                        : ''}"
-                    onclick={() => {
-                        if (!replacingCard) cardType = "AccessPRO";
-                    }}
-                >
-                    <span class="text-sm font-bold">AccessPRO</span>
-                    <span class="text-[10px] opacity-70">Entrada</span>
-                    {#if cardType === "AccessPRO"}
-                        <div
-                            class="absolute -top-2 -right-2 bg-emerald-500 text-white rounded-full p-0.5"
-                        >
-                            <CheckCircle2 size={14} />
-                        </div>
-                    {/if}
-                </button>
+                        <span class="text-sm font-bold">{m.name}</span>
+                        <span class="text-[10px] opacity-70">{m.key}</span>
+                        {#if cardType === m.name}
+                            <div
+                                class="absolute -top-2 -right-2 {typeDotClass(i)} text-white rounded-full p-0.5"
+                            >
+                                <CheckCircle2 size={14} />
+                            </div>
+                        {/if}
+                    </button>
+                {/each}
             </div>
         </div>
 

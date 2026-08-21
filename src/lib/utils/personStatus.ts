@@ -2,16 +2,15 @@
  * personStatus.ts
  *
  * Cálculo centralizado del estado mostrado de una persona a partir de sus
- * tarjetas y su estado en base de datos.
+ * medios de acceso y su estado en base de datos.
  *
- * Reglas (aplica a P2000, KONE y AccessPRO):
- *  - "Activo/a": al menos 2 tipos P2000/KONE listos (programados + firmados),
- *    O la persona SOLO tiene tarjetas AccessPRO (sin P2000/KONE) y tiene al
- *    menos una AccessPRO asignada (activa).
- *  - "Parcial": exactamente 1 tipo P2000/KONE listo.
- *  - AccessPRO NUNCA cuenta para el umbral de 2 tipos (es un acceso secundario
- *    de otro edificio), pero una persona cuya única tarjeta es AccessPRO debe
- *    verse como Activa.
+ * Reglas (generalizadas por `has_floors`):
+ *  - "Activo/a": al menos 2 tipos con pisos listos (programados + firmados),
+ *    O la persona SOLO tiene tipos sin pisos (ej. AccessPRO) y tiene al menos
+ *    uno asignado (activo).
+ *  - "Parcial": exactamente 1 tipo con pisos listo.
+ *  - Los tipos sin pisos NUNCA cuentan para el umbral de 2 tipos (son accesos
+ *    secundarios), pero una persona cuyo único acceso es de ese tipo se ve Activa.
  */
 
 export interface StatusCardInput {
@@ -19,6 +18,7 @@ export interface StatusCardInput {
     status: string;
     programming_status: string | null;
     responsiva_status: string | null;
+    has_floors?: boolean;
 }
 
 export function computePersonStatus(
@@ -33,25 +33,21 @@ export function computePersonStatus(
                 c.responsiva_status === "legacy"),
     );
 
-    // Solo P2000/KONE cuentan para el umbral de 2 tipos
+    // Solo los tipos con pisos cuentan para el umbral de 2 tipos.
     const coreReadyTypes = new Set(
-        readyCards
-            .filter((c) => c.type === "P2000" || c.type === "KONE")
-            .map((c) => c.type),
+        readyCards.filter((c) => c.has_floors).map((c) => c.type),
     );
 
-    const hasCoreCards = allCards.some(
-        (c) => c.type === "P2000" || c.type === "KONE",
-    );
-    const hasActiveAccessPro = allCards.some(
-        (c) => c.type === "AccessPRO" && c.status === "active",
+    const hasCoreCards = allCards.some((c) => c.has_floors);
+    const hasActiveNonCore = allCards.some(
+        (c) => !c.has_floors && c.status === "active",
     );
 
     if (dbStatus === "active") {
         if (coreReadyTypes.size >= 2) return "Activo/a";
         if (coreReadyTypes.size === 1) return "Parcial";
-        // Solo AccessPRO (sin P2000/KONE) y asignada → Activa
-        if (!hasCoreCards && hasActiveAccessPro) return "Activo/a";
+        // Solo tipos sin pisos y asignados → Activa
+        if (!hasCoreCards && hasActiveNonCore) return "Activo/a";
         if (allCards.length > 0) return "Bloqueado/a";
         return "Sin Acceso";
     }

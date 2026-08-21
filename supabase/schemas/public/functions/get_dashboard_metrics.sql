@@ -18,16 +18,17 @@ BEGIN
 
     WITH person_ready_cards AS (
         SELECT p.id, p.status as db_status,
-            COUNT(DISTINCT c.type) FILTER (
-                WHERE c.type IN ('P2000', 'KONE')
-                  AND c.status = 'active'
-                  AND c.programming_status = 'done'
-                  AND c.responsiva_status IN ('signed', 'legacy')
+            COUNT(DISTINCT t.id) FILTER (
+                WHERE t.has_floors
+                  AND am.status = 'active'
+                  AND am.programming_status = 'done'
+                  AND am.responsiva_status IN ('signed', 'legacy')
             ) as core_ready_types,
-            BOOL_OR(c.type IN ('P2000', 'KONE')) as has_core_cards,
-            BOOL_OR(c.type = 'AccessPRO' AND c.status = 'active') as has_active_accesspro
+            BOOL_OR(t.has_floors) as has_core_cards,
+            BOOL_OR((NOT t.has_floors) AND am.status = 'active') as has_active_noncore
         FROM personnel p
-        LEFT JOIN cards c ON c.person_id = p.id
+        LEFT JOIN access_media am ON am.person_id = p.id
+        LEFT JOIN access_media_types t ON t.id = am.media_type_id
         GROUP BY p.id, p.status
     ),
     computed_statuses AS (
@@ -37,7 +38,7 @@ BEGIN
                 WHEN db_status = 'active' AND core_ready_types = 1 THEN 'parcial'
                 WHEN db_status = 'active' AND core_ready_types = 0
                      AND COALESCE(has_core_cards, false) = false
-                     AND COALESCE(has_active_accesspro, false) = true THEN 'activo'
+                     AND COALESCE(has_active_noncore, false) = true THEN 'activo'
                 WHEN db_status = 'active' AND core_ready_types = 0 THEN 'inactivo'
                 WHEN db_status = 'blocked' THEN 'bloqueado'
                 ELSE 'baja'
@@ -56,17 +57,25 @@ BEGIN
     FROM (
         SELECT p.id
         FROM personnel p
-        JOIN cards c ON c.person_id = p.id
-            AND c.status = 'active'
-            AND c.programming_status = 'done'
-            AND c.responsiva_status IN ('signed', 'legacy')
+        JOIN access_media am ON am.person_id = p.id
+        JOIN access_media_types t ON t.id = am.media_type_id
         WHERE p.status = 'active'
+          AND am.status = 'active'
+          AND am.programming_status = 'done'
+          AND am.responsiva_status IN ('signed', 'legacy')
         GROUP BY p.id
-        HAVING COUNT(DISTINCT c.type) >= 1
+        HAVING COUNT(DISTINCT t.id) >= 1
     ) AS op;
 
-    SELECT COUNT(DISTINCT person_id) INTO con_p2000_count FROM cards WHERE type = 'P2000' AND status = 'active' AND person_id IS NOT NULL;
-    SELECT COUNT(DISTINCT person_id) INTO con_kone_count FROM cards WHERE type = 'KONE' AND status = 'active' AND person_id IS NOT NULL;
+    SELECT COUNT(DISTINCT am.person_id) INTO con_p2000_count
+    FROM access_media am
+    INNER JOIN access_media_types t ON t.id = am.media_type_id
+    WHERE t.key = 'p2000' AND am.status = 'active' AND am.person_id IS NOT NULL;
+
+    SELECT COUNT(DISTINCT am.person_id) INTO con_kone_count
+    FROM access_media am
+    INNER JOIN access_media_types t ON t.id = am.media_type_id
+    WHERE t.key = 'kone' AND am.status = 'active' AND am.person_id IS NOT NULL;
 
     SELECT json_build_object(
         'operativos', operativos_count,

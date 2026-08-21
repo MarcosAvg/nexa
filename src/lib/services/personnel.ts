@@ -2,6 +2,7 @@ import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate, batchCollectIds } from "../utils";
 import { computePersonStatus } from "../utils/personStatus";
+import { deriveAccessFromAssignments } from "./accessAssignments";
 import type { Person, Card, DashboardMetrics } from "../types";
 import { networkStore } from "../stores/network.svelte";
 
@@ -24,14 +25,12 @@ interface PersonnelRow {
     building_name?: string | null;
     dependency_name?: string | null;
     photo_url?: string | null;
-    floors_p2000?: string[];
-    floors_kone?: string[];
-    special_accesses?: string[];
     schedule_id?: string | null;
     schedule_name?: string | null;
     schedules?: { name: string; default_entry?: string; default_exit?: string } | null;
     buildings?: { name: string } | null;
     dependencies?: { name: string } | null;
+    access_assignments?: any[];
     cards?: {
         id: string;
         folio: string;
@@ -42,8 +41,23 @@ interface PersonnelRow {
     }[];
 }
 
+/** Convierte filas de access_media (con access_media_types) a la forma `cards` que usa la UI. */
+function toCardsShape(media: any[] | null | undefined): Card[] {
+    return (media || []).map((m: any) => ({
+        id: m.id,
+        folio: m.identifier ?? "",
+        type: m.access_media_types?.name ?? (m.metadata?.legacy_type as string) ?? "",
+        status: m.status,
+        person_id: m.person_id,
+        programming_status: m.programming_status,
+        responsiva_status: m.responsiva_status,
+        has_floors: m.access_media_types?.has_floors,
+    }));
+}
+
 const mapPersonRecord = (p: PersonnelRow): Person => {
-    const allCards = (p.cards || []);
+    const allCards = toCardsShape((p as any).access_media);
+    const access = deriveAccessFromAssignments((p as any).access_assignments);
 
     const displayStatus = p.computed_status
         || computePersonStatus(p.status, allCards);
@@ -71,10 +85,10 @@ const mapPersonRecord = (p: PersonnelRow): Person => {
         } : null),
         status_raw: p.status,
         status: displayStatus,
-        cards: p.cards || [],
-        floors_p2000: p.floors_p2000 || [],
-        floors_kone: p.floors_kone || [],
-        specialAccesses: p.special_accesses || []
+        cards: allCards,
+        floors_p2000: access.floors_p2000,
+        floors_kone: access.floors_kone,
+        specialAccesses: access.specialAccesses
     } as Person;
 };
 
@@ -90,7 +104,7 @@ export const personnelService = {
 
             let query = supabase
                 .from("personnel_with_status")
-                .select("*, cards(id, folio, type, status, programming_status, responsiva_status)", { count: "exact" });
+                .select("*, access_media(id, identifier, status, programming_status, responsiva_status, access_media_types(name, has_floors)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key))", { count: "exact" });
 
             if (search) {
                 const terms = search.trim().split(/\s+/).filter(Boolean);
@@ -136,7 +150,7 @@ export const personnelService = {
             if (withCount) {
                 q = q.select("*", { count: "exact", head: true });
             } else {
-                q = q.select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+                q = q.select("*, access_media(*, access_media_types(name, has_floors)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)");
             }
 
             if (search) {
@@ -205,7 +219,7 @@ export const personnelService = {
             const dbStatusMap: Record<string, string> = { "Bloqueado/a": "blocked", "Baja": "inactive" };
 
             const allData = await batchPaginate<any>(async (from, to) => {
-                let q = supabase.from("personnel").select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+                let q = supabase.from("personnel").select("*, access_media(*, access_media_types(name, has_floors)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)");
                 if (search) {
                     const terms = search.trim().split(/\s+/).filter(Boolean);
                     for (const term of terms) q = q.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
@@ -226,7 +240,7 @@ export const personnelService = {
         return withErrorHandlingSafe(async () => {
             const { data, error } = await supabase
                 .from("personnel")
-                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)")
+                .select("*, access_media(*, access_media_types(name, has_floors)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)")
                 .eq("id", id).single();
             if (error) throw error;
             return data ? mapPersonRecord(data) : null;
@@ -249,7 +263,7 @@ export const personnelService = {
                 const terms = queryStr.split(/\s+/).filter(Boolean);
                 if (terms.length === 0) return [];
 
-                peopleQuery = supabase.from("personnel").select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+                peopleQuery = supabase.from("personnel").select("*, access_media(*, access_media_types(name, has_floors)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)");
                 for (const term of terms) peopleQuery = peopleQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
                 peopleQuery = peopleQuery.order("first_name", { ascending: true }).limit(20);
             } else {
@@ -257,7 +271,7 @@ export const personnelService = {
                 if (error) throw error;
                 if (!data || data.length === 0) return [];
                 rpcIds = data.map((p: { id: string }) => p.id);
-                peopleQuery = supabase.from("personnel").select("*, cards(*), buildings(name), dependencies(name), schedules(*)").in("id", rpcIds ?? []);
+                peopleQuery = supabase.from("personnel").select("*, access_media(*, access_media_types(name, has_floors)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)").in("id", rpcIds ?? []);
             }
 
             const { data: fullPeople, error: fetchError } = await peopleQuery;
@@ -269,17 +283,20 @@ export const personnelService = {
                 orderedPeople = rpcIds.map(id => idToData[id]).filter(Boolean);
             }
 
-            return orderedPeople.map(p => ({
-                id: p.id, first_name: p.first_name, last_name: p.last_name,
-                name: `${p.first_name} ${p.last_name}`, employee_no: p.employee_no,
-                email: p.email, area: p.area, position: p.position, floor: p.floor,
-                building: p.buildings?.name || "N/A", dependency: p.dependencies?.name || "N/A",
-                building_id: p.building_id, dependency_id: p.dependency_id,
-                schedule: p.schedules ? { days: p.schedules.name, entry: p.entry_time || p.schedules.default_entry || "09:00", exit: p.exit_time || p.schedules.default_exit || "18:00" } : null,
-                status_raw: p.status, status: p.status, cards: p.cards || [],
-                floors_p2000: p.floors_p2000 || [], floors_kone: p.floors_kone || [],
-                specialAccesses: p.special_accesses || []
-            } as Person));
+            return orderedPeople.map(p => {
+                const access = deriveAccessFromAssignments(p.access_assignments);
+                return {
+                    id: p.id, first_name: p.first_name, last_name: p.last_name,
+                    name: `${p.first_name} ${p.last_name}`, employee_no: p.employee_no,
+                    email: p.email, area: p.area, position: p.position, floor: p.floor,
+                    building: p.buildings?.name || "N/A", dependency: p.dependencies?.name || "N/A",
+                    building_id: p.building_id, dependency_id: p.dependency_id,
+                    schedule: p.schedules ? { days: p.schedules.name, entry: p.entry_time || p.schedules.default_entry || "09:00", exit: p.exit_time || p.schedules.default_exit || "18:00" } : null,
+                    status_raw: p.status, status: p.status, cards: toCardsShape(p.access_media),
+                    floors_p2000: access.floors_p2000, floors_kone: access.floors_kone,
+                    specialAccesses: access.specialAccesses
+                } as Person;
+            });
         }, "Search Personnel by Name (Fuzzy)", []);
     },
 
@@ -337,12 +354,9 @@ export const personnelService = {
                 dependency_id: data.dependency_id || data.dependencyId,
                 building_id: data.building_id || data.buildingId,
                 floor: data.floor || data.pisoBase,
-                floors_p2000: data.floors_p2000 || [],
-                floors_kone: data.floors_kone || [],
                 schedule_id: data.schedule_id || data.scheduleId,
                 entry_time: data.entry_time || null,
                 exit_time: data.exit_time || null,
-                special_accesses: data.specialAccesses || data.special_accesses || [],
                 email: data.email || null,
                 status: data.status || "active"
             };
@@ -364,6 +378,17 @@ export const personnelService = {
                 const { cardService } = await import("./cards");
                 for (const card of cards) await cardService.save({ ...card, person_id: personId });
             }
+
+            // Reconciliar permisos (pisos + accesos especiales) directamente sobre
+            // el modelo nuevo, sin depender de columnas legacy ni triggers.
+            const { accessAssignmentService } = await import("./accessAssignments");
+            const specialAccesses = data.specialAccesses || data.special_accesses || [];
+            const floorsByBuilding = (data as any).floorsByBuilding || {};
+            await accessAssignmentService.savePersonAccess(
+                String(personId),
+                floorsByBuilding,
+                specialAccesses,
+            );
         }, "Save Personnel");
     },
 
@@ -372,7 +397,7 @@ export const personnelService = {
             const { error } = await withTimeout(supabase.from("personnel").update({ status }).eq("id", id));
             if (error) throw error;
 
-            const { error: cardError } = await withTimeout(supabase.from("cards").update({ status }).eq("person_id", id));
+            const { error: cardError } = await withTimeout(supabase.from("access_media").update({ status }).eq("person_id", id));
             if (cardError) throw cardError;
 
             if (status === "inactive" || status === "baja") {
@@ -398,8 +423,8 @@ export const personnelService = {
 
             if (cardActionMap) {
                 for (const [cardId, action] of Object.entries(cardActionMap)) {
-                    if (action === "delete") await supabase.from("cards").delete().eq("id", cardId);
-                    else if (action === "keep") await supabase.from("cards").update({ person_id: null, status: "available", responsiva_status: "unsigned", programming_status: "pending" }).eq("id", cardId);
+                    if (action === "delete") await supabase.from("access_media").delete().eq("id", cardId);
+                    else if (action === "keep") await supabase.from("access_media").update({ person_id: null, status: "available", responsiva_status: "unsigned", programming_status: "pending" }).eq("id", cardId);
                 }
             }
 
@@ -415,8 +440,10 @@ export const personnelService = {
 
     async fetchDashboardStats() {
         return withErrorHandlingSafe(async () => {
+            // El modelo nuevo (access_media) es la fuente; coincide con la RPC
+            // get_dashboard_stats.
             const readyPersonIds = await batchCollectIds(async (from, to) => {
-                return supabase.from("cards")
+                return supabase.from("access_media")
                     .select("person_id").eq("status", "active").eq("programming_status", "done")
                     .in("responsiva_status", ["signed", "legacy"]).not("person_id", "is", null)
                     .range(from, to);
@@ -429,19 +456,26 @@ export const personnelService = {
             let activePersonnelCount = 0;
             for (const id of readyPersonIds) { if (activePersonnelIds.has(id)) activePersonnelCount++; }
 
-            const { count: koneStock, error: kError } = await supabase.from("cards")
-                .select("*", { count: "exact", head: true }).is("person_id", null).eq("status", "available").eq("type", "KONE");
-            if (kError) throw kError;
+            const stockFor = async (key: string, buildingId?: number) => {
+                let query = supabase
+                    .from("access_media")
+                    .select("id, access_media_types!inner(key, building_id)", { count: "exact", head: true })
+                    .eq("access_media_types.key", key)
+                    .is("person_id", null)
+                    .eq("status", "available");
+                if (buildingId !== undefined) {
+                    query = query.eq("access_media_types.building_id", buildingId);
+                }
+                const { count, error } = await query;
+                if (error) throw error;
+                return count || 0;
+            };
 
-            const { count: p2000Stock, error: p2Error } = await supabase.from("cards")
-                .select("*", { count: "exact", head: true }).is("person_id", null).eq("status", "available").eq("type", "P2000");
-            if (p2Error) throw p2Error;
+            const koneStock = await stockFor("kone");
+            const p2000Stock = await stockFor("p2000");
+            const accessproStock = await stockFor("accesspro");
 
-            const { count: accessproStock, error: aError } = await supabase.from("cards")
-                .select("*", { count: "exact", head: true }).is("person_id", null).eq("status", "available").eq("type", "AccessPRO");
-            if (aError) throw aError;
-
-            return { activePersonnel: activePersonnelCount, koneStock: koneStock || 0, p2000Stock: p2000Stock || 0, accessproStock: accessproStock || 0 };
+            return { activePersonnel: activePersonnelCount, koneStock, p2000Stock, accessproStock };
         }, "Fetch Dashboard Stats", { activePersonnel: 0, koneStock: 0, p2000Stock: 0, accessproStock: 0 });
     },
 

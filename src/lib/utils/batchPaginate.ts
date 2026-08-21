@@ -8,7 +8,7 @@
  * Ejemplo de uso:
  *
  *   const items = await batchPaginate(async (from, to) => {
- *       return supabase.from("cards").select("*").eq("type", "KONE").range(from, to);
+ *       return supabase.from("access_media").select("*").range(from, to);
  *   });
  */
 

@@ -71,7 +71,7 @@ async function fetchPendingKoneResponsivaSet(personIds: string[]): Promise<Set<s
 
     const { data, error } = await supabase
         .from("tickets")
-        .select("person_id, cards!card_id(type)")
+        .select("person_id, access_media!access_media_id(access_media_types(name))")
         .eq("type", "Firma Responsiva")
         .eq("status", "pending")
         .in("person_id", unique);
@@ -79,8 +79,8 @@ async function fetchPendingKoneResponsivaSet(personIds: string[]): Promise<Set<s
     if (error || !data) return new Set();
 
     return new Set(
-        (data as { person_id: string; cards?: { type: string }[] | null }[])
-            .filter((t) => t.cards?.some?.((c) => c.type === "KONE") ?? false)
+        (data as { person_id: string; access_media?: { access_media_types?: { name?: string } | null }[] | null }[])
+            .filter((t) => t.access_media?.some?.((c) => c.access_media_types?.name === "KONE") ?? false)
             .map((t) => t.person_id)
     );
 }

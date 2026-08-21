@@ -48,6 +48,7 @@
     let pageSize = $derived(cardState.pagination.pageSize);
     let totalRecords = $derived(cardState.pagination.totalRecords);
     let isLoading = $derived(cardState.pagination.isLoading);
+    let mediaTypeNames = $derived(catalogState.activeMediaTypeNames());
 
     // No onMount necesario: el $effect debounced dispara la carga inicial automáticamente
 
@@ -196,7 +197,7 @@
     <SectionHeader title="Gestión de tarjetas">
         {#snippet filters()}                <FilterGroup
                 label="Tipo"
-                options={["Todos", "KONE", "P2000", "AccessPRO"]}
+                options={["Todos", ...mediaTypeNames]}
                 bind:value={cardState.filters.type}
             />
             <FilterGroup

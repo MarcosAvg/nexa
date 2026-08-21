@@ -23,8 +23,8 @@
      * <CardItem type="KONE" folio="KNE-001" status="active" onBlock={handleBlock} />
      */
     type Props = {
-        /** Tipo de tarjeta: P2000 (puertas), KONE (elevadores) o AccessPRO (entrada). */
-        type: "P2000" | "KONE" | "AccessPRO";
+        /** Tipo de acceso (medio de acceso del catálogo). */
+        type: string;
         /** Folio único de la tarjeta. */
         folio: string;
         /** Estado de la tarjeta. @default "active" */

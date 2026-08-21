@@ -1,13 +1,13 @@
 <script lang="ts">
-    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, ScheduleCatalog, UserManagementSection } from "../components";
-    import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature } from "lucide-svelte";
+    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection } from "../components";
+    import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard } from "lucide-svelte";
     import { userState, catalogState, settingsState } from "../stores";
     import { networkStore } from "../stores/network.svelte";
     import { generateRequestTemplate, generateKoneUsageTemplate, generateAccessProTemplate, handleError } from "../utils";
     import { toast } from "svelte-sonner";
 
     let activeTab = $state<"catalogos" | "usuarios" | "responsiva">("catalogos");
-    let activeCatalog = $state<"edificios" | "dependencias" | "accesos" | "dias">("edificios");
+    let activeCatalog = $state<"edificios" | "dependencias" | "accesos" | "dias" | "medios">("edificios");
 
     // Campos editables de configuración de responsiva
     let pickupDaysInput = $state(settingsState.responsivaPickupDays);
@@ -93,6 +93,7 @@
         { id: "edificios", label: "Edificios", icon: Building2 },
         { id: "dependencias", label: "Dependencias", icon: Briefcase },
         { id: "accesos", label: "Accesos", icon: Key },
+        { id: "medios", label: "Medios", icon: CreditCard },
         { id: "dias", label: "Horarios", icon: Calendar },
     ] as const;
 </script>
@@ -170,6 +171,8 @@
                         <DependencyCatalog {canEdit} />
                     {:else if activeCatalog === "accesos"}
                         <AccessCatalog {canEdit} />
+                    {:else if activeCatalog === "medios"}
+                        <MediaTypeCatalog {canEdit} />
                     {:else if activeCatalog === "dias"}
                         <ScheduleCatalog {canEdit} />
                     {/if}

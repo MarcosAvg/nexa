@@ -9,12 +9,9 @@ create table "public"."personnel" (
   "dependency_id"    bigint,
   "building_id"      bigint,
   "floor"            text,
-  "floors_p2000"     text[]                   default '{}'::text[],
-  "floors_kone"      text[]                   default '{}'::text[],
   "schedule_id"      bigint,
   "entry_time"       time without time zone,
   "exit_time"        time without time zone,
-  "special_accesses" text[]                   default '{}'::text[],
   "status"           text                     default 'active'::text,
   "photo_url"        text,
   "created_at"       timestamp with time zone default now(),
@@ -53,6 +50,11 @@ create index idx_personnel_name on public.personnel using btree (first_name, las
 create index idx_personnel_schedule_id on public.personnel using btree (schedule_id);
 
 create index idx_personnel_status on public.personnel using btree (status);
+
+create trigger trigger_sync_personnel_access
+  after insert or update or delete on public.personnel
+  for each row
+  execute function public.sync_personnel_access_to_assignments();
 
 create policy "Admins/Operators delete personnel" on "public"."personnel"
   for delete

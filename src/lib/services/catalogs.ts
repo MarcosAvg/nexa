@@ -3,7 +3,7 @@ import { HistoryService } from "./history";
 import { withErrorHandling, withErrorHandlingConditional, catalogCache } from "../utils";
 
 /** Tablas de catálogo que soportan orden personalizado. */
-const CATALOG_TABLES = ["buildings", "dependencies", "schedules", "special_accesses"] as const;
+const CATALOG_TABLES = ["buildings", "dependencies", "schedules", "special_accesses", "access_media_types"] as const;
 export type CatalogTable = (typeof CATALOG_TABLES)[number];
 
 /**
@@ -13,14 +13,50 @@ export type CatalogTable = (typeof CATALOG_TABLES)[number];
 const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
 /** Retorna el siguiente valor de sort_order (max + 1) para que los nuevos items vayan al final. */
-async function getNextSortOrder(table: CatalogTable): Promise<number> {
-    const { data, error } = await supabase
+async function getNextSortOrder(table: CatalogTable, buildingId?: number): Promise<number> {
+    let query = supabase
         .from(table)
         .select("sort_order")
         .order("sort_order", { ascending: false })
         .limit(1);
+    // special_accesses es un catálogo por edificio: el orden se calcula dentro
+    // de cada edificio para no intercalar los items.
+    if (buildingId) query = query.eq("building_id", buildingId);
+    const { data, error } = await query;
     if (error) throw error;
     return ((data?.[0]?.sort_order as number | null | undefined) ?? 0) + 1;
+}
+
+/** Sincroniza la tabla floors (fuente canónica) con el array de pisos de un edificio. */
+async function syncBuildingFloors(buildingId: number, floors: string[]) {
+    const labels = (floors || []).map((f) => f.trim()).filter(Boolean);
+
+    // Preserva los IDs de pisos existentes: los permisos referencian floors.id,
+    // así que solo se eliminan los que dejaron de existir y se insertan los nuevos.
+    const { data: existing } = await supabase
+        .from("floors")
+        .select("id, label")
+        .eq("building_id", buildingId);
+    const idByLabel = new Map<string, number>((existing || []).map((f) => [f.label, f.id]));
+
+    if (labels.length > 0) {
+        await supabase.from("floors").upsert(
+            labels.map((label, i) => ({
+                ...(idByLabel.has(label) ? { id: idByLabel.get(label) } : {}),
+                building_id: buildingId,
+                label,
+                sort_order: i,
+            })),
+            { onConflict: "building_id,label" },
+        );
+    }
+
+    const kept = new Set(labels);
+    for (const [label, id] of idByLabel) {
+        if (!kept.has(label)) {
+            await supabase.from("floors").delete().eq("id", id);
+        }
+    }
 }
 
 export const catalogService = {
@@ -50,7 +86,22 @@ export const catalogService = {
                 .order("sort_order", { ascending: true })
                 .order("id", { ascending: true });
             if (error) throw error;
-            const result = data || [];
+
+            // Pisos derivados de la tabla canónica floors (no del array legacy).
+            const { data: floorsData } = await supabase
+                .from("floors")
+                .select("building_id, label")
+                .order("sort_order", { ascending: true });
+            const floorsByBuilding = new Map<number, string[]>();
+            for (const f of floorsData || []) {
+                if (!floorsByBuilding.has(f.building_id)) floorsByBuilding.set(f.building_id, []);
+                floorsByBuilding.get(f.building_id)!.push(f.label);
+            }
+
+            const result = (data || []).map((b: any) => ({
+                ...b,
+                floors: floorsByBuilding.get(b.id) || [],
+            }));
             catalogCache.set('buildings', result, CATALOG_CACHE_TTL_MS);
             return result;
         }, "Fetch Buildings", throwOnError, []);
@@ -85,18 +136,42 @@ export const catalogService = {
             return result;
         }, "Fetch Schedules", throwOnError, []);
     },
+    async fetchMediaTypes(throwOnError: boolean = false) {
+        const cached = catalogCache.get<any[]>('access_media_types');
+        if (cached) return cached;
+        return withErrorHandlingConditional(async () => {
+            const { data, error } = await supabase
+                .from("access_media_types")
+                .select("*")
+                .order("building_id", { ascending: true })
+                .order("sort_order", { ascending: true })
+                .order("name", { ascending: true });
+            if (error) throw error;
+            const result = data || [];
+            catalogCache.set('access_media_types', result, CATALOG_CACHE_TTL_MS);
+            return result;
+        }, "Fetch Media Types", throwOnError, []);
+    },
 
     /**
      * Reordena un catálogo completo según el arreglo de items proporcionado.
      * Actualiza sort_order en una sola llamada RPC y refresca la caché local.
+     * access_media_types usa ids uuid (RPC dedicada); el resto usa bigint.
      */
     async reorderCatalog(table: CatalogTable, items: { id: number | string }[]) {
         return withErrorHandling(async () => {
-            const { error } = await supabase.rpc("reorder_catalog", {
-                p_table: table,
-                p_ids: items.map((item) => Number(item.id)),
-            });
-            if (error) throw error;
+            if (table === "access_media_types") {
+                const { error } = await supabase.rpc("reorder_media_types", {
+                    p_ids: items.map((item) => String(item.id)),
+                });
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.rpc("reorder_catalog", {
+                    p_table: table,
+                    p_ids: items.map((item) => Number(item.id)),
+                });
+                if (error) throw error;
+            }
             await HistoryService.log("SYSTEM", undefined, "UPDATE_CATALOG", {
                 message: `Orden del catálogo de ${table} actualizado`,
             });
@@ -107,16 +182,19 @@ export const catalogService = {
     // --- Save (Create/Update) ---
     async saveBuilding(id: number | null, payload: { name: string; floors: string[] }) {
         return withErrorHandling(async () => {
+            let buildingId = id;
             if (id) {
-                const { error } = await supabase.from("buildings").update(payload).eq("id", id);
+                const { error } = await supabase.from("buildings").update({ name: payload.name }).eq("id", id);
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Edificio actualizado: ${payload.name}`, entityName: `Edificio: ${payload.name}` });
             } else {
                 const sortOrder = await getNextSortOrder("buildings");
-                const { data, error } = await supabase.from("buildings").insert([{ ...payload, sort_order: sortOrder }]).select().single();
+                const { data, error } = await supabase.from("buildings").insert([{ name: payload.name, sort_order: sortOrder }]).select().single();
                 if (error) throw error;
+                buildingId = data.id;
                 await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Edificio creado: ${payload.name}`, entityName: `Edificio: ${payload.name}` });
             }
+            await syncBuildingFloors(buildingId as number, payload.floors);
             catalogCache.invalidate('buildings');
         }, "Save Building");
     },
@@ -137,15 +215,15 @@ export const catalogService = {
         }, "Save Dependency");
     },
 
-    async saveAccess(id: number | null, payload: { name: string }) {
+    async saveAccess(id: number | null, payload: { name: string; buildingId?: number }) {
         return withErrorHandling(async () => {
             if (id) {
-                const { error } = await supabase.from("special_accesses").update(payload).eq("id", id);
+                const { error } = await supabase.from("special_accesses").update({ name: payload.name }).eq("id", id);
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Acceso especial actualizado: ${payload.name}`, entityName: `Acceso especial: ${payload.name}` });
             } else {
-                const sortOrder = await getNextSortOrder("special_accesses");
-                const { data, error } = await supabase.from("special_accesses").insert([{ ...payload, sort_order: sortOrder }]).select().single();
+                const sortOrder = await getNextSortOrder("special_accesses", payload.buildingId);
+                const { data, error } = await supabase.from("special_accesses").insert([{ name: payload.name, sort_order: sortOrder, building_id: payload.buildingId ?? null }]).select().single();
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Acceso especial creado: ${payload.name}`, entityName: `Acceso especial: ${payload.name}` });
             }
@@ -169,12 +247,68 @@ export const catalogService = {
         }, "Save Schedule");
     },
 
+    /**
+     * Configuración por defecto de los sistemas de acceso que un edificio
+     * puede establecer. Las llaves son fijas (el frontend las usa para
+     * clasificar pisos P2000/KONE), por lo que la creación se limita a estas
+     * plantillas.
+     */
+    async saveMediaType(
+        id: string | null,
+        payload: { key?: string; name?: string; has_floors?: boolean; active?: boolean; buildingId?: number },
+    ) {
+        return withErrorHandling(async () => {
+            const TEMPLATES: Record<string, { name: string; has_floors: boolean }> = {
+                p2000: { name: "P2000", has_floors: true },
+                kone: { name: "KONE", has_floors: true },
+                accesspro: { name: "AccessPRO", has_floors: false },
+            };
+            if (id) {
+                const update: Record<string, unknown> = {};
+                if (payload.name !== undefined) update.name = payload.name;
+                if (payload.has_floors !== undefined) update.has_floors = payload.has_floors;
+                if (payload.active !== undefined) update.active = payload.active;
+                const { error } = await supabase.from("access_media_types").update(update).eq("id", id);
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Medio de acceso actualizado: ${payload.name}`, entityName: `Medio de acceso: ${payload.name}` });
+            } else {
+                const key = payload.key ?? "";
+                const template = TEMPLATES[key];
+                if (!template) throw new Error("Sistema de acceso no válido");
+                if (!payload.buildingId) throw new Error("Edificio requerido");
+                const sortOrder = await getNextSortOrder("access_media_types", payload.buildingId);
+                const { data, error } = await supabase
+                    .from("access_media_types")
+                    .insert([{
+                        key,
+                        name: payload.name?.trim() || template.name,
+                        building_id: payload.buildingId,
+                        has_floors: template.has_floors,
+                        category: "card",
+                        identifier_label: "Folio",
+                        requires_identifier: true,
+                        requires_programming: true,
+                        requires_responsiva: true,
+                        supports_replacement: true,
+                        active: true,
+                        legacy_key: null,
+                        sort_order: sortOrder,
+                    }])
+                    .select()
+                    .single();
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Medio de acceso creado: ${data.name}`, entityName: `Medio de acceso: ${data.name}` });
+            }
+            catalogCache.invalidate('access_media_types');
+        }, "Save Media Type");
+    },
+
     // --- Delete ---
-    async deleteCatalogItem(table: string, id: number, itemName: string) {
+    async deleteCatalogItem(table: string, id: number | string, itemName: string) {
         return withErrorHandling(async () => {
             const { error } = await supabase.from(table).delete().eq("id", id);
             if (error) throw error;
-            await HistoryService.log("SYSTEM", id, "DELETE_CATALOG", { message: `Eliminado de ${table}: ${itemName}`, entityName: `${table}: ${itemName}` });
+            await HistoryService.log("SYSTEM", String(id), "DELETE_CATALOG", { message: `Eliminado de ${table}: ${itemName}`, entityName: `${table}: ${itemName}` });
             catalogCache.invalidate(table);
         }, "Delete Catalog Item");
     }
