@@ -153,7 +153,7 @@
                 dependency:  reg.dependencyName || "",
                 status_raw: "", status: "",
                 schedule: null, cards: [],
-                floorsByMedia: {}, specialAccesses: [],
+                floors: [], specialAccesses: [],
             };
         } else {
             selectedPerson = null;

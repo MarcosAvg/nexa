@@ -9,6 +9,8 @@ import {
     addTableRow,
     autoRowHeight,
 } from './xlsxShared';    // Re-exportar tipos desde aquí
+import { floorsForKey } from '../services/accessAssignments';
+import type { FloorGroup } from '../types';
 
 export type CardType = string;
 
@@ -56,8 +58,8 @@ export interface ExportPersonnelData {
     area: string;
     position: string;
     floor: string;
-    /** Pisos asignados agrupados por clave de tipo de medio. */
-    floorsByMedia: Record<string, string[]>;
+    /** Pisos asignados agrupados por tipo de medio concreto. */
+    floors: FloorGroup[];
     status: string;
     specialAccesses: string[];
     schedule: {
@@ -519,11 +521,11 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
             };
             if (selected.includes('P2000')) {
                 rowData.folioP2000 = folioP2000;
-                rowData.pisosP2000Text = person.floorsByMedia?.p2000?.join(', ') || '-';
+                rowData.pisosP2000Text = floorsForKey(person.floors, "p2000").join(', ') || "-";
             }
             if (selected.includes('KONE')) {
                 rowData.folioKone = folioKone;
-                rowData.pisosKoneText = person.floorsByMedia?.kone?.join(', ') || '-';
+                rowData.pisosKoneText = floorsForKey(person.floors, "kone").join(', ') || "-";
             }
             if (selected.includes('AccessPRO')) {
                 rowData.folioAccesspro = folioAccesspro;

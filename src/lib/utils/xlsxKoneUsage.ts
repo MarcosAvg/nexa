@@ -298,7 +298,7 @@ export async function matchKoneUsageToPersonnel(
                                 dependencies ( name ),
                                 schedules ( name, default_entry, default_exit ),
                                 access_media ( id, identifier, status, programming_status, responsiva_status, access_media_types ( name, has_floors ) ),
-                                access_assignments ( access_media_types ( key ), access_assignment_permissions ( resource_type, resource_key ) ),
+                                access_assignments ( media_type_id, access_media_types ( id, key, name ), access_assignment_permissions ( resource_type, resource_key ) ),
                                 entry_time, exit_time
                             )
                         `)
@@ -353,7 +353,7 @@ export async function matchKoneUsageToPersonnel(
                 area: p.area || '',
                 position: p.position || '',
                 floor: p.floor || '',
-                floorsByMedia: access.floorsByMedia,
+                floors: access.floors,
                 status: displayStatus,
                 specialAccesses: access.specialAccesses,
                 schedule: p.schedules ? {

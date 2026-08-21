@@ -13,6 +13,7 @@
     import ConfirmationModal from "./ConfirmationModal.svelte";
     import { personnelService } from "../../services/personnel";
     import { ticketService } from "../../services/tickets";
+    import { floorsForKey } from "../../services/accessAssignments";
     import { HistoryService } from "../../services/history";
     import { catalogState, personnelState } from "../../stores";
     import InfoCard from "../InfoCard.svelte";
@@ -164,7 +165,7 @@
             return false;
         };
 
-        let proposedP2000 = [...(selectedPerson.floorsByMedia?.p2000 || [])];
+        let proposedP2000 = [...floorsForKey(selectedPerson.floors, "p2000")];
         if (p.accion_p2000) {
             const action = p.accion_p2000;
             const parsedFloors = parseFloors(p.pisos_p2000);
@@ -181,7 +182,7 @@
         // Forzar al modal de comparación a mostrar diferencias pasando los arrays generados
         modifiedPayload.floors_p2000 = proposedP2000;
 
-        let proposedKONE = [...(selectedPerson.floorsByMedia?.kone || [])];
+        let proposedKONE = [...floorsForKey(selectedPerson.floors, "kone")];
         if (p.accion_kone) {
             const action = p.accion_kone;
             const parsedFloors = parseFloors(p.pisos_kone);

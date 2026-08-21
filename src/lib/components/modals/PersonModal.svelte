@@ -15,6 +15,7 @@
     import ScheduleSelect from "../ScheduleSelect.svelte";
 
     import { personnelService, ticketService, accessAssignmentService } from "../../services";
+    import { floorGroupsToIdMap, floorsForKey } from "../../services/accessAssignments";
     import { personnelState, catalogState, userState } from "../../stores";
     import PermissionGuard from "../PermissionGuard.svelte";
     import { toast } from "svelte-sonner";
@@ -120,21 +121,27 @@
         return b ? Number(b.id) : 0;
     });
 
-    let baseP2000 = $derived(floorsByBuilding[baseBuildingId]?.p2000 ?? []);
-    let baseKone = $derived(floorsByBuilding[baseBuildingId]?.kone ?? []);
-
     // Medios con pisos (del catálogo), para renderizar los selectores dinámicamente.
     let floorMediaTypes = $derived.by(() => {
         const seen = new Set<string>();
-        const out: { key: string; name: string }[] = [];
+        const out: { id: string; key: string; name: string }[] = [];
         for (const m of catalogState.mediaTypes) {
             if ((m as any).active === false || !(m as any).has_floors) continue;
             if (seen.has(m.key)) continue;
             seen.add(m.key);
-            out.push({ key: m.key, name: m.name });
+            out.push({ id: m.id, key: m.key, name: m.name });
         }
         return out;
     });
+
+    /** Pisos del edificio base para una clave de medio (ej. "p2000"). */
+    function baseFloorsForKey(key: string): string[] {
+        const fm = floorMediaTypes.find((f) => f.key === key);
+        return fm ? (floorsByBuilding[baseBuildingId]?.[fm.id] ?? []) : [];
+    }
+
+    let baseP2000 = $derived(baseFloorsForKey("p2000"));
+    let baseKone = $derived(baseFloorsForKey("kone"));
 
     function updateBuildingFloors(
         buildingId: number,
@@ -215,7 +222,10 @@
             const access = await accessAssignmentService.fetchPersonAccess(
                 personId,
             );
-            const merged = { ...access.floorsByBuilding };
+            const merged: Record<number, Record<string, string[]>> = {};
+            for (const [bid, groups] of Object.entries(access.floorsByBuilding)) {
+                merged[Number(bid)] = floorGroupsToIdMap(groups);
+            }
             const bid =
                         Number(
                             buildings.find(
@@ -223,11 +233,10 @@
                             )?.id,
                         ) || undefined;
             if (bid) {
-                const fallbackFloors = editingPerson?.floorsByMedia || {};
-                if (!merged[bid]) merged[bid] = { ...fallbackFloors };
-                for (const [key, list] of Object.entries(fallbackFloors)) {
-                    if ((merged[bid][key] || []).length === 0 && list.length) {
-                        merged[bid][key] = [...list];
+                if (!merged[bid]) merged[bid] = {};
+                for (const g of editingPerson?.floors || []) {
+                    if ((merged[bid][g.mediaTypeId] || []).length === 0 && g.floors.length) {
+                        merged[bid][g.mediaTypeId] = [...g.floors];
                     }
                 }
             }
@@ -262,7 +271,7 @@
                         )?.id,
                     ) || undefined;
                 floorsByBuilding = bid
-                    ? { [bid]: { ...(editingPerson.floorsByMedia || {}) } }
+                    ? { [bid]: floorGroupsToIdMap(editingPerson.floors) }
                     : {};
 
                 if (editingPerson.schedule) {
@@ -517,8 +526,8 @@
                     noEmpleado: editingPerson.employee_no,
                     dependency: editingPerson.dependency,
                     edificio: editingPerson.building,
-                    pisosP2000: editingPerson.floorsByMedia?.p2000 || [],
-                    pisosKone: editingPerson.floorsByMedia?.kone || [],
+                    pisosP2000: floorsForKey(editingPerson.floors, "p2000"),
+                    pisosKone: floorsForKey(editingPerson.floors, "kone"),
                     horario: editingPerson.schedule,
                     accesosEspeciales: editingPerson.specialAccesses,
                     tarjetas: editingPerson.cards,
@@ -875,9 +884,9 @@
                                         <ToggleGroup
                                             label={`Pisos ${fm.name}`}
                                             options={bFloors}
-                                            value={floorsByBuilding[Number(b.id)]?.[fm.key] ?? []}
+                                            value={floorsByBuilding[Number(b.id)]?.[fm.id] ?? []}
                                             onchange={(v) =>
-                                                updateBuildingFloors(Number(b.id), fm.key, v)}
+                                                updateBuildingFloors(Number(b.id), fm.id, v)}
                                             showSelectAll={true}
                                         />
                                     {/each}

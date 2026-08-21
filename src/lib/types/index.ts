@@ -27,14 +27,22 @@ export interface Person {
         exit: string;
     } | null;
     cards: Card[];
-    /** Pisos asignados agrupados por clave de tipo de medio (ej. `{ p2000: [...] }`). */
-    floorsByMedia: Record<string, string[]>;
+    /** Pisos asignados agrupados por tipo de medio concreto (instancia por edificio). */
+    floors: FloorGroup[];
     specialAccesses: string[];
     email?: string | null;
     area?: string;
     position?: string;
     floor?: string;
     photo_url?: string | null;
+}
+
+/** Pisos asignados para un tipo de medio concreto (instancia por edificio). */
+export interface FloorGroup {
+    mediaTypeId: string;
+    mediaKey: string;
+    mediaName: string;
+    floors: string[];
 }
 
 export interface Card {
