@@ -11,13 +11,6 @@ export interface PersonAccessData {
 }
 
 /**
- * Edificio al que apunta todo el acceso del personal (pisos + accesos
- * especiales). De momento la asignación de accesos es exclusiva de Torre
- * Administrativa; los demás edificios solo marcan la radicación.
- */
-export const TORRE_BUILDING_ID = 1;
-
-/**
  * Deriva los pisos agrupados por tipo de medio concreto (media_type_id) y los
  * accesos especiales, desde el arreglo anidado de access_assignments +
  * access_assignment_permissions (modelo normalizado).
@@ -155,10 +148,8 @@ export const accessAssignmentService = {
     /**
      * Reconstruye los permisos de las asignaciones activas de una persona.
      *
-     * De momento todo el acceso asignado al personal (pisos de cualquier
-     * edificio + accesos especiales) se escribe bajo Torre Administrativa:
-     * los demás edificios solo diferencian radicación y piso base. Cuando se
-     * requieran accesos a pisos de otros edificios, esta función se revisita.
+     * Cada edificio seleccionado aporta sus pisos con su building_id real;
+     * los accesos especiales heredan el edificio de su propio catálogo.
      */
     async savePersonAccess(
         personId: string,
@@ -166,37 +157,31 @@ export const accessAssignmentService = {
         specialAccesses: string[],
     ): Promise<void> {
         return withErrorHandling(async () => {
-            // Resolver referencias estables (floors.id / special_accesses.id).
-            const { data: torreFloors } = await supabase
+            // Resolver referencias estables por edificio:
+            // floors.label -> floors.id (por edificio) y special_accesses.name -> id + building.
+            const { data: allFloors } = await supabase
                 .from("floors")
-                .select("id, label")
-                .eq("building_id", TORRE_BUILDING_ID);
-            const floorIdByLabel = new Map<string, number>((torreFloors || []).map((f) => [f.label, f.id]));
+                .select("id, label, building_id");
+            const floorIdByBuilding = new Map<number, Map<string, number>>();
+            for (const f of allFloors || []) {
+                if (!floorIdByBuilding.has(f.building_id)) {
+                    floorIdByBuilding.set(f.building_id, new Map());
+                }
+                floorIdByBuilding.get(f.building_id)!.set(f.label, f.id);
+            }
 
             const { data: specials } = await supabase
                 .from("special_accesses")
-                .select("id, name");
-            const specialIdByName = new Map<string, number>();
+                .select("id, name, building_id");
+            const specialByName = new Map<string, { id: number; buildingId: number | null }>();
             for (const s of specials || []) {
-                if (!specialIdByName.has(s.name)) specialIdByName.set(s.name, s.id);
+                if (!specialByName.has(s.name)) {
+                    specialByName.set(s.name, { id: s.id, buildingId: s.building_id });
+                }
             }
 
             const assignments = await this.fetchForPerson(personId);
             for (const assignment of assignments) {
-                // Pisos del tipo de medio concreto de esta asignación.
-                let list: string[] | undefined;
-                if (floorsByBuilding[TORRE_BUILDING_ID]?.[assignment.media_type_id]) {
-                    list = floorsByBuilding[TORRE_BUILDING_ID][assignment.media_type_id];
-                } else {
-                    for (const floors of Object.values(floorsByBuilding)) {
-                        const l = floors[assignment.media_type_id];
-                        if (l !== undefined) {
-                            list = l;
-                            break;
-                        }
-                    }
-                }
-
                 const rows: {
                     assignment_id: string;
                     resource_type: string;
@@ -204,30 +189,42 @@ export const accessAssignmentService = {
                     floor_id?: number | null;
                     special_access_id?: number | null;
                 }[] = [];
+                const seenFloors = new Set<string>();
+                const seenSpecials = new Set<string>();
 
-                if (list && list.length > 0) {
-                    const seen = new Set<string>();
+                // Pisos por edificio seleccionado, con el building_id real.
+                for (const [bidStr, typeMap] of Object.entries(floorsByBuilding)) {
+                    const bid = Number(bidStr);
+                    if (!Number.isFinite(bid)) continue;
+                    const labelMap = floorIdByBuilding.get(bid);
+                    const list = typeMap[assignment.media_type_id] || [];
                     for (const f of list) {
                         const key = f.trim();
-                        if (!key || seen.has(key)) continue;
-                        seen.add(key);
+                        const dedupeKey = `${bid}:${key.toLowerCase()}`;
+                        if (!key || seenFloors.has(dedupeKey)) continue;
+                        seenFloors.add(dedupeKey);
                         rows.push({
                             assignment_id: assignment.id,
                             resource_type: "floor",
-                            building_id: TORRE_BUILDING_ID,
-                            floor_id: floorIdByLabel.get(key) ?? null,
+                            building_id: bid,
+                            floor_id: labelMap?.get(key) ?? null,
                         });
                     }
                 }
 
+                // Accesos especiales: heredan el edificio de su catálogo.
                 for (const s of specialAccesses) {
                     if (!s || !s.trim()) continue;
                     const name = s.trim();
+                    const dedupeKey = name.toLowerCase();
+                    if (seenSpecials.has(dedupeKey)) continue;
+                    seenSpecials.add(dedupeKey);
+                    const sp = specialByName.get(name);
                     rows.push({
                         assignment_id: assignment.id,
                         resource_type: "special_access",
-                        building_id: TORRE_BUILDING_ID,
-                        special_access_id: specialIdByName.get(name) ?? null,
+                        building_id: sp?.buildingId ?? 0,
+                        special_access_id: sp?.id ?? null,
                     });
                 }
 

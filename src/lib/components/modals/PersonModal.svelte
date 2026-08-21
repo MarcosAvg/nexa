@@ -143,6 +143,21 @@
     let baseP2000 = $derived(baseFloorsForKey("p2000"));
     let baseKone = $derived(baseFloorsForKey("kone"));
 
+    /** Edificios con acceso seleccionados para esta persona. */
+    let selectedBuildings = $state<number[]>([]);
+
+    function toggleBuilding(bid: number) {
+        if (selectedBuildings.includes(bid)) {
+            // Desmarcar descarta sus pisos del guardado.
+            const next = { ...floorsByBuilding };
+            delete next[bid];
+            floorsByBuilding = next;
+            selectedBuildings = selectedBuildings.filter((b) => b !== bid);
+        } else {
+            selectedBuildings = [...selectedBuildings, bid];
+        }
+    }
+
     function updateBuildingFloors(
         buildingId: number,
         key: string,
@@ -154,6 +169,22 @@
             [buildingId]: { ...current, [key]: value },
         };
     }
+
+    // El edificio base (radicación) siempre está incluido en el acceso.
+    $effect(() => {
+        if (baseBuildingId && !selectedBuildings.includes(baseBuildingId)) {
+            selectedBuildings = [...selectedBuildings, baseBuildingId];
+        }
+    });
+
+    // Accesos especiales filtrados a los edificios seleccionados.
+    let availableSpecialAccesses = $derived.by(() => {
+        if (selectedBuildings.length === 0) return specialAccesses;
+        return specialAccesses.filter((a) => {
+            const bid = (a as any).building_id;
+            return bid == null || selectedBuildings.includes(Number(bid));
+        });
+    });
 
     // Al cambiar de edificio, reiniciar solo el piso base (los pisos asignados
     // se seleccionan por edificio y no dependen del edificio de radicación).
@@ -241,6 +272,13 @@
                 }
             }
             floorsByBuilding = merged;
+            selectedBuildings = [
+                ...new Set([
+                    ...selectedBuildings,
+                    ...(bid ? [bid] : []),
+                    ...Object.keys(access.floorsByBuilding).map(Number),
+                ]),
+            ];
             if (access.specialAccesses.length > 0) {
                 accesosEspeciales = access.specialAccesses;
             }
@@ -383,6 +421,7 @@
                 }
 
                 lastLoadedPersonId = editingPerson.id;
+                selectedBuildings = bid ? [bid] : [];
                 void refreshPersonAccess(editingPerson.id);
             });
         } else if (
@@ -577,6 +616,7 @@
         edificio = "";
         pisoBase = "";
         floorsByBuilding = {};
+        selectedBuildings = [];
         diasHorario = "";
         horaEntrada = "08:00";
         horaSalida = "17:00";
@@ -855,12 +895,37 @@
             </div>
 
             {#if edificio}
-                <div class="space-y-6">
+                <div class="space-y-4">
+                    <!-- Edificios con acceso: solo se configuran los seleccionados -->
+                    <div>
+                        <p class="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">Edificios con acceso</p>
+                        <div class="flex flex-wrap gap-2">
+                            {#each buildings as b}
+                                {#if (b.floors || []).length > 0}
+                                    {@const bid = Number(b.id)}
+                                    {@const isBase = bid === baseBuildingId}
+                                    <button
+                                        type="button"
+                                        disabled={isBase}
+                                        class="px-3 py-1.5 rounded-xl text-[11px] font-bold border-2 transition-all active:scale-95 {selectedBuildings.includes(bid)
+                                            ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                                            : 'border-slate-200 text-slate-500 hover:border-blue-300'} {isBase ? 'opacity-90 cursor-default' : ''}"
+                                        onclick={() => toggleBuilding(bid)}
+                                        title={isBase ? "Edificio de radicación (siempre incluido)" : undefined}
+                                    >
+                                        {b.name}{isBase ? " ★" : ""}
+                                    </button>
+                                {/if}
+                            {/each}
+                        </div>
+                    </div>
+
                     {#each buildings as b}
+                        {@const bid = Number(b.id)}
                         {@const bFloors = b.floors || []}
-                        {#if bFloors.length > 0}
+                        {#if selectedBuildings.includes(bid) && bFloors.length > 0}
                             <div
-                                class="rounded-lg border p-3 {Number(b.id) ===
+                                class="rounded-lg border p-3 {bid ===
                                 baseBuildingId
                                     ? 'border-slate-300 bg-slate-50'
                                     : 'border-slate-200 bg-white'}"
@@ -870,7 +935,7 @@
                                         class="text-xs font-bold text-slate-600 uppercase tracking-widest"
                                     >
                                         {b.name}
-                                        {#if Number(b.id) === baseBuildingId}
+                                        {#if bid === baseBuildingId}
                                             <span
                                                 class="ml-1 normal-case text-[10px] font-medium text-blue-600"
                                             >
@@ -884,9 +949,9 @@
                                         <ToggleGroup
                                             label={`Pisos ${fm.name}`}
                                             options={bFloors}
-                                            value={floorsByBuilding[Number(b.id)]?.[fm.id] ?? []}
+                                            value={floorsByBuilding[bid]?.[fm.id] ?? []}
                                             onchange={(v) =>
-                                                updateBuildingFloors(Number(b.id), fm.id, v)}
+                                                updateBuildingFloors(bid, fm.id, v)}
                                             showSelectAll={true}
                                         />
                                     {/each}
@@ -922,7 +987,7 @@
         <FormSection title="Accesos Especiales" disabled={!userState.canEdit}>
             <ToggleGroup
                 label=""
-                options={specialAccesses.map((a) => a.name)}
+                options={availableSpecialAccesses.map((a) => a.name)}
                 bind:value={accesosEspeciales}
             />
         </FormSection>

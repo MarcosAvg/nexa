@@ -73,6 +73,7 @@ const mapPersonRecord = (p: PersonnelRow): Person => {
         position: p.position,
         floor: p.floor,
         building: p.building_name || p.buildings?.name || "N/A",
+        building_id: p.building_id ?? null,
         dependency: p.dependency_name || p.dependencies?.name || "N/A",
         schedule: p.schedules ? {
             days: p.schedules.name,

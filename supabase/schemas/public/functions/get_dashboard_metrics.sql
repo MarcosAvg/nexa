@@ -70,7 +70,6 @@ BEGIN
     FROM (
         SELECT t.id AS "mediaTypeId",
                t.name,
-               t.building_id AS "buildingId",
                t.sort_order,
                (SELECT COUNT(DISTINCT am2.person_id)
                   FROM access_media am2

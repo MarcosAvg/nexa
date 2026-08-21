@@ -143,7 +143,6 @@ export const catalogService = {
             const { data, error } = await supabase
                 .from("access_media_types")
                 .select("*")
-                .order("building_id", { ascending: true })
                 .order("sort_order", { ascending: true })
                 .order("name", { ascending: true });
             if (error) throw error;
@@ -254,12 +253,16 @@ export const catalogService = {
      */
     async saveMediaType(
         id: string | null,
-        payload: { key?: string; name?: string; has_floors?: boolean; active?: boolean; buildingId?: number },
+        payload: { key?: string; name?: string; has_floors?: boolean; active?: boolean; buildingIds?: number[] },
     ) {
         return withErrorHandling(async () => {
             const slugify = (s: string) =>
                 s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
                     .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+
+            const buildingIds = (payload.buildingIds || []).filter((b) => Number.isFinite(b));
+            let mediaTypeId = id;
+
             if (id) {
                 const update: Record<string, unknown> = {};
                 if (payload.name !== undefined) update.name = payload.name;
@@ -271,16 +274,15 @@ export const catalogService = {
             } else {
                 const name = payload.name?.trim();
                 if (!name) throw new Error("El nombre del medio es requerido");
-                if (!payload.buildingId) throw new Error("Edificio requerido");
+                if (buildingIds.length === 0) throw new Error("Selecciona al menos un edificio");
                 const key = slugify(payload.key?.trim() || name);
                 if (!key) throw new Error("La clave del medio es inválida");
-                const sortOrder = await getNextSortOrder("access_media_types", payload.buildingId);
+                const sortOrder = await getNextSortOrder("access_media_types");
                 const { data, error } = await supabase
                     .from("access_media_types")
                     .insert([{
                         key,
                         name,
-                        building_id: payload.buildingId,
                         has_floors: payload.has_floors ?? false,
                         requires_programming: true,
                         requires_responsiva: true,
@@ -290,7 +292,20 @@ export const catalogService = {
                     .select()
                     .single();
                 if (error) throw error;
+                mediaTypeId = data.id;
                 await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Medio de acceso creado: ${data.name}`, entityName: `Medio de acceso: ${data.name}` });
+            }
+
+            // Sincronizar edificios donde aplica el medio (N:M).
+            if (mediaTypeId && buildingIds.length > 0) {
+                await supabase
+                    .from("access_media_type_buildings")
+                    .delete()
+                    .eq("media_type_id", mediaTypeId);
+                const { error: jError } = await supabase
+                    .from("access_media_type_buildings")
+                    .insert(buildingIds.map((buildingId) => ({ media_type_id: mediaTypeId, building_id: buildingId })));
+                if (jError) throw jError;
             }
             catalogCache.invalidate('access_media_types');
         }, "Save Media Type");

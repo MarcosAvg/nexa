@@ -210,10 +210,12 @@
                 if ((m as any).active === false) continue;
                 if (byKey[m.key]?.length) typeMap[m.id] = [...byKey[m.key]];
             }
+            // Las pisos de la modificación aplican al edificio de radicación.
+            const baseBid = Number(currentPerson.building_id) || 1;
             const saveData = {
                 id: currentPerson.id,
                 ...modifiedData,
-                floorsByBuilding: { 1: typeMap },
+                floorsByBuilding: { [baseBid]: typeMap },
                 specialAccesses,
             };
 

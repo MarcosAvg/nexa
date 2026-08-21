@@ -24,6 +24,7 @@
     "public/tables/access_assignments.sql",
     "public/tables/access_media.sql",
     "public/tables/access_media_types.sql",
+    "public/tables/access_media_type_buildings.sql",
     "public/tables/buildings.sql",
     "public/tables/cardless_registry.sql",
     "public/tables/dependencies.sql",

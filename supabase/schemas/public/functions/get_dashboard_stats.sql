@@ -19,7 +19,6 @@ create or replace function public.get_dashboard_stats()
             FROM (
                 SELECT t.id AS "mediaTypeId",
                        t.name,
-                       t.building_id AS "buildingId",
                        t.sort_order,
                        COUNT(am.id) AS stock
                 FROM access_media_types t

@@ -20,7 +20,9 @@ export interface Person {
     status: string;
     name: string; // Calculado: first_name + last_name
     building: string;
+    building_id?: number | null;
     dependency: string;
+    dependency_id?: number | null;
     schedule: {
         days: string;
         entry: string;
@@ -116,7 +118,6 @@ export interface CatalogItem {
 export interface MediaStockEntry {
     mediaTypeId: string;
     name: string;
-    buildingId: number;
     stock: number;
 }
 
@@ -124,7 +125,6 @@ export interface MediaStockEntry {
 export interface CoverageEntry {
     mediaTypeId: string;
     name: string;
-    buildingId: number;
     /** Personas operativas que tienen el medio activo. */
     con: number;
     /** Operativos que no lo tienen. */
