@@ -112,6 +112,30 @@ export interface CatalogItem {
     [key: string]: any;
 }
 
+/** Stock disponible de un tipo de medio (inventario sin asignar). */
+export interface MediaStockEntry {
+    mediaTypeId: string;
+    name: string;
+    buildingId: number;
+    stock: number;
+}
+
+/** Cobertura de un tipo de medio entre el personal operativo. */
+export interface CoverageEntry {
+    mediaTypeId: string;
+    name: string;
+    buildingId: number;
+    /** Personas operativas que tienen el medio activo. */
+    con: number;
+    /** Operativos que no lo tienen. */
+    sin: number;
+}
+
+export interface DashboardStats {
+    activePersonnel: number;
+    stock: MediaStockEntry[];
+}
+
 export interface DashboardMetrics {
     totalPersonnel: number;
     statusCounts: {
@@ -121,13 +145,9 @@ export interface DashboardMetrics {
         bloqueado: number;
         baja: number;
     };
-    cardCoverage: {
-        conP2000: number;
-        sinP2000: number;
-        conKone: number;
-        sinKone: number;
-        operativos: number;
-    };
+    /** Cobertura por tipo de medio activo. */
+    cardCoverage: CoverageEntry[];
+    operativos: number;
     topDependencies: { name: string; total: number; activos: number }[];
     topBuildings: { name: string; total: number }[];
     dataQuality: {

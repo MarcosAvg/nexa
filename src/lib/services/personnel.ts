@@ -3,7 +3,7 @@ import { HistoryService } from "./history";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate, batchCollectIds } from "../utils";
 import { computePersonStatus } from "../utils/personStatus";
 import { deriveAccessFromAssignments } from "./accessAssignments";
-import type { Person, Card, DashboardMetrics } from "../types";
+import type { Person, Card, DashboardMetrics, DashboardStats } from "../types";
 import { networkStore } from "../stores/network.svelte";
 
 /** Row shape from personnel_with_status view or personnel table with joins */
@@ -435,45 +435,13 @@ export const personnelService = {
         }, "Delete Personnel");
     },
 
-    async fetchDashboardStats() {
+    async fetchDashboardStats(): Promise<DashboardStats> {
         return withErrorHandlingSafe(async () => {
-            // El modelo nuevo (access_media) es la fuente; coincide con la RPC
-            // get_dashboard_stats.
-            const readyPersonIds = await batchCollectIds(async (from, to) => {
-                return supabase.from("access_media")
-                    .select("person_id").eq("status", "active").eq("programming_status", "done")
-                    .in("responsiva_status", ["signed", "legacy"]).not("person_id", "is", null)
-                    .range(from, to);
-            }, "person_id");
-
-            const activePersonnelIds = await batchCollectIds(async (from, to) => {
-                return supabase.from("personnel").select("id").eq("status", "active").range(from, to);
-            });
-
-            let activePersonnelCount = 0;
-            for (const id of readyPersonIds) { if (activePersonnelIds.has(id)) activePersonnelCount++; }
-
-            const stockFor = async (key: string, buildingId?: number) => {
-                let query = supabase
-                    .from("access_media")
-                    .select("id, access_media_types!inner(key, building_id)", { count: "exact", head: true })
-                    .eq("access_media_types.key", key)
-                    .is("person_id", null)
-                    .eq("status", "available");
-                if (buildingId !== undefined) {
-                    query = query.eq("access_media_types.building_id", buildingId);
-                }
-                const { count, error } = await query;
-                if (error) throw error;
-                return count || 0;
-            };
-
-            const koneStock = await stockFor("kone");
-            const p2000Stock = await stockFor("p2000");
-            const accessproStock = await stockFor("accesspro");
-
-            return { activePersonnel: activePersonnelCount, koneStock, p2000Stock, accessproStock };
-        }, "Fetch Dashboard Stats", { activePersonnel: 0, koneStock: 0, p2000Stock: 0, accessproStock: 0 });
+            // RPC genérica: stock por tipo de medio (sin hardcodes).
+            const { data, error } = await supabase.rpc('get_dashboard_stats');
+            if (error) throw error;
+            return data as DashboardStats;
+        }, "Fetch Dashboard Stats", { activePersonnel: 0, stock: [] });
     },
 
     async fetchDashboardMetrics(): Promise<DashboardMetrics> {
@@ -484,7 +452,8 @@ export const personnelService = {
         }, "Fetch Dashboard Metrics (RPC)", {
             totalPersonnel: 0,
             statusCounts: { activo: 0, parcial: 0, inactivo: 0, bloqueado: 0, baja: 0 },
-            cardCoverage: { conP2000: 0, sinP2000: 0, conKone: 0, sinKone: 0, operativos: 0 },
+            cardCoverage: [],
+            operativos: 0,
             topDependencies: [],
             topBuildings: [],
             dataQuality: { sinEmail: 0, sinSchedule: 0, sinPosition: 0, sinArea: 0, total: 0 },

@@ -13,6 +13,11 @@
         TrendingUp,
     } from "lucide-svelte";
     import { onMount } from "svelte";
+    import {
+        mediaTypeVariant,
+        mediaTypeBarClasses,
+        mediaTypeStockClasses,
+    } from "../utils/mediaTypeAppearance";
 
     onMount(() => {
         personnelState.refreshDashboardStats();
@@ -30,9 +35,7 @@
     let activePersonnelCount = $derived(
         personnelState.dashboardStats.activePersonnel,
     );
-    let koneStock = $derived(personnelState.dashboardStats.koneStock);
-    let p2000Stock = $derived(personnelState.dashboardStats.p2000Stock);
-    let accessproStock = $derived(personnelState.dashboardStats.accessproStock);
+    let mediaStock = $derived(personnelState.dashboardStats.stock);
     let pendingSignaturesCount = $derived(
         pendingItems.filter((t) => t.type === "Firma Responsiva").length,
     );
@@ -304,132 +307,65 @@
                                 Cobertura Tarjetas
                             </h2>
                             <p class="text-[11px] text-slate-400 font-medium">
-                                {metrics.cardCoverage.operativos} operativos
+                                {metrics.operativos} operativos
                             </p>
                         </div>
                     </div>
                 </div>
-                <div class="p-6 space-y-5">                        <!-- P2000 -->
-                    <div>
-                        <div class="flex items-center justify-between mb-1.5">
-                            <span
-                                class="text-[12px] font-extrabold text-amber-700 flex items-center gap-1.5"
-                                ><CreditCard size={14} /> P2000</span
-                            >
-                            <span
-                                class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg"
-                                >{pct(
-                                    metrics.cardCoverage.conP2000,
-                                    metrics.cardCoverage.operativos,
-                                )}%</span
-                            >
-                        </div>
-                        <div
-                            class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-1.5"
-                        >
+                <div class="p-6 space-y-5">
+                    {#each metrics.cardCoverage as cov}
+                        {@const cls = mediaTypeBarClasses(cov.name)}
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span
+                                    class="text-[12px] font-extrabold {cls.text} flex items-center gap-1.5"
+                                    ><CreditCard size={14} /> {cov.name}</span
+                                >
+                                <span
+                                    class="text-[10px] font-bold {cls.badge} px-2 py-0.5 rounded-lg"
+                                    >{pct(cov.con, metrics.operativos)}%</span
+                                >
+                            </div>
                             <div
-                                class="bg-amber-500 h-full rounded-full transition-all duration-700"
-                                style="width: {pct(
-                                    metrics.cardCoverage.conP2000,
-                                    metrics.cardCoverage.operativos,
-                                )}%"
-                            ></div>
+                                class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-1.5"
+                            >
+                                <div
+                                    class="{cls.bar} h-full rounded-full transition-all duration-700"
+                                    style="width: {pct(cov.con, metrics.operativos)}%"
+                                ></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] font-bold">
+                                <span class="text-emerald-600"
+                                    >✓ {cov.con}</span
+                                >
+                                <span
+                                    class={cov.sin > 0
+                                        ? "text-rose-500"
+                                        : "text-emerald-600"}
+                                >{cov.sin > 0 ? "✗" : "✓"}
+                                {cov.sin} sin tarjeta</span
+                                >
+                            </div>
                         </div>
-                        <div class="flex justify-between text-[10px] font-bold">
-                            <span class="text-emerald-600"
-                                >✓ {metrics.cardCoverage.conP2000}</span
-                            >
-                            <span
-                                class={metrics.cardCoverage.sinP2000 > 0
-                                    ? "text-rose-500"
-                                    : "text-emerald-600"}
-                                >{metrics.cardCoverage.sinP2000 > 0 ? "✗" : "✓"}
-                                {metrics.cardCoverage.sinP2000} sin tarjeta</span
-                            >
-                        </div>
-                    </div>                        <!-- KONE -->
-                    <div>
-                        <div class="flex items-center justify-between mb-1.5">
-                            <span
-                                class="text-[12px] font-extrabold text-blue-700 flex items-center gap-1.5"
-                                ><CreditCard size={14} /> KONE</span
-                            >
-                            <span
-                                class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg"
-                                >{pct(
-                                    metrics.cardCoverage.conKone,
-                                    metrics.cardCoverage.operativos,
-                                )}%</span
-                            >
-                        </div>
-                        <div
-                            class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-1.5"
-                        >
-                            <div
-                                class="bg-blue-500 h-full rounded-full transition-all duration-700"
-                                style="width: {pct(
-                                    metrics.cardCoverage.conKone,
-                                    metrics.cardCoverage.operativos,
-                                )}%"
-                            ></div>
-                        </div>
-                        <div class="flex justify-between text-[10px] font-bold">
-                            <span class="text-emerald-600"
-                                >✓ {metrics.cardCoverage.conKone}</span
-                            >
-                            <span
-                                class={metrics.cardCoverage.sinKone > 0
-                                    ? "text-rose-500"
-                                    : "text-emerald-600"}
-                                >{metrics.cardCoverage.sinKone > 0 ? "✗" : "✓"}
-                                {metrics.cardCoverage.sinKone} sin tarjeta</span
-                            >
-                        </div>
-                    </div>                        <!-- Stock en línea -->
+                    {/each}
+                    <!-- Stock en línea -->
                     <div class="pt-4 border-t border-slate-100/60">
-                        <div class="grid grid-cols-3 gap-3">
-                            <div
-                                class="bg-blue-50/60 rounded-xl p-3 text-center"
-                            >
-                                <div
-                                    class="text-[10px] font-extrabold text-blue-400 uppercase tracking-wider mb-0.5"
-                                >
-                                    Stock KONE
+                        <div class="grid gap-3 {mediaStock.length === 3 ? 'grid-cols-3' : mediaStock.length === 4 ? 'grid-cols-4' : 'grid-cols-2'}">
+                            {#each mediaStock as s}
+                                {@const cls = mediaTypeStockClasses(s.name)}
+                                <div class="{cls.wrap} rounded-xl p-3 text-center">
+                                    <div
+                                        class="text-[10px] font-extrabold {cls.label} uppercase tracking-wider mb-0.5"
+                                    >
+                                        Stock {s.name}
+                                    </div>
+                                    <div
+                                        class="text-xl font-black {cls.value} tabular-nums"
+                                    >
+                                        {s.stock}
+                                    </div>
                                 </div>
-                                <div
-                                    class="text-xl font-black text-blue-700 tabular-nums"
-                                >
-                                    {koneStock}
-                                </div>
-                            </div>
-                            <div
-                                class="bg-amber-50/60 rounded-xl p-3 text-center"
-                            >
-                                <div
-                                    class="text-[10px] font-extrabold text-amber-400 uppercase tracking-wider mb-0.5"
-                                >
-                                    Stock P2000
-                                </div>
-                                <div
-                                    class="text-xl font-black text-amber-700 tabular-nums"
-                                >
-                                    {p2000Stock}
-                                </div>
-                            </div>
-                            <div
-                                class="bg-emerald-50/60 rounded-xl p-3 text-center"
-                            >
-                                <div
-                                    class="text-[10px] font-extrabold text-emerald-500 uppercase tracking-wider mb-0.5"
-                                >
-                                    Stock AccessPRO
-                                </div>
-                                <div
-                                    class="text-xl font-black text-emerald-700 tabular-nums"
-                                >
-                                    {accessproStock}
-                                </div>
-                            </div>
+                            {/each}
                         </div>
                     </div>
                 </div>
