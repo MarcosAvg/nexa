@@ -5,7 +5,7 @@
     import Button from "../Button.svelte";
     import Input from "../Input.svelte";
     import Modal from "../Modal.svelte";
-    import { Plus, Edit2, Trash2, Building2, GripVertical } from "lucide-svelte";
+    import { Plus, Edit2, Trash2, Building2, GripVertical, X, ArrowUp, ArrowDown } from "lucide-svelte";
 
     /**
      * BuildingCatalog — Gestión de edificios con pisos (CRUD).
@@ -34,12 +34,71 @@
     let isModalOpen = $state(false);
     let editingId = $state<number | null>(null);
     let buildingName = $state("");
-    let buildingFloors = $state("");
+    /** Pisos ordenados del edificio (el orden define sort_order). */
+    let floorItems = $state<string[]>([]);
+    let newFloorInput = $state("");
+    // Generador de secuencia
+    let seqLevels = $state(10);
+    let seqIncludePB = $state(true);
 
     // Delete modal state
     let isDeleteModalOpen = $state(false);
     let deleteTarget = $state<any>(null);
     let deleteConfirmation = $state("");
+
+    function addFloor() {
+        const label = newFloorInput.trim();
+        if (!label) return;
+        if (label.length > 40) {
+            toast.error("El identificador del piso no puede exceder 40 caracteres");
+            return;
+        }
+        if (floorItems.some((f) => f.toLowerCase() === label.toLowerCase())) {
+            toast.error(`El piso "${label}" ya existe`);
+            return;
+        }
+        floorItems = [...floorItems, label];
+        newFloorInput = "";
+    }
+
+    function removeFloor(index: number) {
+        floorItems = floorItems.filter((_, i) => i !== index);
+    }
+
+    function moveFloor(index: number, dir: -1 | 1) {
+        const j = index + dir;
+        if (j < 0 || j >= floorItems.length) return;
+        const next = [...floorItems];
+        [next[index], next[j]] = [next[j], next[index]];
+        floorItems = next;
+    }
+
+    /** Genera "PB" (opcional) + niveles 1..N y los anexa sin duplicar. */
+    function generateSequence() {
+        const levels = Math.floor(Number(seqLevels));
+        if (!Number.isFinite(levels) || levels < 1 || levels > 200) {
+            toast.error("Los niveles deben ser un número entre 1 y 200");
+            return;
+        }
+        const generated: string[] = [];
+        if (seqIncludePB) generated.push("PB");
+        for (let n = 1; n <= levels; n++) generated.push(String(n));
+
+        const existing = new Set(floorItems.map((f) => f.toLowerCase()));
+        const added: string[] = [];
+        for (const g of generated) {
+            if (!existing.has(g.toLowerCase())) {
+                added.push(g);
+                existing.add(g.toLowerCase());
+            }
+        }
+        if (added.length === 0) {
+            toast.info("No hay pisos nuevos que agregar");
+            return;
+        }
+        floorItems = [...floorItems, ...added];
+        newFloorInput = "";
+    }
 
     async function fetchBuildings() {
         const data = await catalogService.fetchBuildings();
@@ -104,11 +163,14 @@
         if (building) {
             editingId = building.id;
             buildingName = building.name;
-            buildingFloors = (building.floors || []).join(", ");
+            floorItems = [...(building.floors || [])];
         } else {
             editingId = null;
             buildingName = "";
-            buildingFloors = "";
+            floorItems = [];
+            newFloorInput = "";
+            seqLevels = 10;
+            seqIncludePB = true;
         }
         isModalOpen = true;
     }
@@ -118,10 +180,17 @@
             toast.error("El nombre del edificio es requerido");
             return;
         }
-        const floors = buildingFloors
-            .split(",")
-            .map((f) => f.trim())
-            .filter((f) => f);
+        // Red de seguridad anti-duplicados (case-insensitive) antes de enviar.
+        const seen = new Set<string>();
+        const floors: string[] = [];
+        for (const f of floorItems) {
+            const label = f.trim();
+            if (!label) continue;
+            const k = label.toLowerCase();
+            if (seen.has(k)) continue;
+            seen.add(k);
+            floors.push(label);
+        }
         if (floors.length === 0) {
             toast.error("Debes agregar al menos un piso");
             return;
@@ -230,9 +299,103 @@
             <Input id="building-name" placeholder="Ej. Torre Administrativa" bind:value={buildingName} />
         </div>
         <div>
-            <label for="building-floors" class="block text-sm font-medium text-slate-700 mb-1">Pisos (separados por coma)</label>
-            <Input id="building-floors" placeholder="Ej. PB, 1, 2, 3" bind:value={buildingFloors} />
-            <p class="text-xs text-slate-500 mt-1">Ingresa los identificadores de los pisos separados por comas.</p>
+            <p class="block text-sm font-medium text-slate-700 mb-1.5">Pisos</p>
+
+            <!-- Chips de pisos (orden = sort_order) -->
+            {#if floorItems.length > 0}
+                <div class="flex flex-wrap gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50/50 mb-3">
+                    {#each floorItems as floor, i}
+                        <span
+                            class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 shadow-sm"
+                        >
+                            {floor}
+                            {#if canEdit && floorItems.length > 1}
+                                <button
+                                    type="button"
+                                    class="text-slate-300 hover:text-blue-600 transition-colors disabled:opacity-30"
+                                    title="Subir piso"
+                                    aria-label={`Subir piso ${floor}`}
+                                    disabled={i === 0}
+                                    onclick={() => moveFloor(i, -1)}
+                                >
+                                    <ArrowUp size={11} strokeWidth={3} />
+                                </button>
+                                <button
+                                    type="button"
+                                    class="text-slate-300 hover:text-blue-600 transition-colors disabled:opacity-30"
+                                    title="Bajar piso"
+                                    aria-label={`Bajar piso ${floor}`}
+                                    disabled={i === floorItems.length - 1}
+                                    onclick={() => moveFloor(i, 1)}
+                                >
+                                    <ArrowDown size={11} strokeWidth={3} />
+                                </button>
+                            {/if}
+                            {#if canEdit}
+                                <button
+                                    type="button"
+                                    class="text-slate-300 hover:text-rose-500 transition-colors"
+                                    title="Quitar piso"
+                                    aria-label={`Quitar piso ${floor}`}
+                                    onclick={() => removeFloor(i)}
+                                >
+                                    <X size={12} strokeWidth={3} />
+                                </button>
+                            {/if}
+                        </span>
+                    {/each}
+                </div>
+            {:else}
+                <p class="text-xs text-slate-400 mb-3 italic">Sin pisos aún — agrega uno o genera una secuencia.</p>
+            {/if}
+
+            {#if canEdit}
+                <!-- Agregar piso individual -->
+                <form
+                    class="flex gap-2"
+                    onsubmit={(e) => {
+                        e.preventDefault();
+                        addFloor();
+                    }}
+                >
+                    <input
+                        type="text"
+                        bind:value={newFloorInput}
+                        placeholder="Ej. PB, 1, 2, Mezzanine…"
+                        maxlength={40}
+                        class="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                        aria-label="Nuevo piso"
+                    />
+                    <Button type="submit" variant="secondary" size="sm" class="h-10 shrink-0">
+                        <Plus size={15} strokeWidth={3} class="mr-1" /> Agregar
+                    </Button>
+                </form>
+
+                <!-- Generador de secuencia -->
+                <div class="mt-3 p-3 rounded-xl border border-dashed border-slate-200 bg-white">
+                    <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-2">Generador de secuencia</p>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <label class="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer">
+                            <input type="checkbox" bind:checked={seqIncludePB} class="w-4 h-4 accent-blue-600" />
+                            Incluir Planta Baja
+                        </label>
+                        <label class="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                            Niveles
+                            <input
+                                type="number"
+                                min={1}
+                                max={200}
+                                bind:value={seqLevels}
+                                class="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-sm tabular-nums focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            />
+                        </label>
+                        <Button variant="secondary" size="sm" onclick={generateSequence}>
+                            Generar
+                        </Button>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-2">Anexa "PB" (opcional) y los niveles 1…N, sin duplicar los ya agregados.</p>
+                </div>
+            {/if}
         </div>
     </div>
     {#snippet footer()}
