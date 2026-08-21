@@ -192,19 +192,12 @@
         });
     });
 
-    /** Grupos de accesos especiales por edificio seleccionado. */
-    let specialGroups = $derived.by(() => {
-        const out: { name: string; options: string[] }[] = [];
-        for (const b of buildings) {
-            const bid = Number(b.id);
-            if (!selectedBuildings.includes(bid)) continue;
-            const options = availableSpecialAccesses
-                .filter((a) => Number((a as any).building_id) === bid)
-                .map((a) => a.name);
-            if (options.length > 0) out.push({ name: b.name, options });
-        }
-        return out;
-    });
+    /** Opciones de accesos especiales de un edificio (del catálogo). */
+    function specialOptionsFor(bid: number): string[] {
+        return availableSpecialAccesses
+            .filter((a) => Number((a as any).building_id) === bid)
+            .map((a) => a.name);
+    }
 
     // Al cambiar de edificio, reiniciar solo el piso base (los pisos asignados
     // se seleccionan por edificio y no dependen del edificio de radicación).
@@ -921,7 +914,7 @@
                         <p class="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">Edificios con acceso</p>
                         <div class="flex flex-wrap gap-2">
                             {#each buildings as b}
-                                {#if (b.floors || []).length > 0}
+                                {#if (b.floors || []).length > 0 || specialOptionsFor(Number(b.id)).length > 0}
                                     {@const bid = Number(b.id)}
                                     {@const isBase = bid === baseBuildingId}
                                     <button
@@ -943,7 +936,7 @@
                     {#each buildings as b}
                         {@const bid = Number(b.id)}
                         {@const bFloors = b.floors || []}
-                        {#if selectedBuildings.includes(bid) && bFloors.length > 0}
+                        {#if selectedBuildings.includes(bid) && (bFloors.length > 0 || specialOptionsFor(bid).length > 0)}
                             <div
                                 class="rounded-lg border p-3 {bid ===
                                 baseBuildingId
@@ -975,6 +968,13 @@
                                             showSelectAll={true}
                                         />
                                     {/each}
+                                    {#if specialOptionsFor(bid).length > 0}
+                                        <ToggleGroup
+                                            label="Accesos Especiales"
+                                            options={specialOptionsFor(bid)}
+                                            bind:value={accesosEspeciales}
+                                        />
+                                    {/if}
                                 </div>
                             </div>
                         {/if}
@@ -1001,29 +1001,6 @@
                     <Input id="salida" type="time" bind:value={horaSalida} />
                 </FormField>
             </div>
-        </FormSection>
-
-        <!-- SECTION: Special Access -->
-        <FormSection title="Accesos Especiales" disabled={!userState.canEdit}>
-            {#if selectedBuildings.length === 0}
-                <p class="text-sm text-slate-400 italic">
-                    Selecciona al menos un edificio en la sección de pisos para configurar los accesos especiales.
-                </p>
-            {:else if specialGroups.length === 0}
-                <p class="text-sm text-slate-400 italic">
-                    Los edificios seleccionados no tienen accesos especiales definidos en su catálogo.
-                </p>
-            {:else}
-                <div class="space-y-4">
-                    {#each specialGroups as group}
-                        <ToggleGroup
-                            label={group.name}
-                            options={group.options}
-                            bind:value={accesosEspeciales}
-                        />
-                    {/each}
-                </div>
-            {/if}
         </FormSection>
 
         <!-- SECTION: Cards -->
