@@ -4,7 +4,7 @@ create table "public"."floors" (
   "sort_order"  bigint,
   "building_id" bigint,
   constraint "floors_pkey" primary key ("id"),
-  constraint "floors_building_id_fkey" foreign key (building_id) references public.buildings(id)
+  constraint "floors_building_id_fkey" foreign key (building_id) references public.buildings(id) on delete cascade
 );
 
 alter table "public"."floors" enable row level security;

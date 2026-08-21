@@ -27,6 +27,19 @@ async function getNextSortOrder(table: CatalogTable, buildingId?: number): Promi
     return ((data?.[0]?.sort_order as number | null | undefined) ?? 0) + 1;
 }
 
+/** Sincroniza la tabla floors (fuente canónica) con el array de pisos de un edificio. */
+async function syncBuildingFloors(buildingId: number, floors: string[]) {
+    const labels = (floors || []).map((f) => f.trim()).filter(Boolean);
+    // Los permisos referencian pisos por label (resource_key), no por floors.id,
+    // así que es seguro reconstruir el set completo del edificio.
+    await supabase.from("floors").delete().eq("building_id", buildingId);
+    if (labels.length > 0) {
+        await supabase.from("floors").insert(
+            labels.map((label, i) => ({ building_id: buildingId, label, sort_order: i })),
+        );
+    }
+}
+
 export const catalogService = {
     // --- Fetch (with localStorage 24h cache) ---
     async fetchDependencies(throwOnError: boolean = false) {
@@ -135,16 +148,21 @@ export const catalogService = {
     // --- Save (Create/Update) ---
     async saveBuilding(id: number | null, payload: { name: string; floors: string[] }) {
         return withErrorHandling(async () => {
+            let buildingId = id;
             if (id) {
-                const { error } = await supabase.from("buildings").update(payload).eq("id", id);
+                // Doble escritura: array buildings.floors (para el read-path actual)
+                // + tabla floors (fuente canónica del modelo nuevo).
+                const { error } = await supabase.from("buildings").update({ name: payload.name, floors: payload.floors }).eq("id", id);
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Edificio actualizado: ${payload.name}`, entityName: `Edificio: ${payload.name}` });
             } else {
                 const sortOrder = await getNextSortOrder("buildings");
-                const { data, error } = await supabase.from("buildings").insert([{ ...payload, sort_order: sortOrder }]).select().single();
+                const { data, error } = await supabase.from("buildings").insert([{ name: payload.name, floors: payload.floors, sort_order: sortOrder }]).select().single();
                 if (error) throw error;
+                buildingId = data.id;
                 await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Edificio creado: ${payload.name}`, entityName: `Edificio: ${payload.name}` });
             }
+            await syncBuildingFloors(buildingId as number, payload.floors);
             catalogCache.invalidate('buildings');
         }, "Save Building");
     },

@@ -446,13 +446,17 @@ export const personnelService = {
             let activePersonnelCount = 0;
             for (const id of readyPersonIds) { if (activePersonnelIds.has(id)) activePersonnelCount++; }
 
-            const stockFor = async (key: string) => {
-                const { count, error } = await supabase
+            const stockFor = async (key: string, buildingId?: number) => {
+                let query = supabase
                     .from("access_media")
-                    .select("id, access_media_types!inner(key)", { count: "exact", head: true })
+                    .select("id, access_media_types!inner(key, building_id)", { count: "exact", head: true })
                     .eq("access_media_types.key", key)
                     .is("person_id", null)
                     .eq("status", "available");
+                if (buildingId !== undefined) {
+                    query = query.eq("access_media_types.building_id", buildingId);
+                }
+                const { count, error } = await query;
                 if (error) throw error;
                 return count || 0;
             };
