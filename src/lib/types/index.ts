@@ -45,6 +45,7 @@ export interface Card {
     person_id: string | null;
     programming_status: string | null;
     responsiva_status: string | null;
+    has_floors?: boolean;
     // Propiedades calculadas/combinadas
     personName?: string;
     personStatus?: string;

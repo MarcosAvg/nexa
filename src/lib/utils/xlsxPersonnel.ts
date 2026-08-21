@@ -10,7 +10,7 @@ import {
     autoRowHeight,
 } from './xlsxShared';    // Re-exportar tipos desde aquí
 
-export type CardType = "P2000" | "KONE" | "AccessPRO";
+export type CardType = string;
 
 const ALL_CARD_TYPES: CardType[] = ["P2000", "KONE", "AccessPRO"];
 

@@ -297,7 +297,7 @@ export async function matchKoneUsageToPersonnel(
                                 buildings ( name ),
                                 dependencies ( name ),
                                 schedules ( name, default_entry, default_exit ),
-                                access_media ( id, identifier, status, programming_status, responsiva_status, access_media_types ( name ) ),
+                                access_media ( id, identifier, status, programming_status, responsiva_status, access_media_types ( name, has_floors ) ),
                                 access_assignments ( access_media_types ( key ), access_assignment_permissions ( resource_type, resource_key ) ),
                                 entry_time, exit_time
                             )
@@ -339,6 +339,7 @@ export async function matchKoneUsageToPersonnel(
                 status: c.status,
                 programming_status: c.programming_status,
                 responsiva_status: c.responsiva_status,
+                has_floors: c.access_media_types?.has_floors,
             }));
             const displayStatus = computePersonStatus(p.status, allCards);
             const access = deriveAccessFromAssignments(p.access_assignments);

@@ -20,7 +20,6 @@
         Users,
         Check,
     } from "lucide-svelte";
-    import type { CardType } from "../utils/xlsxPersonnel";
     import { personnelService } from "../services/personnel";
     import { cardService } from "../services/cards";
     import { exportPersonnelToExcel, exportPersonnelAllDependenciesAsZip, handleError, createSimpleDebounce } from "../utils";
@@ -38,11 +37,26 @@
         "Sin Edificio",
     ]);
 
-    // Filtros de UI que mapean nombre → ID antes de aplicar
-    /** Tipos de tarjeta a incluir en las columnas/KPIs de la exportación Excel. */
-    let exportCardTypes = $state<CardType[]>(["P2000", "KONE", "AccessPRO"]);
+    // Tipos de acceso (medios) para las columnas/KPIs de la exportación Excel.
+    let exportCardTypes = $state<string[]>([]);
+    let mediaTypeNames = $derived(catalogState.activeMediaTypeNames());
+    // Inicializar una vez que el catálogo de medios esté cargado.
+    $effect(() => {
+        if (mediaTypeNames.length > 0 && exportCardTypes.length === 0) {
+            exportCardTypes = [...mediaTypeNames];
+        }
+    });
 
-    function toggleExportCardType(type: CardType) {
+    const TYPE_DOT_CLASSES = [
+        "bg-amber-400",
+        "bg-sky-400",
+        "bg-emerald-400",
+        "bg-violet-400",
+        "bg-rose-400",
+        "bg-indigo-400",
+    ];
+
+    function toggleExportCardType(type: string) {
         if (exportCardTypes.includes(type) && exportCardTypes.length === 1) {
             // Siempre al menos un tipo seleccionado (el exportador no puede omitir todos)
             return;
@@ -351,27 +365,23 @@
                             Tipos de tarjeta
                         </p>
                         <div class="flex flex-col gap-0.5">
-                            {#each [
-                                { t: "P2000" as CardType, label: "P2000", dot: "bg-amber-400" },
-                                { t: "KONE" as CardType, label: "KONE", dot: "bg-sky-400" },
-                                { t: "AccessPRO" as CardType, label: "AccessPRO", dot: "bg-emerald-400" },
-                            ] as opt}
+                            {#each mediaTypeNames as t, i}
                                 <button
                                     type="button"
-                                    class="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-[12px] font-bold transition-colors {exportCardTypes.includes(opt.t)
+                                    class="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-[12px] font-bold transition-colors {exportCardTypes.includes(t)
                                         ? 'bg-slate-50 text-slate-800'
                                         : 'text-slate-400 hover:text-slate-600'}"
-                                    onclick={() => toggleExportCardType(opt.t)}
+                                    onclick={() => toggleExportCardType(t)}
                                 >
                                     <span
-                                        class="w-4 h-4 rounded flex items-center justify-center border transition-colors {exportCardTypes.includes(opt.t)
+                                        class="w-4 h-4 rounded flex items-center justify-center border transition-colors {exportCardTypes.includes(t)
                                             ? 'bg-blue-600 border-blue-600 text-white'
                                             : 'border-slate-300 text-transparent'}"
                                     >
                                         <Check size={11} strokeWidth={3.5} />
                                     </span>
-                                    <span class="w-2 h-2 rounded-full {opt.dot}"></span>
-                                    {opt.label}
+                                    <span class="w-2 h-2 rounded-full {TYPE_DOT_CLASSES[i % TYPE_DOT_CLASSES.length]}"></span>
+                                    {t}
                                 </button>
                             {/each}
                         </div>

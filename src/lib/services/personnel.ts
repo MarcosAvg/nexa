@@ -51,6 +51,7 @@ function toCardsShape(media: any[] | null | undefined): Card[] {
         person_id: m.person_id,
         programming_status: m.programming_status,
         responsiva_status: m.responsiva_status,
+        has_floors: m.access_media_types?.has_floors,
     }));
 }
 
@@ -103,7 +104,7 @@ export const personnelService = {
 
             let query = supabase
                 .from("personnel_with_status")
-                .select("*, access_media(id, identifier, status, programming_status, responsiva_status, access_media_types(name)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key))", { count: "exact" });
+                .select("*, access_media(id, identifier, status, programming_status, responsiva_status, access_media_types(name, has_floors)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key))", { count: "exact" });
 
             if (search) {
                 const terms = search.trim().split(/\s+/).filter(Boolean);
@@ -149,7 +150,7 @@ export const personnelService = {
             if (withCount) {
                 q = q.select("*", { count: "exact", head: true });
             } else {
-                q = q.select("*, access_media(*, access_media_types(name)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)");
+                q = q.select("*, access_media(*, access_media_types(name, has_floors)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)");
             }
 
             if (search) {
@@ -218,7 +219,7 @@ export const personnelService = {
             const dbStatusMap: Record<string, string> = { "Bloqueado/a": "blocked", "Baja": "inactive" };
 
             const allData = await batchPaginate<any>(async (from, to) => {
-                let q = supabase.from("personnel").select("*, access_media(*, access_media_types(name)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)");
+                let q = supabase.from("personnel").select("*, access_media(*, access_media_types(name, has_floors)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)");
                 if (search) {
                     const terms = search.trim().split(/\s+/).filter(Boolean);
                     for (const term of terms) q = q.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
@@ -239,7 +240,7 @@ export const personnelService = {
         return withErrorHandlingSafe(async () => {
             const { data, error } = await supabase
                 .from("personnel")
-                .select("*, access_media(*, access_media_types(name)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)")
+                .select("*, access_media(*, access_media_types(name, has_floors)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)")
                 .eq("id", id).single();
             if (error) throw error;
             return data ? mapPersonRecord(data) : null;
@@ -262,7 +263,7 @@ export const personnelService = {
                 const terms = queryStr.split(/\s+/).filter(Boolean);
                 if (terms.length === 0) return [];
 
-                peopleQuery = supabase.from("personnel").select("*, access_media(*, access_media_types(name)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)");
+                peopleQuery = supabase.from("personnel").select("*, access_media(*, access_media_types(name, has_floors)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)");
                 for (const term of terms) peopleQuery = peopleQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
                 peopleQuery = peopleQuery.order("first_name", { ascending: true }).limit(20);
             } else {
@@ -270,7 +271,7 @@ export const personnelService = {
                 if (error) throw error;
                 if (!data || data.length === 0) return [];
                 rpcIds = data.map((p: { id: string }) => p.id);
-                peopleQuery = supabase.from("personnel").select("*, access_media(*, access_media_types(name)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)").in("id", rpcIds ?? []);
+                peopleQuery = supabase.from("personnel").select("*, access_media(*, access_media_types(name, has_floors)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)").in("id", rpcIds ?? []);
             }
 
             const { data: fullPeople, error: fetchError } = await peopleQuery;
