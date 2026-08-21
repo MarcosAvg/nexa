@@ -2,6 +2,7 @@ import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate, batchCollectIds } from "../utils";
 import { computePersonStatus } from "../utils/personStatus";
+import { deriveAccessFromAssignments } from "./accessAssignments";
 import type { Person, Card, DashboardMetrics } from "../types";
 import { networkStore } from "../stores/network.svelte";
 
@@ -24,14 +25,12 @@ interface PersonnelRow {
     building_name?: string | null;
     dependency_name?: string | null;
     photo_url?: string | null;
-    floors_p2000?: string[];
-    floors_kone?: string[];
-    special_accesses?: string[];
     schedule_id?: string | null;
     schedule_name?: string | null;
     schedules?: { name: string; default_entry?: string; default_exit?: string } | null;
     buildings?: { name: string } | null;
     dependencies?: { name: string } | null;
+    access_assignments?: any[];
     cards?: {
         id: string;
         folio: string;
@@ -57,6 +56,7 @@ function toCardsShape(media: any[] | null | undefined): Card[] {
 
 const mapPersonRecord = (p: PersonnelRow): Person => {
     const allCards = toCardsShape((p as any).access_media);
+    const access = deriveAccessFromAssignments((p as any).access_assignments);
 
     const displayStatus = p.computed_status
         || computePersonStatus(p.status, allCards);
@@ -85,9 +85,9 @@ const mapPersonRecord = (p: PersonnelRow): Person => {
         status_raw: p.status,
         status: displayStatus,
         cards: allCards,
-        floors_p2000: p.floors_p2000 || [],
-        floors_kone: p.floors_kone || [],
-        specialAccesses: p.special_accesses || []
+        floors_p2000: access.floors_p2000,
+        floors_kone: access.floors_kone,
+        specialAccesses: access.specialAccesses
     } as Person;
 };
 
@@ -103,7 +103,7 @@ export const personnelService = {
 
             let query = supabase
                 .from("personnel_with_status")
-                .select("*, access_media(id, identifier, status, programming_status, responsiva_status, access_media_types(name))", { count: "exact" });
+                .select("*, access_media(id, identifier, status, programming_status, responsiva_status, access_media_types(name)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key))", { count: "exact" });
 
             if (search) {
                 const terms = search.trim().split(/\s+/).filter(Boolean);
@@ -149,7 +149,7 @@ export const personnelService = {
             if (withCount) {
                 q = q.select("*", { count: "exact", head: true });
             } else {
-                q = q.select("*, access_media(*, access_media_types(name)), buildings(name), dependencies(name), schedules(*)");
+                q = q.select("*, access_media(*, access_media_types(name)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)");
             }
 
             if (search) {
@@ -218,7 +218,7 @@ export const personnelService = {
             const dbStatusMap: Record<string, string> = { "Bloqueado/a": "blocked", "Baja": "inactive" };
 
             const allData = await batchPaginate<any>(async (from, to) => {
-                let q = supabase.from("personnel").select("*, access_media(*, access_media_types(name)), buildings(name), dependencies(name), schedules(*)");
+                let q = supabase.from("personnel").select("*, access_media(*, access_media_types(name)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)");
                 if (search) {
                     const terms = search.trim().split(/\s+/).filter(Boolean);
                     for (const term of terms) q = q.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
@@ -239,7 +239,7 @@ export const personnelService = {
         return withErrorHandlingSafe(async () => {
             const { data, error } = await supabase
                 .from("personnel")
-                .select("*, access_media(*, access_media_types(name)), buildings(name), dependencies(name), schedules(*)")
+                .select("*, access_media(*, access_media_types(name)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)")
                 .eq("id", id).single();
             if (error) throw error;
             return data ? mapPersonRecord(data) : null;
@@ -262,7 +262,7 @@ export const personnelService = {
                 const terms = queryStr.split(/\s+/).filter(Boolean);
                 if (terms.length === 0) return [];
 
-                peopleQuery = supabase.from("personnel").select("*, access_media(*, access_media_types(name)), buildings(name), dependencies(name), schedules(*)");
+                peopleQuery = supabase.from("personnel").select("*, access_media(*, access_media_types(name)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)");
                 for (const term of terms) peopleQuery = peopleQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
                 peopleQuery = peopleQuery.order("first_name", { ascending: true }).limit(20);
             } else {
@@ -270,7 +270,7 @@ export const personnelService = {
                 if (error) throw error;
                 if (!data || data.length === 0) return [];
                 rpcIds = data.map((p: { id: string }) => p.id);
-                peopleQuery = supabase.from("personnel").select("*, access_media(*, access_media_types(name)), buildings(name), dependencies(name), schedules(*)").in("id", rpcIds ?? []);
+                peopleQuery = supabase.from("personnel").select("*, access_media(*, access_media_types(name)), access_assignments(access_media_types(key), access_assignment_permissions(resource_type, resource_key)), buildings(name), dependencies(name), schedules(*)").in("id", rpcIds ?? []);
             }
 
             const { data: fullPeople, error: fetchError } = await peopleQuery;
@@ -282,17 +282,20 @@ export const personnelService = {
                 orderedPeople = rpcIds.map(id => idToData[id]).filter(Boolean);
             }
 
-            return orderedPeople.map(p => ({
-                id: p.id, first_name: p.first_name, last_name: p.last_name,
-                name: `${p.first_name} ${p.last_name}`, employee_no: p.employee_no,
-                email: p.email, area: p.area, position: p.position, floor: p.floor,
-                building: p.buildings?.name || "N/A", dependency: p.dependencies?.name || "N/A",
-                building_id: p.building_id, dependency_id: p.dependency_id,
-                schedule: p.schedules ? { days: p.schedules.name, entry: p.entry_time || p.schedules.default_entry || "09:00", exit: p.exit_time || p.schedules.default_exit || "18:00" } : null,
-                status_raw: p.status, status: p.status, cards: toCardsShape(p.access_media),
-                floors_p2000: p.floors_p2000 || [], floors_kone: p.floors_kone || [],
-                specialAccesses: p.special_accesses || []
-            } as Person));
+            return orderedPeople.map(p => {
+                const access = deriveAccessFromAssignments(p.access_assignments);
+                return {
+                    id: p.id, first_name: p.first_name, last_name: p.last_name,
+                    name: `${p.first_name} ${p.last_name}`, employee_no: p.employee_no,
+                    email: p.email, area: p.area, position: p.position, floor: p.floor,
+                    building: p.buildings?.name || "N/A", dependency: p.dependencies?.name || "N/A",
+                    building_id: p.building_id, dependency_id: p.dependency_id,
+                    schedule: p.schedules ? { days: p.schedules.name, entry: p.entry_time || p.schedules.default_entry || "09:00", exit: p.exit_time || p.schedules.default_exit || "18:00" } : null,
+                    status_raw: p.status, status: p.status, cards: toCardsShape(p.access_media),
+                    floors_p2000: access.floors_p2000, floors_kone: access.floors_kone,
+                    specialAccesses: access.specialAccesses
+                } as Person;
+            });
         }, "Search Personnel by Name (Fuzzy)", []);
     },
 
@@ -350,12 +353,9 @@ export const personnelService = {
                 dependency_id: data.dependency_id || data.dependencyId,
                 building_id: data.building_id || data.buildingId,
                 floor: data.floor || data.pisoBase,
-                floors_p2000: data.floors_p2000 || [],
-                floors_kone: data.floors_kone || [],
                 schedule_id: data.schedule_id || data.scheduleId,
                 entry_time: data.entry_time || null,
                 exit_time: data.exit_time || null,
-                special_accesses: data.specialAccesses || data.special_accesses || [],
                 email: data.email || null,
                 status: data.status || "active"
             };
@@ -378,20 +378,16 @@ export const personnelService = {
                 for (const card of cards) await cardService.save({ ...card, person_id: personId });
             }
 
-            // Reconciliar permisos del modelo nuevo (pisos por edificio + accesos
-            // especiales). Todo el acceso se persiste bajo Torre Administrativa
-            // (de momento); si no se provee floorsByBuilding, el trigger de
-            // personnel ya sincronizó los pisos legacy a Torre.
-            const floorsByBuilding = (data as any).floorsByBuilding;
-            if (personId && floorsByBuilding) {
-                const { accessAssignmentService } = await import("./accessAssignments");
-                const specialAccesses = data.specialAccesses || data.special_accesses || [];
-                await accessAssignmentService.savePersonAccess(
-                    personId,
-                    floorsByBuilding,
-                    specialAccesses,
-                );
-            }
+            // Reconciliar permisos (pisos + accesos especiales) directamente sobre
+            // el modelo nuevo, sin depender de columnas legacy ni triggers.
+            const { accessAssignmentService } = await import("./accessAssignments");
+            const specialAccesses = data.specialAccesses || data.special_accesses || [];
+            const floorsByBuilding = (data as any).floorsByBuilding || {};
+            await accessAssignmentService.savePersonAccess(
+                String(personId),
+                floorsByBuilding,
+                specialAccesses,
+            );
         }, "Save Personnel");
     },
 

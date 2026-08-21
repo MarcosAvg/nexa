@@ -333,7 +333,7 @@ export const cardService = {
             // Mantener la asignación del modelo nuevo (antes lo hacía el trigger).
             if (data.person_id && cardId) {
                 await accessAssignmentService.assignMedia(data.person_id, mediaTypeId, cardId);
-                await accessAssignmentService.rebuildPersonAccessFromLegacy(data.person_id);
+                await accessAssignmentService.rebuildPersonAccess(data.person_id);
             } else if (cardId) {
                 await accessAssignmentService.revokeByMedia(cardId);
             }

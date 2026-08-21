@@ -3,6 +3,7 @@ import { supabase } from '../supabase';
 import type { ExportPersonnelData } from './xlsxExport';
 import { batchPaginate } from './batchPaginate';
 import { computePersonStatus } from './personStatus';
+import { deriveAccessFromAssignments } from '../services/accessAssignments';
 
 // ─────────────────────────────────────────
 // Tipos
@@ -288,20 +289,21 @@ export async function matchKoneUsageToPersonnel(
             const cards = await batchPaginate<any>(
                 async (from, to) => {
                     const { data, error } = await supabase
-                        .from('cards')
+                        .from('access_media')
                         .select(`
-                            id, folio, type, status, person_id,
+                            id, identifier, status, person_id, access_media_types ( name ),
                             personnel (
                                 id, first_name, last_name, employee_no, email, area, position, floor, status,
                                 buildings ( name ),
                                 dependencies ( name ),
                                 schedules ( name, default_entry, default_exit ),
-                                cards ( id, folio, type, status, programming_status, responsiva_status ),
-                                floors_p2000, floors_kone, special_accesses, entry_time, exit_time
+                                access_media ( id, identifier, status, programming_status, responsiva_status, access_media_types ( name ) ),
+                                access_assignments ( access_media_types ( key ), access_assignment_permissions ( resource_type, resource_key ) ),
+                                entry_time, exit_time
                             )
                         `)
-                        .eq('type', 'KONE')
-                        .in('folio', chunk)
+                        .eq('access_media_types.name', 'KONE')
+                        .in('identifier', chunk)
                         .range(from, to);
                     return { data, error };
                 },
@@ -315,10 +317,10 @@ export async function matchKoneUsageToPersonnel(
     const cardByFolio = new Map<string, any>();
     for (const card of allMatchingCards) {
         if (card.personnel) {
-            const existing = cardByFolio.get(card.folio);
+            const existing = cardByFolio.get(card.identifier);
             // Priorizar tarjetas activas. Si ya hay una tarjeta activa, no sobrescribir con una no activa.
             if (!existing || card.status === 'active' || existing.status !== 'active') {
-                cardByFolio.set(card.folio, card);
+                cardByFolio.set(card.identifier, card);
             }
         }
     }
@@ -331,8 +333,15 @@ export async function matchKoneUsageToPersonnel(
             const p = card.personnel as any;
 
             // Mapear a ExportPersonnelData
-            const allCards = (p.cards || []);
+            const allCards = (p.access_media || []).map((c: any) => ({
+                type: c.access_media_types?.name ?? '',
+                folio: c.identifier ?? '',
+                status: c.status,
+                programming_status: c.programming_status,
+                responsiva_status: c.responsiva_status,
+            }));
             const displayStatus = computePersonStatus(p.status, allCards);
+            const access = deriveAccessFromAssignments(p.access_assignments);
 
             const person: ExportPersonnelData = {
                 first_name: p.first_name || '',
@@ -343,10 +352,10 @@ export async function matchKoneUsageToPersonnel(
                 area: p.area || '',
                 position: p.position || '',
                 floor: p.floor || '',
-                floors_p2000: p.floors_p2000 || [],
-                floors_kone: p.floors_kone || [],
+                floors_p2000: access.floors_p2000,
+                floors_kone: access.floors_kone,
                 status: displayStatus,
-                specialAccesses: p.special_accesses || [],
+                specialAccesses: access.specialAccesses,
                 schedule: p.schedules ? {
                     days: p.schedules.name,
                     entry: p.entry_time || p.schedules.default_entry || '09:00',

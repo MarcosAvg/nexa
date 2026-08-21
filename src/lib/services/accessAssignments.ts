@@ -19,6 +19,34 @@ export interface PersonAccessData {
  */
 export const TORRE_BUILDING_ID = 1;
 
+/**
+ * Deriva pisos (p2000/kone) y accesos especiales desde el arreglo anidado de
+ * access_assignments + access_assignment_permissions (modelo normalizado).
+ * Reemplaza la lectura de las columnas legacy personnel.floors_p2000/floors_kone/
+ * special_accesses.
+ */
+export function deriveAccessFromAssignments(assignments: any[] | null | undefined): {
+    floors_p2000: string[];
+    floors_kone: string[];
+    specialAccesses: string[];
+} {
+    const floors_p2000: string[] = [];
+    const floors_kone: string[] = [];
+    const specialSet = new Set<string>();
+    for (const a of assignments || []) {
+        const key = a.access_media_types?.key;
+        for (const p of a.access_assignment_permissions || []) {
+            if (p.resource_type === "floor") {
+                if (key === "p2000") floors_p2000.push(p.resource_key);
+                else if (key === "kone") floors_kone.push(p.resource_key);
+            } else if (p.resource_type === "special_access") {
+                specialSet.add(p.resource_key);
+            }
+        }
+    }
+    return { floors_p2000, floors_kone, specialAccesses: Array.from(specialSet) };
+}
+
 export const accessAssignmentService = {
     async fetchForPerson(personId: string): Promise<AccessAssignment[]> {
         return withErrorHandlingSafe(async () => {
@@ -225,23 +253,12 @@ export const accessAssignmentService = {
 
     /**
      * Reconstruye los permisos (pisos + accesos especiales) de una persona a
-     * partir de sus columnas legacy. Se usa al asignar un medio para heredar
-     * el acceso ya configurado, replicando lo que hacían los triggers.
+     * partir de su acceso actual en el modelo nuevo. Se usa al asignar un medio
+     * para heredar el acceso ya configurado a la nueva asignación.
      */
-    async rebuildPersonAccessFromLegacy(personId: string): Promise<void> {
-        const { data: person } = await supabase
-            .from("personnel")
-            .select("floors_p2000, floors_kone, special_accesses")
-            .eq("id", personId)
-            .single();
-        if (!person) return;
-        const floorsByBuilding: Record<number, PersonBuildingFloors> = {
-            [TORRE_BUILDING_ID]: {
-                p2000: (person as any).floors_p2000 || [],
-                kone: (person as any).floors_kone || [],
-            },
-        };
-        await this.savePersonAccess(personId, floorsByBuilding, (person as any).special_accesses || []);
+    async rebuildPersonAccess(personId: string): Promise<void> {
+        const access = await this.fetchPersonAccess(personId);
+        await this.savePersonAccess(personId, access.floorsByBuilding, access.specialAccesses);
     },
 
     /**
