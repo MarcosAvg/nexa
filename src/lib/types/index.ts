@@ -64,7 +64,7 @@ export interface Ticket {
     status: "Pendiente" | "En Proceso" | "Completado" | "pending" | "completed";
     created_at: string;
     person_id: string | null;
-    card_id: string | null;
+    access_media_id: string | null;
     payload: any;
 
     // Propiedades de join (retornadas por Supabase en queries con select anidado)

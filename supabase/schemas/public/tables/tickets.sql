@@ -6,11 +6,11 @@ create table "public"."tickets" (
   "priority"    text                     default 'Media'::text,
   "status"      text                     default 'pending'::text,
   "payload"     jsonb                    default '{}'::jsonb,
-  "person_id"   uuid,
-  "card_id"     uuid,
-  "created_by"  uuid,
-  "created_at"  timestamp with time zone default now(),
-  constraint "tickets_card_id_fkey" foreign key (card_id) references public.cards(id) on delete cascade,
+  "person_id"       uuid,
+  "access_media_id" uuid,
+  "created_by"      uuid,
+  "created_at"      timestamp with time zone default now(),
+  constraint "tickets_access_media_id_fkey" foreign key (access_media_id) references public.access_media(id) on delete cascade,
   constraint "tickets_created_by_fkey" foreign key (created_by) references auth.users(id),
   constraint "tickets_person_id_fkey" foreign key (person_id) references public.personnel(id) on delete cascade,
   constraint "tickets_pkey" primary key (id)
@@ -24,7 +24,7 @@ alter table "public"."tickets"
 
 create index idx_tickets_assigned_to on public.tickets using btree (((payload ->> 'assignedTo'::text)));
 
-create index idx_tickets_card_id on public.tickets using btree (card_id);
+create index idx_tickets_access_media_id on public.tickets using btree (access_media_id);
 
 create index idx_tickets_created_by on public.tickets using btree (created_by);
 

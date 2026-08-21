@@ -103,9 +103,9 @@ function createChannel(channelName: string) {
             )
             .on(
                 "postgres_changes",
-                { event: "*", schema: "public", table: "cards" },
+                { event: "*", schema: "public", table: "access_media" },
                 (payload) => {
-                    console.log("[Realtime: Cards]", payload.eventType, payload);
+                    console.log("[Realtime: Access Media]", payload.eventType, payload);
                 },
             )
             .on(

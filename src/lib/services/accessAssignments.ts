@@ -164,6 +164,67 @@ export const accessAssignmentService = {
     },
 
     /**
+     * Crea (o reactiva) la asignación de un medio de acceso a una persona.
+     * Reemplaza la parte de `sync_access_media_from_card` que insertaba
+     * access_assignments al asignar una tarjeta.
+     */
+    async assignMedia(personId: string, mediaTypeId: string, accessMediaId: string): Promise<void> {
+        return withErrorHandling(async () => {
+            const { error } = await supabase
+                .from("access_assignments")
+                .upsert(
+                    {
+                        person_id: personId,
+                        media_type_id: mediaTypeId,
+                        legacy_card_id: accessMediaId,
+                        assigned_at: new Date().toISOString(),
+                        revoked_at: null,
+                        status: "active",
+                    },
+                    { onConflict: "legacy_card_id" },
+                );
+            if (error) throw error;
+        }, "Assign Access Media");
+    },
+
+    /**
+     * Revoca la asignación vinculada a un medio de acceso.
+     * Reemplaza la revocación que hacía `sync_access_media_from_card`
+     * al desvincular/eliminar una tarjeta.
+     */
+    async revokeByMedia(accessMediaId: string): Promise<void> {
+        return withErrorHandling(async () => {
+            const { error } = await supabase
+                .from("access_assignments")
+                .update({ revoked_at: new Date().toISOString(), status: "revoked" })
+                .eq("legacy_card_id", accessMediaId)
+                .eq("status", "active");
+            if (error) throw error;
+        }, "Revoke Access Media");
+    },
+
+    /**
+     * Reconstruye los permisos (pisos + accesos especiales) de una persona a
+     * partir de sus columnas legacy. Se usa al asignar un medio para heredar
+     * el acceso ya configurado, replicando lo que hacían los triggers.
+     */
+    async rebuildPersonAccessFromLegacy(personId: string): Promise<void> {
+        const { data: person } = await supabase
+            .from("personnel")
+            .select("floors_p2000, floors_kone, special_accesses")
+            .eq("id", personId)
+            .single();
+        if (!person) return;
+        const floorsByBuilding: Record<number, PersonBuildingFloors> = {
+            [TORRE_BUILDING_ID]: {
+                p2000: (person as any).floors_p2000 || [],
+                kone: (person as any).floors_kone || [],
+            },
+        };
+        await this.savePersonAccess(personId, floorsByBuilding, (person as any).special_accesses || []);
+    },
+
+    /**
      * Devuelve los pisos por clave de tipo de medio para una persona.
      * Reemplaza gradualmente a personnel.floors_p2000 / floors_kone.
      */

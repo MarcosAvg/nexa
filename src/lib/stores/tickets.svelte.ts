@@ -41,7 +41,7 @@ export class TicketState {
 
     removeByCard(cardId: string, types?: string[]) {
         this.pendingItems = this.pendingItems.filter(t => {
-            if (t.card_id !== cardId) return true;
+            if (t.access_media_id !== cardId) return true;
             if (types && types.length > 0) {
                 return !types.includes(t.type);
             }

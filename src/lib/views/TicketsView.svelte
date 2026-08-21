@@ -265,7 +265,7 @@
         ) {
             if (ticket.person_id) {
                 personnelState.selectPerson(ticket.person_id);
-                personnelState.highlightedCardId = ticket.card_id || null;
+                personnelState.highlightedCardId = ticket.access_media_id || null;
             } else {
                 toast.error("Este ticket no tiene una persona vinculada");
             }

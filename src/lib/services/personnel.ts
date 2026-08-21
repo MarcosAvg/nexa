@@ -42,8 +42,21 @@ interface PersonnelRow {
     }[];
 }
 
+/** Convierte filas de access_media (con access_media_types) a la forma `cards` que usa la UI. */
+function toCardsShape(media: any[] | null | undefined): Card[] {
+    return (media || []).map((m: any) => ({
+        id: m.id,
+        folio: m.identifier ?? "",
+        type: m.access_media_types?.name ?? (m.metadata?.legacy_type as string) ?? "",
+        status: m.status,
+        person_id: m.person_id,
+        programming_status: m.programming_status,
+        responsiva_status: m.responsiva_status,
+    }));
+}
+
 const mapPersonRecord = (p: PersonnelRow): Person => {
-    const allCards = (p.cards || []);
+    const allCards = toCardsShape((p as any).access_media);
 
     const displayStatus = p.computed_status
         || computePersonStatus(p.status, allCards);
@@ -71,7 +84,7 @@ const mapPersonRecord = (p: PersonnelRow): Person => {
         } : null),
         status_raw: p.status,
         status: displayStatus,
-        cards: p.cards || [],
+        cards: allCards,
         floors_p2000: p.floors_p2000 || [],
         floors_kone: p.floors_kone || [],
         specialAccesses: p.special_accesses || []
@@ -90,7 +103,7 @@ export const personnelService = {
 
             let query = supabase
                 .from("personnel_with_status")
-                .select("*, cards(id, folio, type, status, programming_status, responsiva_status)", { count: "exact" });
+                .select("*, access_media(id, identifier, status, programming_status, responsiva_status, access_media_types(name))", { count: "exact" });
 
             if (search) {
                 const terms = search.trim().split(/\s+/).filter(Boolean);
@@ -136,7 +149,7 @@ export const personnelService = {
             if (withCount) {
                 q = q.select("*", { count: "exact", head: true });
             } else {
-                q = q.select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+                q = q.select("*, access_media(*, access_media_types(name)), buildings(name), dependencies(name), schedules(*)");
             }
 
             if (search) {
@@ -205,7 +218,7 @@ export const personnelService = {
             const dbStatusMap: Record<string, string> = { "Bloqueado/a": "blocked", "Baja": "inactive" };
 
             const allData = await batchPaginate<any>(async (from, to) => {
-                let q = supabase.from("personnel").select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+                let q = supabase.from("personnel").select("*, access_media(*, access_media_types(name)), buildings(name), dependencies(name), schedules(*)");
                 if (search) {
                     const terms = search.trim().split(/\s+/).filter(Boolean);
                     for (const term of terms) q = q.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
@@ -226,7 +239,7 @@ export const personnelService = {
         return withErrorHandlingSafe(async () => {
             const { data, error } = await supabase
                 .from("personnel")
-                .select("*, cards(*), buildings(name), dependencies(name), schedules(*)")
+                .select("*, access_media(*, access_media_types(name)), buildings(name), dependencies(name), schedules(*)")
                 .eq("id", id).single();
             if (error) throw error;
             return data ? mapPersonRecord(data) : null;
@@ -249,7 +262,7 @@ export const personnelService = {
                 const terms = queryStr.split(/\s+/).filter(Boolean);
                 if (terms.length === 0) return [];
 
-                peopleQuery = supabase.from("personnel").select("*, cards(*), buildings(name), dependencies(name), schedules(*)");
+                peopleQuery = supabase.from("personnel").select("*, access_media(*, access_media_types(name)), buildings(name), dependencies(name), schedules(*)");
                 for (const term of terms) peopleQuery = peopleQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
                 peopleQuery = peopleQuery.order("first_name", { ascending: true }).limit(20);
             } else {
@@ -257,7 +270,7 @@ export const personnelService = {
                 if (error) throw error;
                 if (!data || data.length === 0) return [];
                 rpcIds = data.map((p: { id: string }) => p.id);
-                peopleQuery = supabase.from("personnel").select("*, cards(*), buildings(name), dependencies(name), schedules(*)").in("id", rpcIds ?? []);
+                peopleQuery = supabase.from("personnel").select("*, access_media(*, access_media_types(name)), buildings(name), dependencies(name), schedules(*)").in("id", rpcIds ?? []);
             }
 
             const { data: fullPeople, error: fetchError } = await peopleQuery;
@@ -276,7 +289,7 @@ export const personnelService = {
                 building: p.buildings?.name || "N/A", dependency: p.dependencies?.name || "N/A",
                 building_id: p.building_id, dependency_id: p.dependency_id,
                 schedule: p.schedules ? { days: p.schedules.name, entry: p.entry_time || p.schedules.default_entry || "09:00", exit: p.exit_time || p.schedules.default_exit || "18:00" } : null,
-                status_raw: p.status, status: p.status, cards: p.cards || [],
+                status_raw: p.status, status: p.status, cards: toCardsShape(p.access_media),
                 floors_p2000: p.floors_p2000 || [], floors_kone: p.floors_kone || [],
                 specialAccesses: p.special_accesses || []
             } as Person));
@@ -387,7 +400,7 @@ export const personnelService = {
             const { error } = await withTimeout(supabase.from("personnel").update({ status }).eq("id", id));
             if (error) throw error;
 
-            const { error: cardError } = await withTimeout(supabase.from("cards").update({ status }).eq("person_id", id));
+            const { error: cardError } = await withTimeout(supabase.from("access_media").update({ status }).eq("person_id", id));
             if (cardError) throw cardError;
 
             if (status === "inactive" || status === "baja") {
@@ -413,8 +426,8 @@ export const personnelService = {
 
             if (cardActionMap) {
                 for (const [cardId, action] of Object.entries(cardActionMap)) {
-                    if (action === "delete") await supabase.from("cards").delete().eq("id", cardId);
-                    else if (action === "keep") await supabase.from("cards").update({ person_id: null, status: "available", responsiva_status: "unsigned", programming_status: "pending" }).eq("id", cardId);
+                    if (action === "delete") await supabase.from("access_media").delete().eq("id", cardId);
+                    else if (action === "keep") await supabase.from("access_media").update({ person_id: null, status: "available", responsiva_status: "unsigned", programming_status: "pending" }).eq("id", cardId);
                 }
             }
 

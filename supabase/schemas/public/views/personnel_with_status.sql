@@ -1,10 +1,11 @@
 create view "public"."personnel_with_status" with (security_invoker=true) AS  WITH person_ready_cards AS (
          SELECT p_1.id,
-            count(DISTINCT c.type) FILTER (WHERE ((c.type = ANY (ARRAY['P2000'::text, 'KONE'::text])) AND (c.status = 'active'::text) AND (c.programming_status = 'done'::text) AND (c.responsiva_status = ANY (ARRAY['signed'::text, 'legacy'::text])))) AS core_ready_types,
-            bool_or((c.type = ANY (ARRAY['P2000'::text, 'KONE'::text]))) AS has_core_cards,
-            bool_or(((c.type = 'AccessPRO'::text) AND (c.status = 'active'::text))) AS has_active_accesspro
+            count(DISTINCT amt.name) FILTER (WHERE ((amt.name = ANY (ARRAY['P2000'::text, 'KONE'::text])) AND (am.status = 'active'::text) AND (am.programming_status = 'done'::text) AND (am.responsiva_status = ANY (ARRAY['signed'::text, 'legacy'::text])))) AS core_ready_types,
+            bool_or((amt.name = ANY (ARRAY['P2000'::text, 'KONE'::text]))) AS has_core_cards,
+            bool_or(((amt.name = 'AccessPRO'::text) AND (am.status = 'active'::text))) AS has_active_accesspro
            FROM (public.personnel p_1
-             LEFT JOIN public.cards c ON ((c.person_id = p_1.id)))
+             LEFT JOIN public.access_media am ON ((am.person_id = p_1.id))
+             LEFT JOIN public.access_media_types amt ON ((amt.id = am.media_type_id)))
           GROUP BY p_1.id
         )
  SELECT p.id,

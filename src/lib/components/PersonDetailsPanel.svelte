@@ -323,7 +323,7 @@ async function loadFloors() {
         try {
             const { supabase } = await import("../supabase");
             const { error } = await supabase
-                .from("cards")
+                .from("access_media")
                 .update({ [field]: value })
                 .eq("id", card.id);
             if (error) throw error;

@@ -86,29 +86,28 @@ async function fetchCardAssignmentTypes(
 }
 
 async function enrichWithAccessMedia(tickets: any[]): Promise<any[]> {
-    const cardIds = tickets.map((t) => t.card_id).filter(Boolean) as string[];
-    if (cardIds.length === 0) return tickets;
+    const mediaIds = tickets.map((t) => t.access_media_id).filter(Boolean) as string[];
+    if (mediaIds.length === 0) return tickets;
 
-    const uniqueIds = [...new Set(cardIds)];
+    const uniqueIds = [...new Set(mediaIds)];
     const { data } = await supabase
         .from("access_media")
-        .select("legacy_card_id, identifier, access_media_types(name)")
-        .in("legacy_card_id", uniqueIds);
+        .select("id, identifier, access_media_types(name)")
+        .in("id", uniqueIds);
 
-    const byCardId = new Map<string, { type: string; folio: string }>();
+    const byMediaId = new Map<string, { type: string; folio: string }>();
     for (const m of data || []) {
-        if (!m.legacy_card_id) continue;
         const rel = m.access_media_types as { name?: string }[] | { name?: string } | null | undefined;
         const typeName = Array.isArray(rel) ? (rel[0]?.name ?? "") : (rel?.name ?? "");
-        byCardId.set(m.legacy_card_id, {
+        byMediaId.set(m.id, {
             type: typeName,
             folio: m.identifier ?? "",
         });
     }
 
     return tickets.map((t) => {
-        if (t.card_id && byCardId.has(t.card_id)) {
-            const info = byCardId.get(t.card_id)!;
+        if (t.access_media_id && byMediaId.has(t.access_media_id)) {
+            const info = byMediaId.get(t.access_media_id)!;
             return { ...t, cardType: info.type, cardFolio: info.folio };
         }
         return t;
@@ -116,7 +115,7 @@ async function enrichWithAccessMedia(tickets: any[]): Promise<any[]> {
 }
 
 async function enrichWithMovementType(tickets: Ticket[]): Promise<(Ticket & { movementType: string; assignmentDate: string })[]> {
-    const cardIds = tickets.map((t) => t.card_id).filter(Boolean) as string[];
+    const cardIds = tickets.map((t) => t.access_media_id).filter(Boolean) as string[];
     const personnelCreatedAt: Record<string, string> = {};
     for (const t of tickets) {
         const pers = t.personnel as { created_at?: string } | null;
@@ -128,7 +127,7 @@ async function enrichWithMovementType(tickets: Ticket[]): Promise<(Ticket & { mo
     const assignmentMap = await fetchCardAssignmentTypes(cardIds, personnelCreatedAt);
 
     return tickets.map((t: Ticket & { movementType?: string; assignmentDate?: string }) => {
-        const info = t.card_id ? assignmentMap[t.card_id] : undefined;
+        const info = t.access_media_id ? assignmentMap[t.access_media_id] : undefined;
         let movementType = info?.movementType ?? "Sin clasificar";
         let assignmentDate = info?.registeredAt || t.created_at;
 
@@ -304,7 +303,7 @@ export const ticketService = {
         description?: string;
         priority: string;
         person_id?: string | null;
-        card_id?: string | null;
+        access_media_id?: string | null;
         title?: string;
         payload?: Record<string, unknown>;
         metadata?: Record<string, unknown>;
@@ -316,7 +315,7 @@ export const ticketService = {
                 priority: (data.priority || "media").toLowerCase(),
                 status: "pending",
                 person_id: data.person_id || null,
-                card_id: data.card_id || null,
+                access_media_id: data.access_media_id || null,
                 title: data.title || data.type,
                 payload: data.payload || data.metadata || {}
             };
@@ -351,7 +350,7 @@ export const ticketService = {
             priority: t.priority.toLowerCase(),
             status: 'pending',
             person_id: null,
-            card_id: null,
+            access_media_id: null,
             payload: t.payload,
         }));
 
@@ -404,7 +403,7 @@ export const ticketService = {
         return withErrorHandling(async () => {
             let fetchQuery = supabase.from("tickets")
                 .select("id, title")
-                .eq("card_id", cardId);
+                .eq("access_media_id", cardId);
             if (types && types.length > 0) fetchQuery = fetchQuery.in("type", types);
 
             const { data: tickets } = await fetchQuery;
@@ -418,7 +417,7 @@ export const ticketService = {
                 }
             }
 
-            let query = supabase.from("tickets").delete().eq("card_id", cardId);
+            let query = supabase.from("tickets").delete().eq("access_media_id", cardId);
             if (types && types.length > 0) {
                 query = query.in("type", types);
             }
