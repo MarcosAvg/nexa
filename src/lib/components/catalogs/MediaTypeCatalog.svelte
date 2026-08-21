@@ -41,7 +41,6 @@
     // Add/Edit modal state
     let isModalOpen = $state(false);
     let editingId = $state<string | null>(null);
-    let selectedTemplate = $state<"p2000" | "kone" | "accesspro">("p2000");
     let mediaName = $state("");
     let mediaHasFloors = $state(true);
     let mediaActive = $state(true);
@@ -50,12 +49,6 @@
     let isDeleteModalOpen = $state(false);
     let deleteTarget = $state<any>(null);
     let deleteConfirmation = $state("");
-
-    const TEMPLATES = [
-        { key: "p2000", name: "P2000", desc: "Control de puertas" },
-        { key: "kone", name: "KONE", desc: "Elevadores" },
-        { key: "accesspro", name: "AccessPRO", desc: "Acceso secundario" },
-    ] as const;
 
     async function fetchMediaTypes() {
         const data = await catalogService.fetchMediaTypes();
@@ -96,7 +89,6 @@
             mediaActive = type.active !== false;
         } else {
             editingId = null;
-            selectedTemplate = "p2000";
             mediaName = "";
             mediaHasFloors = true;
             mediaActive = true;
@@ -114,8 +106,8 @@
                 });
             } else {
                 await catalogService.saveMediaType(null, {
-                    key: selectedTemplate,
-                    name: mediaName.trim() || undefined,
+                    name: mediaName.trim(),
+                    has_floors: mediaHasFloors,
                     buildingId: selectedBuildingId,
                 });
             }
@@ -240,39 +232,22 @@
     description={`${editingId ? "Actualiza" : "Establece"} el sistema de acceso de ${buildings.find((b) => Number(b.id) === selectedBuildingId)?.name ?? "el edificio seleccionado"}.`}
 >
     <div class="space-y-4">
-        {#if !editingId}
-            <div>
-                <p class="block text-sm font-medium text-slate-700 mb-2">Sistema de acceso</p>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" role="group" aria-label="Sistema de acceso">
-                    {#each TEMPLATES as t}
-                        <button
-                            type="button"
-                            class="flex flex-col items-start gap-1 p-3 rounded-xl border-2 text-left transition-all active:scale-[0.98] {selectedTemplate === t.key ? 'border-blue-500 bg-blue-50/60' : 'border-slate-200 hover:border-slate-300'}"
-                            onclick={() => (selectedTemplate = t.key)}
-                        >
-                            <span class="text-sm font-extrabold text-slate-800">{t.name}</span>
-                            <span class="text-[10px] font-medium text-slate-500">{t.desc}</span>
-                        </button>
-                    {/each}
-                </div>
-            </div>
-        {/if}
         <div>
             <label for="media-name" class="block text-sm font-medium text-slate-700 mb-1">Nombre del Medio</label>
-            <Input id="media-name" placeholder={editingId ? "Nombre" : selectedTemplate.toUpperCase()} bind:value={mediaName} />
+            <Input id="media-name" placeholder={editingId ? "Nombre" : "Ej. P2000, KONE, AccessPRO…"} bind:value={mediaName} />
         </div>
-        {#if editingId}
-            <div class="space-y-2 pt-1">
-                <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
-                    <span class="text-sm font-bold text-slate-700">Maneja pisos (P2000/KONE)</span>
-                    <input type="checkbox" bind:checked={mediaHasFloors} class="w-5 h-5 accent-blue-600" />
-                </label>
+        <div class="space-y-2 pt-1">
+            <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
+                <span class="text-sm font-bold text-slate-700">Maneja pisos</span>
+                <input type="checkbox" bind:checked={mediaHasFloors} class="w-5 h-5 accent-blue-600" />
+            </label>
+            {#if editingId}
                 <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
                     <span class="text-sm font-bold text-slate-700">Activo</span>
                     <input type="checkbox" bind:checked={mediaActive} class="w-5 h-5 accent-emerald-600" />
                 </label>
-            </div>
-        {/if}
+            {/if}
+        </div>
     </div>
     {#snippet footer()}
         <Button variant="secondary" onclick={() => (isModalOpen = false)}>Cancelar</Button>

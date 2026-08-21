@@ -18,7 +18,7 @@
     import { personnelState, catalogState, userState } from "../../stores";
     import PermissionGuard from "../PermissionGuard.svelte";
     import { toast } from "svelte-sonner";
-    import { handleError } from "../../utils";
+    import { handleError, mediaTypeVariant } from "../../utils";
     import type { Person } from "../../types";
     import { personnelSchema } from "../../schemas";
 
@@ -932,12 +932,7 @@
                                         size={18}
                                         class="text-slate-400"
                                     />
-                                    <Badge
-                                        variant={card.type === "KONE"
-                                            ? "blue"
-                                            : card.type === "AccessPRO"
-                                              ? "emerald"
-                                              : "amber"}>{card.type}</Badge
+                                    <Badge variant={mediaTypeVariant(card.type)}>{card.type}</Badge
                                     >
                                     <span
                                         class="text-sm font-bold text-slate-700"

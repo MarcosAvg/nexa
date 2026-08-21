@@ -248,21 +248,18 @@ export const catalogService = {
     },
 
     /**
-     * Configuración por defecto de los sistemas de acceso que un edificio
-     * puede establecer. Las llaves son fijas (el frontend las usa para
-     * clasificar pisos P2000/KONE), por lo que la creación se limita a estas
-     * plantillas.
+     * Crea o actualiza un tipo de medio de acceso por edificio.
+     * La creación acepta cualquier key/nombre (la app deriva pisos y estado
+     * dinámicamente de `has_floors`); la key se normaliza a slug.
      */
     async saveMediaType(
         id: string | null,
         payload: { key?: string; name?: string; has_floors?: boolean; active?: boolean; buildingId?: number },
     ) {
         return withErrorHandling(async () => {
-            const TEMPLATES: Record<string, { name: string; has_floors: boolean }> = {
-                p2000: { name: "P2000", has_floors: true },
-                kone: { name: "KONE", has_floors: true },
-                accesspro: { name: "AccessPRO", has_floors: false },
-            };
+            const slugify = (s: string) =>
+                s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
             if (id) {
                 const update: Record<string, unknown> = {};
                 if (payload.name !== undefined) update.name = payload.name;
@@ -272,18 +269,19 @@ export const catalogService = {
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Medio de acceso actualizado: ${payload.name}`, entityName: `Medio de acceso: ${payload.name}` });
             } else {
-                const key = payload.key ?? "";
-                const template = TEMPLATES[key];
-                if (!template) throw new Error("Sistema de acceso no válido");
+                const name = payload.name?.trim();
+                if (!name) throw new Error("El nombre del medio es requerido");
                 if (!payload.buildingId) throw new Error("Edificio requerido");
+                const key = slugify(payload.key?.trim() || name);
+                if (!key) throw new Error("La clave del medio es inválida");
                 const sortOrder = await getNextSortOrder("access_media_types", payload.buildingId);
                 const { data, error } = await supabase
                     .from("access_media_types")
                     .insert([{
                         key,
-                        name: payload.name?.trim() || template.name,
+                        name,
                         building_id: payload.buildingId,
-                        has_floors: template.has_floors,
+                        has_floors: payload.has_floors ?? false,
                         category: "card",
                         identifier_label: "Folio",
                         requires_identifier: true,
