@@ -184,8 +184,8 @@ export const ticketService = {
             }
             if (section === "Responsivas") {
                 selectString = dependencyId
-                    ? "*, cards(id, folio, type), personnel!inner(first_name, last_name, dependency_id, created_at)"
-                    : "*, cards(id, folio, type), personnel(first_name, last_name, dependency_id, created_at)";
+                    ? "*, access_media(id, identifier, status, access_media_types(name)), personnel!inner(first_name, last_name, dependency_id, created_at)"
+                    : "*, access_media(id, identifier, status, access_media_types(name)), personnel(first_name, last_name, dependency_id, created_at)";
             }
 
             let query = supabase
@@ -236,7 +236,16 @@ export const ticketService = {
 
             if (error) throw error;
 
-            const mapped = ((data || []) as any[]).map(t => ({ ...t } as unknown as Ticket));
+            // Compatibilidad: exponer el medio como `cards` para consumidores existentes.
+            const mapped = ((data || []) as any[]).map(t => ({
+                ...t,
+                cards: t.access_media
+                    ? {
+                          type: t.access_media.access_media_types?.name ?? "",
+                          folio: t.access_media.identifier ?? "",
+                      }
+                    : undefined,
+            }) as unknown as Ticket);
             const withMedia = await enrichWithAccessMedia(mapped);
 
             if (section === "Responsivas" && withMedia.length > 0) {
@@ -272,7 +281,7 @@ export const ticketService = {
             const allData = await batchPaginate<any>(async (from, to) => {
                 let query = supabase
                     .from("tickets")
-                    .select(`*, cards(id, folio, type), ${personnelSelect}`)
+                    .select(`*, access_media(id, identifier, status, access_media_types(name)), ${personnelSelect}`)
                     .eq("status", "pending")
                     .eq("type", "Firma Responsiva");
 
@@ -293,7 +302,18 @@ export const ticketService = {
                     .range(from, to);
             });
 
-            const withMedia = await enrichWithAccessMedia(allData);
+            // Compatibilidad: exponer el medio como `cards` para consumidores existentes.
+            const withCompat = allData.map((t: any) => ({
+                ...t,
+                cards: t.access_media
+                    ? {
+                          type: t.access_media.access_media_types?.name ?? "",
+                          folio: t.access_media.identifier ?? "",
+                      }
+                    : undefined,
+            }));
+
+            const withMedia = await enrichWithAccessMedia(withCompat);
             return enrichWithMovementType(withMedia);
         }, "Fetch Responsivas for Export", []);
     },
