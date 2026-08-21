@@ -6,11 +6,9 @@ create table "public"."access_media" (
   "person_id"          uuid,
   "programming_status" text                     not null default 'pending',
   "responsiva_status"  text                     not null default 'unsigned',
-  "legacy_card_id"     uuid,
   "metadata"           jsonb                    not null default '{}'::jsonb,
   "created_at"         timestamp with time zone not null default now(),
   "updated_at"         timestamp with time zone not null default now(),
-  constraint "access_media_legacy_card_id_key" unique ("legacy_card_id"),
   constraint "access_media_pkey" primary key ("id"),
   constraint "access_media_media_type_id_fkey" foreign key ("media_type_id") references public.access_media_types("id"),
   constraint "access_media_person_id_fkey" foreign key ("person_id") references public.personnel("id") on delete set null

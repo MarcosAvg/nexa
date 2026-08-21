@@ -195,7 +195,6 @@ export interface AccessMedia {
     person_id: string | null;
     programming_status: string;
     responsiva_status: string;
-    legacy_card_id: string | null;
     metadata: Record<string, unknown>;
     created_at: string;
     updated_at: string;
@@ -215,7 +214,7 @@ export interface AccessAssignment {
     id: string;
     person_id: string;
     media_type_id: string;
-    legacy_card_id: string | null;
+    access_media_id: string | null;
     assigned_at: string;
     revoked_at: string | null;
     status: string;
@@ -260,7 +259,6 @@ export interface SignedDocument {
     signature: string;
     legal_hash: string | null;
     legal_snapshot: string | null;
-    legacy_responsiva_id: string | null;
     created_at: string;
     // Propiedades de join
     document_templates?: DocumentTemplate;

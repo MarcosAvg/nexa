@@ -19,7 +19,6 @@
     "public/functions/reorder_media_types.sql",
     "public/functions/search_personnel_fuzzy.sql",
     "public/functions/normalize_floor_label.sql",
-    "public/functions/sync_personnel_access_to_assignments.sql",
     "public/schema.sql",
     "public/tables/access_assignment_permissions.sql",
     "public/tables/access_assignments.sql",

@@ -224,12 +224,12 @@ export const accessAssignmentService = {
                     {
                         person_id: personId,
                         media_type_id: mediaTypeId,
-                        legacy_card_id: accessMediaId,
+                        access_media_id: accessMediaId,
                         assigned_at: new Date().toISOString(),
                         revoked_at: null,
                         status: "active",
                     },
-                    { onConflict: "legacy_card_id" },
+                    { onConflict: "access_media_id" },
                 );
             if (error) throw error;
         }, "Assign Access Media");
@@ -245,7 +245,7 @@ export const accessAssignmentService = {
             const { error } = await supabase
                 .from("access_assignments")
                 .update({ revoked_at: new Date().toISOString(), status: "revoked" })
-                .eq("legacy_card_id", accessMediaId)
+                .eq("access_media_id", accessMediaId)
                 .eq("status", "active");
             if (error) throw error;
         }, "Revoke Access Media");
