@@ -148,11 +148,17 @@
 
     function toggleBuilding(bid: number) {
         if (selectedBuildings.includes(bid)) {
-            // Desmarcar descarta sus pisos del guardado.
+            // Desmarcar descarta sus pisos y sus accesos especiales del guardado.
             const next = { ...floorsByBuilding };
             delete next[bid];
             floorsByBuilding = next;
             selectedBuildings = selectedBuildings.filter((b) => b !== bid);
+            const keepNames = new Set(
+                catalogState.specialAccesses
+                    .filter((a) => selectedBuildings.includes(Number(a.building_id)))
+                    .map((a) => a.name),
+            );
+            accesosEspeciales = accesosEspeciales.filter((n) => keepNames.has(n));
         } else {
             selectedBuildings = [...selectedBuildings, bid];
         }

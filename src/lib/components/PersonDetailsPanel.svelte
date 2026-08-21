@@ -109,6 +109,19 @@
 
 // Pisos leídos del modelo nuevo (access_assignment_permissions), agrupados por
 // edificio y por tipo de medio concreto.
+/** Accesos especiales agrupados por edificio (resueltos desde el catálogo). */
+let specialAccessGroups = $derived.by(() => {
+    const map = new Map<string, string[]>();
+    for (const access of person?.specialAccesses || []) {
+        const sp = catalogState.specialAccesses.find((s) => s.name === access);
+        const bName =
+            catalogState.buildings.find((b) => Number(b.id) === Number(sp?.building_id))?.name ?? "Otros";
+        if (!map.has(bName)) map.set(bName, []);
+        map.get(bName)!.push(access);
+    }
+    return Array.from(map.entries());
+});
+
 let floorsByBuilding = $state<
     Record<number, FloorGroup[]>
 >({});
@@ -486,9 +499,14 @@ async function loadFloors() {
                                 >Accesos Especiales</span
                             >
                         </div>
-                        <div class="flex flex-wrap gap-1.5">
-                            {#each person.specialAccesses as access}
-                                <Badge variant="violet">{access}</Badge>
+                        <div class="space-y-1.5">
+                            {#each specialAccessGroups as [bName, names]}
+                                <div class="flex flex-wrap gap-1.5 items-center">
+                                    <span class="text-[9px] font-extrabold text-slate-400 uppercase">{bName}</span>
+                                    {#each names as access}
+                                        <Badge variant="violet">{access}</Badge>
+                                    {/each}
+                                </div>
                             {/each}
                         </div>
                     </div>
