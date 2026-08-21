@@ -12,6 +12,7 @@
     } from "lucide-svelte";
     import PermissionGuard from "./PermissionGuard.svelte";
     import { uiState } from "../stores/ui.svelte";
+    import { mediaTypeVariant } from "../utils/mediaTypeAppearance";
 
     /**
      * CardItem — Item de tarjeta de acceso en el panel de detalles.
@@ -86,13 +87,7 @@
 >
     <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-3 flex-wrap">
-            <Badge
-                variant={type === "KONE"
-                    ? "blue"
-                    : type === "AccessPRO"
-                      ? "emerald"
-                      : "amber"}
-            >
+            <Badge variant={mediaTypeVariant(type)}>
                 {type}
             </Badge>
             <span class="text-sm font-bold text-slate-800">{folio}</span>

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import bgImg from "../../assets/responsiva_bg.png";
-    import { RESPONSIVA_LEGAL_TEXTS } from "../constants/legal";
+    import { fetchLegalText } from "../services/responsiva";
 
     /**
      * ResponsivaTemplate — Plantilla visual de la Carta Responsiva.
@@ -31,8 +31,8 @@
         signature?: string;
         /** Snapshot del texto legal guardado en BD. */
         legalSnapshot?: string;
-        /** Tipo de tarjeta (determina el texto legal). */
-        cardType?: "KONE" | "P2000" | "AccessPRO";
+        /** Tipo de medio (determina el texto legal). */
+        cardType?: string;
     };
 
     let {
@@ -44,14 +44,21 @@
         cardType = "KONE",
     }: Props = $props();
 
+    let fallbackTexts = $state<string[]>([]);
+
+    onMount(async () => {
+        if (!legalSnapshot) {
+            try {
+                fallbackTexts = await fetchLegalText(cardType);
+            } catch {
+                fallbackTexts = [];
+            }
+        }
+    });
+
     const paragraphs = $derived.by(() => {
         if (legalSnapshot) return legalSnapshot.split("\n");
-        const typeKey = cardType?.toUpperCase() === "P2000"
-            ? "P2000"
-            : cardType?.toUpperCase() === "ACCESSPRO"
-              ? "AccessPRO"
-              : "KONE";
-        return RESPONSIVA_LEGAL_TEXTS[typeKey];
+        return fallbackTexts;
     });
 </script>
 

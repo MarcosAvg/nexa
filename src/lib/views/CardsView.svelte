@@ -23,6 +23,7 @@
     import { toast } from "svelte-sonner";
     import { networkStore } from "../stores/network.svelte";
     import { getCardStatusVariant, getCardStatusLabel } from "../constants/status";
+    import { mediaTypeVariant } from "../utils/mediaTypeAppearance";
 
     let dependencies = $derived(catalogState.dependencies);
     let dependencyNames = $derived(dependencies.map((d) => d.name));
@@ -137,13 +138,7 @@
 </script>
 
 {#snippet renderCardType(row: any)}
-    <Badge
-        variant={row.type === "KONE"
-            ? "blue"
-            : row.type === "AccessPRO"
-              ? "emerald"
-              : "amber"}
-    >
+    <Badge variant={mediaTypeVariant(row.type)}>
         {row.type}
     </Badge>
 {/snippet}

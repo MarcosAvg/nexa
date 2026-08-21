@@ -12,6 +12,7 @@ export { dbCache } from './dbCache';
 export { catalogCache } from './catalogCache';
 export { generateLegalHash } from './crypto';
 export { generateCardPdf, generateResponsivaPdf } from './pdfGenerator';
+export { mediaTypeVariant, mediaTypeDotClass, mediaTypeRgb } from './mediaTypeAppearance';
 export { personnelActions } from './personnelActions';
 export { initGlobalRealtime, destroyGlobalRealtime } from './realtime';
 export { createSimpleDebounce } from './search.svelte';

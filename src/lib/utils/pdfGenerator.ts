@@ -1,10 +1,11 @@
 // src/lib/utils/pdfGenerator.ts
 import type { jsPDF as jsPDFType } from "jspdf";
 import { RESPONSIVA_LEGAL_TEXT } from "../constants/legal";
+import { mediaTypeRgb } from "./mediaTypeAppearance";
 
 export async function generateCardPdf(
     folio: string,
-    type: "P2000" | "KONE" | "AccessPRO"
+    type: string
 ) {
     const { jsPDF } = await import("jspdf");
 
@@ -23,17 +24,9 @@ export async function generateCardPdf(
         doc.setFillColor(255, 255, 255);
         doc.rect(0, 0, pageWidth, pageHeight, "F");
 
-        // Color del tipo de tarjeta
-        const typeColor = type === "KONE"
-            ? [14, 165, 233]
-            : type === "AccessPRO"
-              ? [16, 185, 129]
-              : [245, 158, 11]; // Azul KONE, Esmeralda AccessPRO, Ámbar P2000
-        const typeLabel = type === "KONE"
-            ? "Elevadores"
-            : type === "AccessPRO"
-              ? "Entrada"
-              : "Puertas";
+        // Color determinista por tipo de medio (paleta del catálogo).
+        const typeColor = mediaTypeRgb(type);
+        const typeLabel = "Medio de Acceso";
 
         // Etiqueta de tipo (grande, centrada arriba)
         doc.setTextColor(typeColor[0], typeColor[1], typeColor[2]);

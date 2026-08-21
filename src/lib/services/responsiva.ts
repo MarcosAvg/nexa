@@ -1,6 +1,7 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import { documentService } from "./documents";
+import { RESPONSIVA_LEGAL_TEXTS } from "../constants/legal";
 import type { SignedDocument } from "../types";
 
 function normalizeDocument(d: SignedDocument) {
@@ -15,6 +16,30 @@ function normalizeDocument(d: SignedDocument) {
         legal_snapshot: d.legal_snapshot,
         created_at: d.created_at,
     };
+}
+
+/**
+ * Texto legal de la responsiva para un tipo de medio. Fuente:
+ * document_templates.content (JSON, arreglo de párrafos); cae a las constantes
+ * locales si la plantilla no tiene contenido.
+ */
+export async function fetchLegalText(cardType: string): Promise<string[]> {
+    const key = (cardType || "").toUpperCase();
+    try {
+        const { data } = await supabase
+            .from("document_templates")
+            .select("content")
+            .ilike("legacy_key", key)
+            .maybeSingle();
+        if (data?.content) {
+            const parsed = JSON.parse(data.content);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed as string[];
+        }
+    } catch {
+        // Fallback abajo
+    }
+    const typeKey = key === "P2000" ? "P2000" : key === "ACCESSPRO" ? "AccessPRO" : "KONE";
+    return RESPONSIVA_LEGAL_TEXTS[typeKey as keyof typeof RESPONSIVA_LEGAL_TEXTS];
 }
 
 export const responsivaService = {
