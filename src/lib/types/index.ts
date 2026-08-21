@@ -27,8 +27,8 @@ export interface Person {
         exit: string;
     } | null;
     cards: Card[];
-    floors_p2000: string[];
-    floors_kone: string[];
+    /** Pisos asignados agrupados por clave de tipo de medio (ej. `{ p2000: [...] }`). */
+    floorsByMedia: Record<string, string[]>;
     specialAccesses: string[];
     email?: string | null;
     area?: string;

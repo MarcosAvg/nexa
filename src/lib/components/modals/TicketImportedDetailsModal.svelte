@@ -164,7 +164,7 @@
             return false;
         };
 
-        let proposedP2000 = [...(selectedPerson.floors_p2000 || [])];
+        let proposedP2000 = [...(selectedPerson.floorsByMedia?.p2000 || [])];
         if (p.accion_p2000) {
             const action = p.accion_p2000;
             const parsedFloors = parseFloors(p.pisos_p2000);
@@ -181,7 +181,7 @@
         // Forzar al modal de comparación a mostrar diferencias pasando los arrays generados
         modifiedPayload.floors_p2000 = proposedP2000;
 
-        let proposedKONE = [...(selectedPerson.floors_kone || [])];
+        let proposedKONE = [...(selectedPerson.floorsByMedia?.kone || [])];
         if (p.accion_kone) {
             const action = p.accion_kone;
             const parsedFloors = parseFloors(p.pisos_kone);

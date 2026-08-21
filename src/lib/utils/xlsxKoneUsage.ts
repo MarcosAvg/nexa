@@ -353,8 +353,7 @@ export async function matchKoneUsageToPersonnel(
                 area: p.area || '',
                 position: p.position || '',
                 floor: p.floor || '',
-                floors_p2000: access.floors_p2000,
-                floors_kone: access.floors_kone,
+                floorsByMedia: access.floorsByMedia,
                 status: displayStatus,
                 specialAccesses: access.specialAccesses,
                 schedule: p.schedules ? {

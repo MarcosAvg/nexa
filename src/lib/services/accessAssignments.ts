@@ -2,13 +2,14 @@ import { supabase } from "../supabase";
 import { withErrorHandlingSafe, withErrorHandling } from "../utils";
 import type { AccessAssignment, AccessAssignmentPermission } from "../types";
 
-export interface PersonBuildingFloors {
-    p2000: string[];
-    kone: string[];
-}
+/**
+ * Grupos de pisos por clave de tipo de medio (ej. `{ p2000: [...], kone: [...] }`).
+ * Las claves son las keys reales de los medios con pisos del catálogo.
+ */
+export type FloorGroups = Record<string, string[]>;
 
 export interface PersonAccessData {
-    floorsByBuilding: Record<number, PersonBuildingFloors>;
+    floorsByBuilding: Record<number, FloorGroups>;
     specialAccesses: string[];
 }
 
@@ -20,31 +21,31 @@ export interface PersonAccessData {
 export const TORRE_BUILDING_ID = 1;
 
 /**
- * Deriva pisos (p2000/kone) y accesos especiales desde el arreglo anidado de
- * access_assignments + access_assignment_permissions (modelo normalizado).
- * Reemplaza la lectura de las columnas legacy personnel.floors_p2000/floors_kone/
- * special_accesses.
+ * Deriva pisos agrupados por clave de tipo de medio y accesos especiales desde
+ * el arreglo anidado de access_assignments + access_assignment_permissions
+ * (modelo normalizado).
  */
 export function deriveAccessFromAssignments(assignments: any[] | null | undefined): {
-    floors_p2000: string[];
-    floors_kone: string[];
+    floorsByMedia: FloorGroups;
     specialAccesses: string[];
 } {
-    const floors_p2000: string[] = [];
-    const floors_kone: string[] = [];
+    const floorsByMedia: FloorGroups = {};
     const specialSet = new Set<string>();
     for (const a of assignments || []) {
         const key = a.access_media_types?.key;
         for (const p of a.access_assignment_permissions || []) {
             if (p.resource_type === "floor") {
-                if (key === "p2000") floors_p2000.push(p.resource_key);
-                else if (key === "kone") floors_kone.push(p.resource_key);
+                if (!key) continue;
+                if (!floorsByMedia[key]) floorsByMedia[key] = [];
+                if (!floorsByMedia[key].includes(p.resource_key)) {
+                    floorsByMedia[key].push(p.resource_key);
+                }
             } else if (p.resource_type === "special_access") {
                 specialSet.add(p.resource_key);
             }
         }
     }
-    return { floors_p2000, floors_kone, specialAccesses: Array.from(specialSet) };
+    return { floorsByMedia, specialAccesses: Array.from(specialSet) };
 }
 
 export const accessAssignmentService = {
@@ -86,7 +87,7 @@ export const accessAssignmentService = {
                 .eq("status", "active");
             if (error) throw error;
 
-            const floorsByBuilding: Record<number, PersonBuildingFloors> = {};
+            const floorsByBuilding: Record<number, FloorGroups> = {};
             const specialSet = new Set<string>();
 
             for (const assignment of (data || []) as any[]) {
@@ -94,18 +95,11 @@ export const accessAssignmentService = {
                 for (const p of (assignment.access_assignment_permissions || []) as any[]) {
                     if (p.resource_type === "floor") {
                         const bid = p.building_id;
-                        if (!bid) continue;
-                        if (!floorsByBuilding[bid]) {
-                            floorsByBuilding[bid] = { p2000: [], kone: [] };
-                        }
-                        const target =
-                            mediaKey === "p2000"
-                                ? floorsByBuilding[bid].p2000
-                                : mediaKey === "kone"
-                                  ? floorsByBuilding[bid].kone
-                                  : null;
-                        if (target && !target.includes(p.resource_key)) {
-                            target.push(p.resource_key);
+                        if (!bid || !mediaKey) continue;
+                        if (!floorsByBuilding[bid]) floorsByBuilding[bid] = {};
+                        if (!floorsByBuilding[bid][mediaKey]) floorsByBuilding[bid][mediaKey] = [];
+                        if (!floorsByBuilding[bid][mediaKey].includes(p.resource_key)) {
+                            floorsByBuilding[bid][mediaKey].push(p.resource_key);
                         }
                     } else if (p.resource_type === "special_access") {
                         specialSet.add(p.resource_key);
@@ -130,7 +124,7 @@ export const accessAssignmentService = {
      */
     async savePersonAccess(
         personId: string,
-        floorsByBuilding: Record<number, PersonBuildingFloors>,
+        floorsByBuilding: Record<number, FloorGroups>,
         specialAccesses: string[],
     ): Promise<void> {
         return withErrorHandling(async () => {
@@ -152,8 +146,6 @@ export const accessAssignmentService = {
             const assignments = await this.fetchForPerson(personId);
             for (const assignment of assignments) {
                 const mediaKey = (assignment as any).access_media_types?.key;
-                const isP2000 = mediaKey === "p2000";
-                const isKone = mediaKey === "kone";
 
                 const rows: {
                     assignment_id: string;
@@ -164,10 +156,11 @@ export const accessAssignmentService = {
                     special_access_id?: number | null;
                 }[] = [];
 
-                if (isP2000 || isKone) {
+                // Pisos del medio de esta asignación (cualquier key con pisos).
+                if (mediaKey) {
                     const seen = new Set<string>();
                     for (const floors of Object.values(floorsByBuilding)) {
-                        const list = isP2000 ? floors.p2000 : floors.kone;
+                        const list = floors[mediaKey] || [];
                         for (const f of list) {
                             const key = f.trim();
                             if (!key || seen.has(key)) continue;

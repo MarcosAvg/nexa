@@ -56,8 +56,8 @@ export interface ExportPersonnelData {
     area: string;
     position: string;
     floor: string;
-    floors_p2000: string[];
-    floors_kone: string[];
+    /** Pisos asignados agrupados por clave de tipo de medio. */
+    floorsByMedia: Record<string, string[]>;
     status: string;
     specialAccesses: string[];
     schedule: {
@@ -519,11 +519,11 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
             };
             if (selected.includes('P2000')) {
                 rowData.folioP2000 = folioP2000;
-                rowData.pisosP2000Text = person.floors_p2000?.join(', ') || '-';
+                rowData.pisosP2000Text = person.floorsByMedia?.p2000?.join(', ') || '-';
             }
             if (selected.includes('KONE')) {
                 rowData.folioKone = folioKone;
-                rowData.pisosKoneText = person.floors_kone?.join(', ') || '-';
+                rowData.pisosKoneText = person.floorsByMedia?.kone?.join(', ') || '-';
             }
             if (selected.includes('AccessPRO')) {
                 rowData.folioAccesspro = folioAccesspro;

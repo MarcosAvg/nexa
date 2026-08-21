@@ -86,8 +86,7 @@ const mapPersonRecord = (p: PersonnelRow): Person => {
         status_raw: p.status,
         status: displayStatus,
         cards: allCards,
-        floors_p2000: access.floors_p2000,
-        floors_kone: access.floors_kone,
+        floorsByMedia: access.floorsByMedia,
         specialAccesses: access.specialAccesses
     } as Person;
 };
@@ -293,7 +292,7 @@ export const personnelService = {
                     building_id: p.building_id, dependency_id: p.dependency_id,
                     schedule: p.schedules ? { days: p.schedules.name, entry: p.entry_time || p.schedules.default_entry || "09:00", exit: p.exit_time || p.schedules.default_exit || "18:00" } : null,
                     status_raw: p.status, status: p.status, cards: toCardsShape(p.access_media),
-                    floors_p2000: access.floors_p2000, floors_kone: access.floors_kone,
+                    floorsByMedia: access.floorsByMedia,
                     specialAccesses: access.specialAccesses
                 } as Person;
             });
@@ -320,8 +319,6 @@ export const personnelService = {
         buildingId?: string;
         floor?: string;
         pisoBase?: string;
-        floors_p2000?: string[];
-        floors_kone?: string[];
         schedule_id?: string;
         scheduleId?: string;
         entry_time?: string | null;

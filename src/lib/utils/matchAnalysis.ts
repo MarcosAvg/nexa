@@ -282,7 +282,7 @@ export function analyzeModificacionConflicts(
     const floorChanges: ModificacionConflictAnalysis["floorChanges"] = {};
 
     if (fields.accion_p2000) {
-        const currentFloors = person.floors_p2000 || [];
+        const currentFloors = person.floorsByMedia?.p2000 || [];
         const requestedFloors = parseFloors(fields.pisos_p2000);
         const added = requestedFloors.filter((f) => !currentFloors.includes(f));
         const removed = currentFloors.filter((f) => !requestedFloors.includes(f));
@@ -291,7 +291,7 @@ export function analyzeModificacionConflicts(
     }
 
     if (fields.accion_kone) {
-        const currentFloors = person.floors_kone || [];
+        const currentFloors = person.floorsByMedia?.kone || [];
         const requestedFloors = parseFloors(fields.pisos_kone);
         const added = requestedFloors.filter((f) => !currentFloors.includes(f));
         const removed = currentFloors.filter((f) => !requestedFloors.includes(f));

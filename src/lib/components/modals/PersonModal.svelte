@@ -91,7 +91,7 @@
     let puestoFuncion = $state("");
     let edificio = $state("");
     let pisoBase = $state("");
-    let floorsByBuilding = $state<Record<number, { p2000: string[]; kone: string[] }>>({});
+    let floorsByBuilding = $state<Record<number, Record<string, string[]>>>({});
     let diasHorario = $state("");
     let horaEntrada = $state("08:00");
     let horaSalida = $state("17:00");
@@ -123,23 +123,28 @@
     let baseP2000 = $derived(floorsByBuilding[baseBuildingId]?.p2000 ?? []);
     let baseKone = $derived(floorsByBuilding[baseBuildingId]?.kone ?? []);
 
+    // Medios con pisos (del catálogo), para renderizar los selectores dinámicamente.
+    let floorMediaTypes = $derived.by(() => {
+        const seen = new Set<string>();
+        const out: { key: string; name: string }[] = [];
+        for (const m of catalogState.mediaTypes) {
+            if ((m as any).active === false || !(m as any).has_floors) continue;
+            if (seen.has(m.key)) continue;
+            seen.add(m.key);
+            out.push({ key: m.key, name: m.name });
+        }
+        return out;
+    });
+
     function updateBuildingFloors(
         buildingId: number,
-        key: "p2000" | "kone",
+        key: string,
         value: string[],
     ) {
+        const current = floorsByBuilding[buildingId] || {};
         floorsByBuilding = {
             ...floorsByBuilding,
-            [buildingId]: {
-                p2000:
-                    key === "p2000"
-                        ? value
-                        : (floorsByBuilding[buildingId]?.p2000 ?? []),
-                kone:
-                    key === "kone"
-                        ? value
-                        : (floorsByBuilding[buildingId]?.kone ?? []),
-            },
+            [buildingId]: { ...current, [key]: value },
         };
     }
 
@@ -203,8 +208,8 @@
     // Poblar formulario
     let lastLoadedPersonId = $state("");
 
-    // Trae los pisos multi-edificio del nuevo modelo y los mezcla con los
-    // legacy del edificio base (fallback mientras no existan permisos).
+    // Trae los pisos multi-edificio del nuevo modelo y los mezcla con el
+    // fallback derivado (mientras no existan permisos para el edificio base).
     async function refreshPersonAccess(personId: string) {
         try {
             const access = await accessAssignmentService.fetchPersonAccess(
@@ -218,14 +223,12 @@
                             )?.id,
                         ) || undefined;
             if (bid) {
-                const legacyP2000 = editingPerson?.floors_p2000 || [];
-                const legacyKone = editingPerson?.floors_kone || [];
-                if (!merged[bid]) merged[bid] = { p2000: [], kone: [] };
-                if (merged[bid].p2000.length === 0 && legacyP2000.length) {
-                    merged[bid].p2000 = legacyP2000;
-                }
-                if (merged[bid].kone.length === 0 && legacyKone.length) {
-                    merged[bid].kone = legacyKone;
+                const fallbackFloors = editingPerson?.floorsByMedia || {};
+                if (!merged[bid]) merged[bid] = { ...fallbackFloors };
+                for (const [key, list] of Object.entries(fallbackFloors)) {
+                    if ((merged[bid][key] || []).length === 0 && list.length) {
+                        merged[bid][key] = [...list];
+                    }
                 }
             }
             floorsByBuilding = merged;
@@ -233,7 +236,7 @@
                 accesosEspeciales = access.specialAccesses;
             }
         } catch {
-            // No crítico: se mantienen los valores legacy cargados
+            // No crítico: se mantienen los valores cargados
         }
     }
 
@@ -259,12 +262,7 @@
                         )?.id,
                     ) || undefined;
                 floorsByBuilding = bid
-                    ? {
-                          [bid]: {
-                              p2000: [...(editingPerson.floors_p2000 || [])],
-                              kone: [...(editingPerson.floors_kone || [])],
-                          },
-                      }
+                    ? { [bid]: { ...(editingPerson.floorsByMedia || {}) } }
                     : {};
 
                 if (editingPerson.schedule) {
@@ -503,8 +501,6 @@
                 employee_no: noEmpleado,
                 email: email?.replace(/^mailto:\s*/i, "").trim(),
                 floor: pisoBase,
-                floors_p2000: baseP2000,
-                floors_kone: baseKone,
                 floorsByBuilding,
                 schedule_id: schedules.find((s) => s.name === diasHorario)?.id,
                 entry_time: horaEntrada,
@@ -521,8 +517,8 @@
                     noEmpleado: editingPerson.employee_no,
                     dependency: editingPerson.dependency,
                     edificio: editingPerson.building,
-                    pisosP2000: editingPerson.floors_p2000,
-                    pisosKone: editingPerson.floors_kone,
+                    pisosP2000: editingPerson.floorsByMedia?.p2000 || [],
+                    pisosKone: editingPerson.floorsByMedia?.kone || [],
                     horario: editingPerson.schedule,
                     accesosEspeciales: editingPerson.specialAccesses,
                     tarjetas: editingPerson.cards,
@@ -875,22 +871,16 @@
                                     </span>
                                 </div>
                                 <div class="space-y-4">
-                                    <ToggleGroup
-                                        label="Pisos P2000 (Puertas)"
-                                        options={bFloors}
-                                        value={floorsByBuilding[Number(b.id)]?.p2000 ?? []}
-                                        onchange={(v) =>
-                                            updateBuildingFloors(Number(b.id), "p2000", v)}
-                                        showSelectAll={true}
-                                    />
-                                    <ToggleGroup
-                                        label="Pisos KONE (Elevadores)"
-                                        options={bFloors}
-                                        value={floorsByBuilding[Number(b.id)]?.kone ?? []}
-                                        onchange={(v) =>
-                                            updateBuildingFloors(Number(b.id), "kone", v)}
-                                        showSelectAll={true}
-                                    />
+                                    {#each floorMediaTypes as fm}
+                                        <ToggleGroup
+                                            label={`Pisos ${fm.name}`}
+                                            options={bFloors}
+                                            value={floorsByBuilding[Number(b.id)]?.[fm.key] ?? []}
+                                            onchange={(v) =>
+                                                updateBuildingFloors(Number(b.id), fm.key, v)}
+                                            showSelectAll={true}
+                                        />
+                                    {/each}
                                 </div>
                             </div>
                         {/if}
