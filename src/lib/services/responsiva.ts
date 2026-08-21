@@ -19,26 +19,11 @@ function normalizeDocument(d: SignedDocument) {
 
 export const responsivaService = {
     /**
-     * Dual-read: lee el modelo nuevo (signed_documents) y completa con las
-     * responsivas legacy que aún no fueron migradas (huérfanas sin tarjeta).
+     * Lee las responsivas desde el modelo nuevo (signed_documents).
      */
     async fetchByPerson(personId: string) {
         const docs = await documentService.fetchByPerson(personId);
-        const newItems = docs.map(normalizeDocument);
-        const migratedLegacyIds = new Set(
-            docs.map((d) => d.legacy_responsiva_id).filter(Boolean),
-        );
-
-        const { data: legacy, error } = await supabase
-            .from("signed_responsivas")
-            .select("*")
-            .eq("person_id", personId)
-            .order("created_at", { ascending: false });
-
-        if (error) throw error;
-
-        const orphans = (legacy || []).filter((r) => !migratedLegacyIds.has(r.id));
-        return [...newItems, ...orphans].sort((a, b) =>
+        return docs.map(normalizeDocument).sort((a, b) =>
             String(b.created_at).localeCompare(String(a.created_at)),
         );
     },
@@ -110,34 +95,7 @@ export const responsivaService = {
     },
 
     async delete(id: string, personId: string) {
-        // Si es un documento del modelo nuevo, se elimina junto con su
-        // responsiva legacy correspondiente (evita "resucitar" el registro).
-        const { data: doc } = await supabase
-            .from("signed_documents")
-            .select("legacy_responsiva_id")
-            .eq("id", id)
-            .maybeSingle();
-
-        if (doc) {
-            await documentService.delete(id);
-            if (doc.legacy_responsiva_id) {
-                await supabase
-                    .from("signed_responsivas")
-                    .delete()
-                    .eq("id", doc.legacy_responsiva_id);
-            }
-        } else {
-            // Huérfana legacy: eliminar directamente.
-            const { data: deleted, error } = await supabase
-                .from("signed_responsivas")
-                .delete()
-                .eq("id", id)
-                .select();
-            if (error) throw error;
-            if (!deleted || deleted.length === 0) {
-                throw new Error("No se pudo eliminar la responsiva. Verifique permisos (RLS).");
-            }
-        }
+        await documentService.delete(id);
 
         const { data: person } = await supabase
             .from("personnel")
