@@ -46,7 +46,7 @@ function toCard(m: any): Card {
 function mediaTypeName(m: any): string {
     const t = m?.access_media_types;
     if (Array.isArray(t)) return (t[0]?.name ?? "") as string;
-    return (t?.name ?? (m?.metadata?.legacy_type as string) ?? "") as string;
+    return (t?.name ?? "") as string;
 }
 
 export const cardService = {
@@ -325,7 +325,7 @@ export const cardService = {
             } else {
                 const { data: newMedia, error } = await withTimeout(supabase
                     .from("access_media")
-                    .insert([{ ...payload, metadata: { legacy_type: data.type, legacy_folio: data.folio } }])
+                    .insert([payload])
                     .select()
                     .single());
                 if (error) throw error;

@@ -148,20 +148,13 @@
         ),
     );
 
-    const ticketTypes = [
-        "Todos",
-        "Alta de Persona",
-        "Programación",
-        "Modificación",
-        "Solicitud de acceso",
-        "Reposición",
-        "Bloqueo de tarjeta",
-        "Baja de tarjeta",
-        "Bloqueo de persona",
-        "Baja de Persona",
-        "Reporte de Falla",
-        "Otro",
-    ];
+    // Tipos de ticket desde el catálogo (activos de la sección General).
+    let generalTicketTypeNames = $derived(
+        catalogState.ticketTypes
+            .filter((t) => t.active !== false && t.section === "general")
+            .map((t) => t.name),
+    );
+    let ticketTypes = $derived(["Todos", ...generalTicketTypeNames]);
 
     import { supabase } from "../supabase";
 

@@ -46,7 +46,7 @@ function toCardsShape(media: any[] | null | undefined): Card[] {
     return (media || []).map((m: any) => ({
         id: m.id,
         folio: m.identifier ?? "",
-        type: m.access_media_types?.name ?? (m.metadata?.legacy_type as string) ?? "",
+        type: m.access_media_types?.name ?? "",
         status: m.status,
         person_id: m.person_id,
         programming_status: m.programming_status,

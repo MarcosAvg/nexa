@@ -1,32 +1,40 @@
 <script lang="ts">
-    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection } from "../components";
-    import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard } from "lucide-svelte";
+    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, TicketTypesCatalog, UserManagementSection } from "../components";
+    import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard, Ticket } from "lucide-svelte";
     import { userState, catalogState, settingsState } from "../stores";
     import { networkStore } from "../stores/network.svelte";
     import { generateRequestTemplate, generateKoneUsageTemplate, generateAccessProTemplate, handleError } from "../utils";
     import { toast } from "svelte-sonner";
 
     let activeTab = $state<"catalogos" | "usuarios" | "responsiva">("catalogos");
-    let activeCatalog = $state<"edificios" | "dependencias" | "accesos" | "dias" | "medios">("edificios");
+    let activeCatalog = $state<"edificios" | "dependencias" | "accesos" | "dias" | "medios" | "tickets">("edificios");
 
     // Campos editables de configuración de responsiva
     let pickupDaysInput = $state(settingsState.responsivaPickupDays);
     let warnDaysInput = $state(settingsState.responsivaWarnDays);
+    let coreTypesInput = $state(settingsState.coreTypesRequired);
 
     // Sincronizar inputs cuando cambia el store (ej. reset)
     $effect(() => {
         pickupDaysInput = settingsState.responsivaPickupDays;
         warnDaysInput = settingsState.responsivaWarnDays;
+        coreTypesInput = settingsState.coreTypesRequired;
     });
 
-    function handleSaveResponsivaSettings() {
-        settingsState.setResponsivaPickupDays(pickupDaysInput);
-        settingsState.setResponsivaWarnDays(warnDaysInput);
-        toast.success("Configuración de responsiva guardada");
+    async function handleSaveResponsivaSettings() {
+        try {
+            await settingsState.setResponsivaPickupDays(pickupDaysInput);
+            await settingsState.setResponsivaWarnDays(warnDaysInput);
+            await settingsState.setCoreTypesRequired(coreTypesInput);
+            toast.success("Configuración de responsiva guardada");
+        } catch {
+            handleError(new Error("No se pudo guardar la configuración"), "Guardar Configuración");
+        }
     }
 
-    function handleResetResponsivaSettings() {
-        settingsState.resetToDefaults();
+    async function handleResetResponsivaSettings() {
+        await settingsState.resetToDefaults();
+        coreTypesInput = settingsState.coreTypesRequired;
         toast.success("Valores restablecidos");
     }
 
@@ -95,6 +103,7 @@
         { id: "accesos", label: "Accesos", icon: Key },
         { id: "medios", label: "Medios", icon: CreditCard },
         { id: "dias", label: "Horarios", icon: Calendar },
+        { id: "tickets", label: "Tickets", icon: Ticket },
     ] as const;
 </script>
 
@@ -175,6 +184,8 @@
                         <MediaTypeCatalog {canEdit} />
                     {:else if activeCatalog === "dias"}
                         <ScheduleCatalog {canEdit} />
+                    {:else if activeCatalog === "tickets"}
+                        <TicketTypesCatalog {canEdit} />
                     {/if}
                 </Card>
             {:else if activeTab === "usuarios"}
@@ -278,6 +289,25 @@
                                     {pickupDaysInput} días · Baja de Registro
                                 </span>
                             </div>
+                        </div>
+
+                        <!-- Umbral de tipos core para estado Activo -->
+                        <div class="pt-3 border-t border-slate-100/60 space-y-2">
+                            <label for="core-types-required" class="text-sm font-bold text-slate-800 block">
+                                Tipos de acceso requeridos para "Activo/a"
+                            </label>
+                            <p class="text-[11px] text-slate-500">
+                                Cantidad de medios con pisos listos (programados y firmados) que una persona necesita.
+                                Aplica al listado, dashboard e historial tras recargar.
+                            </p>
+                            <input
+                                id="core-types-required"
+                                type="number"
+                                min="1"
+                                max="10"
+                                bind:value={coreTypesInput}
+                                class="w-24 px-3 py-2 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            />
                         </div>
 
                         <!-- Botones de acción -->

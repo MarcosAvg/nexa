@@ -9,6 +9,38 @@ type CardAssignmentInfo = {
     registeredAt: string;
 };
 
+// ─── Tipos de ticket por sección (desde el catálogo, con caché corta) ──────
+
+let ticketTypeRowsCache: { at: number; namesBySection: Record<string, string[]> } | null = null;
+
+async function getTicketTypeNames(): Promise<Record<string, string[]>> {
+    const TTL = 60_000;
+    if (ticketTypeRowsCache && Date.now() - ticketTypeRowsCache.at < TTL) {
+        return ticketTypeRowsCache.namesBySection;
+    }
+    const { data, error } = await supabase
+        .from("ticket_types")
+        .select("name, section")
+        .eq("active", true);
+    const namesBySection: Record<string, string[]> = {};
+    for (const row of data || []) {
+        if (!namesBySection[row.section]) namesBySection[row.section] = [];
+        namesBySection[row.section].push(row.name);
+    }
+    ticketTypeRowsCache = { at: Date.now(), namesBySection };
+    return namesBySection;
+}
+
+async function applySectionFilter(query: any, section: string) {
+    const namesBySection = await getTicketTypeNames();
+    const names = namesBySection[section] || [];
+    if (names.length === 0) return query;
+    if (section === "Responsivas") {
+        return query.in("type", names);
+    }
+    return query.not("type", "in", `(${names.join(",")})`);
+}
+
 async function fetchCardAssignmentTypes(
     cardIds: string[],
     personnelCreatedAt: Record<string, string>
@@ -194,9 +226,9 @@ export const ticketService = {
                 .eq("status", "pending");
 
             if (section === "Responsivas") {
-                query = query.eq("type", "Firma Responsiva");
+                query = await applySectionFilter(query, "Responsivas");
             } else {
-                query = query.neq("type", "Firma Responsiva");
+                query = await applySectionFilter(query, "General");
                 if (typeFilter && typeFilter !== "Todos") {
                     query = query.eq("type", typeFilter);
                 }
@@ -282,8 +314,9 @@ export const ticketService = {
                 let query = supabase
                     .from("tickets")
                     .select(`*, access_media(id, identifier, status, access_media_types(name)), ${personnelSelect}`)
-                    .eq("status", "pending")
-                    .eq("type", "Firma Responsiva");
+                    .eq("status", "pending");
+
+                query = await applySectionFilter(query, "Responsivas");
 
                 if (dependencyId) {
                     query = query.eq("personnel.dependency_id", dependencyId);

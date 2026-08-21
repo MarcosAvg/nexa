@@ -3,7 +3,7 @@ import { HistoryService } from "./history";
 import { withErrorHandling, withErrorHandlingConditional, catalogCache } from "../utils";
 
 /** Tablas de catálogo que soportan orden personalizado. */
-const CATALOG_TABLES = ["buildings", "dependencies", "schedules", "special_accesses", "access_media_types"] as const;
+const CATALOG_TABLES = ["buildings", "dependencies", "schedules", "special_accesses", "access_media_types", "ticket_types"] as const;
 export type CatalogTable = (typeof CATALOG_TABLES)[number];
 
 /**
@@ -136,8 +136,7 @@ export const catalogService = {
             return result;
         }, "Fetch Schedules", throwOnError, []);
     },
-    async fetchMediaTypes(throwOnError: boolean = false) {
-        const cached = catalogCache.get<any[]>('access_media_types');
+    async fetchMediaTypes(throwOnError: boolean = false) {        const cached = catalogCache.get<any[]>('access_media_types');
         if (cached) return cached;
         return withErrorHandlingConditional(async () => {
             const { data, error } = await supabase
@@ -309,6 +308,61 @@ export const catalogService = {
             }
             catalogCache.invalidate('access_media_types');
         }, "Save Media Type");
+    },
+
+    /** Catálogo de tipos de ticket (key, name, section, color_variant, active). */
+    async fetchTicketTypes(throwOnError: boolean = false) {
+        const cached = catalogCache.get<any[]>('ticket_types');
+        if (cached) return cached;
+        return withErrorHandlingConditional(async () => {
+            const { data, error } = await supabase
+                .from("ticket_types")
+                .select("*")
+                .order("sort_order", { ascending: true })
+                .order("name", { ascending: true });
+            if (error) throw error;
+            const result = data || [];
+            catalogCache.set('ticket_types', result, CATALOG_CACHE_TTL_MS);
+            return result;
+        }, "Fetch Ticket Types", throwOnError, []);
+    },
+
+    async saveTicketType(
+        id: string | null,
+        payload: { name?: string; section?: string; colorVariant?: string; active?: boolean },
+    ) {
+        return withErrorHandling(async () => {
+            const slugify = (s: string) =>
+                s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+            if (id) {
+                const update: Record<string, unknown> = {};
+                if (payload.name !== undefined) update.name = payload.name;
+                if (payload.section !== undefined) update.section = payload.section;
+                if (payload.colorVariant !== undefined) update.color_variant = payload.colorVariant;
+                if (payload.active !== undefined) update.active = payload.active;
+                const { error } = await supabase.from("ticket_types").update(update).eq("key", id);
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Tipo de ticket actualizado: ${payload.name}`, entityName: `Tipo de ticket: ${payload.name}` });
+            } else {
+                const name = payload.name?.trim();
+                if (!name) throw new Error("El nombre del tipo es requerido");
+                const key = slugify(name);
+                if (!key) throw new Error("La clave del tipo es inválida");
+                const sortOrder = await getNextSortOrder("ticket_types");
+                const { error } = await supabase.from("ticket_types").insert([{
+                    key,
+                    name,
+                    section: payload.section ?? "general",
+                    color_variant: payload.colorVariant ?? "slate",
+                    active: true,
+                    sort_order: sortOrder,
+                }]);
+                if (error) throw error;
+                await HistoryService.log("SYSTEM", key, "CREATE_CATALOG", { message: `Tipo de ticket creado: ${name}`, entityName: `Tipo de ticket: ${name}` });
+            }
+            catalogCache.invalidate('ticket_types');
+        }, "Save Ticket Type");
     },
 
     // --- Delete ---
