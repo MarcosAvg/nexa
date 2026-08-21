@@ -106,6 +106,21 @@ export const accessAssignmentService = {
         specialAccesses: string[],
     ): Promise<void> {
         return withErrorHandling(async () => {
+            // Resolver referencias estables (floors.id / special_accesses.id).
+            const { data: torreFloors } = await supabase
+                .from("floors")
+                .select("id, label")
+                .eq("building_id", TORRE_BUILDING_ID);
+            const floorIdByLabel = new Map<string, number>((torreFloors || []).map((f) => [f.label, f.id]));
+
+            const { data: specials } = await supabase
+                .from("special_accesses")
+                .select("id, name");
+            const specialIdByName = new Map<string, number>();
+            for (const s of specials || []) {
+                if (!specialIdByName.has(s.name)) specialIdByName.set(s.name, s.id);
+            }
+
             const assignments = await this.fetchForPerson(personId);
             for (const assignment of assignments) {
                 const mediaKey = (assignment as any).access_media_types?.key;
@@ -117,6 +132,8 @@ export const accessAssignmentService = {
                     resource_type: string;
                     resource_key: string;
                     building_id: number;
+                    floor_id?: number | null;
+                    special_access_id?: number | null;
                 }[] = [];
 
                 if (isP2000 || isKone) {
@@ -132,6 +149,7 @@ export const accessAssignmentService = {
                                 resource_type: "floor",
                                 resource_key: key,
                                 building_id: TORRE_BUILDING_ID,
+                                floor_id: floorIdByLabel.get(key) ?? null,
                             });
                         }
                     }
@@ -139,11 +157,13 @@ export const accessAssignmentService = {
 
                 for (const s of specialAccesses) {
                     if (!s || !s.trim()) continue;
+                    const name = s.trim();
                     rows.push({
                         assignment_id: assignment.id,
                         resource_type: "special_access",
-                        resource_key: s.trim(),
+                        resource_key: name,
                         building_id: TORRE_BUILDING_ID,
+                        special_access_id: specialIdByName.get(name) ?? null,
                     });
                 }
 

@@ -30,13 +30,32 @@ async function getNextSortOrder(table: CatalogTable, buildingId?: number): Promi
 /** Sincroniza la tabla floors (fuente canónica) con el array de pisos de un edificio. */
 async function syncBuildingFloors(buildingId: number, floors: string[]) {
     const labels = (floors || []).map((f) => f.trim()).filter(Boolean);
-    // Los permisos referencian pisos por label (resource_key), no por floors.id,
-    // así que es seguro reconstruir el set completo del edificio.
-    await supabase.from("floors").delete().eq("building_id", buildingId);
+
+    // Preserva los IDs de pisos existentes: los permisos referencian floors.id,
+    // así que solo se eliminan los que dejaron de existir y se insertan los nuevos.
+    const { data: existing } = await supabase
+        .from("floors")
+        .select("id, label")
+        .eq("building_id", buildingId);
+    const idByLabel = new Map<string, number>((existing || []).map((f) => [f.label, f.id]));
+
     if (labels.length > 0) {
-        await supabase.from("floors").insert(
-            labels.map((label, i) => ({ building_id: buildingId, label, sort_order: i })),
+        await supabase.from("floors").upsert(
+            labels.map((label, i) => ({
+                ...(idByLabel.has(label) ? { id: idByLabel.get(label) } : {}),
+                building_id: buildingId,
+                label,
+                sort_order: i,
+            })),
+            { onConflict: "building_id,label" },
         );
+    }
+
+    const kept = new Set(labels);
+    for (const [label, id] of idByLabel) {
+        if (!kept.has(label)) {
+            await supabase.from("floors").delete().eq("id", id);
+        }
     }
 }
 
