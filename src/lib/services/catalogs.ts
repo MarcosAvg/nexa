@@ -86,7 +86,22 @@ export const catalogService = {
                 .order("sort_order", { ascending: true })
                 .order("id", { ascending: true });
             if (error) throw error;
-            const result = data || [];
+
+            // Pisos derivados de la tabla canónica floors (no del array legacy).
+            const { data: floorsData } = await supabase
+                .from("floors")
+                .select("building_id, label")
+                .order("sort_order", { ascending: true });
+            const floorsByBuilding = new Map<number, string[]>();
+            for (const f of floorsData || []) {
+                if (!floorsByBuilding.has(f.building_id)) floorsByBuilding.set(f.building_id, []);
+                floorsByBuilding.get(f.building_id)!.push(f.label);
+            }
+
+            const result = (data || []).map((b: any) => ({
+                ...b,
+                floors: floorsByBuilding.get(b.id) || [],
+            }));
             catalogCache.set('buildings', result, CATALOG_CACHE_TTL_MS);
             return result;
         }, "Fetch Buildings", throwOnError, []);
@@ -169,14 +184,12 @@ export const catalogService = {
         return withErrorHandling(async () => {
             let buildingId = id;
             if (id) {
-                // Doble escritura: array buildings.floors (para el read-path actual)
-                // + tabla floors (fuente canónica del modelo nuevo).
-                const { error } = await supabase.from("buildings").update({ name: payload.name, floors: payload.floors }).eq("id", id);
+                const { error } = await supabase.from("buildings").update({ name: payload.name }).eq("id", id);
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Edificio actualizado: ${payload.name}`, entityName: `Edificio: ${payload.name}` });
             } else {
                 const sortOrder = await getNextSortOrder("buildings");
-                const { data, error } = await supabase.from("buildings").insert([{ name: payload.name, floors: payload.floors, sort_order: sortOrder }]).select().single();
+                const { data, error } = await supabase.from("buildings").insert([{ name: payload.name, sort_order: sortOrder }]).select().single();
                 if (error) throw error;
                 buildingId = data.id;
                 await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Edificio creado: ${payload.name}`, entityName: `Edificio: ${payload.name}` });
