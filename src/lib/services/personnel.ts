@@ -2,7 +2,8 @@ import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate } from "../utils";
 import { computePersonStatus } from "../utils/personStatus";
-import { deriveAccessFromAssignments } from "./accessAssignments";
+import { deriveAccessFromAssignments, buildPermissionPlan } from "./accessAssignments";
+import { catalogState } from "../stores/catalogs.svelte";
 import type { Person, Card, DashboardMetrics, DashboardStats } from "../types";
 import { networkStore } from "../stores/network.svelte";
 
@@ -299,6 +300,94 @@ export const personnelService = {
                 } as Person;
             });
         }, "Search Personnel by Name (Fuzzy)", []);
+    },
+
+    /**
+     * Alta atómica: crea persona + tarjetas + asignaciones + permisos en un solo
+     * RPC transaccional (create_person_with_access). Solo aplica a personas
+     * nuevas (sin `id`). Devuelve el id de la persona creada.
+     */
+    async createWithAccess(data: {
+        first_name?: string;
+        last_name?: string;
+        nombres?: string;
+        apellidos?: string;
+        employee_no?: string;
+        noEmpleado?: string;
+        email?: string | null;
+        area?: string;
+        areaEquipo?: string;
+        position?: string;
+        puestoFuncion?: string;
+        dependency_id?: string;
+        building_id?: string;
+        floor?: string;
+        pisoBase?: string;
+        schedule_id?: string;
+        entry_time?: string | null;
+        exit_time?: string | null;
+        status?: string;
+        cards?: any[];
+        specialAccesses?: number[];
+        floorsByBuilding?: Record<number, Record<string, string[]>>;
+        [key: string]: unknown;
+    }): Promise<string> {
+        return withErrorHandling(async () => {
+            const first = data.first_name || data.nombres || "";
+            const last = data.last_name || data.apellidos || "";
+            if (!first || !last) throw new Error("Nombre y apellidos son requeridos");
+
+            // Resolver media_type_id por cada tarjeta y construir p_media.
+            const medias = catalogState.mediaTypes as any[];
+            const mediaTypeIds: string[] = [];
+            const p_media: any[] = [];
+            for (const card of data.cards || []) {
+                const media = medias.find(
+                    (m) =>
+                        (m.key && m.key === card.type) ||
+                        (m.name && m.name === card.type),
+                );
+                if (!media) continue;
+                const requiresProgramming = media.requires_programming !== false;
+                p_media.push({
+                    media_type_id: media.id,
+                    identifier: card.folio || "",
+                    status: "active",
+                    programming_status: requiresProgramming ? "pending" : "done",
+                    responsiva_status: "unsigned",
+                });
+                mediaTypeIds.push(media.id);
+            }
+
+            // Construir p_permissions (plan con assignment_index).
+            const floorsByBuilding = (data as any).floorsByBuilding || {};
+            const specialAccessIds = (data.specialAccesses as number[]) || [];
+            const plan = await buildPermissionPlan(mediaTypeIds, floorsByBuilding, specialAccessIds);
+
+            const p_person = {
+                first_name: first,
+                last_name: last,
+                employee_no: (data.employee_no || data.noEmpleado || "").trim() || null,
+                dependency_id: data.dependency_id ?? "",
+                building_id: data.building_id ?? "",
+                floor: data.floor || data.pisoBase || "",
+                email: data.email || "",
+                area: data.area || data.areaEquipo || "",
+                position: data.position || data.puestoFuncion || "",
+                schedule_id: data.schedule_id ?? "",
+                entry_time: data.entry_time || "",
+                exit_time: data.exit_time || "",
+                status: data.status || "active",
+            };
+
+            const { data: personId, error } = await supabase.rpc("create_person_with_access", {
+                p_person,
+                p_media,
+                p_permissions: plan,
+            });
+            if (error) throw error;
+            return personId as string;
+        }, "Create Person With Access");
     },
 
     /** Input shape for creating/updating a personnel record */

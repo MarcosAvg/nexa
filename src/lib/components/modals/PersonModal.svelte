@@ -686,7 +686,12 @@
                         return;
                     }
                 }
-                await personnelService.save(data);
+                if (editingPerson) {
+                    await personnelService.save(data);
+                } else {
+                    // Alta nueva: atómica (persona + tarjetas + permisos).
+                    await personnelService.createWithAccess(data);
+                }
                 const updated = await personnelService.fetchAll();
                 personnelState.pagination.setItems(updated.data, updated.count);
                 toast.success("Personal Registrado");

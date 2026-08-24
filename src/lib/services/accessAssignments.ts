@@ -311,3 +311,98 @@ export const accessAssignmentService = {
         await this.savePersonAccess(personId, idKeyed, specialIds);
     },
 };
+
+/**
+ * Construye el "plan" de permisos (filas de access_assignment_permissions) para
+ * un alta transaccional, referenciando las asignaciones por índice (0-based) de
+ * `mediaTypeIds` en lugar de por id. Reutiliza la lógica de savePersonAccess
+ * (pisos por edificio + accesos especiales) pero sin leer las asignaciones,
+ * porque estas aún no existen (las crea el RPC create_person_with_access).
+ */
+export async function buildPermissionPlan(
+    mediaTypeIds: string[],
+    floorsByBuilding: Record<number, FloorGroups>,
+    specialAccessIds: number[],
+): Promise<{
+    assignment_index: number;
+    resource_type: string;
+    building_id: number;
+    floor_id?: number | null;
+    special_access_id?: number | null;
+}[]> {
+    const { data: allFloors } = await supabase
+        .from("floors")
+        .select("id, label, building_id");
+    const floorIdByBuilding = new Map<number, Map<string, number>>();
+    for (const f of allFloors || []) {
+        if (!floorIdByBuilding.has(f.building_id)) {
+            floorIdByBuilding.set(f.building_id, new Map());
+        }
+        floorIdByBuilding.get(f.building_id)!.set(f.label, f.id);
+    }
+
+    const { data: specials } = await supabase
+        .from("special_accesses")
+        .select("id, building_id");
+    const specialById = new Map<number, number | null>(
+        (specials || []).map((s) => [s.id, s.building_id]),
+    );
+
+    const { data: mediaBuildings } = await supabase
+        .from("access_media_type_buildings")
+        .select("media_type_id, building_id");
+    const mediaBuildingsSet = new Set<string>(
+        (mediaBuildings || []).map((r) => `${r.media_type_id}:${r.building_id}`),
+    );
+    const mediaApplies = (mediaTypeId: string, bid: number) =>
+        mediaBuildingsSet.has(`${mediaTypeId}:${bid}`);
+
+    const rows: {
+        assignment_index: number;
+        resource_type: string;
+        building_id: number;
+        floor_id?: number | null;
+        special_access_id?: number | null;
+    }[] = [];
+
+    mediaTypeIds.forEach((mediaTypeId, index) => {
+        const seenFloors = new Set<string>();
+        const seenSpecials = new Set<string>();
+
+        for (const [bidStr, typeMap] of Object.entries(floorsByBuilding)) {
+            const bid = Number(bidStr);
+            if (!Number.isFinite(bid)) continue;
+            const list = typeMap[mediaTypeId] || [];
+            if (list.length === 0) continue;
+            if (!mediaApplies(mediaTypeId, bid)) continue;
+            const labelMap = floorIdByBuilding.get(bid);
+            for (const f of list) {
+                const key = f.trim();
+                const dedupeKey = `${bid}:${key.toLowerCase()}`;
+                if (!key || seenFloors.has(dedupeKey)) continue;
+                seenFloors.add(dedupeKey);
+                rows.push({
+                    assignment_index: index,
+                    resource_type: "floor",
+                    building_id: bid,
+                    floor_id: labelMap?.get(key) ?? null,
+                });
+            }
+        }
+
+        for (const id of specialAccessIds) {
+            if (seenSpecials.has(String(id))) continue;
+            seenSpecials.add(String(id));
+            const buildingId = specialById.get(id);
+            if (buildingId === undefined) continue;
+            rows.push({
+                assignment_index: index,
+                resource_type: "special_access",
+                building_id: buildingId ?? 0,
+                special_access_id: id,
+            });
+        }
+    });
+
+    return rows;
+}
