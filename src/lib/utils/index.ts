@@ -60,6 +60,8 @@ export type { UsageEntry, UsageMatchedEntry, UsageMatchResult, DuplicateFolioInf
 
 export { generateMediaTemplate, generateUsageTemplate } from './xlsxTemplate';
 
+export { capitalize, fullName, personDisplayName, formatDate, formatDateTime } from './format';
+
 export { computePersonStatus } from './personStatus';
 export type { StatusCardInput } from './personStatus';
 

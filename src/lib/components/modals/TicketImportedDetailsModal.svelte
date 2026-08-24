@@ -20,7 +20,7 @@
     import InfoCard from "../InfoCard.svelte";
     import CardCheckItem from "../CardCheckItem.svelte";
     import { toast } from "svelte-sonner";
-    import { handleError, parseFloors } from "../../utils";
+    import { handleError, parseFloors, capitalize } from "../../utils";
     import {
         AlertCircle,
         CheckCircle2,
@@ -203,7 +203,7 @@
                 .map((m: any) => m.key),
         ));
         for (const key of floorMediaKeys) {
-            const cap = key.charAt(0).toUpperCase() + key.slice(1);
+            const cap = capitalize(key);
             const proposed = [...floorsForKey(selectedPerson.floors, key)];
             const action = (p as any)[`accion_${key}`];
             const pisos = (p as any)[`pisos_${key}`];

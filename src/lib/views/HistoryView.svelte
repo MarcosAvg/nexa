@@ -11,7 +11,7 @@
         History,
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
-    import { handleError } from "../utils";
+    import { handleError, formatDateTime } from "../utils";
     import { HistoryService } from "../services/history";
     import { networkStore } from "../stores/network.svelte";
     import {
@@ -83,13 +83,7 @@
 
 {#snippet renderDate(row: HistoryLog)}
     <span class="text-slate-500 text-xs whitespace-nowrap">
-        {new Date(row.timestamp).toLocaleString("es-MX", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        })}
+        {formatDateTime(row.timestamp)}
     </span>
 {/snippet}
 

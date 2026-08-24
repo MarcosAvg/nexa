@@ -3,7 +3,7 @@
     import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard, FileText, Puzzle } from "lucide-svelte";
     import { userState, catalogState, settingsState, moduleState } from "../stores";
     import { networkStore } from "../stores/network.svelte";
-    import { generateMediaTemplate, generateUsageTemplate, handleError } from "../utils";
+    import { generateMediaTemplate, generateUsageTemplate, handleError, capitalize } from "../utils";
     import { toast } from "svelte-sonner";
     import GeneralSettingsView from "./GeneralSettingsView.svelte";
 
@@ -89,7 +89,7 @@
         const loadingToast = toast.loading("Generando plantilla de conteo...");
         try {
             const cfg = moduleState.config("conteo_uso");
-            const label = cfg.mediaKey ? (cfg.mediaKey.charAt(0).toUpperCase() + cfg.mediaKey.slice(1)) : "Uso de tarjetas";
+            const label = cfg.mediaKey ? capitalize(cfg.mediaKey) : "Uso de tarjetas";
             await generateUsageTemplate(label);
             toast.success("Plantilla generada correctamente", { id: loadingToast });
         } catch (e) {

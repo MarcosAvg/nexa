@@ -18,7 +18,7 @@
         FileX,
     } from "lucide-svelte";
     import { cardlessRegistryService } from "../services/cardlessRegistry";
-    import { exportCardlessRegistryAllDependenciesAsZip, handleError } from "../utils";
+    import { exportCardlessRegistryAllDependenciesAsZip, handleError, formatDate } from "../utils";
     import type { CardlessRegistry } from "../types";
     import { toast } from "svelte-sonner";
     
@@ -266,7 +266,7 @@
 
 {#snippet renderDate(row: CardlessRegistry)}
     <div class="flex flex-col">
-        <span class="text-sm text-slate-700">{new Date(row.recorded_at).toLocaleDateString("es-MX")}</span>
+        <span class="text-sm text-slate-700">{formatDate(row.recorded_at)}</span>
         <span class="text-xs text-slate-500">{new Date(row.recorded_at).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
     </div>
 {/snippet}

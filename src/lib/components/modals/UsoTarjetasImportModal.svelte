@@ -3,7 +3,7 @@
     import Button from "../Button.svelte";
     import Badge from "../Badge.svelte";
     import { toast } from "svelte-sonner";
-    import { handleError, parseUsageFile, matchUsageToPersonnel, findDuplicateFolios, getDuplicateFoliosSummary, exportUsageToExcel, exportUsageAllDependenciesAsZip } from "../../utils";
+    import { handleError, parseUsageFile, matchUsageToPersonnel, findDuplicateFolios, getDuplicateFoliosSummary, exportUsageToExcel, exportUsageAllDependenciesAsZip, capitalize } from "../../utils";
     import {
         Upload,
         FileSpreadsheet,
@@ -32,11 +32,7 @@
 
     // Medio configurado para el módulo "conteo_uso" (agnóstico al tipo).
     let mediaKey = $derived(moduleState.config("conteo_uso").mediaKey || "kone");
-    let mediaLabel = $derived(
-        mediaKey
-            ? (mediaKey.charAt(0).toUpperCase() + mediaKey.slice(1))
-            : "tarjetas",
-    );
+    let mediaLabel = $derived(mediaKey ? capitalize(mediaKey) : "tarjetas");
 
     let step = $state<"idle" | "parsing" | "matching" | "results">("idle");
     let matchResult = $state<UsageMatchResult | null>(null);

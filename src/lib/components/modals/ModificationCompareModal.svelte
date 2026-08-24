@@ -8,7 +8,7 @@
     import { personnelState, ticketState, catalogState } from "../../stores";
     import { cardService } from "../../services/cards";
     import { toast } from "svelte-sonner";
-    import { handleError } from "../../utils";
+    import { handleError, capitalize } from "../../utils";
     import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
     import { ArrowRight, Plus, Minus, User } from "lucide-svelte";
     import type { Ticket, Person } from "../../types";
@@ -176,7 +176,7 @@
             const key = m.key;
             if (seen.has(key)) continue;
             seen.add(key);
-            const cap = key.charAt(0).toUpperCase() + key.slice(1);
+            const cap = capitalize(key);
             fields.push({
                 key,
                 label: `Pisos ${m.name}`,
