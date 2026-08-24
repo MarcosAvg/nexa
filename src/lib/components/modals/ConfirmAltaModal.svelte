@@ -14,6 +14,7 @@
     import { handleError, parseFloors } from "../../utils";
     import { wantsCard } from "../../utils/matchAnalysis";
     import { activeMediaTypes } from "../../utils/mediaContract";
+    import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
     import { catalogState } from "../../stores";
     import Badge from "../Badge.svelte";
     import {
@@ -181,11 +182,7 @@
                 <div class="flex gap-1.5">
                     {#each allowedCardTypes as type}
                         <Badge
-                            variant={type === "KONE"
-                                ? "blue"
-                                : type === "AccessPRO"
-                                  ? "emerald"
-                                  : "amber"}>{type}</Badge
+                            variant={mediaTypeVariant(type)}>{type}</Badge
                         >
                     {/each}
                 </div>

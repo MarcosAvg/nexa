@@ -13,6 +13,10 @@ export interface MediaInfo {
     has_floors: boolean;
     requires_responsiva: boolean;
     requires_programming: boolean;
+    /** Si el medio usa un identificador/folio (por defecto true). */
+    requires_identifier: boolean;
+    /** Etiqueta del identificador (por ejemplo "Folio"). */
+    identifier_label: string;
 }
 
 /** Extrae los medios activos del catálogo, normalizados. */
@@ -30,6 +34,8 @@ export function activeMediaTypes(mediaTypes: any[] | null | undefined): MediaInf
             has_floors: m.has_floors === true,
             requires_responsiva: m.requires_responsiva !== false,
             requires_programming: m.requires_programming !== false,
+            requires_identifier: m.requires_identifier !== false,
+            identifier_label: (m.identifier_label as string) || 'Folio',
         });
     }
     return out;
@@ -56,10 +62,13 @@ export function altasMediaCols(media: MediaInfo): { key: string; label: string; 
             { key: `pisos_${media.key}`, label: `Pisos ${media.name} (separados por coma)` },
         ];
     }
-    return [
+    const cols: { key: string; label: string; required?: boolean }[] = [
         { key: `${media.key}_req`, label: `¿Requiere Tarjeta ${media.name}?`, required: true },
-        { key: `${media.key}_folio`, label: `Folio ${media.name} (opcional)` },
     ];
+    if (media.requires_identifier) {
+        cols.push({ key: `${media.key}_folio`, label: `${media.identifier_label} ${media.name} (opcional)` });
+    }
+    return cols;
 }
 
 /** Columnas de modificación de pisos por medio (solo medios con pisos). */
@@ -73,8 +82,11 @@ export function modifMediaCols(media: MediaInfo): { key: string; label: string; 
 
 /** Columnas de reposición por medio (todos los medios). */
 export function reposMediaCols(media: MediaInfo): { key: string; label: string; required?: boolean }[] {
-    return [
+    const cols: { key: string; label: string; required?: boolean }[] = [
         { key: `reponer_${media.key}`, label: `¿Reponer ${media.name}?`, required: true },
-        { key: `folio_${media.key}`, label: `Folio ${media.name} Anterior (si lo conoce)` },
     ];
+    if (media.requires_identifier) {
+        cols.push({ key: `folio_${media.key}`, label: `${media.identifier_label} ${media.name} Anterior (si lo conoce)` });
+    }
+    return cols;
 }

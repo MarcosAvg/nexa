@@ -23,6 +23,7 @@
     import { personnelService } from "../services/personnel";
     import { cardService } from "../services/cards";
     import { exportPersonnelToExcel, exportPersonnelAllDependenciesAsZip, handleError, createSimpleDebounce } from "../utils";
+    import { mediaTypeVariant } from "../utils/mediaTypeAppearance";
     import { toast } from "svelte-sonner";
     import { networkStore } from "../stores/network.svelte";
     import { getPersonnelStatusVariant } from "../constants/status";
@@ -229,11 +230,7 @@
     <div class="flex flex-wrap gap-1">
         {#each row.cards || [] as card}
             <Badge
-                variant={card.type === "KONE"
-                    ? "blue"
-                    : card.type === "AccessPRO"
-                      ? "emerald"
-                      : "amber"}
+                variant={mediaTypeVariant(card.type)}
                 class="px-1.5 py-0"
             >
                 {card.type}

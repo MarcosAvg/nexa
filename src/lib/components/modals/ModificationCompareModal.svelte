@@ -9,6 +9,7 @@
     import { cardService } from "../../services/cards";
     import { toast } from "svelte-sonner";
     import { handleError } from "../../utils";
+    import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
     import { ArrowRight, Plus, Minus, User } from "lucide-svelte";
     import type { Ticket, Person } from "../../types";
 
@@ -382,7 +383,7 @@
                         <div class="flex flex-wrap gap-2">
                             {#each currentPerson.cards as card}
                                 <div class="flex items-center gap-1.5 bg-white border border-slate-200 px-1.5 py-1 rounded-md text-xs shadow-sm transition-all hover:shadow-md">
-                                    <Badge variant={card.type === "KONE" ? "blue" : "amber"} class="px-1.5 py-0.5">
+                                    <Badge variant={mediaTypeVariant(card.type)} class="px-1.5 py-0.5">
                                         {card.type}
                                     </Badge>
                                     <span class="text-slate-700 font-mono font-bold text-[11px] px-0.5">{card.folio}</span>
