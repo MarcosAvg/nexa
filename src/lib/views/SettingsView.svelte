@@ -339,14 +339,15 @@
                                 Vista previa de etiquetas
                             </h4>
                             <div class="flex flex-wrap items-center gap-3">
+                                <!-- Semáforo por días restantes: verde (recién creado) → ámbar (por vencer) → rojo (vencido) -->
                                 <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                                    ≤ {Math.max(0, warnDaysInput - 1)} días · Pendiente
+                                    Restan {pickupDaysInput} días · Pendiente
                                 </span>
                                 <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200/60">
-                                    ≥ {warnDaysInput} días · Por vencer
+                                    Restan {Math.max(1, pickupDaysInput - warnDaysInput)} días · Por vencer
                                 </span>
                                 <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200/60">
-                                    &gt; {pickupDaysInput} días · Baja de Registro
+                                    Plazo vencido · Baja de Registro
                                 </span>
                             </div>
                         </div>

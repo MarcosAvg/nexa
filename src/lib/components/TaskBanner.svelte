@@ -204,14 +204,18 @@
         amber: "border-amber-200/80",
     };
 
-    // Configuración de urgencia para Firma Responsiva
+    // Configuración de urgencia para Firma Responsiva.
+    // Semáforo: verdes (recién creado) → ámbar (por vencer) → rojo (baja de registro).
+    const responsivaDaysRemaining = $derived(
+        Math.max(0, settingsState.responsivaPickupDays - (ticket.daysElapsed ?? 0)),
+    );
     const responsivaUrgency = $derived(
         ticket.type === "Firma Responsiva" && ticket.daysElapsed != null
             ? ticket.needsBaja
                 ? { variant: "rose" as const, label: "Baja de Registro" }
                 : ticket.daysElapsed >= settingsState.responsivaWarnDays
-                    ? { variant: "emerald" as const, label: "Por vencer" }
-                    : { variant: "amber" as const, label: "Pendiente" }
+                    ? { variant: "amber" as const, label: "Por vencer" }
+                    : { variant: "emerald" as const, label: "Pendiente" }
             : null
     );
 
@@ -312,18 +316,22 @@
                     <span>{formatDate(ticket.created_at)}</span>
                 </div>
 
-                {#if responsivaUrgency}
-                    <span
-                        class="flex items-center gap-1"
-                        style="color: {URGENCY_COLORS[responsivaUrgency.variant]}"
-                    >
-                        <span
-                            class="w-1.5 h-1.5 rounded-full shrink-0"
-                            style="background-color: {URGENCY_COLORS[responsivaUrgency.variant]}"
-                        ></span>
-                        {ticket.daysElapsed} día{ticket.daysElapsed !== 1 ? "s" : ""} · {responsivaUrgency.label}
-                    </span>
-                {/if}
+                        {#if responsivaUrgency}
+                            <span
+                                class="flex items-center gap-1"
+                                style="color: {URGENCY_COLORS[responsivaUrgency.variant]}"
+                            >
+                                <span
+                                    class="w-1.5 h-1.5 rounded-full shrink-0"
+                                    style="background-color: {URGENCY_COLORS[responsivaUrgency.variant]}"
+                                ></span>
+                                {#if ticket.needsBaja}
+                                    {responsivaUrgency.label}
+                                {:else}
+                                    Restan {responsivaDaysRemaining} día{responsivaDaysRemaining !== 1 ? "s" : ""} · {responsivaUrgency.label}
+                                {/if}
+                            </span>
+                        {/if}
             </div>
 
             {#if ticket.cardFolio}
