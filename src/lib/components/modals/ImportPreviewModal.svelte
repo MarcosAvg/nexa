@@ -377,6 +377,19 @@
     // ── Resolution Helpers ────────────────────────────
 
     /**
+     * Resuelve el `person_id` de una fila a partir de las coincidencias
+     * (`matchResults`). Usa el primer resultado como persona vinculada.
+     */
+    function resolvePersonId(
+        sheetKey: SheetKey,
+        rowNumber: number,
+    ): string | null {
+        const rk = `${sheetKey}-${rowNumber}`;
+        const matches = matchResults.get(rk) ?? [];
+        return matches.length > 0 ? (matches[0].id ?? null) : null;
+    }
+
+    /**
      * Construye un ticket definition a partir de una hoja/fila.
      * fieldsOverride permite modificar campos antes de crear el ticket.
      */
@@ -401,6 +414,7 @@
             description: buildTicketDescription({ ...row, fields }),
             priority,
             payload: fields,
+            person_id: resolvePersonId(sheetKey, row.rowNumber),
         };
     }
 
@@ -446,6 +460,7 @@
                             origen:
                                 "Conversión desde Alta (matching inteligente)",
                         },
+                        person_id: resolvePersonId(sheetKey, row.rowNumber),
                     });
                 }
             }
@@ -458,7 +473,11 @@
                 wantsCard(modifiedFields, m),
             ).length > 0;
 
-        if (stillWants) {
+        // Alta "solo datos": si la persona tiene datos pero no solicita tarjeta,
+        // registrar igualmente el alta para que la persona quede dada de alta.
+        const hasPersonData = !!(modifiedFields.apellidos || modifiedFields.nombres);
+
+        if (stillWants || hasPersonData) {
             extraTickets.unshift(buildTicketDef(sheetKey, row, modifiedFields));
         }
 

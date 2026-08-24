@@ -33,6 +33,7 @@
         MapPin,
         Calendar,
         FileText,
+        Search,
     } from "lucide-svelte";
 
 
@@ -56,6 +57,14 @@
     let candidates = $state<any[]>([]);
     let selectedPerson = $state<any>(null);
     let searchDone = $state(false);
+
+    // ── Búsqueda manual (cuando el auto-search no encuentra) ──
+    let manualQuery = $state("");
+    let manualSearching = $state(false);
+    let manualCandidates = $state<any[]>([]);
+
+    // ── Estado de seguimiento del Reporte de Falla ──
+    let seguimientoEstado = $state<"En revisión" | "Requiere reposición" | "Resuelto">("En revisión");
 
     // Sub-modales
     let isCompareOpen = $state(false);
@@ -96,6 +105,41 @@
         } finally {
             isSearching = false;
         }
+    }
+
+    /** Búsqueda manual por nombre (con debounce) cuando el auto-search no da resultado. */
+    let manualDebounce: ReturnType<typeof setTimeout> | undefined;
+    async function runManualSearch() {
+        const q = manualQuery.trim();
+        if (!q) {
+            manualCandidates = [];
+            return;
+        }
+        manualSearching = true;
+        try {
+            const terms = q.split(/\s+/).filter(Boolean);
+            const apellidos = terms[0] ?? "";
+            const nombres = terms.slice(1).join(" ");
+            const results = await personnelService.searchByName(
+                apellidos,
+                nombres,
+            );
+            manualCandidates = results;
+        } catch {
+            manualCandidates = [];
+        } finally {
+            manualSearching = false;
+        }
+    }
+    function onManualQuery() {
+        if (manualDebounce) clearTimeout(manualDebounce);
+        manualDebounce = setTimeout(runManualSearch, 250);
+    }
+    function pickManualCandidate(person: any) {
+        selectedPerson = person;
+        manualCandidates = [];
+        manualQuery = "";
+        searchDone = true;
     }
 
     // ── Catalog helpers ───────────────────────────────────
@@ -340,6 +384,14 @@
 
     async function handleMarkReposicionDone() {
         if (!ticket) return;
+        // Validar que exista al menos una tarjeta del medio identificada
+        // (con folio) antes de cerrar la reposición como gestionada.
+        if (!folioChecks.some((c) => !!c.card?.id)) {
+            toast.warning(
+                "No se puede marcar como gestionado sin una tarjeta del medio identificada. Verifique el folio/tarjeta a reponer.",
+            );
+            return;
+        }
         isSubmitting = true;
         try {
             await ticketService.delete(ticket.id, "Reposición gestionada");
@@ -474,15 +526,29 @@
 
     async function handleCreateReposicionTicket() {
         if (!ticket) return;
+        // No crear reposición sin medio/tarjeta o folio especificado.
+        const rawTipo = (p.tipo_tarjeta ?? "").trim();
+        const folio = (p.folio ?? "").trim();
+        const tipos = resolveTipos(rawTipo);
+        const hasMappedMedia = tipos.some((t) =>
+            activeMedias.some((m) => m.name === t || m.key === t),
+        );
+        if (tipos.length === 0 || !hasMappedMedia || (!rawTipo && !folio)) {
+            toast.error(
+                "No se puede crear una reposición sin medio/tipo de tarjeta. Verifique el reporte antes de continuar.",
+            );
+            return;
+        }
         isSubmitting = true;
         try {
             // Mapear campos de Reporte de Falla → campos que entiende el modal de Reposición
-            const rawTipo = (p.tipo_tarjeta ?? "").trim();
-            const folio = (p.folio ?? "").trim();
-            const repoPayload: Record<string, any> = { ...p, origen: "Reporte de Falla" };
+            const repoPayload: Record<string, any> = {
+                ...p,
+                origen: "Reporte de Falla",
+                estado: seguimientoEstado,
+            };
 
             // Usar resolveTipos para manejar "Tarjeta P2000", "Tarjeta KONE" y "Ambas tarjetas"
-            const tipos = resolveTipos(rawTipo);
             for (const media of activeMedias) {
                 if (tipos.includes(media.name)) {
                     repoPayload[`reponer_${media.key}`] = "sí";
@@ -497,6 +563,7 @@
                 priority: p.urgencia?.toLowerCase().includes("alta")
                     ? "alta"
                     : "media",
+                person_id: selectedPerson?.id ?? null,
                 payload: repoPayload,
             });
 
@@ -588,15 +655,76 @@
                         Buscando <strong>{p.apellidos}, {p.nombres}</strong>…
                     </div>
                 {:else if candidates.length === 0 && searchDone}
-                    <div class="flex items-start gap-2 text-sm text-rose-600">
-                        <AlertCircle size={14} class="mt-0.5 shrink-0" />
-                        <div>
-                            <p class="font-semibold">
-                                Persona no encontrada en el sistema
+                    <div class="space-y-2">
+                        <div class="flex items-start gap-2 text-sm text-rose-600">
+                            <AlertCircle size={14} class="mt-0.5 shrink-0" />
+                            <div>
+                                <p class="font-semibold">
+                                    Persona no encontrada en el sistema
+                                </p>
+                                <p class="text-xs text-rose-400">
+                                    Buscado: "{p.apellidos}, {p.nombres}"
+                                </p>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                            <p
+                                class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"
+                            >
+                                <Search size={11} /> Buscar persona manualmente
                             </p>
-                            <p class="text-xs text-rose-400">
-                                Buscado: "{p.apellidos}, {p.nombres}"
-                            </p>
+                            <input
+                                type="text"
+                                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                placeholder="Apellidos, Nombres…"
+                                bind:value={manualQuery}
+                                oninput={onManualQuery}
+                            />
+                            {#if manualSearching}
+                                <div class="flex items-center gap-2 text-xs text-slate-500">
+                                    <Loader2 size={13} class="animate-spin" />
+                                    Buscando…
+                                </div>
+                            {:else if manualCandidates.length > 0}
+                                <div class="space-y-1.5">
+                                    {#each manualCandidates.slice(0, 5) as c}
+                                        <button
+                                            class="w-full flex items-center justify-between p-2 rounded-lg border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-200 text-left transition-colors"
+                                            onclick={() => pickManualCandidate(c)}
+                                        >
+                                            <div class="flex items-center gap-2.5">
+                                                <div
+                                                    class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400"
+                                                >
+                                                    <User size={13} />
+                                                </div>
+                                                <div>
+                                                    <p
+                                                        class="text-sm font-semibold text-slate-800"
+                                                    >
+                                                        {c.last_name}, {c.first_name}
+                                                    </p>
+                                                    <p
+                                                        class="text-[10px] text-slate-500"
+                                                    >
+                                                        {c.dependency} · {c.building}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span
+                                                class="text-[10px] font-bold text-blue-500"
+                                                >Seleccionar →</span
+                                            >
+                                        </button>
+                                    {/each}
+                                </div>
+                            {:else if manualQuery}
+                                <p
+                                    class="text-[10px] text-slate-400 italic"
+                                >
+                                    Sin coincidencias para "{manualQuery}". Intente con otro nombre.
+                                </p>
+                            {/if}
                         </div>
                     </div>
                 {:else if candidates.length > 1 && !selectedPerson}
@@ -1060,6 +1188,39 @@
                     </div>
                 {/if}
             </InfoCard>
+
+            <!-- ── Reporte de Falla: estado de seguimiento ── -->
+            <div class="rounded-xl border border-orange-200 bg-orange-50/40 p-4 space-y-2.5">
+                <p
+                    class="text-[10px] font-bold text-orange-700 uppercase tracking-widest flex items-center gap-1.5"
+                >
+                    <AlertTriangle size={11} /> Estado de seguimiento
+                </p>
+                <p class="text-xs text-slate-600">
+                    Registra el avance del reporte. El estado se incluirá al crear
+                    la reposición o al resolver la falla.
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {seguimientoEstado === 'En revisión' ? 'bg-orange-100 text-orange-800 border border-orange-300 shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-orange-50'}"
+                        onclick={() => (seguimientoEstado = "En revisión")}
+                    >
+                        <AlertCircle size={13} /> En revisión
+                    </button>
+                    <button
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {seguimientoEstado === 'Requiere reposición' ? 'bg-amber-100 text-amber-800 border border-amber-300 shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-amber-50'}"
+                        onclick={() => (seguimientoEstado = "Requiere reposición")}
+                    >
+                        <CreditCard size={13} /> Requiere reposición
+                    </button>
+                    <button
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {seguimientoEstado === 'Resuelto' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-emerald-50'}"
+                        onclick={() => (seguimientoEstado = "Resuelto")}
+                    >
+                        <CheckCircle2 size={13} /> Resuelto
+                    </button>
+                </div>
+            </div>
         {/if}
     </div>
 
@@ -1152,7 +1313,7 @@
                         variant="primary"
                         class="bg-emerald-600 hover:bg-emerald-700 border-emerald-500"
                         loading={isSubmitting}
-                        onclick={() => handleComplete("Falla resuelta")}
+                        onclick={() => handleComplete(`Falla resuelta (${seguimientoEstado})`)}
                     >
                         <CheckCircle2 size={15} class="mr-1.5" />
                         Falla Resuelta

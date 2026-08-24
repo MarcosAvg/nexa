@@ -366,7 +366,7 @@ export const ticketService = {
     },
 
     async createBatch(
-        tickets: { type: string; title: string; description: string; priority: string; payload: Record<string, string> }[]
+        tickets: { type: string; title: string; description: string; priority: string; payload: Record<string, string>; person_id?: string | null }[]
     ): Promise<{ created: number; errors: { index: number; message: string }[] }> {
         const errors: { index: number; message: string }[] = [];
         let created = 0;
@@ -377,7 +377,7 @@ export const ticketService = {
             description: t.description,
             priority: t.priority.toLowerCase(),
             status: 'pending',
-            person_id: null,
+            person_id: t.person_id ?? null,
             access_media_id: null,
             payload: t.payload,
         }));

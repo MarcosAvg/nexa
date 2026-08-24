@@ -271,28 +271,29 @@ export const cardService = {
                     .neq("status", "inactive");
 
                 if (currentMedia && currentMedia.length > 0) {
-                    const oldMedia = currentMedia[0];
                     const newStatus = replacementOptions.oldCardStatus;
 
-                    const { error: updateError } = await withTimeout(supabase
-                        .from("access_media")
-                        .update({
-                            status: newStatus,
-                            person_id: null,
-                            programming_status: null,
-                            responsiva_status: null,
-                        })
-                        .eq("id", oldMedia.id));
+                    for (const oldMedia of currentMedia) {
+                        const { error: updateError } = await withTimeout(supabase
+                            .from("access_media")
+                            .update({
+                                status: newStatus,
+                                person_id: null,
+                                programming_status: null,
+                                responsiva_status: null,
+                            })
+                            .eq("id", oldMedia.id));
 
-                    if (updateError) throw updateError;
+                        if (updateError) throw updateError;
 
-                    await accessAssignmentService.revokeByMedia(oldMedia.id);
+                        await accessAssignmentService.revokeByMedia(oldMedia.id);
 
-                    await HistoryService.log("CARD", oldMedia.id, "REPLACE_OLD", {
-                        message: `Tarjeta ${oldMedia.identifier} reemplazada. Nuevo estado: ${newStatus === "blocked" ? "Baja Definitiva" : "Disponible"}`,
-                        related_person_id: data.person_id,
-                        entityName: `${data.type} (Folio: ${oldMedia.identifier})`
-                    });
+                        await HistoryService.log("CARD", oldMedia.id, "REPLACE_OLD", {
+                            message: `Tarjeta ${oldMedia.identifier} reemplazada. Nuevo estado: ${newStatus === "blocked" ? "Baja Definitiva" : "Disponible"}`,
+                            related_person_id: data.person_id,
+                            entityName: `${data.type} (Folio: ${oldMedia.identifier})`
+                        });
+                    }
                 }
             }
 
