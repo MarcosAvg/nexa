@@ -191,12 +191,6 @@
     const priorityColor = $derived(getTicketPriorityVariant(ticket.priority));
 
     // Colores para texto/metadatos de urgencia (Firma Responsiva)
-    const URGENCY_COLORS: Record<string, string> = {
-        rose: "#f43f5e",
-        emerald: "#10b981",
-        amber: "#f59e0b",
-    };
-
     // Clases de borde completo con opacidad para integrarse al estilo existente
     const URGENCY_BORDER_CLASSES: Record<string, string> = {
         rose: "border-rose-200/80",
@@ -318,20 +312,16 @@
                 </div>
 
                         {#if responsivaUrgency}
-                            <span
-                                class="flex items-center gap-1"
-                                style="color: {URGENCY_COLORS[responsivaUrgency.variant]}"
+                            <Badge
+                                variant={responsivaUrgency.variant}
+                                class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5"
                             >
-                                <span
-                                    class="w-1.5 h-1.5 rounded-full shrink-0"
-                                    style="background-color: {URGENCY_COLORS[responsivaUrgency.variant]}"
-                                ></span>
                                 {#if ticket.needsBaja}
                                     {responsivaUrgency.label}
                                 {:else}
                                     Restan {responsivaDaysRemaining} día{responsivaDaysRemaining !== 1 ? "s" : ""} · {responsivaUrgency.label}
                                 {/if}
-                            </span>
+                            </Badge>
                         {/if}
             </div>
 
