@@ -20,7 +20,7 @@
     import PermissionGuard from "../PermissionGuard.svelte";
     import { toast } from "svelte-sonner";
     import { handleError, mediaTypeVariant } from "../../utils";
-    import { updateWithLock } from "../../utils/optimisticLock";
+    import { updateWithLock, fetchCurrentVersion } from "../../utils/optimisticLock";
     import type { Person } from "../../types";
     import { personnelSchema } from "../../schemas";
 
@@ -89,6 +89,15 @@
 
     // Versión (optimistic locking) de la persona al abrir el modal de edición.
     let editingUpdatedAt = $state<string | null>(null);
+
+    // Aviso temprano de concurrencia: el registro cambió en BD desde que se cargó.
+    let isStale = $state(false);
+
+    /** Compara la versión de la lista con la actual en BD y marca si quedó obsoleta. */
+    async function checkStale(id: string, loadedVersion: string | null) {
+        const fresh = await fetchCurrentVersion("personnel", id);
+        isStale = !!fresh && !!loadedVersion && fresh !== loadedVersion;
+    }
 
     // Estado del formulario
     let nombres = $state("");
@@ -463,6 +472,7 @@
                 editingUpdatedAt = (editingPerson as any).updated_at ?? null;
                 selectedBuildings = bid ? [bid] : [];
                 void refreshPersonAccess(editingPerson.id);
+                void checkStale(editingPerson.id, editingUpdatedAt);
             });
         } else if (
             isOpen &&
@@ -517,6 +527,7 @@
                 }
                 lastLoadedPersonId = "__prefill__";
                 editingUpdatedAt = null;
+                isStale = false;
             });
         } else if (
             isOpen &&
@@ -692,6 +703,7 @@
 
     function resetForm() {
         editingUpdatedAt = null;
+        isStale = false;
         nombres = "";
         apellidos = "";
         noEmpleado = "";
@@ -823,6 +835,16 @@
             handleSave();
         }}
     >
+        {#if isStale}
+            <div
+                class="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3 text-xs font-semibold"
+            >
+                ⚠️ Este registro fue modificado por otra persona luego de que lo
+                abriste. Puedes seguir editando; al guardar se validará la
+                versión.
+            </div>
+        {/if}
+
         {#if headerContent}
             {@render headerContent()}
         {/if}

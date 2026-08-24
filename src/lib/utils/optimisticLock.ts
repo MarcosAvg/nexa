@@ -22,3 +22,22 @@ export async function updateWithLock(
     if (!data) return { ok: false, conflict: true };
     return { ok: true };
 }
+
+/**
+ * Lee la versión (updated_at) actual de un registro en la BD. Se usa al abrir un
+ * modal de edición para detectar si el registro cambió desde que se cargó en la
+ * lista (aviso temprano de concurrencia), sin reemplazar los datos del editor.
+ */
+export async function fetchCurrentVersion(
+    table: string,
+    id: string | number,
+): Promise<string | null> {
+    const { data, error } = await supabase
+        .from(table)
+        .select("updated_at")
+        .eq("id", id)
+        .maybeSingle();
+    if (error) return null;
+    return (data?.updated_at as string) ?? null;
+}
+

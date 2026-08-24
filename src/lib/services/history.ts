@@ -104,6 +104,32 @@ export const HistoryService = {
         _cachedUserId = undefined;
     },
 
+    /**
+     * Resuelve el nombre del usuario (performed_by uuid → profiles.full_name)
+     * y lo adjunta como `performed_by_name` a cada registro.
+     */
+    async _attachUserNames(rows: any[]): Promise<any[]> {
+        const uids = [...new Set(rows.map((r) => r.performed_by).filter(Boolean))];
+        if (uids.length === 0) return rows;
+        try {
+            const { data: profiles } = await supabase
+                .from("profiles")
+                .select("id, full_name")
+                .in("id", uids as string[]);
+            const map = new Map<string, string>();
+            for (const p of profiles || []) map.set(p.id, p.full_name || "");
+            return rows.map((r) => ({
+                ...r,
+                performed_by_name: r.performed_by ? (map.get(r.performed_by) || "—") : "—",
+            }));
+        } catch {
+            return rows.map((r) => ({
+                ...r,
+                performed_by_name: r.performed_by ? "—" : "—",
+            }));
+        }
+    },
+
     async fetchAll(
         page: number = 1,
         limit: number = 50,
@@ -123,7 +149,8 @@ export const HistoryService = {
                 .range(from, from + limit - 1);
 
             if (error) throw error;
-            return { data: data || [], count: count || 0 };
+            const enriched = await this._attachUserNames(data || []);
+            return { data: enriched, count: count || 0 };
         }, "Fetch History", throwOnError, { data: [], count: 0 });
     },
 
@@ -131,11 +158,12 @@ export const HistoryService = {
         filters: HistoryFilters = {}
     ) {
         return withErrorHandlingSafe(async () => {
-            return await batchPaginate<any>(async (from, to) => {
+            const rows = await batchPaginate<any>(async (from, to) => {
                 let q = supabase.from("history_logs").select("*");
                 q = applyFilters(q, filters);
                 return q.order("timestamp", { ascending: false }).range(from, to);
             });
+            return await this._attachUserNames(rows);
         }, "Fetch History for Export", []);
     },
 

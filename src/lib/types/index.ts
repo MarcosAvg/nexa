@@ -170,6 +170,8 @@ export interface HistoryLog {
     action: string;
     details: Record<string, unknown>;
     performed_by: string | null;
+    /** Nombre del usuario que ejecutó la acción (resuelto desde profiles). */
+    performed_by_name?: string;
 }
 
 export interface CardlessRegistry {

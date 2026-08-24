@@ -10,7 +10,7 @@
     import type { CardlessRegistry, Person } from "../../types";
     import { toast } from "svelte-sonner";
     import { networkStore } from "../../stores/network.svelte";
-    import { updateWithLock } from "../../utils/optimisticLock";
+    import { updateWithLock, fetchCurrentVersion } from "../../utils/optimisticLock";
 
     /** Mensaje cuando otro usuario modificó el registro mientras se editaba. */
     const CONFLICT_MSG =
@@ -64,6 +64,15 @@
 
     // Versión (optimistic locking) del registro al abrir la edición.
     let editingUpdatedAt = $state<string | null>(null);
+
+    // Aviso temprano de concurrencia: el registro cambió en BD desde que se cargó.
+    let isStale = $state(false);
+
+    /** Compara la versión de la lista con la actual en BD y marca si quedó obsoleta. */
+    async function checkStale(id: string | number, loadedVersion: string | null) {
+        const fresh = await fetchCurrentVersion("cardless_registry", id);
+        isStale = !!fresh && !!loadedVersion && fresh !== loadedVersion;
+    }
 
     // ── helpers ──────────────────────────────────────────────────
 
@@ -137,6 +146,7 @@
 
     function resetForm() {
         editingUpdatedAt = null;
+        isStale          = false;
         selectedPerson   = null;
         searchResults    = [];
         manualFirstName  = "";
@@ -187,8 +197,10 @@
         const key = editingRegistry ? `edit-${editingRegistry.id}` : "new";
         if (formKey === key) return;
         formKey = key;
-        if (editingRegistry) hydrateFromRegistry(editingRegistry);
-        else resetForm();
+        if (editingRegistry) {
+            hydrateFromRegistry(editingRegistry);
+            void checkStale(editingRegistry.id, editingUpdatedAt);
+        } else resetForm();
     });
 
     let availableFloors = $derived.by(() => {
@@ -330,6 +342,16 @@
 
 <Modal bind:isOpen title={editingRegistry ? "Editar Registro" : "Nuevo Registro"} size="lg" onclose={handleClose}>
     <div class="space-y-5">
+
+        {#if isStale}
+            <div
+                class="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3 text-xs font-semibold"
+            >
+                ⚠️ Este registro fue modificado por otra persona luego de que lo
+                abriste. Puedes seguir editando; al guardar se validará la
+                versión.
+            </div>
+        {/if}
 
         <!-- ── Person fields ─────────────────────────────────────── -->
         <div class="space-y-3 rounded-xl border p-4 transition-colors duration-200

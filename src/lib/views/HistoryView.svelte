@@ -75,6 +75,12 @@
     </span>
 {/snippet}
 
+{#snippet renderUser(row: HistoryLog)}
+    <span class="text-slate-700 text-sm whitespace-nowrap">
+        {row.performed_by_name || "—"}
+    </span>
+{/snippet}
+
 {#snippet renderDate(row: HistoryLog)}
     <span class="text-slate-500 text-xs whitespace-nowrap">
         {new Date(row.timestamp).toLocaleString("es-MX", {
@@ -187,6 +193,12 @@
                         label: "Acción",
                         render: renderHistoryAction,
                         width: "140px",
+                    },
+                    {
+                        key: "user",
+                        label: "Usuario",
+                        render: renderUser,
+                        width: "150px",
                     },
                     {
                         key: "details",
