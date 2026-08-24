@@ -1084,7 +1084,7 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
 const SHEET_LABELS: Record<string, string> = {
     altas: 'Alta',
-    modificaciones: 'Modificación',
+    modificaciones: 'Modificación de datos',
     baja_persona: 'Baja',
     reposicion: 'Reposición',
     reporte_falla: 'Reporte Falla',

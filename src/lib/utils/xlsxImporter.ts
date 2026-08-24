@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { TICKET_TYPES } from '../constants/tickets';
 import {
     activeMediaTypes,
     altasMediaCols,
@@ -49,7 +50,7 @@ type ColDef = { field: string; label: string; required?: boolean };
 
 export const SHEET_TO_TICKET_TYPE: Record<SheetKey, string> = {
     altas: 'Alta de Persona',
-    modificaciones: 'Modificación',
+    modificaciones: TICKET_TYPES.modificacion,
     baja_persona: 'Baja de Persona',
     reposicion: 'Reposición',
     reporte_falla: 'Reporte de Falla',

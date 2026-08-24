@@ -2,7 +2,7 @@ import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import type { Ticket } from "../types";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, batchPaginate, handleError } from "../utils";
-import { ticketState } from "../stores";
+import { ticketState, settingsState } from "../stores";
 import { RESPONSIVA_TICKET_TYPES } from "../constants/tickets";
 
 type CardAssignmentInfo = {
@@ -81,7 +81,7 @@ async function fetchCardAssignmentTypes(
             const diffDays = Math.floor(
                 (assignDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24)
             );
-            if (diffDays >= 0 && diffDays <= 7) {
+            if (diffDays >= 0 && diffDays <= settingsState.responsivaPickupDays) {
                 movementType = "Alta de Personal";
             }
         }
@@ -145,7 +145,7 @@ async function enrichWithMovementType(tickets: Ticket[]): Promise<(Ticket & { mo
             const diffDays = Math.floor(
                 (ticketDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24)
             );
-            if (diffDays >= 0 && diffDays <= 7) {
+            if (diffDays >= 0 && diffDays <= settingsState.responsivaPickupDays) {
                 movementType = "Alta de Personal";
                 assignmentDate = personnelWithDate.created_at;
             } else {
