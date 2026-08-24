@@ -191,7 +191,7 @@
         if (editingRegistry && selectedPerson.id === editingRegistry.person_id) {
             return !!editingRegistry.pendingKoneResponsiva;
         }
-        const koneCard = selectedPerson.cards?.find(c => c.type === "KONE");
+        const koneCard = selectedPerson.cards?.find(c => c.requires_responsiva !== false && (c.requires_responsiva === true || c.type === "KONE"));
         return !!(koneCard && koneCard.responsiva_status !== "signed" && koneCard.responsiva_status !== "legacy");
     });
 
@@ -207,8 +207,8 @@
         if (editingRegistry && selectedPerson.id === editingRegistry.person_id) {
             return editingRegistry.kone_status_at_registration ?? null;
         }
-        const koneCard = selectedPerson.cards?.find(c => c.type === "KONE");
-        // Sin tarjeta KONE asignada
+        const koneCard = selectedPerson.cards?.find(c => c.requires_responsiva !== false && (c.requires_responsiva === true || c.type === "KONE"));
+        // Sin tarjeta que requiera responsiva asignada
         if (!koneCard) return null;
         // Tiene tarjeta KONE — verificar si responsiva sigue pendiente
         const isPending = koneCard.responsiva_status !== "signed" && koneCard.responsiva_status !== "legacy";

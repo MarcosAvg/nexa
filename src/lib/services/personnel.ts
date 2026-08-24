@@ -52,6 +52,7 @@ function toCardsShape(media: any[] | null | undefined): Card[] {
         programming_status: m.programming_status,
         responsiva_status: m.responsiva_status,
         has_floors: m.access_media_types?.has_floors,
+        requires_responsiva: m.access_media_types?.requires_responsiva,
     }));
 }
 
