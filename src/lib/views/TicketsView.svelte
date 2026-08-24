@@ -7,7 +7,7 @@
     import {
         SectionHeader, TaskBanner, Button, FilterGroup, FilterSelect,
         Input, PermissionGuard, ContentView,
-        Pagination, ExportDropdown, ExportMenuItem,
+        Pagination, ExportDropdown, ExportMenuItem, Tabs,
         ModificationCompareModal,
     } from "../components";
     import {
@@ -376,26 +376,14 @@
 
 <div class="space-y-6">
     <!-- Section Tabs -->
-    <div class="flex border-b border-slate-200">
-        <button
-            class="px-6 py-3 text-sm font-bold border-b-2 transition-colors {currentSection ===
-            'General'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}"
-            onclick={() => switchSection("General")}
-        >
-            Tickets Generales
-        </button>
-        <button
-            class="px-6 py-3 text-sm font-bold border-b-2 transition-colors {currentSection ===
-            'Responsivas'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}"
-            onclick={() => switchSection("Responsivas")}
-        >
-            Firmas de Responsiva
-        </button>
-    </div>
+    <Tabs
+        tabs={[
+            { id: "General", label: "Tickets Generales" },
+            { id: "Responsivas", label: "Firmas de Responsiva" },
+        ]}
+        active={currentSection}
+        onSelect={(id) => switchSection(id)}
+    />
 
     <SectionHeader
         title={currentSection === "General"
