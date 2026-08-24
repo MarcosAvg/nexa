@@ -22,6 +22,7 @@ export { default as ToggleGroup } from './ToggleGroup.svelte';
 export { default as SectionHeader } from './SectionHeader.svelte';
 export { default as SectionPill } from './SectionPill.svelte';
 export { default as Tabs } from './Tabs.svelte';
+export { default as TicketStateBadge } from './TicketStateBadge.svelte';
 
 // ─── Data Display ──────────────────────────────────────────
 export { default as DataTable } from './DataTable.svelte';

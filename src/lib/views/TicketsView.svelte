@@ -85,10 +85,7 @@
     let isImportedOpen = $state(false);
     let importedTicket = $state<any>(null);
 
-    // Estado de confirmacións
-    let ticketToComplete = $state<any>(null);
-
-    // Modal de comparación de modificación
+    // Modal de comparación de modificaciónlls
     let isCompareOpen = $state(false);
     let compareTicket = $state<any>(null);
 
@@ -269,28 +266,14 @@
             return;
         }
 
-        ticketToComplete = ticket;
-        handleFinalConfirm();
+        // Tipos sin acción configurada: NO eliminar silenciosamente.
+        toast.info(
+            "Este tipo de ticket no tiene una acción automática. Reprocesa desde la vista de detalle o cancela el ticket.",
+        );
     }
 
     async function handleFinalConfirm() {
-        if (!ticketToComplete) return;
-
-        const ticket = ticketToComplete;
-        ticketToComplete = null;
-
-        const prevTickets = tickets;
-        ticketState.pagination.items = ticketState.pagination.items.filter((t) => t.id !== ticket.id);
-        ticketState.pagination.totalRecords = Math.max(0, ticketState.pagination.totalRecords - 1);
-
-        try {
-            await ticketService.delete(ticket.id);
-            toast.success("Ticket completado");
-        } catch (e) {
-            handleError(e, "Completar Ticket");
-            ticketState.pagination.items = prevTickets;
-            ticketState.pagination.totalRecords = ticketState.pagination.totalRecords + 1;
-        }
+        // Eliminado: los tipos sin accion configurada ya no se borran en silencio.
     }
 
     async function handleExportResponsivas() {

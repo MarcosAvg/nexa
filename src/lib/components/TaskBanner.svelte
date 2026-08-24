@@ -2,6 +2,7 @@
     import Badge from "./Badge.svelte";
     import Button from "./Button.svelte";
     import PermissionGuard from "./PermissionGuard.svelte";
+    import TicketStateBadge from "./TicketStateBadge.svelte";
     import {
         Clock,
         CreditCard,
@@ -12,7 +13,6 @@
         Calendar,
         User,
         Hash,
-        CheckCircle2,
         MoreHorizontal,
         AlertCircle,
     } from "lucide-svelte";
@@ -272,6 +272,7 @@
         >
             {ticket.priority}
         </Badge>
+        <TicketStateBadge status={ticket.status} followup={(ticket.payload as any)?.estado} type={ticket.type} />
     </div>
 
     <!-- Cuerpo: Título y descripción -->
@@ -348,25 +349,20 @@
     <div class="p-3 bg-slate-50/50 border-t border-slate-100 flex gap-2">
         <PermissionGuard requireEdit disabledOnly>
             {#snippet children({ disabled })}
-                {#if (ticket.type === "Programación" || ticket.type === "Firma Responsiva" || ticket.type === "Modificación" || ticket.type === "Modificación de datos") && onComplete}
+                {#if ticket.type === "Programación" || ticket.type === "Firma Responsiva"}
                     <Button
                         variant="primary"
                         size="sm"
                         class="flex-1 shadow-md shadow-slate-200/50"
-                        onclick={() => onComplete(ticket)}
-                        disabled={disabled || !networkStore.isOnline}
-                    >
-                        <CheckCircle2 size={16} class="mr-2" />
-                        Completar
-                    </Button>
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        class="w-10 p-0"
                         onclick={() => onManage?.(ticket)}
                         disabled={disabled || !networkStore.isOnline}
+                        title="Abre el perfil de la persona para completar la gestión. El ticket se cerrará automáticamente al resolver."
                     >
-                        <MoreHorizontal size={18} class="text-slate-400" />
+                        Gestionar en perfil
+                        <ArrowRight
+                            size={16}
+                            class="ml-2 group-hover:translate-x-1 transition-transform"
+                        />
                     </Button>
                 {:else}
                     <Button

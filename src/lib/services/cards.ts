@@ -338,6 +338,12 @@ export const cardService = {
             if (isNewAssignment) {
                 // El ticket de "Programación" lo crea el trigger
                 // (handle_access_media_ticket_effects) al asignar la persona.
+                // Si es una reposición, el ticket "Reposición" se cierra al
+                // completar el reemplazo (flujo inteligente).
+                if (replacementOptions && data.person_id) {
+                    const { ticketService } = await import("./tickets");
+                    await ticketService.deleteByPerson(data.person_id, "Reposición completada (tarjeta reemplazada)", ["Reposición"]);
+                }
 
                 if (data.person_id) {
                     const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", data.person_id).single();

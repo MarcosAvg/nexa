@@ -70,6 +70,8 @@
     let isCompareOpen = $state(false);
     let compareTicket = $state<any>(null);
     let isRejectOpen = $state(false);
+    let isConfirmCloseOpen = $state(false);
+    let pendingCloseNote = $state<string>("Ticket cerrado.");
 
     let p = $derived(ticket?.payload ?? {});
     let ticketType = $derived(ticket?.type ?? "");
@@ -392,14 +394,37 @@
             );
             return;
         }
+        pendingCloseNote = "Reposición gestionada";
+        isConfirmCloseOpen = true;
+    }
+
+    async function doCloseTicket() {
+        if (!ticket) return;
         isSubmitting = true;
         try {
-            await ticketService.delete(ticket.id, "Reposición gestionada");
-            toast.success("Ticket de reposición cerrado.");
+            await ticketService.delete(ticket.id, pendingCloseNote);
+            toast.success("Ticket cerrado.");
             isOpen = false;
             onComplete?.();
         } catch (err) {
-            handleError(err, "Cerrar Reposición");
+            handleError(err, "Cerrar Ticket");
+        } finally {
+            isSubmitting = false;
+            isConfirmCloseOpen = false;
+        }
+    }
+
+    /** Cierre directo (sin confirmación) para flujos automáticos. */
+    async function closeTicketNow(note: string) {
+        if (!ticket) return;
+        isSubmitting = true;
+        try {
+            await ticketService.delete(ticket.id, note);
+            toast.success("Ticket cerrado.");
+            isOpen = false;
+            onComplete?.();
+        } catch (err) {
+            handleError(err, "Cerrar Ticket");
         } finally {
             isSubmitting = false;
         }
@@ -511,17 +536,8 @@
 
     async function handleComplete(note?: string) {
         if (!ticket) return;
-        isSubmitting = true;
-        try {
-            await ticketService.delete(ticket.id, note);
-            toast.success("Ticket completado.");
-            isOpen = false;
-            onComplete?.();
-        } catch (err) {
-            handleError(err, "Completar Ticket");
-        } finally {
-            isSubmitting = false;
-        }
+        pendingCloseNote = note || "Ticket cerrado.";
+        isConfirmCloseOpen = true;
     }
 
     async function handleCreateReposicionTicket() {
@@ -575,7 +591,7 @@
                 personnelState.selectPerson(selectedPerson.id);
             }
 
-            await handleComplete("Reposición creada desde reporte de falla");
+            await closeTicketNow("Reposición creada desde reporte de falla");
         } catch (err) {
             handleError(err, "Crear Ticket de Reposición");
             isSubmitting = false;
@@ -631,6 +647,17 @@
     cancelText="Cancelar"
     variant="warning"
     onConfirm={handleReject}
+/>
+
+<ConfirmationModal
+    bind:isOpen={isConfirmCloseOpen}
+    title="Cerrar ticket"
+    description="El ticket se eliminará del tablero. Esta acción no se puede deshacer. ¿Continuar?"
+    confirmText="Sí, cerrar"
+    cancelText="Cancelar"
+    variant="warning"
+    onConfirm={doCloseTicket}
+    onCancel={() => (isConfirmCloseOpen = false)}
 />
 
 <Modal

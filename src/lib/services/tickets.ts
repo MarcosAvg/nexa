@@ -455,11 +455,13 @@ export const ticketService = {
         }, "Delete Tickets by Card");
     },
 
-    async deleteByPerson(personId: string, reason?: string) {
+    async deleteByPerson(personId: string, reason?: string, types?: string[]) {
         return withErrorHandling(async () => {
-            const { data: tickets } = await supabase.from("tickets")
+            let fetchQuery = supabase.from("tickets")
                 .select("id, title")
                 .eq("person_id", personId);
+            if (types && types.length > 0) fetchQuery = fetchQuery.in("type", types);
+            const { data: tickets } = await fetchQuery;
 
             if (tickets) {
                 for (const t of tickets) {
@@ -470,7 +472,11 @@ export const ticketService = {
                 }
             }
 
-            const { error } = await supabase.from("tickets").delete().eq("person_id", personId);
+            let query = supabase.from("tickets").delete().eq("person_id", personId);
+            if (types && types.length > 0) {
+                query = query.in("type", types);
+            }
+            const { error } = await query;
             if (error) throw error;
             ticketState.removeByPerson(personId);
         }, "Delete Tickets by Person");
