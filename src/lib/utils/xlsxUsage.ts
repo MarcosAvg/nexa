@@ -9,22 +9,22 @@ import { deriveAccessFromAssignments } from '../services/accessAssignments';
 // Tipos
 // ─────────────────────────────────────────
 
-export interface KoneUsageEntry {
+export interface UsageEntry {
     folio: string;
     conteo: number;
     diasInactividad: number | null;
 }
 
-export interface KoneUsageMatchedEntry {
+export interface UsageMatchedEntry {
     folio: string;
     conteo: number;
     diasInactividad: number | null;
     person: ExportPersonnelData;
 }
 
-export interface KoneUsageMatchResult {
-    matched: KoneUsageMatchedEntry[];
-    unmatched: KoneUsageEntry[];
+export interface UsageMatchResult {
+    matched: UsageMatchedEntry[];
+    unmatched: UsageEntry[];
     totalImported: number;
 }
 
@@ -87,11 +87,11 @@ function parseExcelDate(value: any): Date | null {
     return null;
 }
 
-export async function parseKoneUsageFile(
+export async function parseUsageFile(
     file: File,
     creationLimitDate: string,
     inactivityLimitDate: string
-): Promise<KoneUsageEntry[]> {
+): Promise<UsageEntry[]> {
     const workbook = new ExcelJS.Workbook();
     const buffer = await file.arrayBuffer();
     await workbook.xlsx.load(buffer);
@@ -136,7 +136,7 @@ export async function parseKoneUsageFile(
     }
 
     // Extraer filas de datos
-    const entries: KoneUsageEntry[] = [];
+    const entries: UsageEntry[] = [];
 
     worksheet.eachRow((row, rowNumber) => {
         if (rowNumber <= headerRow) return;
@@ -193,7 +193,7 @@ export async function parseKoneUsageFile(
  * Identifies duplicate folios in the parsed entries and returns detailed information.
  * Useful for debugging and understanding why totalImported differs from raw row count.
  */
-export function findDuplicateFolios(entries: KoneUsageEntry[]): DuplicateFolioInfo[] {
+export function findDuplicateFolios(entries: UsageEntry[]): DuplicateFolioInfo[] {
     const folioMap = new Map<string, { conteo: number; diasInactividad: number | null }[]>();
     
     // Agrupar todas las entradas por folio
@@ -256,14 +256,14 @@ export function getDuplicateFoliosSummary(duplicates: DuplicateFolioInfo[]): str
 
 /**
  * Busca tarjetas por folio en la base de datos para un medio (por defecto el
- * de elevadores KONE), uniendo datos del personal.
+ * de elevadores), uniendo datos del personal.
  * Devuelve entradas coincidentes con datos completos y las no coincidentes.
  * Fragmenta los folios por el límite de Supabase (1000 registros).
  */
-export async function matchKoneUsageToPersonnel(
-    entries: KoneUsageEntry[],
+export async function matchUsageToPersonnel(
+    entries: UsageEntry[],
     mediaKey: string = 'kone'
-): Promise<KoneUsageMatchResult> {
+): Promise<UsageMatchResult> {
     if (entries.length === 0) {
         return { matched: [], unmatched: [], totalImported: 0 };
     }        // Construir folio→Map info (en caso de duplicados, ¿conservar el más nuevo o sumar? Sumamos conteos y preservamos inactividad mínima)
@@ -327,8 +327,8 @@ export async function matchKoneUsageToPersonnel(
         }
     }
 
-    const matched: KoneUsageMatchedEntry[] = [];
-    const unmatched: KoneUsageEntry[] = [];
+    const matched: UsageMatchedEntry[] = [];
+    const unmatched: UsageEntry[] = [];
     for (const [folio, data] of conteoMap) {
         const card = cardByFolio.get(folio);
         if (card && card.personnel) {

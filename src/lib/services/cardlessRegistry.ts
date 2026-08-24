@@ -44,13 +44,14 @@ export type CardlessRegistryInput = {
     reason: string;
     comments?: string | null;
     recorded_at?: string;
+    media_type_id?: string | null;
     /**
-     * Snapshot of the KONE responsiva status at the moment of registration.
-     * true  = had a pending "Firma Responsiva" ticket for a KONE card.
-     * false = no pending ticket (card already delivered or no KONE card).
+     * Snapshot of the responsiva status at the moment of registration.
+     * true  = had a pending "Firma Responsiva" ticket for a card of the media.
+     * false = no pending ticket (card already delivered or no card of the media).
      * null  = unknown / pre-migration record.
      */
-    kone_status_at_registration?: boolean | null;
+    responsiva_status_at_registration?: boolean | null;
 };
 
 const SELECT_WITH_RELATIONS = `
@@ -63,9 +64,9 @@ const SELECT_WITH_RELATIONS = `
 
 /**
  * Returns the set of person IDs that have at least one pending "Firma Responsiva"
- * ticket linked to a KONE card.
+ * ticket linked to a card requiring a responsiva.
  */
-async function fetchPendingKoneResponsivaSet(personIds: string[]): Promise<Set<string>> {
+async function fetchPendingResponsivaSet(personIds: string[]): Promise<Set<string>> {
     const unique = [...new Set(personIds.filter(Boolean))];
     if (unique.length === 0) return new Set();
 
@@ -99,7 +100,8 @@ interface RegistryRow {
     comments: string | null;
     recorded_at: string;
     recorded_by: string;
-    kone_status_at_registration: boolean | null;
+    media_type_id: string | null;
+    responsiva_status_at_registration: boolean | null;
     personnel?: { first_name: string; last_name: string; employee_no: string } | null;
     buildings?: { name: string } | null;
     dependencies?: { name: string } | null;
@@ -124,7 +126,8 @@ const mapCardlessRegistryRecord = (r: RegistryRow): CardlessRegistry => {
         comments: r.comments,
         recorded_at: r.recorded_at,
         recorded_by: r.recorded_by,
-        kone_status_at_registration: r.kone_status_at_registration ?? null,
+        media_type_id: r.media_type_id ?? null,
+        responsiva_status_at_registration: r.responsiva_status_at_registration ?? null,
         personName,
         buildingName: r.buildings?.name || undefined,
         dependencyName: r.dependencies?.name || undefined,
@@ -132,26 +135,32 @@ const mapCardlessRegistryRecord = (r: RegistryRow): CardlessRegistry => {
     };
 };
 
-async function enrichWithKoneResponsiva(registries: CardlessRegistry[]): Promise<CardlessRegistry[]> {        // Solo consultar estado actual de ticket para registros sin snapshot almacenado
-    // (i.e. pre-migration records where kone_status_at_registration is null).
+async function enrichWithResponsiva(
+    registries: CardlessRegistry[],
+    mediaTypeId?: string
+): Promise<CardlessRegistry[]> {
+    // mediaTypeId identifica el tipo de medio; no se usa en la consulta porque
+    // fetchPendingResponsivaSet no filtra por tipo de medio (solo se renombra).
+    // Solo consultar estado actual de ticket para registros sin snapshot almacenado
+    // (i.e. pre-migration records where responsiva_status_at_registration is null).
     const legacyIds = registries
-        .filter(r => r.person_id && r.kone_status_at_registration === null)
+        .filter(r => r.person_id && r.responsiva_status_at_registration === null)
         .map(r => r.person_id as string);
 
-    let koneSet = new Set<string>();
+    let pendingSet = new Set<string>();
     if (legacyIds.length > 0) {
-        koneSet = await fetchPendingKoneResponsivaSet(legacyIds);
+        pendingSet = await fetchPendingResponsivaSet(legacyIds);
     }
 
     return registries.map(r => {
         // Si el snapshot ya está almacenado, usarlo directamente.
-        if (r.kone_status_at_registration !== null) {
-            return { ...r, pendingKoneResponsiva: r.kone_status_at_registration ?? false };
+        if (r.responsiva_status_at_registration !== null) {
+            return { ...r, pendingResponsiva: r.responsiva_status_at_registration ?? false };
         }
         // Registro heredado: recurrir a consulta en vivo.
         return {
             ...r,
-            pendingKoneResponsiva: r.person_id ? koneSet.has(r.person_id) : false,
+            pendingResponsiva: r.person_id ? pendingSet.has(r.person_id) : false,
         };
     });
 }
@@ -228,7 +237,7 @@ export const cardlessRegistryService = {
             if (error) throw error;
 
             return {
-                data: data ? await enrichWithKoneResponsiva(data.map(mapCardlessRegistryRecord)) : [],
+                data: data ? await enrichWithResponsiva(data.map(mapCardlessRegistryRecord)) : [],
                 count: count || 0
             };
         }, "Fetch Registry");

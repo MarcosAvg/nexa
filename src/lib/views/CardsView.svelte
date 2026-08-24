@@ -269,7 +269,7 @@
         data={cards}
         emptyTitle="Aún no hay tarjetas registradas"
         emptyTitleFiltered="Sin resultados"
-        emptyDescription="El inventario de tarjetas está vacío. Comienza registrando la primera tarjeta P2000, KONE o AccessPRO."
+        emptyDescription="El inventario de tarjetas está vacío. Comienza registrando la primera tarjeta de acceso."
         emptyDescriptionFiltered="No encontramos tarjetas con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={CreditCard}
         emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"                    hasFilters={!!(cardState.filters.search || cardState.filters.type !== "Todos" || cardState.filters.status !== "Todas" || cardState.filters.dependencyId)}

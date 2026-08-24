@@ -6,7 +6,7 @@ import TicketsView from './views/TicketsView.svelte';
 import HistoryView from './views/HistoryView.svelte';
 import SettingsView from './views/SettingsView.svelte';
 import EnlacesView from './views/EnlacesView.svelte';
-import RegistroSinTarjetaView from './views/RegistroSinTarjetaView.svelte';
+import { moduleRoutes } from './modules/generated';
 
 // ⚠ svelte-spa-router requiere el helper wrap() para lazy loading.
 // Se mantienen imports eager para compatibilidad con todas las versiones del router.
@@ -19,7 +19,8 @@ export const routes = {
     '/history': HistoryView,
     '/settings': SettingsView,
     '/enlaces': EnlacesView,
-    '/registro-sin-tarjeta': RegistroSinTarjetaView,
+    // Rutas de módulos compilados (generated.ts bajo VITE_MODULES)
+    ...moduleRoutes,
     // Catch-all route last
     '*': DashboardView
 };

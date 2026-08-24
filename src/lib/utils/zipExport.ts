@@ -12,10 +12,10 @@ import {
     exportPersonnelToExcel,
     exportResponsivasToExcel,
     exportCardlessRegistryToExcel,
-    exportKoneUsageToExcel,
+    exportUsageToExcel,
 } from './xlsxExport';
 import type { ExportOptions, CardType } from './xlsxExport';
-import type { KoneUsageMatchResult } from './xlsxKoneUsage';
+import type { UsageMatchResult } from './xlsxUsage';
 
 export type ZipProgressCallback = (current: number, total: number, label: string) => void;
 
@@ -175,13 +175,14 @@ export async function exportCardlessRegistryAllDependenciesAsZip(
 // ─── KONE Usage ZIP ────────────────────────────────────────────────────────
 
 /**
- * Exports the KONE usage report for every dependency (derived from the already
- * matched result) as individual Excel files bundled in a single ZIP.
+ * Exporta el reporte de uso de tarjetas por dependencia (derivado del resultado
+ * ya matcheado) como archivos Excel empaquetados en un ZIP.
  */
-export async function exportKoneUsageAllDependenciesAsZip(
-    matchResult: KoneUsageMatchResult,
+export async function exportUsageAllDependenciesAsZip(
+    matchResult: UsageMatchResult,
     usageThreshold: number = 10,
-    onProgress?: ZipProgressCallback
+    onProgress?: ZipProgressCallback,
+    mediaKey: string = 'kone'
 ): Promise<void> {
     const dateStr = new Date().toISOString().split('T')[0];
 
@@ -199,7 +200,7 @@ export async function exportKoneUsageAllDependenciesAsZip(
         onProgress?.(i, total, dep);
 
         // Filtrar resultados para esta dependencia
-        const filteredResult: KoneUsageMatchResult = {
+        const filteredResult: UsageMatchResult = {
             matched: matchResult.matched.filter(
                 (m) => (m.person.dependency || 'Sin Dependencia') === dep
             ),
@@ -209,7 +210,7 @@ export async function exportKoneUsageAllDependenciesAsZip(
 
         if (filteredResult.matched.length === 0) continue;
 
-        const result = await exportKoneUsageToExcel(
+        const result = await exportUsageToExcel(
             filteredResult,
             usageThreshold,
             dep,
@@ -221,5 +222,5 @@ export async function exportKoneUsageAllDependenciesAsZip(
     if (files.length === 0) return;
 
     onProgress?.(total, total, 'Comprimiendo...');
-    await buildZip(files, `Conteo_Uso_KONE_Por_Dependencia_${dateStr}.zip`);
+    await buildZip(files, `Conteo_Uso_Por_Dependencia_${dateStr}.zip`);
 }

@@ -13,6 +13,7 @@ import { fade } from "svelte/transition";
     catalogState,
     historyState,
     settingsState,
+    moduleState,
   } from "./lib/stores";
 
   import Router from "svelte-spa-router";
@@ -111,6 +112,7 @@ import { fade } from "svelte/transition";
       catalogState.setSchedules(_s);
       catalogState.setMediaTypes(_m);
       void settingsState.loadFromServer();
+      void moduleState.loadFromServer();
 
       // 2. Secondary data loaded in background (Non-blocking)
       // Esto permite que la app sea interactiva más rápido

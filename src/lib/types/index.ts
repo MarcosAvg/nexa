@@ -185,19 +185,20 @@ export interface CardlessRegistry {
     comments: string | null;
     recorded_at: string;
     recorded_by: string;
+    media_type_id?: string | null;
     /**
-     * Snapshot of whether the person had a pending KONE "Firma Responsiva"
+     * Snapshot of whether the person had a pending "Firma Responsiva"
      * ticket at the moment this record was created. Null means the record
      * pre-dates this feature (backfilled by migration).
      */
-    kone_status_at_registration: boolean | null;
+    responsiva_status_at_registration: boolean | null;
     // Propiedades calculadas/combinadas
     personName?: string;
     buildingName?: string;
     dependencyName?: string;
     recordedByName?: string;
-    /** @deprecated Use kone_status_at_registration for historical accuracy */
-    pendingKoneResponsiva?: boolean;
+    /** @deprecated Use responsiva_status_at_registration for historical accuracy */
+    pendingResponsiva?: boolean;
 }
 
 export interface AccessMediaType {

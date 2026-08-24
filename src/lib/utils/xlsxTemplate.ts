@@ -771,11 +771,11 @@ export async function generateMediaTemplate(catalogs: TemplateCatalogs) {
     saveAs(new Blob([buffer]), 'Plantilla_Solicitudes_Acceso.xlsx');
 }
 
-export async function generateKoneUsageTemplate() {
+export async function generateUsageTemplate(mediaLabel: string = "Uso de tarjetas") {
     const wb = new ExcelJS.Workbook();
     wb.created = new Date();
 
-    const ws = wb.addWorksheet('Uso KONE');
+    const ws = wb.addWorksheet(`Uso ${mediaLabel}`);
 
     ws.columns = [
         { key: 'folio', width: 20 },
@@ -784,7 +784,7 @@ export async function generateKoneUsageTemplate() {
         { key: 'ultimo_reg', width: 25 },
     ];
 
-    addSheetTitle(ws, 'PLANTILLA DE CONTEO DE USO KONE', 4);
+    addSheetTitle(ws, `PLANTILLA DE CONTEO DE USO — ${mediaLabel.toUpperCase()}`, 4);
 
     ws.mergeCells('A2:D2');
     const banner = ws.getCell('A2');
@@ -803,5 +803,5 @@ export async function generateKoneUsageTemplate() {
     paintDataRows(ws, 4, 4 + ROWS, 4, [1, 2], [3, 4]);
 
     const buffer = await wb.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), 'Plantilla_Conteo_KONE.xlsx');
+    saveAs(new Blob([buffer]), `Plantilla_Conteo_Uso_${mediaLabel.replace(/\s+/g, '_')}.xlsx`);
 }

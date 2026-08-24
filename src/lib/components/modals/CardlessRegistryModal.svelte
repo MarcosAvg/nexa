@@ -186,32 +186,32 @@
         return buildings.find((b) => b.name === manualBuilding)?.floors || [];
     });
 
-    let hasPendingKone = $derived.by(() => {
+    let hasPendingResponsiva = $derived.by(() => {
         if (!selectedPerson) return false;
         if (editingRegistry && selectedPerson.id === editingRegistry.person_id) {
-            return !!editingRegistry.pendingKoneResponsiva;
+            return !!editingRegistry.pendingResponsiva;
         }
-        const koneCard = selectedPerson.cards?.find(c => c.requires_responsiva !== false && c.requires_responsiva === true);
-        return !!(koneCard && koneCard.responsiva_status !== "signed" && koneCard.responsiva_status !== "legacy");
+        const responsivaCard = selectedPerson.cards?.find(c => c.requires_responsiva !== false && c.requires_responsiva === true);
+        return !!(responsivaCard && responsivaCard.responsiva_status !== "signed" && responsivaCard.responsiva_status !== "legacy");
     });
 
     /**
-     * Three-value snapshot for kone_status_at_registration:
-     *   true  → tiene tarjeta KONE asignada y pendiente de firma
-     *   false → tiene tarjeta KONE asignada y ya firmada (digital o legacy)
-     *   null  → no tiene tarjeta KONE asignada (o persona no vinculada)
+     * Three-value snapshot for responsiva_status_at_registration:
+     *   true  → tiene tarjeta del medio asignada y pendiente de firma
+     *   false → tiene tarjeta del medio asignada y ya firmada (digital o legacy)
+     *   null  → no tiene tarjeta del medio asignada (o persona no vinculada)
      */
-    let koneStatusSnapshot = $derived.by((): boolean | null => {
+    let responsivaStatusSnapshot = $derived.by((): boolean | null => {
         if (!selectedPerson) return null;
         // Al editar, reutilizar el snapshot almacenado si la persona no ha cambiado
         if (editingRegistry && selectedPerson.id === editingRegistry.person_id) {
-            return editingRegistry.kone_status_at_registration ?? null;
+            return editingRegistry.responsiva_status_at_registration ?? null;
         }
-        const koneCard = selectedPerson.cards?.find(c => c.requires_responsiva !== false && c.requires_responsiva === true);
+        const responsivaCard = selectedPerson.cards?.find(c => c.requires_responsiva !== false && c.requires_responsiva === true);
         // Sin tarjeta que requiera responsiva asignada
-        if (!koneCard) return null;
-        // Tiene tarjeta KONE — verificar si responsiva sigue pendiente
-        const isPending = koneCard.responsiva_status !== "signed" && koneCard.responsiva_status !== "legacy";
+        if (!responsivaCard) return null;
+        // Tiene tarjeta del medio — verificar si responsiva sigue pendiente
+        const isPending = responsivaCard.responsiva_status !== "signed" && responsivaCard.responsiva_status !== "legacy";
         return isPending;
     });
 
@@ -266,10 +266,10 @@
                 first_name:    manualFirstName.trim(),
                 last_name:     manualLastName.trim(),
                 employee_no:   manualEmployeeNo.trim() || null,
-                // Snapshot: null = sin persona vinculada o sin tarjeta KONE asignada.
-                // true = KONE card assigned but responsiva still pending.
-                // false = KONE card assigned and already signed (digital or legacy).
-                kone_status_at_registration: koneStatusSnapshot,
+                // Snapshot: null = sin persona vinculada o sin tarjeta del medio asignada.
+                // true = tarjeta del medio asignada pero responsiva aún pendiente.
+                // false = tarjeta del medio asignada y ya firmada (digital o legacy).
+                responsiva_status_at_registration: responsivaStatusSnapshot,
             };
 
             let result: CardlessRegistry | null;
@@ -416,19 +416,19 @@
                             <div>
                                 <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
                                     <p class="text-emerald-800 font-semibold text-sm">{selectedPerson.name}</p>
-                                    {#if koneStatusSnapshot === true}
+                                    {#if responsivaStatusSnapshot === true}
                                         <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 leading-none whitespace-nowrap">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                                            Pendiente de recoger KONE
+                                            Pendiente de recoger la tarjeta
                                         </span>
-                                    {:else if koneStatusSnapshot === false}
+                                    {:else if responsivaStatusSnapshot === false}
                                         <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 leading-none whitespace-nowrap">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                            Tarjeta KONE Entregada
+                                            Tarjeta entregada
                                         </span>
                                     {:else}
                                         <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 leading-none whitespace-nowrap">
-                                            Sin tarjeta KONE
+                                            Sin tarjeta del medio
                                         </span>
                                     {/if}
                                 </div>

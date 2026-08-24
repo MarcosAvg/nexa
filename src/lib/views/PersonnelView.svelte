@@ -4,12 +4,13 @@
         catalogState,
         userState,
         ticketState,
+        moduleState,
     } from "../stores";
     import {
         SectionHeader, FilterGroup, FilterSelect, Button, DataTable,
         Badge, PermissionGuard, FloatingActionButton, Pagination,
         ContentView, SearchInput, ExportDropdown,
-        KoneUsageImportModal,
+        UsoTarjetasImportModal,
     } from "../components";
     import {
         FileSpreadsheet,
@@ -313,21 +314,23 @@
         {/snippet}
 
         {#snippet actions()}
-            <PermissionGuard requireEdit>
-                <Button
-                    variant="soft-blue"
-                    onclick={() => (showKoneUsageModal = true)}
-                    class="flex items-center gap-2.5 h-10 px-5"
-                    disabled={!networkStore.isOnline}
-                >
-                    <Upload
-                        size={18}
-                        strokeWidth={2.5}
-                        class="text-blue-600/80"
-                    />
-                    Importar Conteo KONE
-                </Button>
-            </PermissionGuard>
+            {#if moduleState.isEnabled("conteo_uso")}
+                <PermissionGuard requireEdit>
+                    <Button
+                        variant="soft-blue"
+                        onclick={() => (showKoneUsageModal = true)}
+                        class="flex items-center gap-2.5 h-10 px-5"
+                        disabled={!networkStore.isOnline}
+                    >
+                        <Upload
+                            size={18}
+                            strokeWidth={2.5}
+                            class="text-blue-600/80"
+                        />
+                        Importar Conteo de Uso
+                    </Button>
+                </PermissionGuard>
+            {/if}
 
             <ExportDropdown
                 icon={FileSpreadsheet}
@@ -495,4 +498,4 @@
     <FloatingActionButton onclick={onOpenAddModal} label="Nueva Alta" />
 </PermissionGuard>
 
-<KoneUsageImportModal bind:isOpen={showKoneUsageModal} />
+<UsoTarjetasImportModal bind:isOpen={showKoneUsageModal} />

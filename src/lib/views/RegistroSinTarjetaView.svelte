@@ -279,12 +279,12 @@
     <span class="text-sm text-slate-600">{row.recordedByName || "-"}</span>
 {/snippet}
 
-{#snippet renderKoneResponsiva(row: CardlessRegistry)}
+{#snippet renderResponsiva(row: CardlessRegistry)}
     {#if !row.person_id}
         <span class="text-xs text-slate-400">—</span>
-    {:else if row.kone_status_at_registration === null}
+    {:else if row.responsiva_status_at_registration === null}
         <!-- Legacy record: no snapshot stored, showing live status as fallback -->
-        {#if row.pendingKoneResponsiva}
+        {#if row.pendingResponsiva}
             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap" title="Estado actual (registro anterior al historial de snapshots)">
                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                 Pendiente
@@ -297,7 +297,7 @@
                 <span class="text-emerald-400 text-[9px]">~</span>
             </span>
         {/if}
-    {:else if row.kone_status_at_registration}
+    {:else if row.responsiva_status_at_registration}
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap" title="Estado al momento del registro">
             <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             Pendiente
@@ -515,9 +515,9 @@
                             width: "140px",
                         },
                         {
-                            key: "pendingKoneResponsiva",
-                            label: "Tarjeta KONE",
-                            render: renderKoneResponsiva,
+                            key: "responsiva_status_at_registration",
+                            label: "Estado de responsiva",
+                            render: renderResponsiva,
                             width: "160px",
                         },
                     ]}

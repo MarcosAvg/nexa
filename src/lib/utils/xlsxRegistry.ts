@@ -18,8 +18,8 @@ export type CardlessRegistryExportRow = {
     recorded_at: string;
     recordedByName?: string | null;
     personName?: string | null;
-    pendingKoneResponsiva?: boolean;
-    koneResponsivaSignedAt?: string | null;
+    pendingResponsiva?: boolean;
+    responsivaSignedAt?: string | null;
 };
 
 export type CardlessRegistryExportFilters = {
@@ -43,8 +43,8 @@ type CardlessPersonAgg = {
     dates: number[];
     operators: Set<string>;
     isLinked: boolean;
-    pendingKoneResponsiva?: boolean;
-    koneSignedAt?: string | null;
+    pendingResponsiva?: boolean;
+    responsivaSignedAt?: string | null;
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────
@@ -67,9 +67,11 @@ function cardlessPersonLabel(reg: CardlessRegistryExportRow): { name: string; fi
     return { name, firstName, lastName, employeeNo: reg.employee_no || '' };
 }
 
-async function fetchResponsivaSignDates(mediaKey: string): Promise<Map<string, string>> {
+async function fetchResponsivaSignDates(mediaTypeId?: string): Promise<Map<string, string>> {
     const { supabase } = await import('../supabase');
     const signMap = new Map<string, string>();
+
+    const mediaKey = typeof mediaTypeId === 'string' ? mediaTypeId : 'kone';
 
     try {
         const allRows = await batchPaginate<any>(
@@ -142,10 +144,10 @@ function aggregateCardlessData(data: CardlessRegistryExportRow[]) {
         if (agg.dependency === 'Sin dependencia' && reg.dependencyName) agg.dependency = reg.dependencyName;
         if (agg.building === 'Sin edificio' && reg.buildingName) agg.building = reg.buildingName;
         if (reg.person_id) agg.isLinked = true;
-        if (reg.pendingKoneResponsiva !== undefined) agg.pendingKoneResponsiva = reg.pendingKoneResponsiva;
-        if (reg.koneResponsivaSignedAt) {
-            if (!agg.koneSignedAt || reg.koneResponsivaSignedAt > agg.koneSignedAt) {
-                agg.koneSignedAt = reg.koneResponsivaSignedAt;
+        if (reg.pendingResponsiva !== undefined) agg.pendingResponsiva = reg.pendingResponsiva;
+        if (reg.responsivaSignedAt) {
+            if (!agg.responsivaSignedAt || reg.responsivaSignedAt > agg.responsivaSignedAt) {
+                agg.responsivaSignedAt = reg.responsivaSignedAt;
             }
         }
     });
@@ -444,7 +446,7 @@ async function addCardlessReincidenceSheet(
         { key: 'firstDate', width: 20 },
         { key: 'lastDate', width: 20 },
         { key: 'operators', width: 28 },
-        { key: 'pending_kone', width: 22 },
+        { key: 'pending_responsiva', width: 22 },
         { key: 'signed_at', width: 22 },
     ];
 
@@ -557,14 +559,14 @@ async function addCardlessReincidenceSheet(
 
         const severity = person.count >= 3 ? COLORS.rose : person.count >= 2 ? COLORS.amber : COLORS.slate;
 
-        const koneLabel = !person.isLinked
+        const responsivaLabel = !person.isLinked
             ? 'N/A'
-            : person.pendingKoneResponsiva ? 'PENDIENTE DE RECOGER' : 'ENTREGADA';
+            : person.pendingResponsiva ? 'PENDIENTE DE RECOGER' : 'ENTREGADA';
 
         const signedAtLabel = !person.isLinked
             ? ''
-            : person.koneSignedAt
-                ? new Date(person.koneSignedAt).toLocaleString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+            : person.responsivaSignedAt
+                ? new Date(person.responsivaSignedAt).toLocaleString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
                 : '';
 
         const rowData = {
@@ -581,7 +583,7 @@ async function addCardlessReincidenceSheet(
             firstDate: Number.isNaN(minDate) ? '—' : formatDate(minDate),
             lastDate: Number.isNaN(maxDate) ? '—' : formatDate(maxDate),
             operators: [...person.operators].join(', ') || '—',
-            pending_kone: koneLabel,
+            pending_responsiva: responsivaLabel,
             signed_at: signedAtLabel,
         };
 
@@ -638,7 +640,7 @@ async function addCardlessReincidenceSheet(
                 if (!person.isLinked) {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
                     cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.slate.sub } };
-                } else if (person.pendingKoneResponsiva) {
+                } else if (person.pendingResponsiva) {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.rose.head } };
                     cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.rose.sub } };
                 } else {
@@ -653,10 +655,10 @@ async function addCardlessReincidenceSheet(
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
                     cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: COLORS.slate.sub } };
                     cell.value = 'N/A';
-                } else if (person.koneSignedAt) {
+                } else if (person.responsivaSignedAt) {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.emerald.head } };
                     cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.emerald.sub } };
-                } else if (!person.pendingKoneResponsiva) {
+                } else if (!person.pendingResponsiva) {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.sky.head } };
                     cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: COLORS.sky.sub } };
                     cell.value = 'Entrega previa al sistema';
@@ -733,7 +735,7 @@ export async function exportCardlessRegistryToExcel(
     const signDateMap = await fetchResponsivaSignDates(mediaKey);
     const enrichedData: CardlessRegistryExportRow[] = data.map(row => ({
         ...row,
-        koneResponsivaSignedAt: row.person_id ? (signDateMap.get(row.person_id) ?? null) : null,
+        responsivaSignedAt: row.person_id ? (signDateMap.get(row.person_id) ?? null) : null,
     }));
 
     await addCardlessEvidenceSheet(workbook, enrichedData, filterDescription);
@@ -754,7 +756,7 @@ export async function exportCardlessRegistryToExcel(
         { key: 'comments', width: 30 },
         { key: 'recorded_at', width: 20 },
         { key: 'recorded_by', width: 22 },
-        { key: 'pending_kone', width: 22 },
+        { key: 'pending_responsiva', width: 22 },
         { key: 'signed_at', width: 22 },
     ];
 
@@ -837,8 +839,8 @@ export async function exportCardlessRegistryToExcel(
     enrichedData.forEach((reg) => {
         const { firstName, lastName } = cardlessPersonLabel(reg);
         const isLinked = !!reg.person_id;
-        const signedAt = reg.koneResponsivaSignedAt
-            ? new Date(reg.koneResponsivaSignedAt).toLocaleString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+        const signedAt = reg.responsivaSignedAt
+            ? new Date(reg.responsivaSignedAt).toLocaleString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
             : null;
 
         const excelRow = worksheet.addRow({
@@ -853,7 +855,7 @@ export async function exportCardlessRegistryToExcel(
             comments: reg.comments || '',
             recorded_at: new Date(reg.recorded_at).toLocaleString('es-MX'),
             recorded_by: reg.recordedByName || '',
-            pending_kone: !isLinked ? 'N/A' : (reg.pendingKoneResponsiva ? 'PENDIENTE DE RECOGER' : 'ENTREGADA'),
+            pending_responsiva: !isLinked ? 'N/A' : (reg.pendingResponsiva ? 'PENDIENTE DE RECOGER' : 'ENTREGADA'),
             signed_at: !isLinked ? '' : (signedAt || ''),
         });
 
@@ -914,7 +916,7 @@ export async function exportCardlessRegistryToExcel(
                 if (!isLinked) {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
                     cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.slate.sub } };
-                } else if (reg.pendingKoneResponsiva) {
+                } else if (reg.pendingResponsiva) {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.rose.head } };
                     cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.rose.sub } };
                 } else {
@@ -929,10 +931,10 @@ export async function exportCardlessRegistryToExcel(
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
                     cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: COLORS.slate.sub } };
                     cell.value = 'N/A';
-                } else if (reg.koneResponsivaSignedAt) {
+                } else if (reg.responsivaSignedAt) {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.emerald.head } };
                     cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: COLORS.emerald.sub } };
-                } else if (!reg.pendingKoneResponsiva) {
+                } else if (!reg.pendingResponsiva) {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.sky.head } };
                     cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: COLORS.sky.sub } };
                     cell.value = 'Entrega previa al sistema';

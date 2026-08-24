@@ -1,13 +1,13 @@
 <script lang="ts">
-    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection, ExportDropdown, PlantillasCatalog } from "../components";
-    import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard, FileText } from "lucide-svelte";
-    import { userState, catalogState, settingsState } from "../stores";
+    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection, ExportDropdown, PlantillasCatalog, ModulesCatalog } from "../components";
+    import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard, FileText, Puzzle } from "lucide-svelte";
+    import { userState, catalogState, settingsState, moduleState } from "../stores";
     import { networkStore } from "../stores/network.svelte";
-    import { generateMediaTemplate, generateKoneUsageTemplate, handleError } from "../utils";
+    import { generateMediaTemplate, generateUsageTemplate, handleError } from "../utils";
     import { toast } from "svelte-sonner";
     import GeneralSettingsView from "./GeneralSettingsView.svelte";
 
-    let activeTab = $state<"catalogos" | "usuarios" | "general" | "plantillas" | "responsiva">("catalogos");
+    let activeTab = $state<"catalogos" | "usuarios" | "general" | "plantillas" | "modulos" | "responsiva">("catalogos");
     let activeCatalog = $state<"edificios" | "dependencias" | "accesos" | "dias" | "medios">("edificios");
 
     // Campos editables de configuración de responsiva
@@ -86,13 +86,15 @@
 
     async function handleGenerateKoneTemplate() {
         isGeneratingKoneTemplate = true;
-        const loadingToast = toast.loading("Generando plantilla de KONE...");
+        const loadingToast = toast.loading("Generando plantilla de conteo...");
         try {
-            await generateKoneUsageTemplate();
+            const cfg = moduleState.config("conteo_uso");
+            const label = cfg.mediaKey ? (cfg.mediaKey.charAt(0).toUpperCase() + cfg.mediaKey.slice(1)) : "Uso de tarjetas";
+            await generateUsageTemplate(label);
             toast.success("Plantilla generada correctamente", { id: loadingToast });
         } catch (e) {
             toast.dismiss(loadingToast);
-            handleError(e, "Generar Plantilla KONE");
+            handleError(e, "Generar Plantilla de Conteo");
         } finally {
             isGeneratingKoneTemplate = false;
         }
@@ -144,6 +146,13 @@
                     Plantillas
                 </button>
                 <button
+                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab === 'modulos' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
+                    onclick={() => (activeTab = "modulos")}
+                >
+                    <div class={activeTab === "modulos" ? "text-white" : "text-slate-400"}><Puzzle size={18} strokeWidth={2.5} /></div>
+                    Módulos
+                </button>
+                <button
                     class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab === 'responsiva' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
                     onclick={() => (activeTab = "responsiva")}
                 >
@@ -192,14 +201,16 @@
                         </div>
                     {/snippet}
                 </ExportDropdown>
-                <button
-                    class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-                    onclick={handleGenerateKoneTemplate}
-                    disabled={isGeneratingKoneTemplate || !networkStore.isOnline}
-                >
-                    <FileDown size={18} strokeWidth={2.5} class="text-sky-500" />
-                    {isGeneratingKoneTemplate ? "Generando..." : "Plantilla de Uso KONE"}
-                </button>
+                {#if moduleState.isEnabled("conteo_uso")}
+                    <button
+                        class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                        onclick={handleGenerateKoneTemplate}
+                        disabled={isGeneratingKoneTemplate || !networkStore.isOnline}
+                    >
+                        <FileDown size={18} strokeWidth={2.5} class="text-sky-500" />
+                        {isGeneratingKoneTemplate ? "Generando..." : "Plantilla de Conteo de Uso"}
+                    </button>
+                {/if}
             </div>
         </aside>
 
@@ -236,6 +247,8 @@
                 <GeneralSettingsView />
             {:else if activeTab === "plantillas"}
                 <PlantillasCatalog />
+            {:else if activeTab === "modulos"}
+                <ModulesCatalog />
             {:else if activeTab === "responsiva"}
                 <!-- Responsiva Settings -->
                 <div class="flex items-center gap-3 pb-4">

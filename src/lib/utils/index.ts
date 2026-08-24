@@ -31,14 +31,14 @@ export {
     exportCardsToExcel,
     exportHistoryToExcel,
     exportCardlessRegistryToExcel,
-    exportKoneUsageToExcel,
+    exportUsageToExcel,
 } from './xlsxExport';
 
 export {
     exportPersonnelAllDependenciesAsZip,
     exportResponsivasAllDependenciesAsZip,
     exportCardlessRegistryAllDependenciesAsZip,
-    exportKoneUsageAllDependenciesAsZip,
+    exportUsageAllDependenciesAsZip,
 } from './zipExport';
 export type { ZipProgressCallback } from './zipExport';
 
@@ -51,14 +51,14 @@ export {
 export type { SheetKey, ParsedRow, ParsedSheet, ImportParseResult } from './xlsxImporter';
 
 export {
-    parseKoneUsageFile,
+    parseUsageFile,
     findDuplicateFolios,
     getDuplicateFoliosSummary,
-    matchKoneUsageToPersonnel,
-} from './xlsxKoneUsage';
-export type { KoneUsageEntry, KoneUsageMatchedEntry, KoneUsageMatchResult, DuplicateFolioInfo } from './xlsxKoneUsage';
+    matchUsageToPersonnel,
+} from './xlsxUsage';
+export type { UsageEntry, UsageMatchedEntry, UsageMatchResult, DuplicateFolioInfo } from './xlsxUsage';
 
-export { generateMediaTemplate, generateKoneUsageTemplate } from './xlsxTemplate';
+export { generateMediaTemplate, generateUsageTemplate } from './xlsxTemplate';
 
 export { computePersonStatus } from './personStatus';
 export type { StatusCardInput } from './personStatus';

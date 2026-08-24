@@ -3,8 +3,8 @@
  *
  * Punto de entrada para exportación a Excel.
  * Re-exporta funciones desde módulos especializados.
- * Mantiene exportKoneUsageToExcel aquí porque es importado
- * por xlsxKoneUsage.ts para evitar dependencia circular.
+ * Mantiene exportUsageToExcel aquí porque es importado
+ * por xlsxUsage.ts para evitar dependencia circular.
  */
 
 export type {
@@ -38,10 +38,10 @@ export {
     exportCardlessRegistryToExcel,
 } from './xlsxRegistry';
 
-// ─── KONE Usage Export (stays here — used by xlsxKoneUsage.ts) ────────
+// ─── Usage Export (stays here — used by xlsxUsage.ts) ────────
 
 import type * as ExcelJSTypes from 'exceljs';
-import type { KoneUsageMatchResult, KoneUsageMatchedEntry } from './xlsxKoneUsage';
+import type { UsageMatchResult, UsageMatchedEntry } from './xlsxUsage';
 import {
     addLogoToSheet,
     addBorder,
@@ -53,12 +53,13 @@ import {
     autoRowHeight,
 } from './xlsxShared';
 
-async function addKoneSummarySheet(
+async function addUsageSummarySheet(
     workbook: ExcelJSTypes.Workbook,
-    matchedData: KoneUsageMatchedEntry[],
+    matchedData: UsageMatchedEntry[],
     sheetName: string,
     title: string,
-    usageThreshold: number
+    usageThreshold: number,
+    mediaLabel: string = 'tarjetas'
 ) {
     const ws = workbook.addWorksheet(sheetName);
 
@@ -299,23 +300,26 @@ async function addKoneSummarySheet(
     ws.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1 };
 }
 
-export async function exportKoneUsageToExcel(
-    matchResult: KoneUsageMatchResult,
+export async function exportUsageToExcel(
+    matchResult: UsageMatchResult,
     usageThreshold?: number,
     dependencyFilter?: string,
-    returnBuffer?: false
+    returnBuffer?: false,
+    mediaLabel?: string
 ): Promise<void>;
-export async function exportKoneUsageToExcel(
-    matchResult: KoneUsageMatchResult,
+export async function exportUsageToExcel(
+    matchResult: UsageMatchResult,
     usageThreshold: number | undefined,
     dependencyFilter: string | undefined,
-    returnBuffer: true
+    returnBuffer: true,
+    mediaLabel?: string
 ): Promise<{ buffer: ArrayBuffer; filename: string }>;
-export async function exportKoneUsageToExcel(
-    matchResult: KoneUsageMatchResult,
+export async function exportUsageToExcel(
+    matchResult: UsageMatchResult,
     usageThreshold: number = 10,
     dependencyFilter?: string,
-    returnBuffer?: boolean
+    returnBuffer?: boolean,
+    mediaLabel: string = 'tarjetas'
 ): Promise<void | { buffer: ArrayBuffer; filename: string }> {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
@@ -373,7 +377,7 @@ export async function exportKoneUsageToExcel(
     // ── Row 1: Title ──
     worksheet.mergeCells(`A1:${LAST_COL}1`);
     const titleCell = worksheet.getCell('A1');
-    titleCell.value = `       REPORTE DE USO DE ELEVADORES (KONE)${filterSuffix}`;
+    titleCell.value = `       REPORTE DE USO DE TARJETAS - ${mediaLabel.toUpperCase()}${filterSuffix}`;
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     worksheet.getRow(1).height = 40;
@@ -410,8 +414,8 @@ export async function exportKoneUsageToExcel(
         { label: '#', range: 'A4:A4', colors: COLORS.slate, endCol: 1 },
         { label: 'DATOS PERSONALES', range: 'B4:D4', colors: COLORS.personal, endCol: 4 },
         { label: 'UBICACIÓN Y PUESTO', range: 'E4:I4', colors: COLORS.amber, endCol: 9 },
-        { label: 'TARJETA KONE', range: 'J4:J4', colors: COLORS.sky, endCol: 10 },
-        { label: 'USO DE ELEVADORES', range: 'K4:M4', colors: COLORS.emerald, endCol: 13 },
+        { label: `TARJETA ${mediaLabel.toUpperCase()}`, range: 'J4:J4', colors: COLORS.sky, endCol: 10 },
+        { label: 'USO DE TARJETAS', range: 'K4:M4', colors: COLORS.emerald, endCol: 13 },
         { label: 'PERSONAL', range: 'N4:O4', colors: COLORS.violet, endCol: 15 },
     ];
 
@@ -442,7 +446,7 @@ export async function exportKoneUsageToExcel(
         { label: 'EQUIPO / ÁREA', group: groups[2], col: 7 },
         { label: 'PUESTO', group: groups[2], col: 8 },
         { label: 'PISO', group: groups[2], col: 9 },
-        { label: 'FOLIO KONE', group: groups[3], col: 10 },
+        { label: `FOLIO ${mediaLabel.toUpperCase()}`, group: groups[3], col: 10 },
         { label: 'CONTEO', group: groups[4], col: 11 },
         { label: 'INACTIVIDAD', group: groups[4], col: 12 },
         { label: 'NIVEL DE USO', group: groups[4], col: 13 },
@@ -574,7 +578,7 @@ export async function exportKoneUsageToExcel(
     worksheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1 };
 
     // ─── Summary sheet ───
-    await addKoneSummarySheet(workbook, filteredMatched, 'Resumen — Uso KONE', `RESUMEN DE USO — ELEVADORES KONE${filterSuffix}`, usageThreshold);
+    await addUsageSummarySheet(workbook, filteredMatched, `Resumen — Uso ${mediaLabel}`, `RESUMEN DE USO — ${mediaLabel.toUpperCase()}${filterSuffix}`, usageThreshold, mediaLabel);
 
     // ─── "Directorio con Conteo" sheet ───
     const ws2 = workbook.addWorksheet('Directorio con Conteo');
@@ -621,8 +625,8 @@ export async function exportKoneUsageToExcel(
         { label: '#', range: 'A3:A3', colors: COLORS.slate, endCol: 1 },
         { label: 'DATOS PERSONALES', range: 'B3:D3', colors: COLORS.personal, endCol: 4 },
         { label: 'UBICACIÓN Y PUESTO', range: 'E3:I3', colors: COLORS.amber, endCol: 9 },
-        { label: 'TARJETA KONE', range: 'J3:J3', colors: COLORS.sky, endCol: 10 },
-        { label: 'USO DE ELEVADORES', range: 'K3:M3', colors: COLORS.emerald, endCol: 13 },
+        { label: `TARJETA ${mediaLabel.toUpperCase()}`, range: 'J3:J3', colors: COLORS.sky, endCol: 10 },
+        { label: 'USO DE TARJETAS', range: 'K3:M3', colors: COLORS.emerald, endCol: 13 },
         { label: 'PERSONAL', range: 'N3:O3', colors: COLORS.violet, endCol: 15 },
     ];
 
@@ -653,7 +657,7 @@ export async function exportKoneUsageToExcel(
         { label: 'EQUIPO / ÁREA', group: groups2[2], col: 7 },
         { label: 'PUESTO', group: groups2[2], col: 8 },
         { label: 'PISO', group: groups2[2], col: 9 },
-        { label: 'FOLIO KONE', group: groups2[3], col: 10 },
+        { label: `FOLIO ${mediaLabel.toUpperCase()}`, group: groups2[3], col: 10 },
         { label: 'CONTEO', group: groups2[4], col: 11 },
         { label: 'INACTIVIDAD', group: groups2[4], col: 12 },
         { label: 'NIVEL DE USO', group: groups2[4], col: 13 },
@@ -825,7 +829,7 @@ export async function exportKoneUsageToExcel(
     }
 
     // ── Save ──
-    let fileNameParts = ['Reporte_Uso_KONE'];
+    let fileNameParts = [`Reporte_Uso_${mediaLabel.replace(/\s+/g, '_')}`];
     if (dependencyFilter && dependencyFilter !== 'Todas') {
         fileNameParts.push(dependencyFilter.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ ]/g, '').replace(/ /g, '_'));
     }

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { push, location } from "svelte-spa-router";
     import { supabase } from "../supabase";
-    import { uiState, userState } from "../stores";
+    import { uiState, userState, moduleState } from "../stores";
     import DashboardLayout from "./DashboardLayout.svelte";
     import {
         LayoutDashboard,
@@ -23,9 +23,18 @@
             { label: "Tarjetas", href: "/cards", icon: CreditCard },
             { label: "Pendientes", href: "/tickets", icon: ClipboardList },
             { label: "Enlaces", href: "/enlaces", icon: Contact },
-            { label: "Sin Tarjeta", href: "/registro-sin-tarjeta", icon: FileX },
             { label: "Historial", href: "/history", icon: History },
         ];
+
+        // Módulos: "Registro sin tarjeta" solo si está compilado y activo.
+        if (moduleState.isEnabled("registro_sin_tarjeta")) {
+            const idx = items.findIndex((i) => i.href === "/history");
+            items.splice(idx < 0 ? items.length : idx, 0, {
+                label: "Sin Tarjeta",
+                href: "/registro-sin-tarjeta",
+                icon: FileX,
+            });
+        }
 
         if (userState.isAdmin) {
             items.push({
