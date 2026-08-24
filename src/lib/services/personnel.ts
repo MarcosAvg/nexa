@@ -2,7 +2,8 @@ import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate } from "../utils";
 import { computePersonStatus } from "../utils/personStatus";
-import { deriveAccessFromAssignments } from "./accessAssignments";
+import { deriveAccessFromAssignments, buildPermissionPlan } from "./accessAssignments";
+import { catalogState } from "../stores/catalogs.svelte";
 import type { Person, Card, DashboardMetrics, DashboardStats } from "../types";
 import { networkStore } from "../stores/network.svelte";
 
@@ -52,6 +53,7 @@ function toCardsShape(media: any[] | null | undefined): Card[] {
         programming_status: m.programming_status,
         responsiva_status: m.responsiva_status,
         has_floors: m.access_media_types?.has_floors,
+        requires_responsiva: m.access_media_types?.requires_responsiva,
     }));
 }
 
@@ -300,6 +302,94 @@ export const personnelService = {
         }, "Search Personnel by Name (Fuzzy)", []);
     },
 
+    /**
+     * Alta atómica: crea persona + tarjetas + asignaciones + permisos en un solo
+     * RPC transaccional (create_person_with_access). Solo aplica a personas
+     * nuevas (sin `id`). Devuelve el id de la persona creada.
+     */
+    async createWithAccess(data: {
+        first_name?: string;
+        last_name?: string;
+        nombres?: string;
+        apellidos?: string;
+        employee_no?: string;
+        noEmpleado?: string;
+        email?: string | null;
+        area?: string;
+        areaEquipo?: string;
+        position?: string;
+        puestoFuncion?: string;
+        dependency_id?: string;
+        building_id?: string;
+        floor?: string;
+        pisoBase?: string;
+        schedule_id?: string;
+        entry_time?: string | null;
+        exit_time?: string | null;
+        status?: string;
+        cards?: any[];
+        specialAccesses?: number[];
+        floorsByBuilding?: Record<number, Record<string, string[]>>;
+        [key: string]: unknown;
+    }): Promise<string> {
+        return withErrorHandling(async () => {
+            const first = data.first_name || data.nombres || "";
+            const last = data.last_name || data.apellidos || "";
+            if (!first || !last) throw new Error("Nombre y apellidos son requeridos");
+
+            // Resolver media_type_id por cada tarjeta y construir p_media.
+            const medias = catalogState.mediaTypes as any[];
+            const mediaTypeIds: string[] = [];
+            const p_media: any[] = [];
+            for (const card of data.cards || []) {
+                const media = medias.find(
+                    (m) =>
+                        (m.key && m.key === card.type) ||
+                        (m.name && m.name === card.type),
+                );
+                if (!media) continue;
+                const requiresProgramming = media.requires_programming !== false;
+                p_media.push({
+                    media_type_id: media.id,
+                    identifier: card.folio || "",
+                    status: "active",
+                    programming_status: requiresProgramming ? "pending" : "done",
+                    responsiva_status: "unsigned",
+                });
+                mediaTypeIds.push(media.id);
+            }
+
+            // Construir p_permissions (plan con assignment_index).
+            const floorsByBuilding = (data as any).floorsByBuilding || {};
+            const specialAccessIds = (data.specialAccesses as number[]) || [];
+            const plan = await buildPermissionPlan(mediaTypeIds, floorsByBuilding, specialAccessIds);
+
+            const p_person = {
+                first_name: first,
+                last_name: last,
+                employee_no: (data.employee_no || data.noEmpleado || "").trim() || null,
+                dependency_id: data.dependency_id ?? "",
+                building_id: data.building_id ?? "",
+                floor: data.floor || data.pisoBase || "",
+                email: data.email || "",
+                area: data.area || data.areaEquipo || "",
+                position: data.position || data.puestoFuncion || "",
+                schedule_id: data.schedule_id ?? "",
+                entry_time: data.entry_time || "",
+                exit_time: data.exit_time || "",
+                status: data.status || "active",
+            };
+
+            const { data: personId, error } = await supabase.rpc("create_person_with_access", {
+                p_person,
+                p_media,
+                p_permissions: plan,
+            });
+            if (error) throw error;
+            return personId as string;
+        }, "Create Person With Access");
+    },
+
     /** Input shape for creating/updating a personnel record */
     async save(data: {
         id?: string;
@@ -324,7 +414,7 @@ export const personnelService = {
         scheduleId?: string;
         entry_time?: string | null;
         exit_time?: string | null;
-        specialAccesses?: string[];
+        specialAccesses?: number[];
         special_accesses?: string[];
         status?: string;
         cards?: any[];
@@ -380,7 +470,18 @@ export const personnelService = {
             // Reconciliar permisos (pisos + accesos especiales) directamente sobre
             // el modelo nuevo, sin depender de columnas legacy ni triggers.
             const { accessAssignmentService } = await import("./accessAssignments");
-            const specialAccesses = data.specialAccesses || data.special_accesses || [];
+            let specialAccesses: number[];
+            if (Array.isArray(data.specialAccesses)) {
+                specialAccesses = data.specialAccesses;
+            } else {
+                // fallback: nombres legacy -> ids del catálogo
+                const names = (data.special_accesses || []) as string[];
+                const { data: rows } = await supabase
+                    .from("special_accesses")
+                    .select("id, name");
+                const idByName = new Map((rows || []).map((r: any) => [r.name, r.id]));
+                specialAccesses = names.map((n) => idByName.get(n)).filter((id): id is number => id !== undefined);
+            }
             const floorsByBuilding = (data as any).floorsByBuilding || {};
             await accessAssignmentService.savePersonAccess(
                 String(personId),
@@ -392,25 +493,11 @@ export const personnelService = {
 
     async updateStatus(id: string, status: string) {
         return withErrorHandling(async () => {
-            const { error } = await withTimeout(supabase.from("personnel").update({ status }).eq("id", id));
+            const { error } = await withTimeout(supabase.rpc("update_person_status", {
+                p_person_id: id,
+                p_status: status,
+            }));
             if (error) throw error;
-
-            const { error: cardError } = await withTimeout(supabase.from("access_media").update({ status }).eq("person_id", id));
-            if (cardError) throw cardError;
-
-            if (status === "inactive" || status === "baja") {
-                const { ticketService } = await import("./tickets");
-                await ticketService.deleteByPerson(id);
-            }
-
-            const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", id).single();
-            const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${id})`;
-            const statusLabel = status === 'active' ? 'activo' : status === 'blocked' ? 'bloqueado/a' : 'BAJA';
-
-            await HistoryService.log("PERSONNEL", id, "UPDATE_STATUS", {
-                message: `Estado actualizado a ${statusLabel} (incluye tarjetas)`,
-                entityName: personName
-            });
         }, "Update Personnel Status");
     },
 

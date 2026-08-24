@@ -1,6 +1,8 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import type { CatalogItem } from '../types';
+import { activeMediaTypes, ALTAS_BASE, altasMediaCols, modifMediaCols, reposMediaCols, type MediaInfo } from './mediaContract';
+import { settingsState } from '../stores';
 
 // ─────────────────────────────────────────
 // Tipos
@@ -15,6 +17,8 @@ interface TemplateCatalogs {
     dependencies: CatalogItem[];
     specialAccesses: CatalogItem[];
     schedules: CatalogItem[];
+    /** Tipos de medio activos (del catálogo) para armar columnas/dropdowns. */
+    mediaTypes?: CatalogItem[];
 }
 
 // ─────────────────────────────────────────
@@ -65,6 +69,18 @@ function sortFloors(floors: string[]): string[] {
 // Utilidades
 // ─────────────────────────────────────────
 
+/** Convierte un índice de columna 0-based a su letra (A, B, ..., Z, AA, ...). */
+function colLetter(idx: number): string {
+    let n = idx + 1;
+    let s = '';
+    while (n > 0) {
+        const rem = (n - 1) % 26;
+        s = String.fromCharCode(65 + rem) + s;
+        n = Math.floor((n - 1) / 26);
+    }
+    return s;
+}
+
 function styleCell(
     cell: ExcelJS.Cell,
     opts: {
@@ -103,7 +119,7 @@ function styleCell(
 }
 
 function addSheetTitle(ws: ExcelJS.Worksheet, title: string, totalCols: number) {
-    const last = String.fromCharCode(64 + totalCols);
+    const last = colLetter(totalCols - 1);
     ws.mergeCells(`A1:${last}1`);
     const cell = ws.getCell('A1');
     cell.value = title;
@@ -116,8 +132,8 @@ type GroupConfig = { label: string; cols: number; color: { head: string; fill: s
 function addGroupHeaders(ws: ExcelJS.Worksheet, row: number, groups: GroupConfig[]) {
     let col = 1;
     for (const g of groups) {
-        const start = String.fromCharCode(64 + col);
-        const end = String.fromCharCode(64 + col + g.cols - 1);
+        const start = colLetter(col - 1);
+        const end = colLetter(col + g.cols - 2);
         const range = g.cols > 1 ? `${start}${row}:${end}${row}` : `${start}${row}`;
         if (g.cols > 1) ws.mergeCells(range);
         const cell = ws.getCell(`${start}${row}`);
@@ -146,7 +162,7 @@ function addColumnHeaders(ws: ExcelJS.Worksheet, row: number, headers: { label: 
 }
 
 function addDropdown(ws: ExcelJS.Worksheet, col: string | number, from: number, to: number, formulae: string) {
-    const colStr = typeof col === 'number' ? String.fromCharCode(64 + col) : col;
+    const colStr = typeof col === 'number' ? colLetter(col - 1) : col;
     for (let r = from; r <= to; r++) {
         ws.getCell(`${colStr}${r}`).dataValidation = {
             type: 'list', allowBlank: true, formulae: [formulae],
@@ -189,6 +205,14 @@ function prepareCatalogData(catalogs: TemplateCatalogs) {
     catalogs.buildings.forEach(b => (b.floors || []).forEach(f => allFloors.add(f)));
     const floorList = sortFloors(Array.from(allFloors));
 
+    // Tipos de tarjeta derivados del catálogo de medios (activos); "Ambas" al final.
+    // Se usa el nombre visible (P2000/KONE/AccessPRO) para no romper el contrato
+    // de la hoja Reporte de Falla; la key queda como identificador interno.
+    const mediaNames = (catalogs.mediaTypes || [])
+        .filter((m) => m.active !== false)
+        .map((m) => m.name || m.key);
+    const cardTypeList = [...mediaNames, 'Ambas'];
+
     const refs = {
         depsRef: () => `CATALOGOS!$A$1:$A$${depsNames.length}`,
         buildingsRef: () => `CATALOGOS!$B$1:$B$${buildingNames.length}`,
@@ -196,13 +220,13 @@ function prepareCatalogData(catalogs: TemplateCatalogs) {
         accessRef: () => `CATALOGOS!$D$1:$D$${accessNames.length}`,
         schedulesRef: () => `CATALOGOS!$E$1:$E$${scheduleNames.length}`,
         tipoPersonalRef: () => `CATALOGOS!$F$1:$F$6`,
-        tipoTarjetaRef: () => `CATALOGOS!$G$1:$G$3`,
+        tipoTarjetaRef: () => `CATALOGOS!$G$1:$G$${cardTypeList.length}`,
         accionPisosRef: () => `CATALOGOS!$H$1:$H$3`,
         tipoBajaRef: () => `CATALOGOS!$I$1:$I$2`,
         motivoReposRef: () => `CATALOGOS!$J$1:$J$4`,
         urgenciaRef: () => `CATALOGOS!$K$2:$K$4`,
     };
-    return { refs, lists: { depsNames, buildingNames, accessNames, scheduleNames, floorList } };
+    return { refs, lists: { depsNames, buildingNames, accessNames, scheduleNames, floorList, cardTypeList } };
 }
 
 function writeCatalogSheet(wb: ExcelJS.Workbook, lists: ReturnType<typeof prepareCatalogData>['lists']) {
@@ -216,7 +240,7 @@ function writeCatalogSheet(wb: ExcelJS.Workbook, lists: ReturnType<typeof prepar
     write(4, lists.accessNames);
     write(5, lists.scheduleNames);
     write(6, ['Trabajador de planta', 'Honorarios Profesionales', 'Servicio Social', 'Otro']);
-    write(7, ['P2000', 'KONE', 'Ambas']);
+    write(7, lists.cardTypeList);
     write(8, ['Reemplazar', 'Sumar', 'Quitar']);
     write(9, ['Definitiva', 'Temporal']);
     write(10, ['Extravío', 'Daño', 'Robo', 'Otro']);
@@ -307,10 +331,10 @@ function buildInstructionsSheet(wb: ExcelJS.Workbook) {
 
     // ─ CONTACT ─
     sectionTitle('📬  ENVÍO DE LA SOLICITUD');
-    addRow('Correo de envío', 'Control.Accesos@nuevoleon.gob.mx', 'note');
+    addRow('Correo de envío', settingsState.orgSupportEmail || 'Control.Accesos@nuevoleon.gob.mx', 'note');
     addRow('Asunto del correo', 'Formato sugerido: [TIPO DE MOVIMIENTO] – [DEPENDENCIA]\nEjemplo: ALTA – SECRETARÍA DEL TRABAJO\nEjemplo: BAJA – SECRETARÍA DE ADMINISTRACIÓN\nEjemplo: ALTA/REPOSICIÓN – SECRETARÍA DE ADMINISTRACIÓN', 'note');
     addRow('Tiempo de respuesta', 'Las solicitudes se procesan en un plazo de 1 a 3 días hábiles.');
-    addRow('Dudas o aclaraciones', 'Comuníquese al área de Control de Accesos - [Ext: 32199] antes de enviar la solicitud\nsi tiene dudas sobre qué tipo de hoja usar.');
+    addRow('Dudas o aclaraciones', `Comuníquese al área de Control de Accesos - [Ext: ${settingsState.orgSupportExtension || '0000'}] antes de enviar la solicitud\nsi tiene dudas sobre qué tipo de hoja usar.`);
     space();
 }
 
@@ -318,167 +342,177 @@ function buildInstructionsSheet(wb: ExcelJS.Workbook) {
 // Hoja: ALTAS
 // ─────────────────────────────────────────
 
-function buildAltasSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
+function buildAltasSheet(wb: ExcelJS.Workbook, refs: CatalogRefs, mediaTypes: MediaInfo[]) {
     const ws = wb.addWorksheet('✅ ALTAS');
     ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 4, showGridLines: true }];
 
-    ws.columns = [
-        { key: 'apellidos', width: 22 },
-        { key: 'nombres', width: 22 },
-        { key: 'tipo_personal', width: 22 },
-        { key: 'no_empleado', width: 14 },
-        { key: 'dependencia', width: 26 },
-        { key: 'edificio', width: 22 },
-        { key: 'piso_base', width: 13 },
-        { key: 'area', width: 22 },
-        { key: 'puesto', width: 22 },
-        { key: 'p2000_req', width: 16 },
-        { key: 'pisos_p2000', width: 28 },
-        { key: 'kone_req', width: 16 },
-        { key: 'pisos_kone', width: 28 },
-        { key: 'acceso1', width: 22 },
-        { key: 'acceso2', width: 22 },
-        { key: 'acceso3', width: 22 },
-        { key: 'horario', width: 22 },
-        { key: 'entrada', width: 13 },
-        { key: 'salida', width: 13 },
+    const base = ALTAS_BASE;
+    const mediaCols = mediaTypes.flatMap((m) => altasMediaCols(m));
+    const accesoCols = ['acceso1', 'acceso2', 'acceso3'];
+    const jornadaCols = ['horario', 'hora_entrada', 'hora_salida'];
+
+    const widthOf = (key: string) => {
+        const BASE_WIDTH: Record<string, number> = {
+            apellidos: 22, nombres: 22, tipo_personal: 22, no_empleado: 14,
+            dependencia: 26, edificio: 22, piso_base: 13, area: 22, puesto: 22,
+            acceso1: 22, acceso2: 22, acceso3: 22, horario: 22,
+            hora_entrada: 13, hora_salida: 13, correo: 30,
+        };
+        if (BASE_WIDTH[key]) return BASE_WIDTH[key];
+        if (key.startsWith('pisos_')) return 28;
+        if (key.startsWith('accion_')) return 16;
+        return 20;
+    };
+
+    const allColumns = [
+        ...base.map((b) => ({ key: b.key, width: widthOf(b.key) })),
+        ...mediaCols.map((c) => ({ key: c.key, width: widthOf(c.key) })),
+        ...accesoCols.map((k) => ({ key: k, width: widthOf(k) })),
+        ...jornadaCols.map((k) => ({ key: k, width: widthOf(k) })),
         { key: 'correo', width: 30 },
     ];
+    ws.columns = allColumns;
+    const totalCols = allColumns.length;
 
-    addSheetTitle(ws, 'SOLICITUD DE ALTA', 20);
+    addSheetTitle(ws, 'SOLICITUD DE ALTA', totalCols);
 
-    // Fila 2: banner explicativo
-    ws.mergeCells('A2:T2');
+    ws.mergeCells(`A2:${colLetter(totalCols - 1)}2`);
     const banner = ws.getCell('A2');
     banner.value = 'Use esta hoja para dar de alta a personas nuevas en el sistema de accesos (Trabajadores, Honorarios, Servicio Social, etc.). Llene todos los campos marcados con *.';
     styleCell(banner, { size: 9, fontColor: 'FF065F46', fillColor: 'FFD1FAE5', align: 'center', wrap: true });
     ws.getRow(2).height = 24;
 
-    addGroupHeaders(ws, 3, [
+    // Grupos de encabezado (fila 3)
+    const mediaStartIdx = base.length;
+    const mediaGroups = mediaTypes.map((m, i) => ({
+        label: `TARJETA ${m.name}`,
+        cols: altasMediaCols(m).length,
+        color: i % 2 === 0 ? C.groupAmber : C.groupSky,
+    }));
+    const accesoStartIdx = mediaStartIdx + mediaCols.length;
+    const groupConfigs: GroupConfig[] = [
         { label: 'IDENTIFICACIÓN', cols: 4, color: C.groupBlue },
         { label: 'UBICACIÓN', cols: 3, color: C.groupSlate },
         { label: 'PUESTO', cols: 2, color: C.groupSlate },
-        { label: 'TARJETA P2000 (Puertas)', cols: 2, color: C.groupAmber },
-        { label: 'TARJETA KONE (Elevadores)', cols: 2, color: C.groupSky },
-        { label: 'ACCESOS ESPECIALES', cols: 3, color: C.groupViolet },
-        { label: 'JORNADA LABORAL', cols: 3, color: C.groupEmerald },
+        ...mediaGroups,
+        { label: 'ACCESOS ESPECIALES', cols: accesoCols.length, color: C.groupViolet },
+        { label: 'JORNADA LABORAL', cols: jornadaCols.length, color: C.groupEmerald },
         { label: 'CONTACTO', cols: 1, color: C.groupRose },
-    ]);
+    ];
+    addGroupHeaders(ws, 3, groupConfigs);
 
-    addColumnHeaders(ws, 4, [
-        { label: 'Apellidos', mandatory: true },
-        { label: 'Nombres', mandatory: true },
-        { label: 'Tipo de Personal', mandatory: true },
-        { label: 'No. Empleado (solo trabajadores)' },
-        { label: 'Dependencia', mandatory: true },
-        { label: 'Edificio', mandatory: true },
-        { label: 'Piso Base', mandatory: true },
-        { label: 'Área / Equipo', mandatory: true },
-        { label: 'Puesto', mandatory: true },
-        { label: '¿Requiere Tarjeta P2000?', mandatory: true },
-        { label: 'Pisos P2000 (separados por coma)' },
-        { label: '¿Requiere Tarjeta KONE?', mandatory: true },
-        { label: 'Pisos KONE (separados por coma)' },
-        { label: 'Acceso Especial 1' },
-        { label: 'Acceso Especial 2' },
-        { label: 'Acceso Especial 3' },
-        { label: 'Horario', mandatory: true },
-        { label: 'Hora Entrada', mandatory: true },
-        { label: 'Hora Salida', mandatory: true },
+    // Encabezados de columnas (fila 4)
+    const headers = [
+        ...base.map((b) => ({ label: b.label, mandatory: b.required })),
+        ...mediaCols.map((c) => ({ label: c.label, mandatory: c.required })),
+        ...accesoCols.map((k, i) => ({ label: `Acceso Especial ${i + 1}` })),
+        ...jornadaCols.map((k, i) => ({ label: ['Horario', 'Hora Entrada', 'Hora Salida'][i], mandatory: i === 0 })),
         { label: 'Correo Electrónico' },
-    ]);
+    ];
+    addColumnHeaders(ws, 4, headers);
 
     const ROWS = 200;
-    paintDataRows(ws, 5, 5 + ROWS, 20, [1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 17, 18, 19]);
+    const requiredIdxs = [1, 2, 3, 5, 6, 7, 8, 9];
+    let nextReq = 10;
+    for (const m of mediaTypes) {
+        for (const c of altasMediaCols(m)) {
+            if (c.required) requiredIdxs.push(nextReq);
+            nextReq++;
+        }
+    }
+    // accesos son opcionales; jornada horario obligatorio
+    const jornadaStartIdx = accesoStartIdx + accesoCols.length;
+    requiredIdxs.push(jornadaStartIdx + 1, jornadaStartIdx + 2, jornadaStartIdx + 3);
+    paintDataRows(ws, 5, 5 + ROWS, totalCols, [...new Set(requiredIdxs)]);
 
+    // Dropdowns
     addDropdown(ws, 'C', 5, 5 + ROWS, refs.tipoPersonalRef());
     addDropdown(ws, 'E', 5, 5 + ROWS, refs.depsRef());
     addDropdown(ws, 'F', 5, 5 + ROWS, refs.buildingsRef());
     addDropdown(ws, 'G', 5, 5 + ROWS, refs.floorsRef());
-    addYesNoDropdown(ws, 'J', 5, 5 + ROWS);
-    addYesNoDropdown(ws, 'L', 5, 5 + ROWS);
-    addDropdown(ws, 'N', 5, 5 + ROWS, refs.accessRef());
-    addDropdown(ws, 'O', 5, 5 + ROWS, refs.accessRef());
-    addDropdown(ws, 'P', 5, 5 + ROWS, refs.accessRef());
-    addDropdown(ws, 'Q', 5, 5 + ROWS, refs.schedulesRef());
+    mediaTypes.forEach((m, i) => {
+        const reqIdx = mediaStartIdx + i * altasMediaCols(m).length;
+        addYesNoDropdown(ws, colLetter(reqIdx), 5, 5 + ROWS);
+    });
+    accesoCols.forEach((k, i) => addDropdown(ws, colLetter(accesoStartIdx + i), 5, 5 + ROWS, refs.accessRef()));
+    addDropdown(ws, colLetter(jornadaStartIdx), 5, 5 + ROWS, refs.schedulesRef());
 
-    ws.autoFilter = 'A4:T4';
+    ws.autoFilter = `A4:${colLetter(totalCols - 1)}4`;
 }
 
 // ─────────────────────────────────────────
 // Hoja: MODIFICACIONES
 // ─────────────────────────────────────────
 
-function buildModificacionesSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
+function buildModificacionesSheet(wb: ExcelJS.Workbook, refs: CatalogRefs, mediaTypes: MediaInfo[]) {
     const ws = wb.addWorksheet('✏️ MODIFICACIONES');
     ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 4, showGridLines: true }];
 
-    // A: Apellidos* B: Nombres* C: NoEmpleado
-    // D: NuevoApellido E: NuevoNombre F: NuevaDep G: NuevoEdificio H: NuevoPiso I: NuevaArea J: NuevoPuesto
-    // K: AccionP2000 L: PisosP2000
-    // M: AccionKONE N: PisosKONE
-    // O: AccionAccEsp P: AccEsp1 Q: AccEsp2 R: AccEsp3
-    // S: Horario T: Entrada U: Salida
-    // V: Observaciones
-    ws.columns = [
-        { key: 'apellidos', width: 22 }, // A obligatorio
-        { key: 'nombres', width: 22 }, // B obligatorio
-        { key: 'no_empleado', width: 14 }, // C
-        { key: 'nuevo_apellido', width: 22 }, // D
-        { key: 'nuevo_nombre', width: 22 }, // E
-        { key: 'nueva_dep', width: 26 }, // F
-        { key: 'nuevo_edificio', width: 22 }, // G
-        { key: 'nuevo_piso', width: 13 }, // H
-        { key: 'nueva_area', width: 22 }, // I
-        { key: 'nuevo_puesto', width: 22 }, // J
-        { key: 'accion_p2000', width: 16 }, // K
-        { key: 'pisos_p2000', width: 28 }, // L
-        { key: 'accion_kone', width: 16 }, // M
-        { key: 'pisos_kone', width: 28 }, // N
-        { key: 'accion_acc', width: 16 }, // O
-        { key: 'acceso1', width: 22 }, // P
-        { key: 'acceso2', width: 22 }, // Q
-        { key: 'acceso3', width: 22 }, // R
-        { key: 'horario', width: 22 }, // S
-        { key: 'entrada', width: 13 }, // T
-        { key: 'salida', width: 13 }, // U
-        { key: 'observacion', width: 30 }, // V
+    const widthOf = (key: string) => {
+        if (key.startsWith('pisos_')) return 28;
+        if (key.startsWith('accion_')) return 16;
+        return 22;
+    };
+
+    // Solo medios CON pisos generan bloques en MODIFICACIONES.
+    const floorMedias = mediaTypes.filter((m) => m.has_floors);
+    const mediaCols = floorMedias.flatMap((m) => modifMediaCols(m));
+    const base = [
+        { key: 'apellidos', label: 'Apellidos (como aparece en sistema)', mandatory: true },
+        { key: 'nombres', label: 'Nombres (como aparece en sistema)', mandatory: true },
+        { key: 'no_empleado', label: 'No. Empleado' },
+        { key: 'nuevo_apellido', label: 'Nuevo Apellido' },
+        { key: 'nuevo_nombre', label: 'Nuevo Nombre' },
+        { key: 'nueva_dep', label: 'Nueva Dependencia' },
+        { key: 'nuevo_edificio', label: 'Nuevo Edificio' },
+        { key: 'nuevo_piso', label: 'Nuevo Piso Base' },
+        { key: 'nueva_area', label: 'Nueva Área' },
+        { key: 'nuevo_puesto', label: 'Nuevo Puesto' },
     ];
 
-    addSheetTitle(ws, 'SOLICITUD DE MODIFICACIÓN', 22);
+    const allColumns = [
+        ...base.map((b) => ({ key: b.key, width: widthOf(b.key) })),
+        ...mediaCols.map((c) => ({ key: c.key, width: widthOf(c.key) })),
+        { key: 'accion_acc', width: 16 },
+        { key: 'acceso1', width: 22 },
+        { key: 'acceso2', width: 22 },
+        { key: 'acceso3', width: 22 },
+        { key: 'horario', width: 22 },
+        { key: 'entrada', width: 13 },
+        { key: 'salida', width: 13 },
+        { key: 'observacion', width: 30 },
+    ];
+    ws.columns = allColumns;
+    const totalCols = allColumns.length;
 
-    // Fila 2: nota de leyenda
-    ws.mergeCells('A2:V2');
+    addSheetTitle(ws, 'SOLICITUD DE MODIFICACIÓN', totalCols);
+
+    ws.mergeCells(`A2:${colLetter(totalCols - 1)}2`);
     const note = ws.getCell('A2');
     note.value = '⚠️  IMPORTANTE: Solo llene los campos que desea MODIFICAR. Los campos vacíos NO serán alterados en el sistema. Si un valor es igual al actual, puede dejarlo en blanco.';
     styleCell(note, { bold: true, size: 9, fontColor: 'FF92400E', fillColor: 'FFFFFBEB', align: 'center', wrap: true });
     ws.getRow(2).height = 24;
 
-    addGroupHeaders(ws, 3, [
+    const mediaStartIdx = base.length;
+    const mediaGroups = floorMedias.map((m) => ({
+        label: `CAMBIOS ${m.name}`,
+        cols: modifMediaCols(m).length,
+        color: C.groupAmber,
+    }));
+    const accesosStartIdx = mediaStartIdx + mediaCols.length;
+    const groupConfigs: GroupConfig[] = [
         { label: 'IDENTIFICACIÓN *', cols: 3, color: C.groupBlue },
         { label: 'CAMBIOS PERSONALES (dejar vacío si no cambia)', cols: 7, color: C.groupSlate },
-        { label: 'CAMBIOS P2000', cols: 2, color: C.groupAmber },
-        { label: 'CAMBIOS KONE', cols: 2, color: C.groupSky },
+        ...mediaGroups,
         { label: 'ACCESOS ESPECIALES (dejar en blanco si no cambia)', cols: 4, color: C.groupViolet },
         { label: 'JORNADA LABORAL', cols: 3, color: C.groupEmerald },
         { label: 'NOTAS', cols: 1, color: C.groupSlate },
-    ]);
+    ];
+    addGroupHeaders(ws, 3, groupConfigs);
 
-    addColumnHeaders(ws, 4, [
-        { label: 'Apellidos (como aparece en sistema)', mandatory: true },
-        { label: 'Nombres (como aparece en sistema)', mandatory: true },
-        { label: 'No. Empleado' },
-        { label: 'Nuevo Apellido' },
-        { label: 'Nuevo Nombre' },
-        { label: 'Nueva Dependencia' },
-        { label: 'Nuevo Edificio' },
-        { label: 'Nuevo Piso Base' },
-        { label: 'Nueva Área' },
-        { label: 'Nuevo Puesto' },
-        { label: 'Acción P2000' },
-        { label: 'Pisos P2000 (coma)' },
-        { label: 'Acción KONE' },
-        { label: 'Pisos KONE (coma)' },
+    const headers = [
+        ...base.map((b) => ({ label: b.label, mandatory: b.mandatory })),
+        ...mediaCols.map((c) => ({ label: c.label })),
         { label: 'Acción Acc. Esp.' },
         { label: 'Acceso Esp. 1' },
         { label: 'Acceso Esp. 2' },
@@ -487,23 +521,26 @@ function buildModificacionesSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
         { label: 'Hora Entrada' },
         { label: 'Hora Salida' },
         { label: 'Observaciones' },
-    ]);
+    ];
+    addColumnHeaders(ws, 4, headers);
 
     const ROWS = 200;
-    paintDataRows(ws, 5, 5 + ROWS, 22, [1, 2]);
+    paintDataRows(ws, 5, 5 + ROWS, totalCols, [1, 2]);
 
     addDropdown(ws, 'F', 5, 5 + ROWS, refs.depsRef());
     addDropdown(ws, 'G', 5, 5 + ROWS, refs.buildingsRef());
     addDropdown(ws, 'H', 5, 5 + ROWS, refs.floorsRef());
-    addDropdown(ws, 'K', 5, 5 + ROWS, refs.accionPisosRef());
-    addDropdown(ws, 'M', 5, 5 + ROWS, refs.accionPisosRef());
-    addDropdown(ws, 'O', 5, 5 + ROWS, refs.accionPisosRef());
-    addDropdown(ws, 'P', 5, 5 + ROWS, refs.accessRef());
-    addDropdown(ws, 'Q', 5, 5 + ROWS, refs.accessRef());
-    addDropdown(ws, 'R', 5, 5 + ROWS, refs.accessRef());
-    addDropdown(ws, 'S', 5, 5 + ROWS, refs.schedulesRef());
+    floorMedias.forEach((m, i) => {
+        const accionIdx = mediaStartIdx + i * modifMediaCols(m).length;
+        addDropdown(ws, colLetter(accionIdx), 5, 5 + ROWS, refs.accionPisosRef());
+    });
+    addDropdown(ws, colLetter(accesosStartIdx), 5, 5 + ROWS, refs.accionPisosRef());
+    addDropdown(ws, colLetter(accesosStartIdx + 1), 5, 5 + ROWS, refs.accessRef());
+    addDropdown(ws, colLetter(accesosStartIdx + 2), 5, 5 + ROWS, refs.accessRef());
+    addDropdown(ws, colLetter(accesosStartIdx + 3), 5, 5 + ROWS, refs.accessRef());
+    addDropdown(ws, colLetter(accesosStartIdx + 4), 5, 5 + ROWS, refs.schedulesRef());
 
-    ws.autoFilter = 'A4:V4';
+    ws.autoFilter = `A4:${colLetter(totalCols - 1)}4`;
 }
 
 // ─────────────────────────────────────────
@@ -561,60 +598,81 @@ function buildBajaPersonaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 // Hoja: REPOSICIÓN DE TARJETA
 // ─────────────────────────────────────────
 
-function buildReposicionSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
+function buildReposicionSheet(wb: ExcelJS.Workbook, refs: CatalogRefs, mediaTypes: MediaInfo[]) {
     const ws = wb.addWorksheet('🔄 REPOSICIÓN DE TARJETA');
     ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 4, showGridLines: true }];
 
-    ws.columns = [
-        { key: 'apellidos', width: 22 },
-        { key: 'nombres', width: 22 },
-        { key: 'no_empleado', width: 14 },
-        { key: 'dependencia', width: 26 },
-        { key: 'reponer_p2000', width: 18 },
-        { key: 'folio_p2000', width: 16 },
-        { key: 'reponer_kone', width: 18 },
-        { key: 'folio_kone', width: 16 },
+    const widthOf = (key: string) => {
+        if (key.startsWith('folio_')) return 20;
+        if (key.startsWith('reponer_')) return 18;
+        return 22;
+    };
+
+    const base = [
+        { key: 'apellidos', label: 'Apellidos', mandatory: true },
+        { key: 'nombres', label: 'Nombres', mandatory: true },
+        { key: 'no_empleado', label: 'No. Empleado' },
+        { key: 'dependencia', label: 'Dependencia', mandatory: true },
+    ];
+    const mediaCols = mediaTypes.flatMap((m) => reposMediaCols(m));
+
+    const allColumns = [
+        ...base.map((b) => ({ key: b.key, width: widthOf(b.key) })),
+        ...mediaCols.map((c) => ({ key: c.key, width: widthOf(c.key) })),
         { key: 'motivo', width: 20 },
         { key: 'observaciones', width: 40 },
     ];
+    ws.columns = allColumns;
+    const totalCols = allColumns.length;
 
-    addSheetTitle(ws, 'SOLICITUD DE REPOSICIÓN DE TARJETA', 10);
+    addSheetTitle(ws, 'SOLICITUD DE REPOSICIÓN DE TARJETA', totalCols);
 
-    // Fila 2: banner explicativo
-    ws.mergeCells('A2:J2');
+    ws.mergeCells(`A2:${colLetter(totalCols - 1)}2`);
     const banner = ws.getCell('A2');
-    banner.value = 'Use esta hoja para solicitar la reposición de una tarjeta P2000 (Puertas), KONE (Elevadores) o ambas. Puede solicitar una o las dos al mismo tiempo en una sola fila. Indique "Sí" en la(s) tarjeta(s) que requiere reponer.';
+    banner.value = 'Use esta hoja para solicitar la reposición de una tarjeta del sistema de accesos. Puede solicitar una o varias al mismo tiempo en una sola fila. Indique "Sí" en la(s) tarjeta(s) que requiere reponer.';
     styleCell(banner, { size: 9, fontColor: 'FF92400E', fillColor: 'FFFEF3C7', align: 'center', wrap: true });
     ws.getRow(2).height = 24;
 
-    addGroupHeaders(ws, 3, [
+    const mediaStartIdx = base.length;
+    const groupConfigs: GroupConfig[] = [
         { label: 'IDENTIFICACIÓN', cols: 4, color: C.groupBlue },
-        { label: 'TARJETA P2000 (Puertas)', cols: 2, color: C.groupAmber },
-        { label: 'TARJETA KONE (Elevadores)', cols: 2, color: C.groupSky },
+        ...mediaTypes.map((m, i) => ({
+            label: `TARJETA ${m.name}`,
+            cols: reposMediaCols(m).length,
+            color: i % 2 === 0 ? C.groupAmber : C.groupSky,
+        })),
         { label: 'MOTIVO Y NOTAS', cols: 2, color: C.groupSlate },
-    ]);
-    addColumnHeaders(ws, 4, [
-        { label: 'Apellidos', mandatory: true },
-        { label: 'Nombres', mandatory: true },
-        { label: 'No. Empleado' },
-        { label: 'Dependencia', mandatory: true },
-        { label: '¿Reponer P2000?', mandatory: true },
-        { label: 'Folio P2000 Anterior (si lo conoce)' },
-        { label: '¿Reponer KONE?', mandatory: true },
-        { label: 'Folio KONE Anterior (si lo conoce)' },
+    ];
+    addGroupHeaders(ws, 3, groupConfigs);
+
+    const headers = [
+        ...base.map((b) => ({ label: b.label, mandatory: b.mandatory })),
+        ...mediaCols.map((c) => ({ label: c.label, mandatory: c.required })),
         { label: 'Motivo', mandatory: true },
         { label: 'Observaciones' },
-    ]);
+    ];
+    addColumnHeaders(ws, 4, headers);
 
     const ROWS = 100;
-    paintDataRows(ws, 5, 5 + ROWS, 10, [1, 2, 4, 5, 7, 9]);
+    const mandatoryIdxs = [1, 2, 4];
+    let next = 5;
+    for (const m of mediaTypes) {
+        for (const c of reposMediaCols(m)) {
+            if (c.required) mandatoryIdxs.push(next);
+            next++;
+        }
+    }
+    mandatoryIdxs.push(next); // motivo
+    paintDataRows(ws, 5, 5 + ROWS, totalCols, [...new Set(mandatoryIdxs)]);
 
     addDropdown(ws, 'D', 5, 5 + ROWS, refs.depsRef());
-    addYesNoDropdown(ws, 'E', 5, 5 + ROWS);
-    addYesNoDropdown(ws, 'G', 5, 5 + ROWS);
-    addDropdown(ws, 'I', 5, 5 + ROWS, refs.motivoReposRef());
+    mediaTypes.forEach((m, i) => {
+        const reqIdx = mediaStartIdx + i * reposMediaCols(m).length;
+        addYesNoDropdown(ws, colLetter(reqIdx), 5, 5 + ROWS);
+    });
+    addDropdown(ws, colLetter(totalCols - 2), 5, 5 + ROWS, refs.motivoReposRef());
 
-    ws.autoFilter = 'A4:J4';
+    ws.autoFilter = `A4:${colLetter(totalCols - 1)}4`;
 }
 
 // ─────────────────────────────────────────
@@ -678,7 +736,7 @@ function buildReporteFallaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
     paintDataRows(ws, 5, 5 + ROWS, 11, [1, 2, 4, 5, 7, 8, 10]);
 
     addDropdown(ws, 'D', 5, 5 + ROWS, refs.depsRef());
-    addDropdown(ws, 'E', 5, 5 + ROWS, '"Tarjeta P2000,Tarjeta KONE,Ambas tarjetas"');
+    addDropdown(ws, 'E', 5, 5 + ROWS, refs.tipoTarjetaRef());
     addDropdown(ws, 'G', 5, 5 + ROWS, refs.buildingsRef());
     addDropdown(ws, 'J', 5, 5 + ROWS, refs.urgenciaRef());
 
@@ -686,257 +744,24 @@ function buildReporteFallaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 }
 
 // ─────────────────────────────────────────
-// Plantilla AccessPRO — INSTRUCCIONES
-// ─────────────────────────────────────────
-
-function buildAccessProInstructionsSheet(wb: ExcelJS.Workbook) {
-    const ws = wb.addWorksheet('📋 INSTRUCCIONES');
-    ws.views = [{ showGridLines: false }];
-    ws.columns = [
-        { width: 4 }, { width: 32 }, { width: 90 }
-    ];
-
-    ws.mergeCells('A1:C1');
-    const title = ws.getCell('A1');
-    title.value = 'Plantilla de Trámites — Tarjeta AccessPRO';
-    styleCell(title, { bold: true, size: 18, fontColor: C.white, fillColor: C.groupEmerald.head, align: 'center' });
-    ws.getRow(1).height = 48;
-
-    ws.mergeCells('A2:C2');
-    const subtitle = ws.getCell('A2');
-    subtitle.value = 'Lea las instrucciones completas antes de llenar cualquier hoja';
-    styleCell(subtitle, { size: 16, fontColor: C.metaText, fillColor: 'FFF8FAFC', align: 'center', italic: true, bold: true });
-    ws.getRow(2).height = 24;
-
-    let r = 4;
-
-    const sectionTitle = (text: string) => {
-        ws.mergeCells(`B${r}:C${r}`);
-        const c = ws.getCell(`B${r}`);
-        c.value = text;
-        styleCell(c, { bold: true, size: 11, fontColor: C.white, fillColor: 'FF065F46' });
-        ws.getRow(r).height = 28;
-        r++;
-    };
-
-    const addRow = (label: string, description: string, type?: 'mandatory' | 'recommended' | 'optional' | 'note') => {
-        ws.getCell(`B${r}`).value = label;
-        const fill = type === 'mandatory' ? C.mandatoryFill : type === 'recommended' ? C.recommendedFill : type === 'note' ? 'FFFFFBEB' : C.optionalFill;
-        const fontColor = type === 'mandatory' ? C.mandatoryText : type === 'recommended' ? C.recommendedText : type === 'note' ? 'FF92400E' : C.optionalText;
-        styleCell(ws.getCell(`B${r}`), { bold: type === 'mandatory', size: 9, fontColor, fillColor: fill, borders: true, valign: 'top' });
-        ws.getCell(`C${r}`).value = description;
-        styleCell(ws.getCell(`C${r}`), { size: 9, fontColor, fillColor: fill, borders: true, wrap: true, valign: 'top' });
-        const lines = description.split('\n').length + Math.ceil(description.replace(/\n/g, '').length / 105);
-        ws.getRow(r).height = Math.max(10, lines * 10);
-        r++;
-    };
-
-    const space = (h = 10) => { ws.getRow(r).height = h; r++; };
-
-    sectionTitle('🎨  LEYENDA DE COLORES');
-    addRow('CAMPO OBLIGATORIO *', 'Debe llenarse siempre.\nEl registro será rechazado si falta este dato.', 'mandatory');
-    addRow('CAMPO OPCIONAL', 'Complételo solo si aplica al caso.\nPuede dejarse en blanco sin afectar el trámite.');
-    space();
-
-    sectionTitle('📑  DESCRIPCIÓN DE CADA HOJA');
-    addRow('✅ ALTAS', 'Para dar de alta a personas que requieren tarjeta AccessPRO (acceso de entrada al edificio).\n"Área / Equipo" y "Puesto" son OBLIGATORIOS. El campo "Folio AccessPRO" es OPCIONAL: si la persona ya tiene folio asignado, anótelo para que quede pre-cargado; si no, se le asignará uno en el proceso.');
-    addRow('🚫 BAJA', 'Para dar de baja a una persona del sistema de accesos AccessPRO.\nEsta acción desactiva todos sus accesos.');
-    addRow('🔄 REPOSICIÓN', 'Para solicitar la reposición de una tarjeta AccessPRO extraviada, dañada o robada.\nIndique el folio anterior de la tarjeta si lo conoce.');
-    addRow('🔧 REPORTE FALLA', 'Para reportar cuando una tarjeta AccessPRO no funciona correctamente\n(no abre la entrada, el lector no la lee). El área de accesos verificará antes de determinar si se requiere reposición.');
-    space();
-
-    sectionTitle('⚠️  REGLAS Y ACLARACIONES IMPORTANTES');
-    addRow('Listas desplegables', 'Los campos con lista desplegable (▼) NO aceptan valores escritos a mano.\nUse siempre las opciones predefinidas.', 'mandatory');
-    addRow('Apellidos y Nombres', 'Use siempre DOS campos separados: Apellidos y Nombres.\nEsto evita confusiones al buscar personas en el sistema.', 'note');
-    addRow('Múltiples registros', 'Puede incluir varios trámites en cada hoja, uno por fila.\nNo modifique ni elimine las filas de encabezado.', 'recommended');
-    addRow('Flujo del trámite', 'Al importar el archivo, cada fila genera un ticket (Alta, Baja, Reposición o Reporte de Falla)\nque deberá ser procesado por el área de Control de Accesos.', 'note');
-    space();
-
-    sectionTitle('📬  ENVÍO DE LA SOLICITUD');
-    addRow('Correo de envío', 'Control.Accesos@nuevoleon.gob.mx', 'note');
-    addRow('Asunto del correo', 'Formato sugerido: [TIPO DE MOVIMIENTO] – [DEPENDENCIA]\nEjemplo: ALTA ACCESPRO – SECRETARÍA DEL TRABAJO', 'note');
-    addRow('Tiempo de respuesta', 'Las solicitudes se procesan en un plazo de 1 a 3 días hábiles.');
-    addRow('Dudas o aclaraciones', 'Comuníquese al área de Control de Accesos - [Ext: 32199] antes de enviar la solicitud\nsi tiene dudas sobre qué tipo de hoja usar.');
-    space();
-}
-
-// ─────────────────────────────────────────
-// Plantilla AccessPRO — BAJA
-// ─────────────────────────────────────────
-
-function buildBajaAccessProSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
-    const ws = wb.addWorksheet('🚫 BAJA');
-    ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 4, showGridLines: true }];
-
-    ws.columns = [
-        { key: 'apellidos', width: 22 },
-        { key: 'nombres', width: 22 },
-        { key: 'no_empleado', width: 14 },
-        { key: 'dependencia', width: 26 },
-        { key: 'tipo_baja', width: 18 },
-        { key: 'motivo', width: 45 },
-        { key: 'observaciones', width: 40 },
-    ];
-
-    addSheetTitle(ws, 'SOLICITUD DE BAJA — TARJETA ACCESSPRO', 7);
-
-    ws.mergeCells('A2:G2');
-    const banner = ws.getCell('A2');
-    banner.value = 'Use esta hoja para solicitar la baja total de una persona del acceso AccessPRO (entrada al edificio). Esta acción desactivará su tarjeta AccessPRO.';
-    styleCell(banner, { size: 9, fontColor: 'FF9D174D', fillColor: 'FFFCE7F3', align: 'center', wrap: true });
-    ws.getRow(2).height = 24;
-
-    addGroupHeaders(ws, 3, [
-        { label: 'IDENTIFICACIÓN', cols: 4, color: C.groupBlue },
-        { label: 'DATOS DE BAJA', cols: 2, color: C.groupRose },
-        { label: 'NOTAS', cols: 1, color: C.groupSlate },
-    ]);
-    addColumnHeaders(ws, 4, [
-        { label: 'Apellidos', mandatory: true },
-        { label: 'Nombres', mandatory: true },
-        { label: 'No. Empleado' },
-        { label: 'Dependencia', mandatory: true },
-        { label: 'Tipo de Baja', mandatory: true },
-        { label: 'Motivo de la Baja', mandatory: true },
-        { label: 'Observaciones' },
-    ]);
-
-    const ROWS = 100;
-    paintDataRows(ws, 5, 5 + ROWS, 7, [1, 2, 4, 5, 6]);
-
-    addDropdown(ws, 'D', 5, 5 + ROWS, refs.depsRef());
-    addDropdown(ws, 'E', 5, 5 + ROWS, refs.tipoBajaRef());
-
-    ws.autoFilter = 'A4:G4';
-}
-
-// ─────────────────────────────────────────
-// Plantilla AccessPRO — REPOSICIÓN
-// ─────────────────────────────────────────
-
-function buildReposicionAccessProSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
-    const ws = wb.addWorksheet('🔄 REPOSICIÓN');
-    ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 4, showGridLines: true }];
-
-    ws.columns = [
-        { key: 'apellidos', width: 22 },
-        { key: 'nombres', width: 22 },
-        { key: 'no_empleado', width: 14 },
-        { key: 'dependencia', width: 26 },
-        { key: 'folio_accesspro', width: 20 },
-        { key: 'motivo', width: 20 },
-        { key: 'observaciones', width: 40 },
-    ];
-
-    addSheetTitle(ws, 'SOLICITUD DE REPOSICIÓN — TARJETA ACCESSPRO', 7);
-
-    ws.mergeCells('A2:G2');
-    const banner = ws.getCell('A2');
-    banner.value = 'Use esta hoja para solicitar la reposición de una tarjeta AccessPRO (acceso de entrada al edificio). Indique el folio anterior de la tarjeta si lo conoce.';
-    styleCell(banner, { size: 9, fontColor: 'FF92400E', fillColor: 'FFFEF3C7', align: 'center', wrap: true });
-    ws.getRow(2).height = 24;
-
-    addGroupHeaders(ws, 3, [
-        { label: 'IDENTIFICACIÓN', cols: 4, color: C.groupBlue },
-        { label: 'TARJETA ACCESSPRO', cols: 1, color: C.groupEmerald },
-        { label: 'MOTIVO Y NOTAS', cols: 2, color: C.groupSlate },
-    ]);
-    addColumnHeaders(ws, 4, [
-        { label: 'Apellidos', mandatory: true },
-        { label: 'Nombres', mandatory: true },
-        { label: 'No. Empleado' },
-        { label: 'Dependencia', mandatory: true },
-        { label: 'Folio AccessPRO Anterior (si lo conoce)' },
-        { label: 'Motivo', mandatory: true },
-        { label: 'Observaciones' },
-    ]);
-
-    const ROWS = 100;
-    paintDataRows(ws, 5, 5 + ROWS, 7, [1, 2, 4, 6]);
-
-    addDropdown(ws, 'D', 5, 5 + ROWS, refs.depsRef());
-    addDropdown(ws, 'F', 5, 5 + ROWS, refs.motivoReposRef());
-
-    ws.autoFilter = 'A4:G4';
-}
-
-// ─────────────────────────────────────────
-// Plantilla AccessPRO — REPORTE DE FALLA
-// ─────────────────────────────────────────
-
-function buildReporteFallaAccessProSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
-    const ws = wb.addWorksheet('🔧 REPORTE FALLA');
-    ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 4, showGridLines: true }];
-
-    ws.columns = [
-        { key: 'apellidos', width: 22 },
-        { key: 'nombres', width: 22 },
-        { key: 'no_empleado', width: 14 },
-        { key: 'dependencia', width: 26 },
-        { key: 'folio', width: 16 },
-        { key: 'ubicacion', width: 28 },
-        { key: 'descripcion', width: 55 },
-        { key: 'desde_cuando', width: 18 },
-        { key: 'urgencia', width: 14 },
-        { key: 'observaciones', width: 40 },
-    ];
-
-    addSheetTitle(ws, 'REPORTE DE FALLA — TARJETA ACCESSPRO', 10);
-
-    ws.mergeCells('A2:J2');
-    const note = ws.getCell('A2');
-    note.value = 'Use esta hoja para reportar cuando su tarjeta AccessPRO no funciona correctamente (no abre la entrada, el lector no la lee, etc.). El área de Control de Accesos verificará el estado de la tarjeta y determinará si se requiere reposición.';
-    styleCell(note, { size: 9, fontColor: 'FF075985', fillColor: 'FFE0F2FE', align: 'center', wrap: true });
-    ws.getRow(2).height = 32;
-
-    addGroupHeaders(ws, 3, [
-        { label: 'DATOS DEL TITULAR', cols: 4, color: C.groupBlue },
-        { label: 'TARJETA CON FALLA', cols: 1, color: C.groupEmerald },
-        { label: 'DESCRIPCIÓN DEL PROBLEMA', cols: 3, color: C.groupRose },
-        { label: 'PRIORIDAD', cols: 1, color: C.groupOrange },
-        { label: 'NOTAS', cols: 1, color: C.groupSlate },
-    ]);
-
-    addColumnHeaders(ws, 4, [
-        { label: 'Apellidos', mandatory: true },
-        { label: 'Nombres', mandatory: true },
-        { label: 'No. Empleado' },
-        { label: 'Dependencia', mandatory: true },
-        { label: 'Folio de Tarjeta (si lo conoce)' },
-        { label: 'Edificio / Lugar donde falla', mandatory: true },
-        { label: 'Descripción del Problema', mandatory: true },
-        { label: '¿Desde cuándo ocurre?' },
-        { label: 'Urgencia', mandatory: true },
-        { label: 'Observaciones adicionales' },
-    ]);
-
-    const ROWS = 100;
-    paintDataRows(ws, 5, 5 + ROWS, 10, [1, 2, 4, 6, 7, 9]);
-
-    addDropdown(ws, 'D', 5, 5 + ROWS, refs.depsRef());
-    addDropdown(ws, 'F', 5, 5 + ROWS, refs.buildingsRef());
-    addDropdown(ws, 'I', 5, 5 + ROWS, refs.urgenciaRef());
-
-    ws.autoFilter = 'A4:J4';
-}
-
-// ─────────────────────────────────────────
 // Punto de entrada principal
 // ─────────────────────────────────────────
 
-export async function generateRequestTemplate(catalogs: TemplateCatalogs) {
+export async function generateMediaTemplate(catalogs: TemplateCatalogs) {
     const wb = new ExcelJS.Workbook();
     wb.created = new Date();
+
+    const mediaTypes = activeMediaTypes(catalogs.mediaTypes || []);
 
     // Preparar referencias desde datos de catálogo (sin escribir workbook aún)
     const { refs, lists } = prepareCatalogData(catalogs);
 
     // Construir todas las hojas visibles primero
     buildInstructionsSheet(wb);
-    buildAltasSheet(wb, refs);
-    buildModificacionesSheet(wb, refs);
+    buildAltasSheet(wb, refs, mediaTypes);
+    buildModificacionesSheet(wb, refs, mediaTypes);
     buildBajaPersonaSheet(wb, refs);
-    buildReposicionSheet(wb, refs);
+    buildReposicionSheet(wb, refs, mediaTypes);
     buildReporteFallaSheet(wb, refs);
 
     // Añadir hoja de catálogo al FINAL para que aparezca al final (y permanezca oculta)
@@ -946,11 +771,11 @@ export async function generateRequestTemplate(catalogs: TemplateCatalogs) {
     saveAs(new Blob([buffer]), 'Plantilla_Solicitudes_Acceso.xlsx');
 }
 
-export async function generateKoneUsageTemplate() {
+export async function generateUsageTemplate(mediaLabel: string = "Uso de tarjetas") {
     const wb = new ExcelJS.Workbook();
     wb.created = new Date();
 
-    const ws = wb.addWorksheet('Uso KONE');
+    const ws = wb.addWorksheet(`Uso ${mediaLabel}`);
 
     ws.columns = [
         { key: 'folio', width: 20 },
@@ -959,7 +784,7 @@ export async function generateKoneUsageTemplate() {
         { key: 'ultimo_reg', width: 25 },
     ];
 
-    addSheetTitle(ws, 'PLANTILLA DE CONTEO DE USO KONE', 4);
+    addSheetTitle(ws, `PLANTILLA DE CONTEO DE USO — ${mediaLabel.toUpperCase()}`, 4);
 
     ws.mergeCells('A2:D2');
     const banner = ws.getCell('A2');
@@ -978,92 +803,5 @@ export async function generateKoneUsageTemplate() {
     paintDataRows(ws, 4, 4 + ROWS, 4, [1, 2], [3, 4]);
 
     const buffer = await wb.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), 'Plantilla_Conteo_KONE.xlsx');
-}
-
-export async function generateAccessProTemplate(catalogs: TemplateCatalogs) {
-    const wb = new ExcelJS.Workbook();
-    wb.created = new Date();
-
-    const { refs, lists } = prepareCatalogData(catalogs);
-
-    buildAccessProInstructionsSheet(wb);
-    buildAltasAccessProSheet(wb, refs);
-    buildBajaAccessProSheet(wb, refs);
-    buildReposicionAccessProSheet(wb, refs);
-    buildReporteFallaAccessProSheet(wb, refs);
-
-    // Hoja oculta con catálogos para los desplegables (Dependencia, Edificio, etc.)
-    writeCatalogSheet(wb, lists);
-
-    const buffer = await wb.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), 'Plantilla_AccessPRO.xlsx');
-}
-
-// ─────────────────────────────────────────
-// Plantilla AccessPRO — ALTAS
-// ─────────────────────────────────────────
-
-function buildAltasAccessProSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
-    const ws = wb.addWorksheet('✅ ALTAS');
-    ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 4, showGridLines: true }];
-
-    ws.columns = [
-        { key: 'apellidos', width: 22 },
-        { key: 'nombres', width: 22 },
-        { key: 'no_empleado', width: 14 },
-        { key: 'dependencia', width: 26 },
-        { key: 'edificio', width: 22 },
-        { key: 'piso_base', width: 13 },
-        { key: 'area', width: 22 },
-        { key: 'puesto', width: 22 },
-        { key: 'folio_accesspro', width: 20 },
-        { key: 'horario', width: 22 },
-        { key: 'hora_entrada', width: 13 },
-        { key: 'hora_salida', width: 13 },
-        { key: 'correo', width: 30 },
-    ];
-
-    addSheetTitle(ws, 'SOLICITUD DE ALTA CON TARJETA ACCESSPRO', 13);
-
-    ws.mergeCells('A2:M2');
-    const banner = ws.getCell('A2');
-    banner.value = 'Use esta hoja para dar de alta a personas que requieren tarjeta AccessPRO (acceso de entrada al edificio). El Folio AccessPRO es OPCIONAL: si la persona ya tiene folio, anótelo para que quede pre-cargado; si no, se le asignará uno en el proceso. Llene todos los campos marcados con *.';
-    styleCell(banner, { size: 9, fontColor: 'FF065F46', fillColor: 'FFD1FAE5', align: 'center', wrap: true });
-    ws.getRow(2).height = 36;
-
-    addGroupHeaders(ws, 3, [
-        { label: 'IDENTIFICACIÓN', cols: 3, color: C.groupBlue },
-        { label: 'UBICACIÓN', cols: 3, color: C.groupSlate },
-        { label: 'PUESTO', cols: 2, color: C.groupSlate },
-        { label: 'TARJETA ACCESSPRO', cols: 1, color: C.groupEmerald },
-        { label: 'JORNADA LABORAL', cols: 3, color: C.groupEmerald },
-        { label: 'CONTACTO', cols: 1, color: C.groupRose },
-    ]);
-
-    addColumnHeaders(ws, 4, [
-        { label: 'Apellidos', mandatory: true },
-        { label: 'Nombres', mandatory: true },
-        { label: 'No. Empleado' },
-        { label: 'Dependencia', mandatory: true },
-        { label: 'Edificio', mandatory: true },
-        { label: 'Piso Base', mandatory: true },
-        { label: 'Área / Equipo', mandatory: true },
-        { label: 'Puesto', mandatory: true },
-        { label: 'Folio AccessPRO (opcional)' },
-        { label: 'Horario', mandatory: true },
-        { label: 'Hora Entrada', mandatory: true },
-        { label: 'Hora Salida', mandatory: true },
-        { label: 'Correo Electrónico' },
-    ]);
-
-    const ROWS = 200;
-    paintDataRows(ws, 5, 5 + ROWS, 13, [1, 2, 4, 5, 6, 7, 8, 10, 11, 12]);
-
-    addDropdown(ws, 'D', 5, 5 + ROWS, refs.depsRef());
-    addDropdown(ws, 'E', 5, 5 + ROWS, refs.buildingsRef());
-    addDropdown(ws, 'F', 5, 5 + ROWS, refs.floorsRef());
-    addDropdown(ws, 'J', 5, 5 + ROWS, refs.schedulesRef());
-
-    ws.autoFilter = 'A4:M4';
+    saveAs(new Blob([buffer]), `Plantilla_Conteo_Uso_${mediaLabel.replace(/\s+/g, '_')}.xlsx`);
 }

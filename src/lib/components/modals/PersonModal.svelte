@@ -20,10 +20,15 @@
     import PermissionGuard from "../PermissionGuard.svelte";
     import { toast } from "svelte-sonner";
     import { handleError, mediaTypeVariant } from "../../utils";
+    import { updateWithLock, fetchCurrentVersion } from "../../utils/optimisticLock";
     import type { Person } from "../../types";
     import { personnelSchema } from "../../schemas";
 
     import { type Snippet } from "svelte";
+
+    /** Mensaje cuando otro usuario modificó la persona mientras se editaba. */
+    const CONFLICT_MSG =
+        "Este registro fue modificado por otra persona. Recarga e inténtalo de nuevo.";
 
     let {
         isOpen = $bindable(false),
@@ -55,10 +60,9 @@
             horaEntrada?: string;
             horaSalida?: string;
             correo?: string;
-            pisosP2000?: string[];
-            pisosKone?: string[];
+            pisosPorMedio?: Record<string, string[]>;
+            foliosPorMedio?: Record<string, string>;
             specialAccesses?: string[];
-            folioAccessPro?: string;
         } | null;
         /** If set, only these card types can be added ('P2000', 'KONE') */
         allowedCardTypes?: string[] | null;
@@ -83,6 +87,18 @@
     let specialAccesses = $derived(catalogState.specialAccesses);
     let availableCards = $derived(personnelState.extraCards);
 
+    // Versión (optimistic locking) de la persona al abrir el modal de edición.
+    let editingUpdatedAt = $state<string | null>(null);
+
+    // Aviso temprano de concurrencia: el registro cambió en BD desde que se cargó.
+    let isStale = $state(false);
+
+    /** Compara la versión de la lista con la actual en BD y marca si quedó obsoleta. */
+    async function checkStale(id: string, loadedVersion: string | null) {
+        const fresh = await fetchCurrentVersion("personnel", id);
+        isStale = !!fresh && !!loadedVersion && fresh !== loadedVersion;
+    }
+
     // Estado del formulario
     let nombres = $state("");
     let apellidos = $state("");
@@ -97,7 +113,7 @@
     let horaEntrada = $state("08:00");
     let horaSalida = $state("17:00");
     let email = $state("");
-    let accesosEspeciales = $state<string[]>([]);
+    let accesosEspeciales = $state<number[]>([]);
     let tarjetasAsignadas = $state<{ type: string; folio: string }[]>([]);
 
     // Estado del modal anidado
@@ -153,8 +169,12 @@
         return m.access_media_type_buildings.some((r: any) => Number(r.building_id) === bid);
     }
 
-    let baseP2000 = $derived(baseFloorsForKey("p2000"));
-    let baseKone = $derived(baseFloorsForKey("kone"));
+    /** Pisos base por clave de medio (dinámico, para el payload de guardado). */
+    let pisosPorMedio = $derived.by(() => {
+        const out: Record<string, string[]> = {};
+        for (const fm of floorMediaTypes) out[fm.key] = baseFloorsForKey(fm.key);
+        return out;
+    });
 
     /** Edificios con acceso seleccionados para esta persona. */
     let selectedBuildings = $state<number[]>([]);
@@ -166,12 +186,12 @@
             delete next[bid];
             floorsByBuilding = next;
             selectedBuildings = selectedBuildings.filter((b) => b !== bid);
-            const keepNames = new Set(
-                catalogState.specialAccesses
-                    .filter((a) => selectedBuildings.includes(Number(a.building_id)))
-                    .map((a) => a.name),
+            const removedIds = new Set(
+                availableSpecialAccesses
+                    .filter((a) => Number((a as any).building_id) === bid)
+                    .map((a) => Number(a.id)),
             );
-            accesosEspeciales = accesosEspeciales.filter((n) => keepNames.has(n));
+            accesosEspeciales = accesosEspeciales.filter((id) => !removedIds.has(id));
         } else {
             selectedBuildings = [...selectedBuildings, bid];
         }
@@ -205,11 +225,39 @@
         });
     });
 
-    /** Opciones de accesos especiales de un edificio (del catálogo). */
-    function specialOptionsFor(bid: number): string[] {
+    /** Opciones de accesos especiales de un edificio: id + nombre (para mostrar). */
+    function specialOptionsFor(bid: number): { id: number; name: string }[] {
         return availableSpecialAccesses
             .filter((a) => Number((a as any).building_id) === bid)
-            .map((a) => a.name);
+            .map((a) => ({ id: Number(a.id), name: a.name }));
+    }
+
+    /** Nombres de accesos especiales seleccionados pertenecientes a un edificio. */
+    function selectedSpecialNames(bid: number): string[] {
+        const opts = specialOptionsFor(bid);
+        return accesosEspeciales
+            .filter((id) => opts.some((o) => o.id === id))
+            .map((id) => opts.find((o) => o.id === id)!.name);
+    }
+
+    /** Actualiza la selección de accesos especiales por edificio (nombres → ids). */
+    function onSpecialChange(bid: number, names: string[]) {
+        const opts = specialOptionsFor(bid);
+        const otherIds = accesosEspeciales.filter((id) => !opts.some((o) => o.id === id));
+        const newIds = names
+            .map((n) => opts.find((o) => o.name === n)?.id)
+            .filter((id): id is number => id !== undefined);
+        accesosEspeciales = [...otherIds, ...newIds];
+    }
+
+    /** Convierte nombres de accesos especiales a sus ids (para prefill/import). */
+    function namesToSpecialIds(names: string[]): number[] {
+        const ids: number[] = [];
+        for (const n of names) {
+            const id = catalogState.specialAccesses.find((s) => s.name === n)?.id;
+            if (id !== undefined) ids.push(Number(id));
+        }
+        return ids;
     }
 
     // Al cambiar de edificio, reiniciar solo el piso base (los pisos asignados
@@ -306,7 +354,7 @@
                 ]),
             ];
             if (access.specialAccesses.length > 0) {
-                accesosEspeciales = access.specialAccesses;
+                accesosEspeciales = namesToSpecialIds(access.specialAccesses);
             }
         } catch {
             // No crítico: se mantienen los valores cargados
@@ -345,17 +393,14 @@
                 }
 
                 email = editingPerson.email || "";
-                accesosEspeciales = [...(editingPerson.specialAccesses || [])];
+                accesosEspeciales = namesToSpecialIds(editingPerson.specialAccesses || []);
                 tarjetasAsignadas = [...(editingPerson.cards || [])];
 
                 // Si también tenemos precarga (vinculando ticket de Alta), sobrescribir datos solicitados
                 if (prefill) {
-                    const wantsP2000 =
-                        !allowedCardTypes || allowedCardTypes.includes("P2000");
-                    const wantsKONE =
-                        !allowedCardTypes || allowedCardTypes.includes("KONE");
-
-                    if (wantsP2000) {
+                    // Pisos por medio con pisos: sobrescribir sólo los medios
+                    // solicitados, conservando los pisos ya existentes del resto.
+                    if (prefill.pisosPorMedio) {
                         const pid =
                             Number(
                                 buildings.find(
@@ -363,51 +408,23 @@
                                 )?.id,
                             ) || undefined;
                         if (pid) {
+                            const merged = {
+                                ...(floorsByBuilding[pid] ?? {}),
+                            };
+                            for (const fm of floorMediaTypes) {
+                                const wanted =
+                                    !allowedCardTypes ||
+                                    allowedCardTypes.includes(fm.name);
+                                if (wanted && prefill.pisosPorMedio[fm.key]) {
+                                    merged[fm.id] = [
+                                        ...prefill.pisosPorMedio[fm.key],
+                                    ];
+                                }
+                            }
                             floorsByBuilding = {
                                 ...floorsByBuilding,
-                                [pid]: {
-                                    p2000: prefill.pisosP2000
-                                        ? [...prefill.pisosP2000]
-                                        : [],
-                                    kone: floorsByBuilding[pid]?.kone ?? [],
-                                },
+                                [pid]: merged,
                             };
-                        }
-                    }
-
-                    if (wantsKONE) {
-                        if (prefill.pisosKone && prefill.pisosKone.length > 0) {
-                            const pid =
-                                Number(
-                                    buildings.find(
-                                        (b) => b.name === prefill.edificio,
-                                    )?.id,
-                                ) || undefined;
-                            if (pid) {
-                                floorsByBuilding = {
-                                    ...floorsByBuilding,
-                                    [pid]: {
-                                        p2000: floorsByBuilding[pid]?.p2000 ?? [],
-                                        kone: [...prefill.pisosKone],
-                                    },
-                                };
-                            }
-                        } else if (prefill.pisosKone) {
-                            const pid =
-                                Number(
-                                    buildings.find(
-                                        (b) => b.name === prefill.edificio,
-                                    )?.id,
-                                ) || undefined;
-                            if (pid) {
-                                floorsByBuilding = {
-                                    ...floorsByBuilding,
-                                    [pid]: {
-                                        p2000: floorsByBuilding[pid]?.p2000 ?? [],
-                                        kone: [],
-                                    },
-                                };
-                            }
                         }
                     }
 
@@ -415,7 +432,7 @@
                         prefill.specialAccesses &&
                         prefill.specialAccesses.length > 0
                     ) {
-                        accesosEspeciales = [...prefill.specialAccesses];
+                        accesosEspeciales = namesToSpecialIds(prefill.specialAccesses);
                     } else if (prefill.specialAccesses) {
                         accesosEspeciales = [];
                     }
@@ -427,28 +444,35 @@
                     if (prefill.horaEntrada) horaEntrada = prefill.horaEntrada;
                     if (prefill.horaSalida) horaSalida = prefill.horaSalida;
 
-                    // Tarjeta AccessPRO solicitada en el ticket de alta
-                    if (
-                        prefill.folioAccessPro &&
-                        !tarjetasAsignadas.some(
-                            (c) =>
-                                c.type === "AccessPRO" &&
-                                c.folio === prefill.folioAccessPro,
-                        )
-                    ) {
-                        tarjetasAsignadas = [
-                            ...tarjetasAsignadas,
-                            {
-                                type: "AccessPRO",
-                                folio: prefill.folioAccessPro,
-                            },
-                        ];
+                    // Tarjetas sin pisos (folio) solicitadas en el ticket de alta
+                    if (prefill.foliosPorMedio) {
+                        for (const [key, folio] of Object.entries(prefill.foliosPorMedio)) {
+                            if (!folio) continue;
+                            const mediaName =
+                                catalogState.mediaTypes.find(
+                                    (m: any) => m.key === key,
+                                )?.name ?? key;
+                            if (
+                                !tarjetasAsignadas.some(
+                                    (c) =>
+                                        c.type === mediaName &&
+                                        c.folio === folio,
+                                )
+                            ) {
+                                tarjetasAsignadas = [
+                                    ...tarjetasAsignadas,
+                                    { type: mediaName, folio },
+                                ];
+                            }
+                        }
                     }
                 }
 
                 lastLoadedPersonId = editingPerson.id;
+                editingUpdatedAt = (editingPerson as any).updated_at ?? null;
                 selectedBuildings = bid ? [bid] : [];
                 void refreshPersonAccess(editingPerson.id);
+                void checkStale(editingPerson.id, editingUpdatedAt);
             });
         } else if (
             isOpen &&
@@ -481,17 +505,29 @@
                     ) || undefined;
                 floorsByBuilding = prefillBid
                     ? {
-                          [prefillBid]: {
-                              p2000: prefill.pisosP2000 ?? [],
-                              kone: prefill.pisosKone ?? [],
-                          },
+                          [prefillBid]: Object.fromEntries(
+                              floorMediaTypes.map((fm) => [
+                                  fm.id,
+                                  prefill.pisosPorMedio?.[fm.key] ?? [],
+                              ]),
+                          ),
                       }
                     : {};
-                accesosEspeciales = prefill.specialAccesses ?? [];
-                tarjetasAsignadas = prefill.folioAccessPro
-                    ? [{ type: "AccessPRO", folio: prefill.folioAccessPro }]
-                    : [];
+                accesosEspeciales = namesToSpecialIds(prefill.specialAccesses ?? []);
+                tarjetasAsignadas = [];
+                if (prefill.foliosPorMedio) {
+                    for (const [key, folio] of Object.entries(prefill.foliosPorMedio)) {
+                        if (!folio) continue;
+                        const mediaName =
+                            catalogState.mediaTypes.find(
+                                (m: any) => m.key === key,
+                            )?.name ?? key;
+                        tarjetasAsignadas.push({ type: mediaName, folio });
+                    }
+                }
                 lastLoadedPersonId = "__prefill__";
+                editingUpdatedAt = null;
+                isStale = false;
             });
         } else if (
             isOpen &&
@@ -568,8 +604,7 @@
                 edificio,
                 building_id: buildings.find((b) => b.name === edificio)?.id,
                 pisoBase,
-                pisosP2000: baseP2000,
-                pisosKone: baseKone,
+                pisosPorMedio,
                 first_name: nombres,
                 last_name: apellidos,
                 employee_no: noEmpleado,
@@ -591,8 +626,13 @@
                     noEmpleado: editingPerson.employee_no,
                     dependency: editingPerson.dependency,
                     edificio: editingPerson.building,
-                    pisosP2000: floorsForKey(editingPerson.floors, "p2000"),
-                    pisosKone: floorsForKey(editingPerson.floors, "kone"),
+                    pisosPorMedio: (() => {
+                        const out: Record<string, string[]> = {};
+                        for (const fm of floorMediaTypes) {
+                            out[fm.key] = floorsForKey(editingPerson.floors, fm.key);
+                        }
+                        return out;
+                    })(),
                     horario: editingPerson.schedule,
                     accesosEspeciales: editingPerson.specialAccesses,
                     tarjetas: editingPerson.cards,
@@ -617,7 +657,41 @@
                     description: "Los cambios se han enviado a aprobación.",
                 });
             } else {
-                await personnelService.save(data);
+                // Optimistic locking: solo en guardado directo (no ticket). Si la
+                // fila cambió desde que se abrió, abortamos sin sobrescribir.
+                if (editingPerson && editingUpdatedAt) {
+                    const personRowPayload = {
+                        first_name: nombres,
+                        last_name: apellidos,
+                        employee_no: (noEmpleado || "").trim() || null,
+                        area: areaEquipo || null,
+                        position: puestoFuncion || null,
+                        dependency_id: dependencies.find((d) => d.name === dependency)?.id ?? null,
+                        building_id: buildings.find((b) => b.name === edificio)?.id ?? null,
+                        floor: pisoBase || null,
+                        schedule_id: schedules.find((s) => s.name === diasHorario)?.id ?? null,
+                        entry_time: horaEntrada || null,
+                        exit_time: horaSalida || null,
+                        email: email?.replace(/^mailto:\s*/i, "").trim() || null,
+                        status: editingPerson?.status_raw || "active",
+                    };
+                    const lock = await updateWithLock(
+                        "personnel",
+                        editingPerson.id,
+                        personRowPayload,
+                        editingUpdatedAt,
+                    );
+                    if (!lock.ok) {
+                        toast.error(CONFLICT_MSG);
+                        return;
+                    }
+                }
+                if (editingPerson) {
+                    await personnelService.save(data);
+                } else {
+                    // Alta nueva: atómica (persona + tarjetas + permisos).
+                    await personnelService.createWithAccess(data);
+                }
                 const updated = await personnelService.fetchAll();
                 personnelState.pagination.setItems(updated.data, updated.count);
                 toast.success("Personal Registrado");
@@ -633,6 +707,8 @@
     }
 
     function resetForm() {
+        editingUpdatedAt = null;
+        isStale = false;
         nombres = "";
         apellidos = "";
         noEmpleado = "";
@@ -764,6 +840,16 @@
             handleSave();
         }}
     >
+        {#if isStale}
+            <div
+                class="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3 text-xs font-semibold"
+            >
+                ⚠️ Este registro fue modificado por otra persona luego de que lo
+                abriste. Puedes seguir editando; al guardar se validará la
+                versión.
+            </div>
+        {/if}
+
         {#if headerContent}
             {@render headerContent()}
         {/if}
@@ -986,8 +1072,9 @@
                                     {#if specialOptionsFor(bid).length > 0}
                                         <ToggleGroup
                                             label="Accesos Especiales"
-                                            options={specialOptionsFor(bid)}
-                                            bind:value={accesosEspeciales}
+                                            options={specialOptionsFor(bid).map((o) => o.name)}
+                                            value={selectedSpecialNames(bid)}
+                                            onchange={(v) => onSpecialChange(bid, v)}
                                         />
                                     {/if}
                                 </div>
@@ -1086,7 +1173,7 @@
                         loading={isSubmitting}
                         >{editingPerson
                             ? forceDirectSave
-                                ? "Aplicar Alta a Persona"
+                                ? "Vincular Alta a Persona"
                                 : "Actualizar (Ticket)"
                             : "Guardar Alta"}</Button
                     >

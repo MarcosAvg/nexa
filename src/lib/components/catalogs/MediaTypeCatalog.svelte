@@ -7,7 +7,13 @@
     import Modal from "../Modal.svelte";
     import DataTable from "../DataTable.svelte";
     import Badge from "../Badge.svelte";
-    import { Plus, Edit2, Trash2, CreditCard, GripVertical, Layers, Power } from "lucide-svelte";
+    import DeleteConfirmTypedModal from "../DeleteConfirmTypedModal.svelte";
+    import CatalogSectionHeader from "./CatalogSectionHeader.svelte";
+    import CatalogRowActions from "./CatalogRowActions.svelte";
+    import { useCatalogReorder } from "./useCatalogReorder.svelte";
+    import ToggleRow from "../ToggleRow.svelte";
+    import { Plus, CreditCard, Layers, Power, Palette } from "lucide-svelte";
+    import { MEDIA_COLOR_OPTIONS } from "../../utils/mediaTypeAppearance";
 
     /**
      * MediaTypeCatalog — Gestión de medios de acceso por edificio (CRUD).
@@ -41,8 +47,13 @@
         return map;
     });
 
-    // Estado de reordenamiento (evita clics consecutivos en vuelo)
-    let isReordering = $state(false);
+    // Reordenamiento con actualización optimista y rollback
+    const { isReordering, handleDrop } = useCatalogReorder({
+        table: "access_media_types",
+        getItems: () => mediaTypes,
+        setItems: (items: any[]) => catalogState.setMediaTypes(items),
+        fetchFn: fetchMediaTypes,
+    });
 
     // Add/Edit modal state
     let isModalOpen = $state(false);
@@ -52,11 +63,15 @@
     let mediaActive = $state(true);
     /** Edificios seleccionados en el modal (multi-edificio). */
     let mediaBuildings = $state<number[]>([]);
+    /** Color de la paleta (variante) para el medio. */
+    let mediaColor = $state<string>("emerald");
+    let mediaRequiresProgramming = $state(true);
+    let mediaRequiresResponsiva = $state(true);
+    let mediaRequiresIdentifier = $state(true);
 
     // Delete modal state
     let isDeleteModalOpen = $state(false);
     let deleteTarget = $state<any>(null);
-    let deleteConfirmation = $state("");
 
     async function fetchMediaTypes() {
         const data = await catalogService.fetchMediaTypes();
@@ -78,28 +93,6 @@
             : [...mediaBuildings, bid];
     }
 
-    /** Mueve un elemento de la posición `from` a la posición `to` y persiste el orden. */
-    async function handleDrop(from: number, to: number) {
-        if (isReordering || from === to) return;
-        const next = [...mediaTypes];
-        const [item] = next.splice(from, 1);
-        next.splice(to, 0, item);
-        isReordering = true;
-        // Actualización optimista: los desplegables reflejan el nuevo orden al instante
-        catalogState.setMediaTypes(
-            next,
-        );
-        try {
-            await catalogService.reorderCatalog("access_media_types", next);
-            toast.success("Orden actualizado");
-        } catch {
-            toast.error("Error al actualizar el orden");
-            await fetchMediaTypes();
-        } finally {
-            isReordering = false;
-        }
-    }
-
     function openModal(type?: any) {
         if (type) {
             editingId = type.id;
@@ -107,12 +100,20 @@
             mediaHasFloors = !!type.has_floors;
             mediaActive = type.active !== false;
             mediaBuildings = [...(buildingsByMedia[type.id] || [])];
+            mediaColor = type.color || "emerald";
+            mediaRequiresProgramming = type.requires_programming !== false;
+            mediaRequiresResponsiva = type.requires_responsiva !== false;
+            mediaRequiresIdentifier = type.requires_identifier !== false;
         } else {
             editingId = null;
             mediaName = "";
             mediaHasFloors = true;
             mediaActive = true;
             mediaBuildings = [];
+            mediaColor = "emerald";
+            mediaRequiresProgramming = true;
+            mediaRequiresResponsiva = true;
+            mediaRequiresIdentifier = true;
         }
         isModalOpen = true;
     }
@@ -124,6 +125,10 @@
                 has_floors: mediaHasFloors,
                 active: mediaActive,
                 buildingIds: mediaBuildings,
+                color: mediaColor,
+                requires_programming: mediaRequiresProgramming,
+                requires_responsiva: mediaRequiresResponsiva,
+                requires_identifier: mediaRequiresIdentifier,
             };
             await catalogService.saveMediaType(editingId, payload);
             await fetchMediaTypes();
@@ -136,12 +141,11 @@
 
     function openDeleteModal(item: any) {
         deleteTarget = { ...item, type: "media_type" };
-        deleteConfirmation = "";
         isDeleteModalOpen = true;
     }
 
     async function confirmDelete() {
-        if (!deleteTarget || deleteConfirmation !== deleteTarget.name) return;
+        if (!deleteTarget) return;
         try {
             await catalogService.deleteCatalogItem("access_media_types", deleteTarget.id, deleteTarget.name);
             await fetchMediaTypes();
@@ -155,17 +159,14 @@
 </script>
 
 <div>
-    <div class="flex justify-between items-center mb-8">
-        <div>
-            <h3 class="text-xl font-black text-slate-900 tracking-tight">Medios de Acceso</h3>
-            <p class="text-sm font-medium text-slate-500 mt-0.5">Sistemas de acceso por edificio</p>
-        </div>
-        {#if canEdit}
-            <Button variant="primary" size="sm" class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10" onclick={() => openModal()}>
-                <Plus size={18} strokeWidth={3} class="mr-2" /> Nuevo Medio
-            </Button>
-        {/if}
-    </div>
+    <CatalogSectionHeader
+        title="Medios de Acceso"
+        subtitle="Sistemas de acceso por edificio"
+        actionLabel="Nuevo Medio"
+        icon={Plus}
+        {canEdit}
+        onNew={() => openModal()}
+    />
 
     {#snippet renderMediaName(row: any)}
         <div class="flex items-center gap-3">
@@ -221,17 +222,7 @@
     >
         {#snippet actions(row: any)}
             {#if canEdit}
-                <div class="flex justify-end gap-1">
-                    <span class="p-1.5 text-slate-300 group-hover:text-slate-400 cursor-grab transition-colors" title="Arrastrar para reordenar" aria-hidden="true">
-                        <GripVertical size={16} />
-                    </span>
-                    <button class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" onclick={() => openModal(row)} title="Editar medio de acceso" aria-label="Editar medio de acceso">
-                        <Edit2 size={16} />
-                    </button>
-                    <button class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" onclick={() => openDeleteModal(row)} title="Eliminar medio de acceso" aria-label="Eliminar medio de acceso">
-                        <Trash2 size={16} />
-                    </button>
-                </div>
+                <CatalogRowActions onEdit={() => openModal(row)} onDelete={() => openDeleteModal(row)} />
             {/if}
         {/snippet}
     </DataTable>
@@ -268,16 +259,33 @@
                 <p class="text-[11px] text-rose-500 mt-1.5">Selecciona al menos un edificio.</p>
             {/if}
         </div>
+        <div>
+            <p class="block text-sm font-medium text-slate-700 mb-2">Color del medio</p>
+            <div class="flex flex-wrap gap-2">
+                {#each MEDIA_COLOR_OPTIONS as opt}
+                    {@const selected = mediaColor === opt.id}
+                    <button
+                        type="button"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold border-2 transition-all active:scale-95 {selected
+                            ? 'border-slate-900 text-slate-900 bg-slate-50'
+                            : 'border-slate-200 text-slate-500 hover:border-slate-400'}"
+                        onclick={() => (mediaColor = opt.id)}
+                        title={`Color ${opt.label}`}
+                    >
+                        <span class="{opt.dot} w-2.5 h-2.5 rounded-full inline-block"></span>
+                        {opt.label}
+                    </button>
+                {/each}
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1.5">Personaliza el color con el que se muestra este medio en la app.</p>
+        </div>
         <div class="space-y-2 pt-1">
-            <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
-                <span class="text-sm font-bold text-slate-700">Maneja pisos</span>
-                <input type="checkbox" bind:checked={mediaHasFloors} class="w-5 h-5 accent-blue-600" />
-            </label>
+            <ToggleRow label="Maneja pisos" checked={mediaHasFloors} onChange={(v) => (mediaHasFloors = v)} />
+            <ToggleRow label="Requiere programación" checked={mediaRequiresProgramming} onChange={(v) => (mediaRequiresProgramming = v)} />
+            <ToggleRow label="Requiere responsiva" checked={mediaRequiresResponsiva} onChange={(v) => (mediaRequiresResponsiva = v)} />
+            <ToggleRow label="Requiere identificador (folio)" checked={mediaRequiresIdentifier} onChange={(v) => (mediaRequiresIdentifier = v)} />
             {#if editingId}
-                <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
-                    <span class="text-sm font-bold text-slate-700">Activo</span>
-                    <input type="checkbox" bind:checked={mediaActive} class="w-5 h-5 accent-emerald-600" />
-                </label>
+                <ToggleRow label="Activo" checked={mediaActive} onChange={(v) => (mediaActive = v)} />
             {/if}
         </div>
     </div>
@@ -288,24 +296,11 @@
 </Modal>
 
 <!-- Delete Media Type Modal -->
-<Modal bind:isOpen={isDeleteModalOpen} title="Eliminar Medio de Acceso" description={`Estás a punto de eliminar "${deleteTarget?.name}". Esta acción es irreversible.`} size="sm">
-    <div class="space-y-4">
-        <div class="p-4 bg-rose-50 rounded-xl border border-rose-100">
-            <div class="flex gap-3">
-                <div class="mt-0.5 text-rose-600"><Trash2 size={20} /></div>
-                <div>
-                    <h4 class="text-sm font-bold text-rose-900">Confirmación requerida</h4>
-                    <p class="text-sm text-rose-800 mt-1">Para confirmar, escribe <strong>{deleteTarget?.name}</strong> en el campo de abajo.</p>
-                </div>
-            </div>
-        </div>
-        <div>
-            <label for="media-delete-confirm" class="block text-sm font-medium text-slate-700 mb-1">Confirmación</label>
-            <Input id="media-delete-confirm" placeholder={deleteTarget?.name} bind:value={deleteConfirmation} class="border-rose-300 focus:ring-rose-500" />
-        </div>
-    </div>
-    {#snippet footer()}
-        <Button variant="secondary" onclick={() => (isDeleteModalOpen = false)}>Cancelar</Button>
-        <Button variant="danger" onclick={confirmDelete} disabled={deleteConfirmation !== deleteTarget?.name}>Eliminar permanentemente</Button>
-    {/snippet}
-</Modal>
+<DeleteConfirmTypedModal
+    bind:isOpen={isDeleteModalOpen}
+    title="Eliminar Medio de Acceso"
+    targetName={deleteTarget?.name ?? ""}
+    confirmText="Eliminar permanentemente"
+    onConfirm={confirmDelete}
+    onCancel={() => (isDeleteModalOpen = false)}
+/>

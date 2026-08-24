@@ -1,4 +1,5 @@
 import { addLogoToSheet, autoRowHeight } from './xlsxShared';
+import { settingsState } from '../stores';
 
 export async function exportCardsToExcel(data: any[], options?: { filters?: { type?: string; status?: string; dependency?: string; search?: string } }) {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
@@ -47,7 +48,7 @@ export async function exportCardsToExcel(data: any[], options?: { filters?: { ty
 
     worksheet.mergeCells('A1:F1');
     const titleCell = worksheet.getCell('A1');
-    titleCell.value = `       INVENTARIO DE TARJETAS Y ACCESOS - NEXA${filterDescription}`;
+    titleCell.value = `       INVENTARIO DE TARJETAS Y ACCESOS - ${settingsState.orgName.toUpperCase()}${filterDescription}`;
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     worksheet.getRow(1).height = 40;
@@ -165,7 +166,7 @@ export async function exportCardsToExcel(data: any[], options?: { filters?: { ty
     });
 
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
-    const finalFileName = `Tarjetas_Nexa_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const finalFileName = `Tarjetas_${settingsState.orgName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
     saveAsFunction(new Blob([buffer]), finalFileName);
 }

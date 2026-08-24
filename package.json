@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "postbuild": "node scripts/generate-build-info.js",
-    "predev": "node scripts/generate-build-info.js",
+    "predev": "node scripts/generate-build-info.js && node scripts/generate-modules.mjs",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "prebuild": "node scripts/generate-modules.mjs",
+    "smoke:contract": "esbuild scripts/smoke-media-contract.ts --bundle --platform=node --format=esm --outfile=.smoke.mjs && node .smoke.mjs; rm -f .smoke.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

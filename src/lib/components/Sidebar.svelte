@@ -153,7 +153,7 @@
                 </button>
             {/if}
             <div
-                class="flex items-center {uiState.isSidebarCondensed ? 'justify-center p-2' : 'gap-3.5 p-4'} rounded-[22px] bg-gradient-to-b from-slate-900/50 to-slate-950/50 border border-white/5 backdrop-blur-md shadow-2xl group transition-all duration-300 hover:border-blue-500/30 hover:shadow-blue-500/5"
+                class="flex items-center {uiState.isSidebarCondensed ? 'justify-center p-2' : 'gap-3.5 p-4'} rounded-2xl bg-gradient-to-b from-slate-900/50 to-slate-950/50 border border-white/5 backdrop-blur-md shadow-2xl group transition-all duration-300 hover:border-blue-500/30 hover:shadow-blue-500/5"
             >
                 <div
                     class="h-11 w-11 flex-shrink-0 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-extrabold overflow-hidden border-2 border-slate-800 ring-2 ring-white/5 shadow-xl group-hover:scale-105 transition-all duration-300"

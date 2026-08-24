@@ -97,7 +97,7 @@
     const onDeactivate = (p: any) => {
         confirm.open({
             title: "¿DAR DE BAJA?",
-            description: "Esta persona dejará de tener acceso, pero sus datos se conservarán en el sistema. Las tarjetas pasarán a estar bloqueadas.",
+            description: "Esta persona dejará de tener acceso, pero sus datos se conservarán en el sistema. Sus tarjetas quedarán disponibles en el inventario.",
             variant: "danger",
             confirmText: "Dar de Baja",
             onConfirm: () => personnelActions.handleDeactivatePerson(p, refreshData),

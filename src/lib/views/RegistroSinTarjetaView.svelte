@@ -6,7 +6,7 @@
     import {
         SectionHeader, FilterSelect, Button, Card, DataTable,
         Badge, PermissionGuard, Pagination, FloatingActionButton,
-        ContentView, SearchInput, Input,
+        ContentView, SearchInput, Input, ExportDropdown, ExportMenuItem,
         CardlessRegistryModal, ConfirmationModal,
     } from "../components";
     import {
@@ -15,11 +15,11 @@
         Loader2,
         Trash2,
         FolderArchive,
-        ChevronDown,
         FileX,
     } from "lucide-svelte";
     import { cardlessRegistryService } from "../services/cardlessRegistry";
-    import { exportCardlessRegistryAllDependenciesAsZip, handleError } from "../utils";
+    import { exportCardlessRegistryAllDependenciesAsZip, handleError, formatDate } from "../utils";
+    import { reasonVariant } from "../constants/appearance";
     import type { CardlessRegistry } from "../types";
     import { toast } from "svelte-sonner";
     
@@ -51,7 +51,6 @@
     let editingRegistry = $state<CardlessRegistry | null>(null);
     let isExporting = $state(false);
     let isZipExporting = $state(false);
-    let showExportMenu = $state(false);
 
     let isConfirmDeleteOpen = $state(false);
     let registryToDelete = $state<CardlessRegistry | null>(null);
@@ -141,7 +140,6 @@
     }
 
     async function handleExport() {
-        showExportMenu = false;
         isExporting = true;
         try {
             const rows = await cardlessRegistryService.fetchAllMatching(
@@ -167,7 +165,6 @@
     }
 
     async function handleExportAllDepsZip() {
-        showExportMenu = false;
         if (dependencies.length === 0) {
             toast.error("No hay dependencias registradas");
             return;
@@ -200,33 +197,6 @@
         if (page === currentPage) return;
         cardlessRegistryState.pagination.currentPage = page;
         refreshData();
-    }
-
-    function getReasonVariant(reason: string) {
-        if (
-            reason.includes("Olvidada") ||
-            reason === "No la porta" ||
-            reason === "En resguardo de Enlace Administrativo"
-        ) {
-            return "amber";
-        }
-        if (reason === "Extraviada" || reason === "Robada") return "rose";
-        if (
-            reason === "Dañada" ||
-            reason === "Desmagnetizada / No funciona" ||
-            reason === "Bloqueada por Seguridad"
-        ) {
-            return "slate";
-        }
-        if (
-            reason === "No se le ha entregado" ||
-            reason.includes("proceso") ||
-            reason.includes("ingreso") ||
-            reason.includes("Reposición")
-        ) {
-            return "blue";
-        }
-        return "slate";
     }
 
 </script>
@@ -263,14 +233,14 @@
 {/snippet}
 
 {#snippet renderReason(row: CardlessRegistry)}
-    <Badge variant={getReasonVariant(row.reason)}>
+    <Badge variant={reasonVariant(row.reason)}>
         {row.reason}
     </Badge>
 {/snippet}
 
 {#snippet renderDate(row: CardlessRegistry)}
     <div class="flex flex-col">
-        <span class="text-sm text-slate-700">{new Date(row.recorded_at).toLocaleDateString("es-MX")}</span>
+        <span class="text-sm text-slate-700">{formatDate(row.recorded_at)}</span>
         <span class="text-xs text-slate-500">{new Date(row.recorded_at).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
     </div>
 {/snippet}
@@ -279,12 +249,12 @@
     <span class="text-sm text-slate-600">{row.recordedByName || "-"}</span>
 {/snippet}
 
-{#snippet renderKoneResponsiva(row: CardlessRegistry)}
+{#snippet renderResponsiva(row: CardlessRegistry)}
     {#if !row.person_id}
         <span class="text-xs text-slate-400">—</span>
-    {:else if row.kone_status_at_registration === null}
+    {:else if row.responsiva_status_at_registration === null}
         <!-- Legacy record: no snapshot stored, showing live status as fallback -->
-        {#if row.pendingKoneResponsiva}
+        {#if row.pendingResponsiva}
             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap" title="Estado actual (registro anterior al historial de snapshots)">
                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                 Pendiente
@@ -297,7 +267,7 @@
                 <span class="text-emerald-400 text-[9px]">~</span>
             </span>
         {/if}
-    {:else if row.kone_status_at_registration}
+    {:else if row.responsiva_status_at_registration}
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap" title="Estado al momento del registro">
             <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             Pendiente
@@ -395,57 +365,29 @@
         {/snippet}
 
         {#snippet actions()}
-            <div class="relative">
-                <Button
-                    variant="soft-emerald"
-                    onclick={() => (showExportMenu = !showExportMenu)}
-                    class="flex items-center gap-2.5 h-10 px-5"
-                    disabled={totalCount === 0 || !networkStore.isOnline || isExporting || isZipExporting}
-                >
-                    <FileSpreadsheet size={18} strokeWidth={2.5} class="text-emerald-600/80" />
-                    Exportar Excel
-                    <ChevronDown
-                        size={14}
-                        class="ml-1 opacity-50 transition-transform {showExportMenu ? 'rotate-180' : ''}"
+            <ExportDropdown
+                icon={FileSpreadsheet}
+                label="Exportar Excel"
+                disabled={totalCount === 0 || !networkStore.isOnline || isExporting || isZipExporting}
+            >
+                {#snippet items()}
+                    <ExportMenuItem
+                        icon={FileSpreadsheet}
+                        label={isExporting ? "Exportando..." : "Exportar (Filtro actual)"}
+                        disabled={isExporting}
+                        onclick={handleExport}
                     />
-                </Button>
-
-                {#if showExportMenu}
-                    <div
-                        class="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 z-50 py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300"
-                    >
-                        <button
-                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
-                            onclick={handleExport}
-                            disabled={isExporting}
-                        >
-                            <span class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                                <FileSpreadsheet size={16} />
-                            </span>
-                            {#if isExporting}
-                                <span class="flex items-center gap-2"><Loader2 size={14} class="animate-spin" /> Exportando...</span>
-                            {:else}
-                                Exportar (Filtro actual)
-                            {/if}
-                        </button>
-                        <div class="mx-3 my-1 border-t border-slate-100"></div>
-                        <button
-                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
-                            onclick={handleExportAllDepsZip}
-                            disabled={isZipExporting || dependencies.length === 0}
-                        >
-                            <span class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600">
-                                <FolderArchive size={16} />
-                            </span>
-                            {#if isZipExporting}
-                                <span class="flex items-center gap-2"><Loader2 size={14} class="animate-spin" /> Generando ZIP...</span>
-                            {:else}
-                                Todas las Dependencias (ZIP)
-                            {/if}
-                        </button>
-                    </div>
-                {/if}
-            </div>
+                    <div class="mx-3 my-1 border-t border-slate-100"></div>
+                    <ExportMenuItem
+                        icon={FolderArchive}
+                        label={isZipExporting ? "Generando ZIP..." : "Todas las Dependencias (ZIP)"}
+                        iconBgClass="bg-violet-50"
+                        iconColorClass="text-violet-600"
+                        disabled={isZipExporting || dependencies.length === 0}
+                        onclick={handleExportAllDepsZip}
+                    />
+                {/snippet}
+            </ExportDropdown>
 
             <PermissionGuard allowedRoles={["admin", "operator"]}>
                 <Button
@@ -515,9 +457,9 @@
                             width: "140px",
                         },
                         {
-                            key: "pendingKoneResponsiva",
-                            label: "Tarjeta KONE",
-                            render: renderKoneResponsiva,
+                            key: "responsiva_status_at_registration",
+                            label: "Estado de responsiva",
+                            render: renderResponsiva,
                             width: "160px",
                         },
                     ]}

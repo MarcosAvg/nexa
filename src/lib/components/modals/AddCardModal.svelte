@@ -3,6 +3,10 @@
     import Button from "../Button.svelte";
     import Badge from "../Badge.svelte";
     import { personnelState, catalogState } from "../../stores";
+
+    /** Mensaje cuando otro usuario modificó la tarjeta mientras se editaba. */
+    const CONFLICT_MSG =
+        "Este registro fue modificado por otra persona. Recarga e inténtalo de nuevo.";
     import {
         Search,
         CreditCard,
@@ -14,6 +18,8 @@
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
     import { cardService } from "../../services/cards";
+    import { supabase } from "../../supabase";
+    import { updateWithLock } from "../../utils/optimisticLock";
 
     /**
      * AddCardModal — Modal para asignar, crear o reponer tarjetas.
@@ -58,7 +64,7 @@
     let personnel = $derived(personnelState.pagination.items);
     let extraCards = $derived(personnelState.extraCards);
 
-    let cardType = $state<string>("P2000");
+    let cardType = $state<string>("");
     // Medios de acceso activos, para renderizar el selector dinámicamente.
     let mediaTypes = $derived.by(() =>
         catalogState.mediaTypes
@@ -99,6 +105,9 @@
             cardType = replacingCard.type;
         } else if (allowedCardTypes?.length === 1) {
             cardType = allowedCardTypes[0];
+        } else if (mediaTypes.length > 0 && !mediaTypes.some((m) => m.name === cardType)) {
+            // default al primer medio activo del catálogo (no hardcodeado)
+            cardType = mediaTypes[0].name;
         }
     });
 
@@ -249,8 +258,37 @@
 
             // CRÍTICO: Si la tarjeta ya existe en inventario, debemos pasar su ID
             // to update it instead of attempting to create a duplicate folio.
+            let updatedAt: string | null = null;
             if (status.type === "available" && status.card?.id) {
                 savePayload.id = status.card.id;
+                // Optimistic locking: recuperamos la versión (updated_at) actual de
+                // la fila para detectar ediciones concurrentes al guardar.
+                const { data: cardRow } = await supabase
+                    .from("access_media")
+                    .select("updated_at")
+                    .eq("id", status.card.id)
+                    .maybeSingle();
+                updatedAt = cardRow?.updated_at ?? null;
+            }
+
+            if (updatedAt && savePayload.id) {
+                // Guardado idempotente con los valores actuales: solo valida la versión.
+                const lock = await updateWithLock(
+                    "access_media",
+                    savePayload.id,
+                    {
+                        identifier: savePayload.folio,
+                        status: status.card?.status,
+                        person_id: status.card?.person_id ?? null,
+                        programming_status: status.card?.programming_status ?? null,
+                        responsiva_status: status.card?.responsiva_status ?? null,
+                    },
+                    updatedAt,
+                );
+                if (!lock.ok) {
+                    toast.error(CONFLICT_MSG);
+                    return;
+                }
             }
 
             // Pasar opciones de reemplazo si está reemplazando

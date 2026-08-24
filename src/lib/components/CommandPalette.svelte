@@ -18,7 +18,7 @@
     } from "lucide-svelte";
     import { personnelService } from "../services/personnel";
     import { personnelState } from "../stores";
-    import { handleError } from "../utils";
+    import { handleError, fullName } from "../utils";
     import { push } from "svelte-spa-router";
 
     let isOpen = $state(false);
@@ -130,7 +130,7 @@
 
             const peopleResults = people.slice(0, 5).map((p) => ({
                 id: p.id,
-                title: `${p.first_name} ${p.last_name}`,
+                title: fullName(p.first_name, p.last_name),
                 subtitle: `${p.employee_no || "S/E"} • ${p.dependency || "Sin dep."}`,
                 icon: User,
                 category: "Personal",

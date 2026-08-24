@@ -6,7 +6,7 @@
         SectionHeader, FilterGroup, FilterSelect, Button, Card,
         DataTable, Badge, PermissionGuard, FloatingActionButton,
         ContentView, SearchInput, Pagination,
-        AddCardModal, ConfirmationModal,
+        AddCardModal, ResponsivaProgramBadges,
     } from "../components";
     import {
         User,
@@ -176,14 +176,7 @@
     <div class="flex items-center gap-2">
         <span class="font-medium text-slate-700">{row.folio}</span>
         {#if row.personId}
-            {#if row.responsiva_status === "legacy"}
-                <Badge variant="slate" class="text-[8px] px-1 py-0 h-4">LEGACY</Badge>
-            {:else if row.responsiva_status !== "signed"}
-                <Badge variant="rose" class="text-[8px] px-1 py-0 h-4">SIN RESPONSIVA</Badge>
-            {/if}
-            {#if row.programming_status !== "done"}
-                <Badge variant="blue" class="text-[8px] px-1 py-0 h-4">SIN PROGRAMAR</Badge>
-            {/if}
+            <ResponsivaProgramBadges responsiva_status={row.responsiva_status} programming_status={row.programming_status} />
         {/if}
     </div>
 {/snippet}
@@ -269,7 +262,7 @@
         data={cards}
         emptyTitle="Aún no hay tarjetas registradas"
         emptyTitleFiltered="Sin resultados"
-        emptyDescription="El inventario de tarjetas está vacío. Comienza registrando la primera tarjeta P2000, KONE o AccessPRO."
+        emptyDescription="El inventario de tarjetas está vacío. Comienza registrando la primera tarjeta de acceso."
         emptyDescriptionFiltered="No encontramos tarjetas con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={CreditCard}
         emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"                    hasFilters={!!(cardState.filters.search || cardState.filters.type !== "Todos" || cardState.filters.status !== "Todas" || cardState.filters.dependencyId)}
@@ -410,17 +403,6 @@
         replacingCard = null;
         isModalOpen = false;
     }}
-/>
-
-<ConfirmationModal
-    bind:isOpen={confirm.isOpen}
-    title={confirm.title}
-    description={confirm.description}
-    variant={confirm.variant}
-    confirmText={confirm.confirmText}
-    cancelText={confirm.cancelText}
-    onConfirm={confirm.onConfirm}
-    onCancel={() => confirm.close()}
 />
 
 <PermissionGuard requireEdit>

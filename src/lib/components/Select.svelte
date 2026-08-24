@@ -49,8 +49,8 @@
         {id}
         bind:value
         {disabled}
-        class="w-full h-full px-4 pr-10 rounded-xl border border-slate-200 bg-white/50 backdrop-blur-sm text-[14px] font-medium text-slate-700
-               focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+        class="w-full h-full px-4 pr-10 rounded-xl border border-slate-200 bg-white text-[14px] font-medium text-slate-700
+               focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
         {onchange}
     >
         {#if placeholder}

@@ -1,5 +1,6 @@
 <script lang="ts">
     import Badge from "./Badge.svelte";
+    import ResponsivaProgramBadges from "./ResponsivaProgramBadges.svelte";
     import Button from "./Button.svelte";
     import {
         FileSignature,
@@ -92,20 +93,7 @@
             </Badge>
             <span class="text-sm font-bold text-slate-800">{folio}</span>
 
-            {#if responsiva_status === "legacy"}
-                <Badge variant="slate" class="text-[8px] px-1 py-0 h-4"
-                    >LEGACY</Badge
-                >
-            {:else if responsiva_status !== "signed"}
-                <Badge variant="rose" class="text-[8px] px-1 py-0 h-4"
-                    >SIN RESPONSIVA</Badge
-                >
-            {/if}
-            {#if programming_status !== "done"}
-                <Badge variant="blue" class="text-[8px] px-1 py-0 h-4"
-                    >SIN PROGRAMAR</Badge
-                >
-            {/if}
+            <ResponsivaProgramBadges {responsiva_status} {programming_status} />
         </div>
         <Badge
             variant={status === "active"

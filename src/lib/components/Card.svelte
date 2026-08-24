@@ -22,9 +22,7 @@
     let { class: className = "", children, ...rest }: Props = $props();
 
     const baseStyles =
-        "rounded-2xl border border-slate-200/50 bg-white/90 backdrop-blur-sm text-slate-950 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300/50";
-
-    let computedClass = $derived(twMerge(baseStyles, className));
+        "rounded-2xl border border-slate-200/50 bg-white/90 backdrop-blur-sm text-slate-950 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300/50";    let computedClass = $derived(twMerge(baseStyles, className));
 </script>
 
 <div class={computedClass} {...rest}>

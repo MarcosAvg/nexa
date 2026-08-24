@@ -6,7 +6,11 @@
     import Input from "../Input.svelte";
     import Modal from "../Modal.svelte";
     import DataTable from "../DataTable.svelte";
-    import { Plus, Edit2, Trash2, GripVertical } from "lucide-svelte";
+    import DeleteConfirmTypedModal from "../DeleteConfirmTypedModal.svelte";
+    import CatalogSectionHeader from "./CatalogSectionHeader.svelte";
+    import CatalogRowActions from "./CatalogRowActions.svelte";
+    import { useCatalogReorder } from "./useCatalogReorder.svelte";
+    import { Plus } from "lucide-svelte";
 
     /**
      * DependencyCatalog — Gestión de dependencias (CRUD).
@@ -23,8 +27,13 @@
 
     let dependencies = $derived(catalogState.dependencies);
 
-    // Estado de reordenamiento (evita clics consecutivos en vuelo)
-    let isReordering = $state(false);
+    // Reordenamiento con actualización optimista y rollback
+    const { isReordering, handleDrop } = useCatalogReorder({
+        table: "dependencies",
+        getItems: () => dependencies,
+        setItems: (items: any[]) => catalogState.setDependencies(items),
+        fetchFn: fetchDependencies,
+    });
 
     // Add/Edit modal state
     let isModalOpen = $state(false);
@@ -34,31 +43,10 @@
     // Delete modal state
     let isDeleteModalOpen = $state(false);
     let deleteTarget = $state<any>(null);
-    let deleteConfirmation = $state("");
 
     async function fetchDependencies() {
         const data = await catalogService.fetchDependencies();
         catalogState.setDependencies(data);
-    }
-
-    /** Mueve un elemento de la posición `from` a la posición `to` y persiste el orden. */
-    async function handleDrop(from: number, to: number) {
-        if (isReordering || from === to) return;
-        const next = [...dependencies];
-        const [item] = next.splice(from, 1);
-        next.splice(to, 0, item);
-        isReordering = true;
-        // Actualización optimista: los desplegables reflejan el nuevo orden al instante
-        catalogState.setDependencies(next);
-        try {
-            await catalogService.reorderCatalog("dependencies", next);
-            toast.success("Orden actualizado");
-        } catch {
-            toast.error("Error al actualizar el orden");
-            await fetchDependencies();
-        } finally {
-            isReordering = false;
-        }
     }
 
     function openModal(dep?: any) {
@@ -89,12 +77,11 @@
 
     function openDeleteModal(item: any) {
         deleteTarget = { ...item, type: "dependency" };
-        deleteConfirmation = "";
         isDeleteModalOpen = true;
     }
 
     async function confirmDelete() {
-        if (!deleteTarget || deleteConfirmation !== deleteTarget.name) return;
+        if (!deleteTarget) return;
         try {
             await catalogService.deleteCatalogItem("dependencies", deleteTarget.id, deleteTarget.name);
             await fetchDependencies();
@@ -108,17 +95,14 @@
 </script>
 
 <div>
-    <div class="flex justify-between items-center mb-8">
-        <div>
-            <h3 class="text-xl font-black text-slate-900 tracking-tight">Dependencias</h3>
-            <p class="text-sm font-medium text-slate-500 mt-0.5">Áreas y departamentos registrados</p>
-        </div>
-        {#if canEdit}
-            <Button variant="primary" size="sm" class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10" onclick={() => openModal()}>
-                <Plus size={18} strokeWidth={3} class="mr-2" /> Nueva Dependencia
-            </Button>
-        {/if}
-    </div>
+    <CatalogSectionHeader
+        title="Dependencias"
+        subtitle="Áreas y departamentos registrados"
+        actionLabel="Nueva Dependencia"
+        icon={Plus}
+        {canEdit}
+        onNew={() => openModal()}
+    />
 
     <DataTable
         data={dependencies}
@@ -127,17 +111,7 @@
     >
         {#snippet actions(row: any)}
             {#if canEdit}
-                <div class="flex justify-end gap-1">
-                    <span class="p-1.5 text-slate-300 group-hover:text-slate-400 cursor-grab transition-colors" title="Arrastrar para reordenar" aria-hidden="true">
-                        <GripVertical size={16} />
-                    </span>
-                    <button class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" onclick={() => openModal(row)} title="Editar dependencia" aria-label="Editar dependencia">
-                        <Edit2 size={16} />
-                    </button>
-                    <button class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" onclick={() => openDeleteModal(row)} title="Eliminar dependencia" aria-label="Eliminar dependencia">
-                        <Trash2 size={16} />
-                    </button>
-                </div>
+                <CatalogRowActions onEdit={() => openModal(row)} onDelete={() => openDeleteModal(row)} />
             {/if}
         {/snippet}
     </DataTable>
@@ -158,24 +132,11 @@
 </Modal>
 
 <!-- Delete Dependency Modal -->
-<Modal bind:isOpen={isDeleteModalOpen} title="Eliminar Dependencia" description={`Estás a punto de eliminar "${deleteTarget?.name}". Esta acción es irreversible.`} size="sm">
-    <div class="space-y-4">
-        <div class="p-4 bg-rose-50 rounded-xl border border-rose-100">
-            <div class="flex gap-3">
-                <div class="mt-0.5 text-rose-600"><Trash2 size={20} /></div>
-                <div>
-                    <h4 class="text-sm font-bold text-rose-900">Confirmación requerida</h4>
-                    <p class="text-sm text-rose-800 mt-1">Para confirmar, escribe <strong>{deleteTarget?.name}</strong> en el campo de abajo.</p>
-                </div>
-            </div>
-        </div>
-        <div>
-            <label for="dep-delete-confirm" class="block text-sm font-medium text-slate-700 mb-1">Confirmación</label>
-            <Input id="dep-delete-confirm" placeholder={deleteTarget?.name} bind:value={deleteConfirmation} class="border-rose-300 focus:ring-rose-500" />
-        </div>
-    </div>
-    {#snippet footer()}
-        <Button variant="secondary" onclick={() => (isDeleteModalOpen = false)}>Cancelar</Button>
-        <Button variant="danger" onclick={confirmDelete} disabled={deleteConfirmation !== deleteTarget?.name}>Eliminar permanentemente</Button>
-    {/snippet}
-</Modal>
+<DeleteConfirmTypedModal
+    bind:isOpen={isDeleteModalOpen}
+    title="Eliminar Dependencia"
+    targetName={deleteTarget?.name ?? ""}
+    confirmText="Eliminar permanentemente"
+    onConfirm={confirmDelete}
+    onCancel={() => (isDeleteModalOpen = false)}
+/>

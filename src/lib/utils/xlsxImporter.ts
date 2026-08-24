@@ -1,4 +1,12 @@
 import ExcelJS from 'exceljs';
+import { TICKET_TYPES } from '../constants/tickets';
+import {
+    activeMediaTypes,
+    altasMediaCols,
+    modifMediaCols,
+    reposMediaCols,
+    type MediaInfo,
+} from './mediaContract';
 
 // ─────────────────────────────────────────
 // Tipos
@@ -6,14 +14,10 @@ import ExcelJS from 'exceljs';
 
 export type SheetKey =
     | 'altas'
-    | 'altas_accesspro'
     | 'modificaciones'
     | 'baja_persona'
-    | 'baja_accesspro'
     | 'reposicion'
-    | 'reposicion_accesspro'
-    | 'reporte_falla'
-    | 'reporte_falla_accesspro';
+    | 'reporte_falla';
 
 export interface ParsedRow {
     rowNumber: number;
@@ -38,34 +42,82 @@ export interface ImportParseResult {
     hasAnyData: boolean;
 }
 
-// ─────────────────────────────────────────
-// Configuración por hoja
-// ─────────────────────────────────────────
-
 type ColDef = { field: string; label: string; required?: boolean };
 
-type SheetConfig = {
+// ─────────────────────────────────────────
+// Mapeo de tipo de ticket
+// ─────────────────────────────────────────
+
+export const SHEET_TO_TICKET_TYPE: Record<SheetKey, string> = {
+    altas: 'Alta de Persona',
+    modificaciones: TICKET_TYPES.modificacion,
+    baja_persona: 'Baja de Persona',
+    reposicion: 'Reposición',
+    reporte_falla: 'Reporte de Falla',
+};
+
+export const FIELD_LABELS: Record<string, string> = {
+    apellidos: 'Apellidos',
+    nombres: 'Nombres',
+    tipo_personal: 'Tipo de Personal',
+    no_empleado: 'No. Empleado',
+    dependencia: 'Dependencia',
+    edificio: 'Edificio',
+    piso_base: 'Piso Base',
+    area: 'Área / Equipo',
+    puesto: 'Puesto',
+    nuevo_apellido: 'Nuevo Apellido',
+    nuevo_nombre: 'Nuevo Nombre',
+    nueva_dep: 'Nueva Dependencia',
+    nuevo_edificio: 'Nuevo Edificio',
+    nuevo_piso: 'Nuevo Piso Base',
+    nueva_area: 'Nueva Área',
+    nuevo_puesto: 'Nuevo Puesto',
+    acceso1: 'Acceso Especial 1',
+    acceso2: 'Acceso Especial 2',
+    acceso3: 'Acceso Especial 3',
+    accion_acc: 'Acción Acc. Esp.',
+    horario: 'Horario',
+    hora_entrada: 'Hora Entrada',
+    hora_salida: 'Hora Salida',
+    correo: 'Correo Electrónico',
+    tipo_baja: 'Tipo de Baja',
+    motivo: 'Motivo',
+    observaciones: 'Observaciones',
+    observacion: 'Observaciones',
+    tipo_tarjeta: 'Tipo de Tarjeta',
+    folio: 'Folio de Tarjeta',
+    ubicacion: 'Edificio / Lugar donde falla',
+    descripcion: 'Descripción del Problema',
+    desde_cuando: '¿Desde cuándo ocurre?',
+    urgencia: 'Urgencia',
+};
+
+// ─────────────────────────────────────────
+// Configuración por hoja (base + columnas de medio dinámicas)
+// ─────────────────────────────────────────
+
+type BaseSheetCols = {
     name: string;
     label: string;
     dataStartRow: number;
-    cols: ColDef[];
-    /**
-     * Columna de encabezados que identifica de forma inequívoca esta hoja
-     * cuando su nombre se comparte entre plantillas
-     * (p. ej. '✅ ALTAS' existe en la plantilla general y en la de AccessPRO).
-     */
-    signature?: { col: number; contains: string };
-    /** Nombres alternativos de la hoja (plantillas generadas con nomenclatura anterior). */
-    aliases?: string[];
+    base: ColDef[];
+    /** Posición (índice 1-based) donde se inserta el bloque de columnas de medio. */
+    mediaInsertAfter: number;
+    /** Bloques que van DESPUÉS del bloque de medio. */
+    trailing: ColDef[];
+    /** Columnas de medio a generar. Por defecto TODAS. */
+    mediaKind: 'altas' | 'modif' | 'repos' | 'none';
 };
 
-const SHEET_CONFIG: Record<SheetKey, SheetConfig> = {
+const SHEET_DEFS: Record<SheetKey, BaseSheetCols> = {
     altas: {
         name: '✅ ALTAS',
         label: 'Altas',
         dataStartRow: 5,
-        signature: { col: 3, contains: 'Tipo de Personal' },
-        cols: [
+        mediaInsertAfter: 9, // tras "Puesto"
+        mediaKind: 'altas',
+        base: [
             { field: 'apellidos', label: 'Apellidos', required: true },
             { field: 'nombres', label: 'Nombres', required: true },
             { field: 'tipo_personal', label: 'Tipo de Personal', required: true },
@@ -75,10 +127,8 @@ const SHEET_CONFIG: Record<SheetKey, SheetConfig> = {
             { field: 'piso_base', label: 'Piso Base', required: true },
             { field: 'area', label: 'Área / Equipo', required: true },
             { field: 'puesto', label: 'Puesto', required: true },
-            { field: 'p2000_req', label: '¿Require P2000?', required: true },
-            { field: 'pisos_p2000', label: 'Pisos P2000' },
-            { field: 'kone_req', label: '¿Requiere KONE?', required: true },
-            { field: 'pisos_kone', label: 'Pisos KONE' },
+        ],
+        trailing: [
             { field: 'acceso1', label: 'Acceso Especial 1' },
             { field: 'acceso2', label: 'Acceso Especial 2' },
             { field: 'acceso3', label: 'Acceso Especial 3' },
@@ -92,9 +142,11 @@ const SHEET_CONFIG: Record<SheetKey, SheetConfig> = {
         name: '✏️ MODIFICACIONES',
         label: 'Modificaciones',
         dataStartRow: 5,
-        cols: [
-            { field: 'apellidos', label: 'Apellidos', required: true },
-            { field: 'nombres', label: 'Nombres', required: true },
+        mediaInsertAfter: 10, // tras "Nuevo Puesto"
+        mediaKind: 'modif',
+        base: [
+            { field: 'apellidos', label: 'Apellidos (como aparece en sistema)', required: true },
+            { field: 'nombres', label: 'Nombres (como aparece en sistema)', required: true },
             { field: 'no_empleado', label: 'No. Empleado' },
             { field: 'nuevo_apellido', label: 'Nuevo Apellido' },
             { field: 'nuevo_nombre', label: 'Nuevo Nombre' },
@@ -103,10 +155,8 @@ const SHEET_CONFIG: Record<SheetKey, SheetConfig> = {
             { field: 'nuevo_piso', label: 'Nuevo Piso Base' },
             { field: 'nueva_area', label: 'Nueva Área' },
             { field: 'nuevo_puesto', label: 'Nuevo Puesto' },
-            { field: 'accion_p2000', label: 'Acción P2000' },
-            { field: 'pisos_p2000', label: 'Pisos P2000' },
-            { field: 'accion_kone', label: 'Acción KONE' },
-            { field: 'pisos_kone', label: 'Pisos KONE' },
+        ],
+        trailing: [
             { field: 'accion_acc', label: 'Acción Acc. Esp.' },
             { field: 'acceso1', label: 'Acceso Esp. 1' },
             { field: 'acceso2', label: 'Acceso Esp. 2' },
@@ -119,9 +169,11 @@ const SHEET_CONFIG: Record<SheetKey, SheetConfig> = {
     },
     baja_persona: {
         name: '🚫 BAJA DE PERSONA',
-        label: 'Bajas',
+        label: 'Bajas de Persona',
         dataStartRow: 5,
-        cols: [
+        mediaInsertAfter: 0,
+        mediaKind: 'none',
+        base: [
             { field: 'apellidos', label: 'Apellidos', required: true },
             { field: 'nombres', label: 'Nombres', required: true },
             { field: 'no_empleado', label: 'No. Empleado' },
@@ -130,20 +182,21 @@ const SHEET_CONFIG: Record<SheetKey, SheetConfig> = {
             { field: 'motivo', label: 'Motivo de la Baja', required: true },
             { field: 'observaciones', label: 'Observaciones' },
         ],
+        trailing: [],
     },
     reposicion: {
         name: '🔄 REPOSICIÓN DE TARJETA',
         label: 'Reposiciones',
         dataStartRow: 5,
-        cols: [
+        mediaInsertAfter: 4, // tras "Dependencia"
+        mediaKind: 'repos',
+        base: [
             { field: 'apellidos', label: 'Apellidos', required: true },
             { field: 'nombres', label: 'Nombres', required: true },
             { field: 'no_empleado', label: 'No. Empleado' },
             { field: 'dependencia', label: 'Dependencia', required: true },
-            { field: 'reponer_p2000', label: '¿Reponer P2000?', required: true },
-            { field: 'folio_p2000', label: 'Folio P2000' },
-            { field: 'reponer_kone', label: '¿Reponer KONE?', required: true },
-            { field: 'folio_kone', label: 'Folio KONE' },
+        ],
+        trailing: [
             { field: 'motivo', label: 'Motivo', required: true },
             { field: 'observaciones', label: 'Observaciones' },
         ],
@@ -152,7 +205,9 @@ const SHEET_CONFIG: Record<SheetKey, SheetConfig> = {
         name: '🔧 REPORTE DE FALLA',
         label: 'Reportes de Falla',
         dataStartRow: 5,
-        cols: [
+        mediaInsertAfter: 0,
+        mediaKind: 'none',
+        base: [
             { field: 'apellidos', label: 'Apellidos', required: true },
             { field: 'nombres', label: 'Nombres', required: true },
             { field: 'no_empleado', label: 'No. Empleado' },
@@ -165,122 +220,59 @@ const SHEET_CONFIG: Record<SheetKey, SheetConfig> = {
             { field: 'urgencia', label: 'Urgencia', required: true },
             { field: 'observaciones', label: 'Observaciones adicionales' },
         ],
-    },
-    altas_accesspro: {
-        name: '✅ ALTAS',
-        label: 'Altas AccessPRO',
-        dataStartRow: 5,
-        signature: { col: 9, contains: 'Folio AccessPRO' },
-        aliases: ['✅ ALTAS ACCESSPRO'],
-        cols: [
-            { field: 'apellidos', label: 'Apellidos', required: true },
-            { field: 'nombres', label: 'Nombres', required: true },
-            { field: 'no_empleado', label: 'No. Empleado' },
-            { field: 'dependencia', label: 'Dependencia', required: true },
-            { field: 'edificio', label: 'Edificio', required: true },
-            { field: 'piso_base', label: 'Piso Base', required: true },
-            { field: 'area', label: 'Área / Equipo', required: true },
-            { field: 'puesto', label: 'Puesto', required: true },
-            // El folio es OPCIONAL: el alta puede ser de una persona
-            // sin tarjeta asignada aún, o con su folio ya conocido.
-            { field: 'folio_accesspro', label: 'Folio AccessPRO' },
-            { field: 'horario', label: 'Horario', required: true },
-            { field: 'hora_entrada', label: 'Hora Entrada', required: true },
-            { field: 'hora_salida', label: 'Hora Salida', required: true },
-            { field: 'correo', label: 'Correo Electrónico' },
-        ],
-    },
-    baja_accesspro: {
-        name: '🚫 BAJA',
-        label: 'Bajas AccessPRO',
-        dataStartRow: 5,
-        aliases: ['🚫 BAJA ACCESSPRO'],
-        cols: [
-            { field: 'apellidos', label: 'Apellidos', required: true },
-            { field: 'nombres', label: 'Nombres', required: true },
-            { field: 'no_empleado', label: 'No. Empleado' },
-            { field: 'dependencia', label: 'Dependencia', required: true },
-            { field: 'tipo_baja', label: 'Tipo de Baja', required: true },
-            { field: 'motivo', label: 'Motivo de la Baja', required: true },
-            { field: 'observaciones', label: 'Observaciones' },
-        ],
-    },
-    reposicion_accesspro: {
-        name: '🔄 REPOSICIÓN',
-        label: 'Reposiciones AccessPRO',
-        dataStartRow: 5,
-        aliases: ['🔄 REPOSICIÓN ACCESSPRO'],
-        cols: [
-            { field: 'apellidos', label: 'Apellidos', required: true },
-            { field: 'nombres', label: 'Nombres', required: true },
-            { field: 'no_empleado', label: 'No. Empleado' },
-            { field: 'dependencia', label: 'Dependencia', required: true },
-            { field: 'folio_accesspro_repo', label: 'Folio AccessPRO a reponer' },
-            { field: 'motivo', label: 'Motivo', required: true },
-            { field: 'observaciones', label: 'Observaciones' },
-        ],
-    },
-    reporte_falla_accesspro: {
-        name: '🔧 REPORTE FALLA',
-        label: 'Reportes Falla AccessPRO',
-        dataStartRow: 5,
-        aliases: ['🔧 REPORTE FALLA ACCESSPRO'],
-        cols: [
-            { field: 'apellidos', label: 'Apellidos', required: true },
-            { field: 'nombres', label: 'Nombres', required: true },
-            { field: 'no_empleado', label: 'No. Empleado' },
-            { field: 'dependencia', label: 'Dependencia', required: true },
-            { field: 'folio', label: 'Folio de Tarjeta' },
-            { field: 'ubicacion', label: 'Edificio / Lugar donde falla', required: true },
-            { field: 'descripcion', label: 'Descripción del Problema', required: true },
-            { field: 'desde_cuando', label: '¿Desde cuándo ocurre?' },
-            { field: 'urgencia', label: 'Urgencia', required: true },
-            { field: 'observaciones', label: 'Observaciones adicionales' },
-        ],
+        trailing: [],
     },
 };
 
+/** Genera el conjunto de columnas de medio según el tipo de hoja. */
+function mediaColsFor(key: SheetKey, medias: MediaInfo[]): ColDef[] {
+    const from = (cols: { key: string; label: string; required?: boolean }[]): ColDef[] =>
+        cols.map((c) => ({ field: c.key, label: c.label, required: c.required }));
+    switch (key) {
+        case 'altas':
+            return from(medias.flatMap((m) => altasMediaCols(m)));
+        case 'modificaciones':
+            return from(medias.filter((m) => m.has_floors).flatMap((m) => modifMediaCols(m)));
+        case 'reposicion':
+            return from(medias.flatMap((m) => reposMediaCols(m)));
+        default:
+            return [];
+    }
+}
+
+/** Construye la lista lógica de columnas (base + medios + trailing) para una hoja. */
+function buildCols(key: SheetKey, medias: MediaInfo[]): ColDef[] {
+    const def = SHEET_DEFS[key];
+    const media = mediaColsFor(key, medias);
+    const insert = def.mediaInsertAfter;
+    if (insert <= 0) return [...def.base, ...def.trailing];
+    return [
+        ...def.base.slice(0, insert),
+        ...media,
+        ...def.base.slice(insert),
+        ...def.trailing,
+    ];
+}
+
 // ─────────────────────────────────────────
-// Mapeo de tipo de ticket
+// Utilidades de celda/encabezado
 // ─────────────────────────────────────────
 
-export const SHEET_TO_TICKET_TYPE: Record<SheetKey, string> = {
-    altas: 'Alta de Persona',
-    altas_accesspro: 'Alta de Persona',
-    modificaciones: 'Modificación',
-    baja_persona: 'Baja de Persona',
-    baja_accesspro: 'Baja de Persona',
-    reposicion: 'Reposición',
-    reposicion_accesspro: 'Reposición',
-    reporte_falla: 'Reporte de Falla',
-    reporte_falla_accesspro: 'Reporte de Falla',
-};
-
-/** Formats an Excel cell value as a clean string.
- * - Date objects with year 1899/1900 → time: "HH:MM" (Excel stores times as day fractions with 1899-12-30 as epoch)
- * - Other Date objects → "DD/MM/YYYY HH:MM"
- * - Formula cells → their computed result
- * - Everything else → trimmed string
- */
 function cellText(cell: ExcelJS.Cell): string {
     const v = cell.value;
     if (v === null || v === undefined) return '';
 
-    // Fórmula: usar resultado calculado
     if (typeof v === 'object' && 'result' in v) {
         return cellText({ ...cell, value: (v as any).result } as ExcelJS.Cell);
     }
 
-    // Objeto Date (ExcelJS devuelve horas y fechas como JS Date)
     if (v instanceof Date) {
         const y = v.getUTCFullYear();
-        // Valores solo de hora en Excel tienen fecha 1899-12-30 (año 1899 o 1900 tras redondeo)
         if (y <= 1900) {
             const hh = String(v.getUTCHours()).padStart(2, '0');
             const mm = String(v.getUTCMinutes()).padStart(2, '0');
             return `${hh}:${mm}`;
         }
-        // Fecha completa
         const dd = String(v.getUTCDate()).padStart(2, '0');
         const mo = String(v.getUTCMonth() + 1).padStart(2, '0');
         return `${dd}/${mo}/${y}`;
@@ -289,45 +281,76 @@ function cellText(cell: ExcelJS.Cell): string {
     return String(v).trim();
 }
 
-// ─────────────────────────────────────────
-// Búsqueda de etiqueta de campo (clave → etiqueta legible)
-// ─────────────────────────────────────────
-
-export const FIELD_LABELS: Record<string, string> = {};
-for (const cfg of Object.values(SHEET_CONFIG)) {
-    for (const col of cfg.cols) {
-        FIELD_LABELS[col.field] = col.label;
-    }
+/** Normaliza el texto de un encabezado: quita el asterisco de obligatorio y recorta. */
+function normalizeHeader(text: string): string {
+    return text.replace(/\s*\*\s*$/, '').trim().toLowerCase();
 }
 
-function parseSheet(ws: ExcelJS.Worksheet, key: SheetKey): ParsedSheet {
+// ─────────────────────────────────────────
+// Paráseo de una hoja por encabezados
+// ─────────────────────────────────────────
 
-    const cfg = SHEET_CONFIG[key];
+function parseSheet(ws: ExcelJS.Worksheet, key: SheetKey, cols: ColDef[]): ParsedSheet {
+    const def = SHEET_DEFS[key];
     const rows: ParsedRow[] = [];
 
+    // Mapa: (col index 1-based → texto de cabecera normalizada)
+    const headerByCol = new Map<number, string>();
+    const headerRow = def.dataStartRow - 1;
+    ws.getRow(headerRow).eachCell((cell, col) => {
+        const txt = normalizeHeader(cellText(cell));
+        if (txt) headerByCol.set(col, txt);
+    });
+
+    // Mapa: (col index 1-based → ColDef) resolviendo por etiqueta normalizada.
+    // Primero por igualdad exacta; luego por contenido (encabezado empieza/contiene label).
+    const colToDef = new Map<number, ColDef>();
+    const usedCols = new Set<number>();
+
+    const labelOf = (c: ColDef) => normalizeHeader(c.label);
+    const available = () => Array.from(headerByCol.entries()).filter(([c]) => !usedCols.has(c));
+
+    // Pase 1: igualdad exacta
+    for (const c of cols) {
+        const exact = available().find(([, h]) => h === labelOf(c));
+        if (exact) {
+            colToDef.set(exact[0], c);
+            usedCols.add(exact[0]);
+        }
+    }
+    // Pase 2: encabezado que contiene la etiqueta (o es contenida por ella)
+    for (const c of cols) {
+        if (Array.from(colToDef.values()).includes(c)) continue;
+        const lbl = labelOf(c);
+        const loose = available().find(([, h]) =>
+            h === lbl || (lbl.length > 3 && h.includes(lbl)) || (h.length > 3 && lbl.includes(h)),
+        );
+        if (loose) {
+            colToDef.set(loose[0], c);
+            usedCols.add(loose[0]);
+        }
+    }
+
     ws.eachRow((row, rowNumber) => {
-        if (rowNumber < cfg.dataStartRow) return;
+        if (rowNumber < def.dataStartRow) return;
 
         const fields: Record<string, string> = {};
         let hasData = false;
 
-        cfg.cols.forEach((col, idx) => {
-            let val = cellText(row.getCell(idx + 1));
-
-            // Sanitización: eliminar mailto: de correos
-            if (col.field === "correo" && val.toLowerCase().startsWith("mailto:")) {
-                val = val.replace(/^mailto:\s*/i, "").trim();
+        for (const [colIdx, c] of colToDef) {
+            let val = cellText(row.getCell(colIdx));
+            if (c.field === 'correo' && val.toLowerCase().startsWith('mailto:')) {
+                val = val.replace(/^mailto:\s*/i, '').trim();
             }
-
-            fields[col.field] = val;
+            fields[c.field] = val;
             if (val) hasData = true;
-        });
+        }
 
-        if (!hasData) return; // skip empty rows
+        if (!hasData) return;
 
-        const missingRequired = cfg.cols
-            .filter(c => c.required && !fields[c.field])
-            .map(c => c.label);
+        const missingRequired = cols
+            .filter((c) => c.required && !fields[c.field])
+            .map((c) => FIELD_LABELS[c.field] ?? c.label);
 
         rows.push({
             rowNumber,
@@ -337,10 +360,10 @@ function parseSheet(ws: ExcelJS.Worksheet, key: SheetKey): ParsedSheet {
         });
     });
 
-    const validCount = rows.filter(r => r.isValid).length;
+    const validCount = rows.filter((r) => r.isValid).length;
     return {
         key,
-        label: cfg.label,
+        label: def.label,
         rows,
         validCount,
         invalidCount: rows.length - validCount,
@@ -348,23 +371,21 @@ function parseSheet(ws: ExcelJS.Worksheet, key: SheetKey): ParsedSheet {
 }
 
 // ─────────────────────────────────────────
-// Utilidades
+// Parsing of floors
 // ─────────────────────────────────────────
 
 /** Parses a string of floors into a naturally sorted array of strings. */
 export function parseFloors(floorsStr: string | null | undefined): string[] {
     if (!floorsStr) return [];
-    
-    // Excel puede convertir "13,14" en un número decimal 13.14
-    // Reemplazamos la palabra " y " por coma y dividimos por delimitadores naturales
+
     const parsed = String(floorsStr)
         .replace(/\by\b/gi, ',')
         .split(/[,;|.]/)
         .map((s) => s.trim())
         .filter(Boolean);
-        
-    return [...new Set(parsed)].sort((a, b) => 
-        a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+
+    return [...new Set(parsed)].sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }),
     );
 }
 
@@ -372,45 +393,30 @@ export function parseFloors(floorsStr: string | null | undefined): string[] {
 // Exportación principal
 // ─────────────────────────────────────────
 
-export async function parseTemplateFile(file: File): Promise<ImportParseResult> {
+/**
+ * Parsea el archivo de plantilla en hojas/personas.
+ *
+ * - `mediaTypes` indica los medios activos del catálogo; define qué columnas de
+ *   medio esperar (acorde al contrato de `mediaContract`) y sus claves.
+ * - La lectura es por encabezado (no posición), por lo que el orden de medios
+ *   al importar puede diferir del de generación sin romper el mapeo.
+ */
+export async function parseTemplateFile(file: File, mediaTypes?: any[]): Promise<ImportParseResult> {
+    const medias = activeMediaTypes(mediaTypes);
+
     const buffer = await file.arrayBuffer();
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buffer);
 
-    // Nombre de hoja → claves que lo reclaman. Cuando varias configuraciones
-    // comparten el mismo nombre (p. ej. '✅ ALTAS' en la plantilla general y en
-    // la de AccessPRO), se desambigua con la firma de encabezados de cada una.
-    const claims = new Map<string, SheetKey[]>();
-    for (const [key, cfg] of Object.entries(SHEET_CONFIG) as [SheetKey, SheetConfig][]) {
-        for (const candidate of [cfg.name, ...(cfg.aliases ?? [])]) {
-            const list = claims.get(candidate) ?? [];
-            if (!list.includes(key)) list.push(key);
-            claims.set(candidate, list);
-        }
-    }
-
-    const resolveWorksheet = (key: SheetKey): ExcelJS.Worksheet | undefined => {
-        const cfg = SHEET_CONFIG[key];
-        for (const candidate of [cfg.name, ...(cfg.aliases ?? [])]) {
-            const ws = wb.getWorksheet(candidate);
-            if (!ws) continue;
-            const shared = (claims.get(candidate) ?? []).length > 1;
-            if (shared && cfg.signature) {
-                const headerRow = cfg.dataStartRow - 1;
-                const header = cellText(ws.getCell(headerRow, cfg.signature.col)).toLowerCase();
-                if (!header.includes(cfg.signature.contains.toLowerCase())) continue;
-            }
-            return ws;
-        }
-        return undefined;
-    };
-
     const sheets: ParsedSheet[] = [];
 
-    for (const key of Object.keys(SHEET_CONFIG) as SheetKey[]) {
-        const ws = resolveWorksheet(key);
+    for (const key of Object.keys(SHEET_DEFS) as SheetKey[]) {
+        const def = SHEET_DEFS[key];
+        const ws = wb.getWorksheet(def.name) ?? wb.getWorksheet(def.label);
         if (!ws) continue;
-        const parsed = parseSheet(ws, key);
+
+        const cols = buildCols(key, medias);
+        const parsed = parseSheet(ws, key, cols);
         if (parsed.rows.length > 0) {
             sheets.push(parsed);
         }

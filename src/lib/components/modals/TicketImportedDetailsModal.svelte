@@ -16,10 +16,11 @@
     import { floorsForKey } from "../../services/accessAssignments";
     import { HistoryService } from "../../services/history";
     import { catalogState, personnelState } from "../../stores";
+    import { activeMediaTypes } from "../../utils/mediaContract";
     import InfoCard from "../InfoCard.svelte";
     import CardCheckItem from "../CardCheckItem.svelte";
     import { toast } from "svelte-sonner";
-    import { handleError, parseFloors } from "../../utils";
+    import { handleError, parseFloors, capitalize } from "../../utils";
     import {
         AlertCircle,
         CheckCircle2,
@@ -32,6 +33,7 @@
         MapPin,
         Calendar,
         FileText,
+        Search,
     } from "lucide-svelte";
 
 
@@ -56,10 +58,20 @@
     let selectedPerson = $state<any>(null);
     let searchDone = $state(false);
 
+    // ── Búsqueda manual (cuando el auto-search no encuentra) ──
+    let manualQuery = $state("");
+    let manualSearching = $state(false);
+    let manualCandidates = $state<any[]>([]);
+
+    // ── Estado de seguimiento del Reporte de Falla ──
+    let seguimientoEstado = $state<"En revisión" | "Requiere reposición" | "Resuelto">("En revisión");
+
     // Sub-modales
     let isCompareOpen = $state(false);
     let compareTicket = $state<any>(null);
     let isRejectOpen = $state(false);
+    let isConfirmCloseOpen = $state(false);
+    let pendingCloseNote = $state<string>("Ticket cerrado.");
 
     let p = $derived(ticket?.payload ?? {});
     let ticketType = $derived(ticket?.type ?? "");
@@ -97,6 +109,41 @@
         }
     }
 
+    /** Búsqueda manual por nombre (con debounce) cuando el auto-search no da resultado. */
+    let manualDebounce: ReturnType<typeof setTimeout> | undefined;
+    async function runManualSearch() {
+        const q = manualQuery.trim();
+        if (!q) {
+            manualCandidates = [];
+            return;
+        }
+        manualSearching = true;
+        try {
+            const terms = q.split(/\s+/).filter(Boolean);
+            const apellidos = terms[0] ?? "";
+            const nombres = terms.slice(1).join(" ");
+            const results = await personnelService.searchByName(
+                apellidos,
+                nombres,
+            );
+            manualCandidates = results;
+        } catch {
+            manualCandidates = [];
+        } finally {
+            manualSearching = false;
+        }
+    }
+    function onManualQuery() {
+        if (manualDebounce) clearTimeout(manualDebounce);
+        manualDebounce = setTimeout(runManualSearch, 250);
+    }
+    function pickManualCandidate(person: any) {
+        selectedPerson = person;
+        manualCandidates = [];
+        manualQuery = "";
+        searchDone = true;
+    }
+
     // ── Catalog helpers ───────────────────────────────────
     function resolveId(catalog: { id: any; name: string }[], value: string) {
         if (!value) return null;
@@ -104,6 +151,36 @@
             catalog.find((c) => c.name.toLowerCase() === value.toLowerCase()) ??
             null
         );
+    }
+
+    // ── Medios (catálogo genérico con fallback por defecto) ──────────────
+    type MediaInfoLike = { key: string; name: string; has_floors: boolean };
+
+    const DEFAULT_MEDIAS: MediaInfoLike[] = [
+        { key: 'p2000', name: 'P2000', has_floors: true },
+        { key: 'kone', name: 'KONE', has_floors: true },
+        { key: 'accesspro', name: 'AccessPRO', has_floors: false },
+    ];
+
+    /** Medios activos del catálogo (con fallback al catálogo por defecto). */
+    let activeMedias = $derived.by((): MediaInfoLike[] => {
+        const list = activeMediaTypes(catalogState.mediaTypes);
+        return list.length > 0 ? list : DEFAULT_MEDIAS;
+    });
+
+    /** Medios con pisos (para la sección de MODIFICACIÓN). */
+    let floorMedias = $derived.by(() => activeMedias.filter((m) => m.has_floors));
+
+    /** Clave de medio a partir del nombre (p.ej. "P2000" → "p2000"). */
+    function mediaKeyForName(name: string): string {
+        const m = activeMedias.find((mm) => mm.name === name);
+        return m ? m.key : name.toLowerCase();
+    }
+
+    /** Folio solicitado en el payload para el tipo de tarjeta dado. */
+    function folioForType(type: string): string | undefined {
+        const key = mediaKeyForName(type);
+        return (p as any)[`folio_${key}`] || undefined;
     }
 
     // ── MODIFICACIÓN: build compareTicket for ModificationCompareModal ──
@@ -165,38 +242,32 @@
             return false;
         };
 
-        let proposedP2000 = [...floorsForKey(selectedPerson.floors, "p2000")];
-        if (p.accion_p2000) {
-            const action = p.accion_p2000;
-            const parsedFloors = parseFloors(p.pisos_p2000);
-
-            if (isAction(action, "clear")) proposedP2000 = [];
-            else if (isAction(action, "replace")) proposedP2000 = parsedFloors;
-            else if (isAction(action, "add"))
-                proposedP2000 = parseFloors([...proposedP2000, ...parsedFloors].join(","));
-            else if (isAction(action, "remove"))
-                proposedP2000 = proposedP2000.filter(
-                    (f) => !parsedFloors.includes(f),
-                );
+        // Pisos por clave de medio (derivados del catálogo con has_floors).
+        const floorMediaKeys = Array.from(new Set(
+            catalogState.mediaTypes
+                .filter((m: any) => m.active !== false && m.has_floors)
+                .map((m: any) => m.key),
+        ));
+        for (const key of floorMediaKeys) {
+            const cap = capitalize(key);
+            const proposed = [...floorsForKey(selectedPerson.floors, key)];
+            const action = (p as any)[`accion_${key}`];
+            const pisos = (p as any)[`pisos_${key}`];
+            if (action) {
+                const parsedFloors = parseFloors(pisos);
+                if (isAction(action, "clear")) proposed.length = 0;
+                else if (isAction(action, "replace")) proposed.splice(0, proposed.length, ...parsedFloors);
+                else if (isAction(action, "add"))
+                    proposed.splice(0, proposed.length,
+                        ...Array.from(new Set([...proposed, ...parsedFloors])));
+                else if (isAction(action, "remove"))
+                    proposed.splice(0, proposed.length,
+                        ...proposed.filter((f) => !parsedFloors.includes(f)));
+            }
+            // Forzar al modal de comparación a mostrar diferencias pasando los arrays generados
+            modifiedPayload[`floors_${key}`] = proposed;
+            modifiedPayload[`pisos${cap}`] = proposed;
         }
-        // Forzar al modal de comparación a mostrar diferencias pasando los arrays generados
-        modifiedPayload.floors_p2000 = proposedP2000;
-
-        let proposedKONE = [...floorsForKey(selectedPerson.floors, "kone")];
-        if (p.accion_kone) {
-            const action = p.accion_kone;
-            const parsedFloors = parseFloors(p.pisos_kone);
-
-            if (isAction(action, "clear")) proposedKONE = [];
-            else if (isAction(action, "replace")) proposedKONE = parsedFloors;
-            else if (isAction(action, "add"))
-                proposedKONE = parseFloors([...proposedKONE, ...parsedFloors].join(","));
-            else if (isAction(action, "remove"))
-                proposedKONE = proposedKONE.filter(
-                    (f) => !parsedFloors.includes(f),
-                );
-        }
-        modifiedPayload.floors_kone = proposedKONE;
 
         let proposedAccesses = [...(selectedPerson.specialAccesses || [])];
         if (p.accion_acc) {
@@ -271,65 +342,31 @@
         const cards: any[] = (selectedPerson.cards ?? []).filter(
             (c: any) => c.status === "active",
         );
-        const wantsP2000 = ["sí", "si"].includes(
-            (p.reponer_p2000 ?? "").toLowerCase(),
-        );
-        const wantsKONE = ["sí", "si"].includes(
-            (p.reponer_kone ?? "").toLowerCase(),
-        );
-        const wantsAccessPro =
-            ["sí", "si"].includes(
-                (p.reponer_accesspro ?? "").toLowerCase(),
-            ) || (p.folio_accesspro ?? "").trim().length > 0;
+        const YES = ["sí", "si"];
 
         const checks: FolioCheck[] = [];
 
-        if (wantsP2000) {
-            const folioSought = p.folio_p2000?.trim();
-            const p2000Cards = cards.filter((c: any) => c.type === "P2000");
-            if (p2000Cards.length === 0) {
-                // Sin tarjeta P2000 activa
+        // Deriva los tipos de medio desde el catálogo; cada uno se busca por
+        // sus columnas de reposición (reponer_<key> / folio_<key>).
+        const replacementMediaKeys = Array.from(new Set(
+            catalogState.mediaTypes
+                .filter((m: any) => m.active !== false)
+                .map((m: any) => ({ key: m.key, name: m.name })),
+        ));
+        for (const media of replacementMediaKeys) {
+            const wanted = YES.includes(((`reponer_${media.key}` as any) in p ? (p as any)[`reponer_${media.key}`] : "").toLowerCase());
+            const folioSought = (p as any)[`folio_${media.key}`]?.trim();
+            const wantFolio = (p as any)[`folio_${media.key}`]?.trim().length > 0 || YES.includes((p[`reponer_${media.key}`] ?? "").toLowerCase());
+            if (!wanted && !wantFolio) continue;
+            const mediaCards = cards.filter((c: any) => c.type === media.name);
+            if (mediaCards.length === 0) {
                 checks.push({
-                    card: { type: "P2000", folio: folioSought ?? "—" },
+                    card: { type: media.name, folio: folioSought ?? "—" },
                     match: false,
                     warning: true,
                 });
             } else {
-                for (const c of p2000Cards) {
-                    const match = !folioSought || c.folio === folioSought;
-                    checks.push({ card: c, match, warning: !match });
-                }
-            }
-        }
-        if (wantsKONE) {
-            const folioSought = p.folio_kone?.trim();
-            const koneCards = cards.filter((c: any) => c.type === "KONE");
-            if (koneCards.length === 0) {
-                checks.push({
-                    card: { type: "KONE", folio: folioSought ?? "—" },
-                    match: false,
-                    warning: true,
-                });
-            } else {
-                for (const c of koneCards) {
-                    const match = !folioSought || c.folio === folioSought;
-                    checks.push({ card: c, match, warning: !match });
-                }
-            }
-        }
-        if (wantsAccessPro) {
-            const folioSought = (p.folio_accesspro_repo ?? p.folio_accesspro)?.trim();
-            const accessproCards = cards.filter(
-                (c: any) => c.type === "AccessPRO",
-            );
-            if (accessproCards.length === 0) {
-                checks.push({
-                    card: { type: "AccessPRO", folio: folioSought ?? "—" },
-                    match: false,
-                    warning: true,
-                });
-            } else {
-                for (const c of accessproCards) {
+                for (const c of mediaCards) {
                     const match = !folioSought || c.folio === folioSought;
                     checks.push({ card: c, match, warning: !match });
                 }
@@ -349,14 +386,45 @@
 
     async function handleMarkReposicionDone() {
         if (!ticket) return;
+        // Validar que exista al menos una tarjeta del medio identificada
+        // (con folio) antes de cerrar la reposición como gestionada.
+        if (!folioChecks.some((c) => !!c.card?.id)) {
+            toast.warning(
+                "No se puede marcar como gestionado sin una tarjeta del medio identificada. Verifique el folio/tarjeta a reponer.",
+            );
+            return;
+        }
+        pendingCloseNote = "Reposición gestionada";
+        isConfirmCloseOpen = true;
+    }
+
+    async function doCloseTicket() {
+        if (!ticket) return;
         isSubmitting = true;
         try {
-            await ticketService.delete(ticket.id, "Reposición gestionada");
-            toast.success("Ticket de reposición cerrado.");
+            await ticketService.delete(ticket.id, pendingCloseNote);
+            toast.success("Ticket cerrado.");
             isOpen = false;
             onComplete?.();
         } catch (err) {
-            handleError(err, "Cerrar Reposición");
+            handleError(err, "Cerrar Ticket");
+        } finally {
+            isSubmitting = false;
+            isConfirmCloseOpen = false;
+        }
+    }
+
+    /** Cierre directo (sin confirmación) para flujos automáticos. */
+    async function closeTicketNow(note: string) {
+        if (!ticket) return;
+        isSubmitting = true;
+        try {
+            await ticketService.delete(ticket.id, note);
+            toast.success("Ticket cerrado.");
+            isOpen = false;
+            onComplete?.();
+        } catch (err) {
+            handleError(err, "Cerrar Ticket");
         } finally {
             isSubmitting = false;
         }
@@ -378,12 +446,12 @@
      */
     function resolveTipos(raw: string): string[] {
         const t = raw.toLowerCase().trim();
-        if (t.includes("ambas")) return ["P2000", "KONE"];
-        if (t.includes("p2000")) return ["P2000"];
-        if (t.includes("kone")) return ["KONE"];
-        if (t.includes("accesspro") || t.includes("access pro")) {
-            return ["AccessPRO"];
-        }
+        if (!t) return [];
+        if (t.includes("ambas")) return activeMedias.map((m) => m.name);
+        const matching = activeMedias.filter(
+            (m) => t.includes(m.name.toLowerCase()) || t.includes(m.key),
+        );
+        if (matching.length > 0) return matching.map((m) => m.name);
         return [raw];
     }
 
@@ -468,41 +536,40 @@
 
     async function handleComplete(note?: string) {
         if (!ticket) return;
-        isSubmitting = true;
-        try {
-            await ticketService.delete(ticket.id, note);
-            toast.success("Ticket completado.");
-            isOpen = false;
-            onComplete?.();
-        } catch (err) {
-            handleError(err, "Completar Ticket");
-        } finally {
-            isSubmitting = false;
-        }
+        pendingCloseNote = note || "Ticket cerrado.";
+        isConfirmCloseOpen = true;
     }
 
     async function handleCreateReposicionTicket() {
         if (!ticket) return;
+        // No crear reposición sin medio/tarjeta o folio especificado.
+        const rawTipo = (p.tipo_tarjeta ?? "").trim();
+        const folio = (p.folio ?? "").trim();
+        const tipos = resolveTipos(rawTipo);
+        const hasMappedMedia = tipos.some((t) =>
+            activeMedias.some((m) => m.name === t || m.key === t),
+        );
+        if (tipos.length === 0 || !hasMappedMedia || (!rawTipo && !folio)) {
+            toast.error(
+                "No se puede crear una reposición sin medio/tipo de tarjeta. Verifique el reporte antes de continuar.",
+            );
+            return;
+        }
         isSubmitting = true;
         try {
             // Mapear campos de Reporte de Falla → campos que entiende el modal de Reposición
-            const rawTipo = (p.tipo_tarjeta ?? "").trim();
-            const folio = (p.folio ?? "").trim();
-            const repoPayload: Record<string, any> = { ...p, origen: "Reporte de Falla" };
+            const repoPayload: Record<string, any> = {
+                ...p,
+                origen: "Reporte de Falla",
+                estado: seguimientoEstado,
+            };
 
             // Usar resolveTipos para manejar "Tarjeta P2000", "Tarjeta KONE" y "Ambas tarjetas"
-            const tipos = resolveTipos(rawTipo);
-            if (tipos.includes("P2000")) {
-                repoPayload.reponer_p2000 = "sí";
-                repoPayload.folio_p2000 = folio;
-            }
-            if (tipos.includes("KONE")) {
-                repoPayload.reponer_kone = "sí";
-                repoPayload.folio_kone = folio;
-            }
-            if (tipos.includes("AccessPRO")) {
-                repoPayload.reponer_accesspro = "sí";
-                repoPayload.folio_accesspro = folio;
+            for (const media of activeMedias) {
+                if (tipos.includes(media.name)) {
+                    repoPayload[`reponer_${media.key}`] = "sí";
+                    repoPayload[`folio_${media.key}`] = folio;
+                }
             }
 
             await ticketService.create({
@@ -512,6 +579,7 @@
                 priority: p.urgencia?.toLowerCase().includes("alta")
                     ? "alta"
                     : "media",
+                person_id: selectedPerson?.id ?? null,
                 payload: repoPayload,
             });
 
@@ -523,7 +591,7 @@
                 personnelState.selectPerson(selectedPerson.id);
             }
 
-            await handleComplete("Reposición creada desde reporte de falla");
+            await closeTicketNow("Reposición creada desde reporte de falla");
         } catch (err) {
             handleError(err, "Crear Ticket de Reposición");
             isSubmitting = false;
@@ -581,6 +649,17 @@
     onConfirm={handleReject}
 />
 
+<ConfirmationModal
+    bind:isOpen={isConfirmCloseOpen}
+    title="Cerrar ticket"
+    description="El ticket se eliminará del tablero. Esta acción no se puede deshacer. ¿Continuar?"
+    confirmText="Sí, cerrar"
+    cancelText="Cancelar"
+    variant="warning"
+    onConfirm={doCloseTicket}
+    onCancel={() => (isConfirmCloseOpen = false)}
+/>
+
 <Modal
     bind:isOpen
     title={ticketType}
@@ -603,15 +682,76 @@
                         Buscando <strong>{p.apellidos}, {p.nombres}</strong>…
                     </div>
                 {:else if candidates.length === 0 && searchDone}
-                    <div class="flex items-start gap-2 text-sm text-rose-600">
-                        <AlertCircle size={14} class="mt-0.5 shrink-0" />
-                        <div>
-                            <p class="font-semibold">
-                                Persona no encontrada en el sistema
+                    <div class="space-y-2">
+                        <div class="flex items-start gap-2 text-sm text-rose-600">
+                            <AlertCircle size={14} class="mt-0.5 shrink-0" />
+                            <div>
+                                <p class="font-semibold">
+                                    Persona no encontrada en el sistema
+                                </p>
+                                <p class="text-xs text-rose-400">
+                                    Buscado: "{p.apellidos}, {p.nombres}"
+                                </p>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                            <p
+                                class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"
+                            >
+                                <Search size={11} /> Buscar persona manualmente
                             </p>
-                            <p class="text-xs text-rose-400">
-                                Buscado: "{p.apellidos}, {p.nombres}"
-                            </p>
+                            <input
+                                type="text"
+                                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                placeholder="Apellidos, Nombres…"
+                                bind:value={manualQuery}
+                                oninput={onManualQuery}
+                            />
+                            {#if manualSearching}
+                                <div class="flex items-center gap-2 text-xs text-slate-500">
+                                    <Loader2 size={13} class="animate-spin" />
+                                    Buscando…
+                                </div>
+                            {:else if manualCandidates.length > 0}
+                                <div class="space-y-1.5">
+                                    {#each manualCandidates.slice(0, 5) as c}
+                                        <button
+                                            class="w-full flex items-center justify-between p-2 rounded-lg border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-200 text-left transition-colors"
+                                            onclick={() => pickManualCandidate(c)}
+                                        >
+                                            <div class="flex items-center gap-2.5">
+                                                <div
+                                                    class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400"
+                                                >
+                                                    <User size={13} />
+                                                </div>
+                                                <div>
+                                                    <p
+                                                        class="text-sm font-semibold text-slate-800"
+                                                    >
+                                                        {c.last_name}, {c.first_name}
+                                                    </p>
+                                                    <p
+                                                        class="text-[10px] text-slate-500"
+                                                    >
+                                                        {c.dependency} · {c.building}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span
+                                                class="text-[10px] font-bold text-blue-500"
+                                                >Seleccionar →</span
+                                            >
+                                        </button>
+                                    {/each}
+                                </div>
+                            {:else if manualQuery}
+                                <p
+                                    class="text-[10px] text-slate-400 italic"
+                                >
+                                    Sin coincidencias para "{manualQuery}". Intente con otro nombre.
+                                </p>
+                            {/if}
                         </div>
                     </div>
                 {:else if candidates.length > 1 && !selectedPerson}
@@ -736,18 +876,14 @@
                         <div class="text-amber-800 font-medium">
                             {p.hora_salida}
                         </div>{/if}
-                    {#if p.accion_p2000}<div class="text-slate-500">
-                            Acción P2000
-                        </div>
-                        <div class="text-amber-800 font-medium">
-                            {p.accion_p2000}: {p.pisos_p2000 || "N/A"}
-                        </div>{/if}
-                    {#if p.accion_kone}<div class="text-slate-500">
-                            Acción KONE
-                        </div>
-                        <div class="text-amber-800 font-medium">
-                            {p.accion_kone}: {p.pisos_kone || "N/A"}
-                        </div>{/if}
+                    {#each floorMedias as media}
+                        {#if p[`accion_${media.key}`]}<div class="text-slate-500">
+                                Acción {media.name}
+                            </div>
+                            <div class="text-amber-800 font-medium">
+                                {p[`accion_${media.key}`]}: {p[`pisos_${media.key}`] || "N/A"}
+                            </div>{/if}
+                    {/each}
                     {#if p.accion_acc}<div class="text-slate-500">
                             Acción Acc. Esp.
                         </div>
@@ -866,9 +1002,7 @@
                                                 asignada.
                                             {:else}
                                                 Folio en plantilla (<strong
-                                                    >{check.card.type === "P2000"
-                                                        ? p.folio_p2000
-                                                        : p.folio_kone}</strong
+                                                    >{folioForType(check.card.type)}</strong
                                                 >) no coincide con la tarjeta
                                                 asignada (<strong
                                                     >{check.card.folio}</strong
@@ -893,7 +1027,7 @@
                             <AlertCircle size={14} class="mt-0.5 shrink-0" />
                             <span
                                 >No se identificaron tarjetas a reponer según el
-                                payload. Revise los campos "¿Reponer P2000/KONE?".</span
+                                payload. Revise los campos "¿Reponer {activeMedias.map((m) => m.name).join("/")}?".</span
                             >
                         </div>
                     {/if}
@@ -1081,6 +1215,39 @@
                     </div>
                 {/if}
             </InfoCard>
+
+            <!-- ── Reporte de Falla: estado de seguimiento ── -->
+            <div class="rounded-xl border border-orange-200 bg-orange-50/40 p-4 space-y-2.5">
+                <p
+                    class="text-[10px] font-bold text-orange-700 uppercase tracking-widest flex items-center gap-1.5"
+                >
+                    <AlertTriangle size={11} /> Estado de seguimiento
+                </p>
+                <p class="text-xs text-slate-600">
+                    Registra el avance del reporte. El estado se incluirá al crear
+                    la reposición o al resolver la falla.
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {seguimientoEstado === 'En revisión' ? 'bg-orange-100 text-orange-800 border border-orange-300 shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-orange-50'}"
+                        onclick={() => (seguimientoEstado = "En revisión")}
+                    >
+                        <AlertCircle size={13} /> En revisión
+                    </button>
+                    <button
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {seguimientoEstado === 'Requiere reposición' ? 'bg-amber-100 text-amber-800 border border-amber-300 shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-amber-50'}"
+                        onclick={() => (seguimientoEstado = "Requiere reposición")}
+                    >
+                        <CreditCard size={13} /> Requiere reposición
+                    </button>
+                    <button
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {seguimientoEstado === 'Resuelto' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-emerald-50'}"
+                        onclick={() => (seguimientoEstado = "Resuelto")}
+                    >
+                        <CheckCircle2 size={13} /> Resuelto
+                    </button>
+                </div>
+            </div>
         {/if}
     </div>
 
@@ -1112,12 +1279,12 @@
                 {:else if ticketType === "Baja de Persona"}
                     <Button
                         variant="outline"
-                        class="border-rose-200 text-rose-600 hover:bg-rose-50 group"
+                        class="border-slate-200 text-slate-600 hover:bg-slate-50 group"
                         disabled={!selectedPerson}
                         onclick={handleBaja}
                     >
                         <User size={15} class="mr-1.5" />
-                        Revisar perfil
+                        Ver perfil
                         <ArrowRight
                             size={16}
                             class="ml-1.5 group-hover:translate-x-0.5 transition-transform"
@@ -1126,6 +1293,19 @@
 
                     <!-- REPOSICIÓN -->
                 {:else if ticketType === "Reposición"}
+                    <Button
+                        variant="outline"
+                        class="border-slate-200 text-slate-600 hover:bg-slate-50 group"
+                        disabled={!selectedPerson}
+                        onclick={handleViewPersonProfile}
+                    >
+                        <User size={15} class="mr-1.5" />
+                        Ver perfil
+                        <ArrowRight
+                            size={16}
+                            class="ml-1.5 group-hover:translate-x-0.5 transition-transform"
+                        />
+                    </Button>
                     <Button
                         variant="outline"
                         class="border-amber-200 text-amber-600 hover:bg-amber-50 group"
@@ -1145,7 +1325,7 @@
                 {:else if ticketType === "Reporte de Falla"}
                     <Button
                         variant="outline"
-                        class="border-orange-200 text-orange-600 hover:bg-orange-50 group"
+                        class="border-slate-200 text-slate-600 hover:bg-slate-50 group"
                         disabled={!selectedPerson}
                         onclick={handleViewPersonProfile}
                     >
@@ -1173,7 +1353,7 @@
                         variant="primary"
                         class="bg-emerald-600 hover:bg-emerald-700 border-emerald-500"
                         loading={isSubmitting}
-                        onclick={() => handleComplete("Falla resuelta")}
+                        onclick={() => handleComplete(`Falla resuelta (${seguimientoEstado})`)}
                     >
                         <CheckCircle2 size={15} class="mr-1.5" />
                         Falla Resuelta

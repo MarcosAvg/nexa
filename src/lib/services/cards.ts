@@ -74,16 +74,11 @@ export const cardService = {
                 .select("*, access_media_types(*), personnel(first_name, last_name, status)", { count: "exact" });
 
             if (search) {
-                const terms = search.trim().split(/\s+/).filter(Boolean);
                 const searchTerm = `%${search}%`;
 
-                let peopleQuery = supabase.from("personnel").select("id");
-                for (const term of terms) {
-                    const termPattern = `%${term}%`;
-                    peopleQuery = peopleQuery.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern}`);
-                }
-                const { data: people } = await peopleQuery;
-                const personIds = people?.map(p => p.id) || [];
+                // Búsqueda de personas vía RPC (un round-trip con unaccent).
+                const { data: people } = await supabase.rpc("search_personnel_ids", { p_search: search });
+                const personIds = people || [];
 
                 if (personIds.length > 0) {
                     query = query.or(`identifier.ilike.${searchTerm},person_id.in.(${personIds.join(',')})`);
@@ -143,13 +138,8 @@ export const cardService = {
         return withErrorHandlingSafe(async () => {
             let personIds: string[] = [];
             if (search) {
-                const terms = search.trim().split(/\s+/).filter(Boolean);
-                let peopleQuery = supabase.from("personnel").select("id");
-                for (const term of terms) {
-                    peopleQuery = peopleQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
-                }
-                const { data: people } = await peopleQuery;
-                personIds = people?.map(p => p.id) || [];
+                const { data: people } = await supabase.rpc("search_personnel_ids", { p_search: search });
+                personIds = people || [];
             }
 
             let depPersonIds: string[] | null = null;
@@ -281,28 +271,29 @@ export const cardService = {
                     .neq("status", "inactive");
 
                 if (currentMedia && currentMedia.length > 0) {
-                    const oldMedia = currentMedia[0];
                     const newStatus = replacementOptions.oldCardStatus;
 
-                    const { error: updateError } = await withTimeout(supabase
-                        .from("access_media")
-                        .update({
-                            status: newStatus,
-                            person_id: null,
-                            programming_status: null,
-                            responsiva_status: null,
-                        })
-                        .eq("id", oldMedia.id));
+                    for (const oldMedia of currentMedia) {
+                        const { error: updateError } = await withTimeout(supabase
+                            .from("access_media")
+                            .update({
+                                status: newStatus,
+                                person_id: null,
+                                programming_status: null,
+                                responsiva_status: null,
+                            })
+                            .eq("id", oldMedia.id));
 
-                    if (updateError) throw updateError;
+                        if (updateError) throw updateError;
 
-                    await accessAssignmentService.revokeByMedia(oldMedia.id);
+                        await accessAssignmentService.revokeByMedia(oldMedia.id);
 
-                    await HistoryService.log("CARD", oldMedia.id, "REPLACE_OLD", {
-                        message: `Tarjeta ${oldMedia.identifier} reemplazada. Nuevo estado: ${newStatus === "blocked" ? "Baja Definitiva" : "Disponible"}`,
-                        related_person_id: data.person_id,
-                        entityName: `${data.type} (Folio: ${oldMedia.identifier})`
-                    });
+                        await HistoryService.log("CARD", oldMedia.id, "REPLACE_OLD", {
+                            message: `Tarjeta ${oldMedia.identifier} reemplazada. Nuevo estado: ${newStatus === "blocked" ? "Baja Definitiva" : "Disponible"}`,
+                            related_person_id: data.person_id,
+                            entityName: `${data.type} (Folio: ${oldMedia.identifier})`
+                        });
+                    }
                 }
             }
 
@@ -345,19 +336,13 @@ export const cardService = {
             }
 
             if (isNewAssignment) {
-                // El ticket de Programación solo aplica a medios que la requieren.
-                if (needsProgramming) {
+                // El ticket de "Programación" lo crea el trigger
+                // (handle_access_media_ticket_effects) al asignar la persona.
+                // Si es una reposición, el ticket "Reposición" se cierra al
+                // completar el reemplazo (flujo inteligente).
+                if (replacementOptions && data.person_id) {
                     const { ticketService } = await import("./tickets");
-                    await ticketService.create({
-                        type: "Programación",
-                        description: replacementOptions
-                            ? `Reponer tarjeta ${data.type} (Folio anterior dado de baja/liberado). Nuevo folio: ${data.folio}`
-                            : `Programar acceso para tarjeta ${data.type} folio ${data.folio}`,
-                        priority: "alta",
-                        person_id: data.person_id,
-                        access_media_id: cardId,
-                        title: `Programación: ${data.folio}`,
-                    });
+                    await ticketService.deleteByPerson(data.person_id, "Reposición completada (tarjeta reemplazada)", ["Reposición"]);
                 }
 
                 if (data.person_id) {
@@ -378,24 +363,11 @@ export const cardService = {
 
     async updateProgrammingStatus(cardId: string, status: string | null) {
         return withErrorHandling(async () => {
-            const { data: media } = await supabase.from("access_media")
-                .select("identifier, responsiva_status, person_id, access_media_types(name)")
-                .eq("id", cardId).single();
-
             const { error } = await supabase.from("access_media")
                 .update({ programming_status: status }).eq("id", cardId);
             if (error) throw error;
-
-            if (status === "done" && media && media.responsiva_status !== "signed" && media.person_id) {
-                const typeName = mediaTypeName(media);
-                const { ticketService } = await import("./tickets");
-                await ticketService.create({
-                    type: "Firma Responsiva",
-                    description: `Firma de responsiva para tarjeta ${typeName} folio ${media.identifier}`,
-                    priority: "media", person_id: media.person_id, access_media_id: cardId,
-                    title: `Firma: ${media.identifier}`
-                });
-            }
+            // El ticket "Firma Responsiva" se crea/limpia en la BD vía trigger
+            // (handle_access_media_ticket_effects).
         }, "Update Programming Status");
     },
 
@@ -404,11 +376,7 @@ export const cardService = {
             const { error } = await supabase.from("access_media")
                 .update({ responsiva_status: status }).eq("id", cardId);
             if (error) throw error;
-
-            if (status === "signed") {
-                const { ticketService } = await import("./tickets");
-                await ticketService.deleteByCard(cardId, ["Firma Responsiva"], "Ticket completado/atendido");
-            }
+            // El trigger limpia los tickets "Firma Responsiva" al firmar.
         }, "Update Responsiva Status");
     },
 

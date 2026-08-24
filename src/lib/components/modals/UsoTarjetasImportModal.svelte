@@ -3,7 +3,7 @@
     import Button from "../Button.svelte";
     import Badge from "../Badge.svelte";
     import { toast } from "svelte-sonner";
-    import { handleError, parseKoneUsageFile, matchKoneUsageToPersonnel, findDuplicateFolios, getDuplicateFoliosSummary, exportKoneUsageToExcel, exportKoneUsageAllDependenciesAsZip } from "../../utils";
+    import { handleError, parseUsageFile, matchUsageToPersonnel, findDuplicateFolios, getDuplicateFoliosSummary, exportUsageToExcel, exportUsageAllDependenciesAsZip, capitalize } from "../../utils";
     import {
         Upload,
         FileSpreadsheet,
@@ -15,22 +15,27 @@
         FolderArchive,
         ChevronDown,
     } from "lucide-svelte";
-    import type { KoneUsageMatchResult, DuplicateFolioInfo } from "../../utils";
+    import type { UsageMatchResult, DuplicateFolioInfo } from "../../utils";
+    import { moduleState } from "../../stores";
 
     type Props = {
         isOpen: boolean;
     };
 
     /**
-     * KoneUsageImportModal — Importa archivo de uso de tarjetas KONE.
+     * UsoTarjetasImportModal — Importa archivo de uso de tarjetas.
      *
      * @example
-     * <KoneUsageImportModal bind:isOpen />
+     * <UsoTarjetasImportModal bind:isOpen />
      */
     let { isOpen = $bindable() }: Props = $props();
 
+    // Medio configurado para el módulo "conteo_uso" (agnóstico al tipo).
+    let mediaKey = $derived(moduleState.config("conteo_uso").mediaKey || "kone");
+    let mediaLabel = $derived(mediaKey ? capitalize(mediaKey) : "tarjetas");
+
     let step = $state<"idle" | "parsing" | "matching" | "results">("idle");
-    let matchResult = $state<KoneUsageMatchResult | null>(null);
+    let matchResult = $state<UsageMatchResult | null>(null);
     let rawEntries = $state<any[]>([]);
     let duplicates = $state<DuplicateFolioInfo[]>([]);
     let showDuplicates = $state(false);
@@ -75,7 +80,7 @@
 
         step = "parsing";
         try {
-            const entries = await parseKoneUsageFile(
+            const entries = await parseUsageFile(
                 file,
                 creationLimitDate,
                 inactivityLimitDate,
@@ -93,11 +98,11 @@
             duplicates = foundDuplicates;
 
             step = "matching";
-            const result = await matchKoneUsageToPersonnel(entries);
+            const result = await matchUsageToPersonnel(entries, mediaKey);
             matchResult = result;
             step = "results";
         } catch (err) {
-            handleError(err, "Importar Conteo KONE");
+            handleError(err, "Importar Conteo de uso");
             step = "idle";
         }
 
@@ -110,10 +115,10 @@
         showExportMenu = false;
         isExporting = true;
         try {
-            await exportKoneUsageToExcel(filteredResult, usageThreshold, selectedDependency || undefined);
+            await exportUsageToExcel(filteredResult, usageThreshold, selectedDependency || undefined, undefined, mediaLabel);
             toast.success("Exportación completada");
         } catch (err) {
-            handleError(err, "Exportar Conteo KONE");
+            handleError(err, "Exportar Conteo de uso");
         } finally {
             isExporting = false;
         }
@@ -125,17 +130,18 @@
         isZipExporting = true;
         const loadingToast = toast.loading("Preparando ZIP...");
         try {
-            await exportKoneUsageAllDependenciesAsZip(
+            await exportUsageAllDependenciesAsZip(
                 matchResult,
                 usageThreshold,
                 (_current, _total, label) => {
                     toast.loading(`Procesando: ${label}`, { id: loadingToast });
                 },
+                mediaKey,
             );
             toast.success("ZIP descargado", { id: loadingToast });
         } catch (err) {
             toast.dismiss(loadingToast);
-            handleError(err, "Exportar ZIP Conteo KONE");
+            handleError(err, "Exportar ZIP Conteo de uso");
         } finally {
             isZipExporting = false;
         }
@@ -194,7 +200,7 @@
 
 <Modal
     bind:isOpen
-    title="Importar Conteo de Uso KONE"
+    title={`Importar Conteo de Uso — ${mediaLabel}`}
     description="Suba un archivo Excel con columnas Folio y Conteo para cruzar con el directorio de personal."
     size="lg"
     onclose={closeModal}
@@ -213,10 +219,10 @@
                     >
                         <label
                             class="block text-xs font-bold text-slate-700 mb-1"
-                            for="kone-inactivity-date"
+                            for="usage-inactivity-date"
                         >Inactividad (Fecha Límite)</label>
                         <input
-                            id="kone-inactivity-date"
+                            id="usage-inactivity-date"
                             type="date"
                             bind:value={inactivityLimitDate}
                             class="w-full h-9 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 text-sm outline-none bg-slate-50"
@@ -233,10 +239,10 @@
                     >
                         <label
                             class="block text-xs font-bold text-slate-700 mb-1"
-                            for="kone-creation-date"
+                            for="usage-creation-date"
                         >Cortesía (Límite Creación)</label>
                         <input
-                            id="kone-creation-date"
+                            id="usage-creation-date"
                             type="date"
                             bind:value={creationLimitDate}
                             class="w-full h-9 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 text-sm outline-none bg-slate-50"
@@ -541,7 +547,7 @@
                         </p>
                         <p class="text-xs text-emerald-600 mt-0.5">
                             Se generará un directorio de personal con {stats.found}
-                            registros incluyendo el conteo de uso de tarjetas KONE
+                            registros incluyendo el conteo de uso de tarjetas
                             y métricas estadísticas.
                         </p>
                     </div>
@@ -557,7 +563,7 @@
                         </p>
                         <p class="text-xs text-rose-600 mt-0.5">
                             Ninguno de los folios importados coincide con
-                            tarjetas KONE asignadas en el sistema.
+                            tarjetas asignadas en el sistema.
                         </p>
                     </div>
                 </div>

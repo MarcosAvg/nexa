@@ -2,7 +2,7 @@ import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import type { Ticket } from "../types";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, batchPaginate, handleError } from "../utils";
-import { ticketState } from "../stores";
+import { ticketState, settingsState } from "../stores";
 import { RESPONSIVA_TICKET_TYPES } from "../constants/tickets";
 
 type CardAssignmentInfo = {
@@ -81,7 +81,7 @@ async function fetchCardAssignmentTypes(
             const diffDays = Math.floor(
                 (assignDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24)
             );
-            if (diffDays >= 0 && diffDays <= 7) {
+            if (diffDays >= 0 && diffDays <= settingsState.responsivaPickupDays) {
                 movementType = "Alta de Personal";
             }
         }
@@ -145,7 +145,7 @@ async function enrichWithMovementType(tickets: Ticket[]): Promise<(Ticket & { mo
             const diffDays = Math.floor(
                 (ticketDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24)
             );
-            if (diffDays >= 0 && diffDays <= 7) {
+            if (diffDays >= 0 && diffDays <= settingsState.responsivaPickupDays) {
                 movementType = "Alta de Personal";
                 assignmentDate = personnelWithDate.created_at;
             } else {
@@ -366,7 +366,7 @@ export const ticketService = {
     },
 
     async createBatch(
-        tickets: { type: string; title: string; description: string; priority: string; payload: Record<string, string> }[]
+        tickets: { type: string; title: string; description: string; priority: string; payload: Record<string, string>; person_id?: string | null }[]
     ): Promise<{ created: number; errors: { index: number; message: string }[] }> {
         const errors: { index: number; message: string }[] = [];
         let created = 0;
@@ -377,7 +377,7 @@ export const ticketService = {
             description: t.description,
             priority: t.priority.toLowerCase(),
             status: 'pending',
-            person_id: null,
+            person_id: t.person_id ?? null,
             access_media_id: null,
             payload: t.payload,
         }));
@@ -455,11 +455,13 @@ export const ticketService = {
         }, "Delete Tickets by Card");
     },
 
-    async deleteByPerson(personId: string, reason?: string) {
+    async deleteByPerson(personId: string, reason?: string, types?: string[]) {
         return withErrorHandling(async () => {
-            const { data: tickets } = await supabase.from("tickets")
+            let fetchQuery = supabase.from("tickets")
                 .select("id, title")
                 .eq("person_id", personId);
+            if (types && types.length > 0) fetchQuery = fetchQuery.in("type", types);
+            const { data: tickets } = await fetchQuery;
 
             if (tickets) {
                 for (const t of tickets) {
@@ -470,7 +472,11 @@ export const ticketService = {
                 }
             }
 
-            const { error } = await supabase.from("tickets").delete().eq("person_id", personId);
+            let query = supabase.from("tickets").delete().eq("person_id", personId);
+            if (types && types.length > 0) {
+                query = query.in("type", types);
+            }
+            const { error } = await query;
             if (error) throw error;
             ticketState.removeByPerson(personId);
         }, "Delete Tickets by Person");

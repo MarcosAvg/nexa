@@ -109,3 +109,6 @@ tsconfig.tsbuildinfo
 
 # ─── Playwright (tests E2E) ──────────────────────────────────────────────────
 playwright/.cache/
+
+# ─── Módulos generados (VITE_MODULES) ────────────────────────────────────────
+src/lib/modules/generated.ts

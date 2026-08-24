@@ -7,7 +7,7 @@
     import {
         SectionHeader, TaskBanner, Button, FilterGroup, FilterSelect,
         Input, PermissionGuard, ContentView,
-        Pagination, ExportDropdown,
+        Pagination, ExportDropdown, ExportMenuItem, Tabs,
         ModificationCompareModal,
     } from "../components";
     import {
@@ -20,7 +20,7 @@
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
     import { toast } from "svelte-sonner";
-    import { handleError, exportResponsivasToExcel, exportResponsivasAllDependenciesAsZip } from "../utils";
+    import { handleError, exportResponsivasToExcel, exportResponsivasAllDependenciesAsZip, fullName } from "../utils";
     import { settingsState } from "../stores";
     import { computeResponsivaManagement, matchesResponsivaFilters } from "../utils/xlsxResponsivas";
     import {
@@ -85,10 +85,7 @@
     let isImportedOpen = $state(false);
     let importedTicket = $state<any>(null);
 
-    // Estado de confirmacións
-    let ticketToComplete = $state<any>(null);
-
-    // Modal de comparación de modificación
+    // Modal de comparación de modificaciónlls
     let isCompareOpen = $state(false);
     let compareTicket = $state<any>(null);
 
@@ -99,14 +96,9 @@
         tickets.map((t) => {
             let personName = "Desconocido";
             if (t.personnel) {
-                personName = `${t.personnel.first_name} ${t.personnel.last_name}`;
+                personName = fullName(t.personnel.first_name, t.personnel.last_name);
             } else if (t.payload?.nombres || t.payload?.apellidos) {
-                personName =
-                    `${t.payload.apellidos || ""}, ${t.payload.nombres || ""}`.trim();
-                if (personName.startsWith(","))
-                    personName = personName.slice(1).trim();
-                if (personName.endsWith(","))
-                    personName = personName.slice(0, -1).trim();
+                personName = fullName(t.payload.nombres, t.payload.apellidos);
             } else if (t.payload?.relatedPerson?.name) {
                 personName = t.payload.relatedPerson.name;
             }
@@ -115,12 +107,14 @@
             let cardFolio = t.cardFolio || t.cards?.folio;
 
             if (!cardFolio && t.payload) {
-                if (t.payload.folio_p2000) {
-                    cardType = "P2000";
-                    cardFolio = t.payload.folio_p2000;
-                } else if (t.payload.folio_kone) {
-                    cardType = "KONE";
-                    cardFolio = t.payload.folio_kone;
+                // Derivar de forma multi-medio: claves del payload `folio_<key>`.
+                const matchedKey = Object.keys(t.payload).find((k) =>
+                    /^folio_.+/.test(k) && t.payload[k],
+                );
+                if (matchedKey) {
+                    const mediaKey = matchedKey.replace(/^folio_/, "");
+                    cardType = mediaKey.toUpperCase();
+                    cardFolio = t.payload[matchedKey];
                 } else if (t.payload.folio) {
                     cardType = t.payload.tipo_tarjeta || "N/A";
                     cardFolio = t.payload.folio;
@@ -272,28 +266,14 @@
             return;
         }
 
-        ticketToComplete = ticket;
-        handleFinalConfirm();
+        // Tipos sin acción configurada: NO eliminar silenciosamente.
+        toast.info(
+            "Este tipo de ticket no tiene una acción automática. Reprocesa desde la vista de detalle o cancela el ticket.",
+        );
     }
 
     async function handleFinalConfirm() {
-        if (!ticketToComplete) return;
-
-        const ticket = ticketToComplete;
-        ticketToComplete = null;
-
-        const prevTickets = tickets;
-        ticketState.pagination.items = ticketState.pagination.items.filter((t) => t.id !== ticket.id);
-        ticketState.pagination.totalRecords = Math.max(0, ticketState.pagination.totalRecords - 1);
-
-        try {
-            await ticketService.delete(ticket.id);
-            toast.success("Ticket completado");
-        } catch (e) {
-            handleError(e, "Completar Ticket");
-            ticketState.pagination.items = prevTickets;
-            ticketState.pagination.totalRecords = ticketState.pagination.totalRecords + 1;
-        }
+        // Eliminado: los tipos sin accion configurada ya no se borran en silencio.
     }
 
     async function handleExportResponsivas() {
@@ -344,7 +324,7 @@
                 return;
             }
 
-            await exportResponsivasToExcel(data, depNameFilter);
+            await exportResponsivasToExcel(data, depNameFilter, undefined, settingsState.responsivaPickupDays);
             toast.success("Exportación completada", { id: loadingToast });
         } catch (error) {
             toast.dismiss(loadingToast);
@@ -379,26 +359,14 @@
 
 <div class="space-y-6">
     <!-- Section Tabs -->
-    <div class="flex border-b border-slate-200">
-        <button
-            class="px-6 py-3 text-sm font-bold border-b-2 transition-colors {currentSection ===
-            'General'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}"
-            onclick={() => switchSection("General")}
-        >
-            Tickets Generales
-        </button>
-        <button
-            class="px-6 py-3 text-sm font-bold border-b-2 transition-colors {currentSection ===
-            'Responsivas'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}"
-            onclick={() => switchSection("Responsivas")}
-        >
-            Firmas de Responsiva
-        </button>
-    </div>
+    <Tabs
+        tabs={[
+            { id: "General", label: "Tickets Generales" },
+            { id: "Responsivas", label: "Firmas de Responsiva" },
+        ]}
+        active={currentSection}
+        onSelect={(id) => switchSection(id as "General" | "Responsivas")}
+    />
 
     <SectionHeader
         title={currentSection === "General"
@@ -481,26 +449,20 @@
                     menuWidth="w-64"
                 >
                     {#snippet items()}
-                        <button
-                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                        <ExportMenuItem
+                            icon={FileSpreadsheet}
+                            label="Exportar (Filtro actual)"
                             onclick={handleExportResponsivas}
-                        >
-                            <span class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                                <FileSpreadsheet size={16} />
-                            </span>
-                            Exportar (Filtro actual)
-                        </button>
+                        />
                         <div class="mx-3 my-1 border-t border-slate-100"></div>
-                        <button
-                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
-                            onclick={handleExportResponsivasAllDepsZip}
+                        <ExportMenuItem
+                            icon={FolderArchive}
+                            label="Todas las Dependencias (ZIP)"
+                            iconBgClass="bg-violet-50"
+                            iconColorClass="text-violet-600"
                             disabled={isZipExporting}
-                        >
-                            <span class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600">
-                                <FolderArchive size={16} />
-                            </span>
-                            Todas las Dependencias (ZIP)
-                        </button>
+                            onclick={handleExportResponsivasAllDepsZip}
+                        />
                     {/snippet}
                 </ExportDropdown>
             {/if}
@@ -526,7 +488,9 @@
         emptyDescription="No hay tickets pendientes en este momento. Todo está en orden."
         emptyDescriptionFiltered="No encontramos tickets con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={ClipboardList}
-        emptyIconBgClass="from-amber-50 to-amber-100 ring-1 ring-amber-200/50 text-amber-400"
+        emptyIconBgClass={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || depNameFilter !== "Todas")
+            ? "from-slate-50 to-slate-100 ring-1 ring-slate-200/60 text-slate-400"
+            : "from-emerald-50 to-emerald-100 ring-1 ring-emerald-200/60 text-emerald-400"}
         hasFilters={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || depNameFilter !== "Todas")}
         onClearFilters={() => {
             ticketState.filters.type = 'Todos';

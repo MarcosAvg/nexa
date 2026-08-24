@@ -1,5 +1,6 @@
 import type * as ExcelJSTypes from 'exceljs';
 import { addLogoToSheet, autoRowHeight } from './xlsxShared';
+import { settingsState } from '../stores';
 import {
     displayEntityName as fmtEntityName,
     cleanMessage as fmtCleanMessage,
@@ -33,19 +34,20 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
         { key: 'date', width: 24 },
         { key: 'entity', width: 45 },
         { key: 'actionLabel', width: 28 },
+        { key: 'user', width: 25 },
         { key: 'description', width: 65 },
     ];
 
-    worksheet.mergeCells('A1:D1');
+    worksheet.mergeCells('A1:E1');
     const titleCell = worksheet.getCell('A1');
-    titleCell.value = `       HISTORIAL DE AUDITORÍA Y ACCIONES - NEXA`;
+    titleCell.value = `       HISTORIAL DE AUDITORÍA Y ACCIONES - ${settingsState.orgName.toUpperCase()}`;
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     worksheet.getRow(1).height = 40;
 
     await addLogoToSheet(workbook, worksheet);
 
-    worksheet.mergeCells('A2:D2');
+    worksheet.mergeCells('A2:E2');
     const metaCell = worksheet.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
         year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -59,7 +61,8 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
         { label: 'TEMPORALIDAD', range: 'A3:A3', colors: COLORS.slate },
         { label: 'AUDITORÍA', range: 'B3:B3', colors: COLORS.personal },
         { label: 'MOVIMIENTO', range: 'C3:C3', colors: COLORS.amber },
-        { label: 'DETALLES DE LA ACCIÓN', range: 'D3:D3', colors: COLORS.violet }
+        { label: 'USUARIO', range: 'D3:D3', colors: COLORS.personal },
+        { label: 'DETALLES DE LA ACCIÓN', range: 'E3:E3', colors: COLORS.violet }
     ];
 
     groups.forEach(group => {
@@ -79,7 +82,7 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
 
     const headerRow = worksheet.getRow(4);
     headerRow.height = 30;
-    const headerLabels = ['FECHA / HORA', 'ENTIDAD AFECTADA', 'ACCIÓN REALIZADA', 'DESCRIPCIÓN'];
+    const headerLabels = ['FECHA / HORA', 'ENTIDAD AFECTADA', 'ACCIÓN REALIZADA', 'USUARIO', 'DESCRIPCIÓN'];
     headerLabels.forEach((label, i) => {
         const cell = headerRow.getCell(i + 1);
         cell.value = label;
@@ -98,7 +101,7 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
         };
     });
 
-    worksheet.autoFilter = 'A4:D4';
+    worksheet.autoFilter = 'A4:E4';
 
     data.forEach((log) => {
         const displayName = fmtEntityName(log);
@@ -108,6 +111,7 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
             date: new Date(log.timestamp).toLocaleString('es-MX'),
             entity: displayName,
             actionLabel: actionNames[log.action] || log.action,
+            user: log.performed_by_name || '—',
             description: desc
         };
 
@@ -157,7 +161,7 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
     });
 
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
-    const finalFileName = `Historial_Nexa_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const finalFileName = `Historial_${settingsState.orgName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
     saveAsFunction(new Blob([buffer]), finalFileName);
 }

@@ -3,10 +3,11 @@
     import { enlaceService } from "../services/enlaces";
     import type { Enlace } from "../types";
     import { confirm } from "../utils/confirmModal.svelte";
+    import { fullName } from "../utils";
     import {
         SectionHeader, FloatingActionButton, PermissionGuard,
         DataTable, FilterSelect, Button, ContentView, SearchInput,
-        AddEnlaceModal, EditEnlaceModal, ConfirmationModal,
+        AddEnlaceModal, EditEnlaceModal,
     } from "../components";
     import { catalogState } from "../stores";
     import {
@@ -71,7 +72,7 @@
 
             return {
                 ...e,
-                name: `${e.personnel?.first_name || ""} ${e.personnel?.last_name || ""}`.trim() || "Desconocido",
+                name: fullName(e.personnel?.first_name, e.personnel?.last_name) || "Desconocido",
                 dependency: dependencyName,
                 building: buildingName,
                 floor: e.personnel?.floor || "N/A",
@@ -147,7 +148,7 @@
     ];
 
     function requestRemove(enlace: Enlace) {
-        const name = `${enlace.personnel?.first_name || ""} ${enlace.personnel?.last_name || ""}`.trim();
+        const name = fullName(enlace.personnel?.first_name, enlace.personnel?.last_name);
         confirm.open({
             title: "Remover Enlace",
             description: `¿Estás seguro de que deseas quitar a ${name} de los enlaces administrativos?`,
@@ -199,9 +200,7 @@
 </script>
 
 {#snippet renderName(row: Enlace)}
-    <span class="font-bold text-slate-900"
-        >{`${row.personnel?.first_name || ""} ${row.personnel?.last_name || ""}`.trim() ||
-            "Desconocido"}</span
+    <span class="font-bold text-slate-900">{fullName(row.personnel?.first_name, row.personnel?.last_name) || "Desconocido"}</span
     >
 {/snippet}
 
@@ -263,23 +262,23 @@
                     <div
                         class="w-full xl:w-auto mt-4 xl:mt-0 flex gap-2 justify-end"
                     >
-                        <button
-                            type="button"
-                            class="flex items-center justify-center gap-2 h-10 px-4 bg-white text-slate-700 border border-slate-200 font-bold rounded-xl hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+                        <Button
+                            variant="secondary"
+                            class="flex items-center justify-center gap-2 h-10 px-4 rounded-xl"
                             onclick={broadcastEmail}
                         >
                             <Send size={16} class="text-slate-400" />
                             Difusión
-                        </button>
-                        <button
-                            type="button"
-                            class="flex items-center justify-center gap-2 h-10 px-6 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/10"
+                        </Button>
+                        <Button
+                            variant="primary"
+                            class="flex items-center justify-center gap-2 h-10 px-6 rounded-xl shadow-lg shadow-slate-900/10"
                             onclick={() => (isAddModalOpen = true)}
                             {disabled}
                         >
                             <Contact size={18} />
                             Asignar Enlace
-                        </button>
+                        </Button>
                     </div>
                 {/snippet}
             </PermissionGuard>
@@ -373,17 +372,6 @@
     bind:isOpen={isEditOpen}
     enlace={selectedEnlaceForEdit}
     onComplete={loadData}
-/>
-
-<ConfirmationModal
-    bind:isOpen={confirm.isOpen}
-    title={confirm.title}
-    description={confirm.description}
-    variant={confirm.variant}
-    confirmText={confirm.confirmText}
-    cancelText={confirm.cancelText}
-    onConfirm={confirm.onConfirm}
-    onCancel={() => confirm.close()}
 />
 
 <PermissionGuard requireEdit>

@@ -8,7 +8,8 @@
     import { personnelState, ticketState, catalogState } from "../../stores";
     import { cardService } from "../../services/cards";
     import { toast } from "svelte-sonner";
-    import { handleError } from "../../utils";
+    import { handleError, capitalize, fetchCurrentVersion } from "../../utils";
+    import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
     import { ArrowRight, Plus, Minus, User } from "lucide-svelte";
     import type { Ticket, Person } from "../../types";
 
@@ -150,7 +151,9 @@
 
     function getCurrentFloors(key: string): string[] {
         if (!currentPerson) return [];
-        return (currentPerson as any)[key] || [];
+        // Leer desde el modelo nuevo (floorGroup por clave de medio).
+        const group = (currentPerson.floors || []).find((g) => g.mediaKey === key);
+        return group ? group.floors : [];
     }
 
     function getModifiedFloors(key: string, fallbackKey?: string): string[] {
@@ -161,6 +164,29 @@
             []
         );
     }
+
+    // Medios con pisos del catálogo: deriva los campos de comparación de pisos.
+    // Para una clave de medio "p2000", se mapen a floors_p2000 / pisosP2000,
+    // heredando el nombre de campo legado para compatibilidad con la plantilla.
+    let floorMediaFields = $derived.by(() => {
+        const seen = new Set<string>();
+        const fields: { key: string; label: string; currentKey: string; modifiedKey: string; fallbackKey: string }[] = [];
+        for (const m of catalogState.mediaTypes) {
+            if ((m as any).active === false || !(m as any).has_floors) continue;
+            const key = m.key;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const cap = capitalize(key);
+            fields.push({
+                key,
+                label: `Pisos ${m.name}`,
+                currentKey: `floors_${key}`,
+                modifiedKey: `pisos${cap}`,
+                fallbackKey: `floors_${key}`,
+            });
+        }
+        return fields;
+    });
 
     // Comparación de horario
     function getCurrentScheduleEntry(): string {
@@ -195,29 +221,54 @@
 
         try {
             // Construir payload de guardado desde datos modificados.
-            // Las listas de pisos del ticket vienen por clave de medio; se
-            // convierten a id de tipo de medio para savePersonAccess.
-            const byKey: Record<string, string[]> = {
-                p2000: (modifiedData as any).floors_p2000 ?? [],
-                kone: (modifiedData as any).floors_kone ?? [],
-            };
+            // Las listas de pisos vienen por clave de medio (pisos<Cap>/floors_<key>
+            // para la plantilla, o pisosPorMedio para la ruta manual).
+            const byKey: Record<string, string[]> = {};
+            const pisosPorMedio = (modifiedData as any).pisosPorMedio ?? {};
+            for (const f of floorMediaFields) {
+                const raw =
+                    (modifiedData as any)[f.modifiedKey] ??
+                    (modifiedData as any)[f.fallbackKey] ??
+                    pisosPorMedio[f.key] ??
+                    [];
+                if (Array.isArray(raw) && raw.length > 0) byKey[f.key] = raw;
+            }
             const specialAccesses =
                 (modifiedData as any).specialAccesses ??
                 (modifiedData as any).special_accesses ??
                 [];
+            // Convertir nombres de accesos especiales a ids del catálogo.
+            const specialAccessIds: number[] = [];
+            for (const n of specialAccesses as string[]) {
+                const id = catalogState.specialAccesses.find((s) => s.name === n)?.id;
+                if (id !== undefined) specialAccessIds.push(Number(id));
+            }
             const typeMap: Record<string, string[]> = {};
             for (const m of catalogState.mediaTypes) {
                 if ((m as any).active === false) continue;
                 if (byKey[m.key]?.length) typeMap[m.id] = [...byKey[m.key]];
             }
-            // Las pisos de la modificación aplican al edificio de radicación.
+            // La modificación aplica a TODOS los edificios con pisos del payload
+            // (floorsByBuilding ya viene con claves mediaTypeId); si no viene, solo
+            // el edificio de radicación.
             const baseBid = Number(currentPerson.building_id) || 1;
+            const floorsByBuilding =
+                (modifiedData as any).floorsByBuilding ??
+                ({ [baseBid]: typeMap } as Record<number, Record<string, string[]>>);
             const saveData = {
                 id: currentPerson.id,
                 ...modifiedData,
-                floorsByBuilding: { [baseBid]: typeMap },
-                specialAccesses,
+                floorsByBuilding,
+                specialAccesses: specialAccessIds,
             };
+
+            // Optimistic lock: si la persona cambió desde que se cargó, avisar.
+            const freshVersion = await fetchCurrentVersion("personnel", currentPerson.id);
+            const currentUpdatedAt = (currentPerson as any).updated_at;
+            if (freshVersion && currentUpdatedAt && freshVersion !== currentUpdatedAt) {
+                toast.error("Esta persona fue modificada por otra persona. Recarga e inténtalo de nuevo.");
+                return;
+            }
 
             await personnelService.save(saveData);
 
@@ -350,7 +401,7 @@
                         <div class="flex flex-wrap gap-2">
                             {#each currentPerson.cards as card}
                                 <div class="flex items-center gap-1.5 bg-white border border-slate-200 px-1.5 py-1 rounded-md text-xs shadow-sm transition-all hover:shadow-md">
-                                    <Badge variant={card.type === "KONE" ? "blue" : "amber"} class="px-1.5 py-0.5">
+                                    <Badge variant={mediaTypeVariant(card.type)} class="px-1.5 py-0.5">
                                         {card.type}
                                     </Badge>
                                     <span class="text-slate-700 font-mono font-bold text-[11px] px-0.5">{card.folio}</span>
@@ -650,11 +701,11 @@
             {/if}
 
             <!-- Floor Arrays Comparison -->
-            {#each [{ label: "Pisos P2000", currentKey: "floors_p2000", modifiedKey: "pisosP2000", fallbackKey: "floors_p2000" }, { label: "Pisos Kone", currentKey: "floors_kone", modifiedKey: "pisosKone", fallbackKey: "floors_kone" }] as floorField}
-                {@const currentFloors = getCurrentFloors(floorField.currentKey)}
+            {#each floorMediaFields as field}
+                {@const currentFloors = getCurrentFloors(field.key)}
                 {@const modifiedFloors = getModifiedFloors(
-                    floorField.modifiedKey,
-                    floorField.fallbackKey,
+                    field.modifiedKey,
+                    field.fallbackKey,
                 )}
                 {@const changes = getFloorChanges(
                     currentFloors,
@@ -668,7 +719,7 @@
                         <p
                             class="text-xs font-bold text-slate-500 uppercase tracking-widest px-1"
                         >
-                            {floorField.label}
+                            {field.label}
                         </p>
 
                         <div

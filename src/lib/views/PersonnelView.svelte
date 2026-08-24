@@ -4,12 +4,13 @@
         catalogState,
         userState,
         ticketState,
+        moduleState,
     } from "../stores";
     import {
         SectionHeader, FilterGroup, FilterSelect, Button, DataTable,
         Badge, PermissionGuard, FloatingActionButton, Pagination,
-        ContentView, SearchInput, ExportDropdown,
-        KoneUsageImportModal,
+        ContentView, SearchInput, ExportDropdown, ExportMenuItem,
+        UsoTarjetasImportModal,
     } from "../components";
     import {
         FileSpreadsheet,
@@ -23,6 +24,7 @@
     import { personnelService } from "../services/personnel";
     import { cardService } from "../services/cards";
     import { exportPersonnelToExcel, exportPersonnelAllDependenciesAsZip, handleError, createSimpleDebounce } from "../utils";
+    import { mediaTypeVariant } from "../utils/mediaTypeAppearance";
     import { toast } from "svelte-sonner";
     import { networkStore } from "../stores/network.svelte";
     import { getPersonnelStatusVariant } from "../constants/status";
@@ -147,6 +149,7 @@
                 },
                 splitByDependency,
                 cardTypes: exportCardTypes,
+                mediaTypes: catalogState.mediaTypes,
             });
             toast.success("Exportación completada", { id: loadingToast });
         } catch (error) {
@@ -179,6 +182,7 @@
                     toast.loading(`Procesando: ${label}`, { id: loadingToast });
                 },
                 exportCardTypes,
+                catalogState.mediaTypes,
             );
             toast.success("ZIP descargado", { id: loadingToast });
         } catch (error) {
@@ -227,11 +231,7 @@
     <div class="flex flex-wrap gap-1">
         {#each row.cards || [] as card}
             <Badge
-                variant={card.type === "KONE"
-                    ? "blue"
-                    : card.type === "AccessPRO"
-                      ? "emerald"
-                      : "amber"}
+                variant={mediaTypeVariant(card.type)}
                 class="px-1.5 py-0"
             >
                 {card.type}
@@ -314,21 +314,23 @@
         {/snippet}
 
         {#snippet actions()}
-            <PermissionGuard requireEdit>
-                <Button
-                    variant="soft-blue"
-                    onclick={() => (showKoneUsageModal = true)}
-                    class="flex items-center gap-2.5 h-10 px-5"
-                    disabled={!networkStore.isOnline}
-                >
-                    <Upload
-                        size={18}
-                        strokeWidth={2.5}
-                        class="text-blue-600/80"
-                    />
-                    Importar Conteo KONE
-                </Button>
-            </PermissionGuard>
+            {#if moduleState.isEnabled("conteo_uso")}
+                <PermissionGuard requireEdit>
+                    <Button
+                        variant="soft-blue"
+                        onclick={() => (showKoneUsageModal = true)}
+                        class="flex items-center gap-2.5 h-10 px-5"
+                        disabled={!networkStore.isOnline}
+                    >
+                        <Upload
+                            size={18}
+                            strokeWidth={2.5}
+                            class="text-blue-600/80"
+                        />
+                        Importar Conteo de Uso
+                    </Button>
+                </PermissionGuard>
+            {/if}
 
             <ExportDropdown
                 icon={FileSpreadsheet}
@@ -337,28 +339,18 @@
                 class="h-10 px-5"
             >
                 {#snippet items()}
-                    <button
-                        class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                    <ExportMenuItem
+                        icon={FileSpreadsheet}
+                        label="Hoja Única"
+                        iconBgClass="bg-blue-50"
+                        iconColorClass="text-blue-600"
                         onclick={() => handleExportExcel(false)}
-                    >
-                        <span
-                            class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600"
-                        >
-                            <FileSpreadsheet size={16} />
-                        </span>
-                        Hoja Única
-                    </button>
-                    <button
-                        class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                    />
+                    <ExportMenuItem
+                        icon={FileStack}
+                        label="Separado por Dependencia"
                         onclick={() => handleExportExcel(true)}
-                    >
-                        <span
-                            class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600"
-                        >
-                            <FileStack size={16} />
-                        </span>
-                        Separado por Dependencia
-                    </button>
+                    />
                     <div class="mx-3 my-1 border-t border-slate-100"></div>
                     <div class="px-4 py-2">
                         <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1.5">
@@ -390,18 +382,14 @@
                         </p>
                     </div>
                     <div class="mx-3 my-1 border-t border-slate-100"></div>
-                    <button
-                        class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
-                        onclick={handleExportAllDepsZip}
+                    <ExportMenuItem
+                        icon={FolderArchive}
+                        label="Todas las Dependencias (ZIP)"
+                        iconBgClass="bg-violet-50"
+                        iconColorClass="text-violet-600"
                         disabled={isZipExporting || dependencies.length === 0}
-                    >
-                        <span
-                            class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600"
-                        >
-                            <FolderArchive size={16} />
-                        </span>
-                        Todas las Dependencias (ZIP)
-                    </button>
+                        onclick={handleExportAllDepsZip}
+                    />
                 {/snippet}
             </ExportDropdown>
 
@@ -496,4 +484,4 @@
     <FloatingActionButton onclick={onOpenAddModal} label="Nueva Alta" />
 </PermissionGuard>
 
-<KoneUsageImportModal bind:isOpen={showKoneUsageModal} />
+<UsoTarjetasImportModal bind:isOpen={showKoneUsageModal} />

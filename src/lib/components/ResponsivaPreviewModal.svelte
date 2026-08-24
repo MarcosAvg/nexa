@@ -241,14 +241,7 @@
 
         const subject = `Responsiva de Acceso - Folio ${data.folio} - ${data.nombre}`;
 
-        const cardDescription =
-            card?.type === "KONE"
-                ? "KONE - Torniquetes elevadores"
-                : card?.type === "P2000"
-                  ? "P2000 - Puertas y estacionamiento"
-                  : card?.type === "AccessPRO"
-                    ? "AccessPRO - Entrada de edificio"
-                    : card?.type || "Acceso Electrónico";
+        const cardDescription = card?.type || "Acceso Electrónico";
 
         const body = `Estimado/a ${data.nombre},
 

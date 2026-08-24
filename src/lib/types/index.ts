@@ -56,6 +56,7 @@ export interface Card {
     programming_status: string | null;
     responsiva_status: string | null;
     has_floors?: boolean;
+    requires_responsiva?: boolean;
     // Propiedades calculadas/combinadas
     personName?: string;
     personStatus?: string;
@@ -169,6 +170,8 @@ export interface HistoryLog {
     action: string;
     details: Record<string, unknown>;
     performed_by: string | null;
+    /** Nombre del usuario que ejecutó la acción (resuelto desde profiles). */
+    performed_by_name?: string;
 }
 
 export interface CardlessRegistry {
@@ -184,19 +187,20 @@ export interface CardlessRegistry {
     comments: string | null;
     recorded_at: string;
     recorded_by: string;
+    media_type_id?: string | null;
     /**
-     * Snapshot of whether the person had a pending KONE "Firma Responsiva"
+     * Snapshot of whether the person had a pending "Firma Responsiva"
      * ticket at the moment this record was created. Null means the record
      * pre-dates this feature (backfilled by migration).
      */
-    kone_status_at_registration: boolean | null;
+    responsiva_status_at_registration: boolean | null;
     // Propiedades calculadas/combinadas
     personName?: string;
     buildingName?: string;
     dependencyName?: string;
     recordedByName?: string;
-    /** @deprecated Use kone_status_at_registration for historical accuracy */
-    pendingKoneResponsiva?: boolean;
+    /** @deprecated Use responsiva_status_at_registration for historical accuracy */
+    pendingResponsiva?: boolean;
 }
 
 export interface AccessMediaType {
@@ -219,7 +223,6 @@ export interface AccessMedia {
     person_id: string | null;
     programming_status: string;
     responsiva_status: string;
-    metadata: Record<string, unknown>;
     created_at: string;
     updated_at: string;
     // Propiedades de join

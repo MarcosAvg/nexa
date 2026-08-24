@@ -78,7 +78,7 @@
     }
 </script>
 
-<Card class="p-0 overflow-hidden bg-white/60 backdrop-blur-md rounded-[22px] border border-slate-200/50 shadow-sm h-fit">
+<Card class="p-0 overflow-hidden bg-white/60 backdrop-blur-md rounded-2xl border border-slate-200/50 shadow-sm h-fit">
     <div class="p-8 border-b border-slate-100/60">
         <h3 class="text-xl font-black text-slate-900 tracking-tight">Gestión de Permisos</h3>
         <p class="text-sm font-medium text-slate-500 mt-0.5">Configura los niveles de acceso de los usuarios registrados</p>

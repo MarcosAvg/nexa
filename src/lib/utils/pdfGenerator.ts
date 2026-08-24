@@ -2,6 +2,7 @@
 import type { jsPDF as jsPDFType } from "jspdf";
 import { RESPONSIVA_LEGAL_TEXT } from "../constants/legal";
 import { mediaTypeRgb } from "./mediaTypeAppearance";
+import { settingsState } from "../stores";
 
 export async function generateCardPdf(
     folio: string,
@@ -177,7 +178,9 @@ export async function generateResponsivaPdf(
                 .replace(/{nombre}/g, `**${data.nombre}**`)
                 .replace(/{numEmpleado}/g, `**${data.numEmpleado}**`)
                 .replace(/{dependencia}/g, `**${data.dependencia}**`)
-                .replace(/{folio}/g, `**${data.folio}**`);
+                .replace(/{folio}/g, `**${data.folio}**`)
+                .replace(/{monto}/g, settingsState.replacementCost || "")
+                .replace(/{organizacion}/g, settingsState.orgName || "");
 
             currentY = drawRichText(processedText, margin, currentY, contentWidth);
             currentY += 4; // Espacio entre párrafos (4mm)

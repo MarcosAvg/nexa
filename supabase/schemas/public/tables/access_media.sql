@@ -6,7 +6,6 @@ create table "public"."access_media" (
   "person_id"          uuid,
   "programming_status" text                     not null default 'pending',
   "responsiva_status"  text                     not null default 'unsigned',
-  "metadata"           jsonb                    not null default '{}'::jsonb,
   "created_at"         timestamp with time zone not null default now(),
   "updated_at"         timestamp with time zone not null default now(),
   constraint "access_media_pkey" primary key ("id"),

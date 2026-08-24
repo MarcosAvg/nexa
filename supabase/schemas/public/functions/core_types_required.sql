@@ -5,7 +5,11 @@ create or replace function public.core_types_required()
   set search_path to 'public'
   AS $function$
     SELECT COALESCE(
-      (SELECT (value)::integer FROM public.app_settings WHERE key = 'coreTypesRequired'),
+      (SELECT CASE
+         WHEN btrim(value::text, '"') ~ '^[0-9]+$' THEN btrim(value::text, '"')::integer
+         ELSE NULL
+       END
+       FROM public.app_settings WHERE key = 'coreTypesRequired'),
       2
     );
 $function$;

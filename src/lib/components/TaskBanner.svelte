@@ -2,6 +2,7 @@
     import Badge from "./Badge.svelte";
     import Button from "./Button.svelte";
     import PermissionGuard from "./PermissionGuard.svelte";
+    import TicketStateBadge from "./TicketStateBadge.svelte";
     import {
         Clock,
         CreditCard,
@@ -12,7 +13,6 @@
         Calendar,
         User,
         Hash,
-        CheckCircle2,
         MoreHorizontal,
         AlertCircle,
     } from "lucide-svelte";
@@ -191,12 +191,6 @@
     const priorityColor = $derived(getTicketPriorityVariant(ticket.priority));
 
     // Colores para texto/metadatos de urgencia (Firma Responsiva)
-    const URGENCY_COLORS: Record<string, string> = {
-        rose: "#f43f5e",
-        emerald: "#10b981",
-        amber: "#f59e0b",
-    };
-
     // Clases de borde completo con opacidad para integrarse al estilo existente
     const URGENCY_BORDER_CLASSES: Record<string, string> = {
         rose: "border-rose-200/80",
@@ -204,14 +198,18 @@
         amber: "border-amber-200/80",
     };
 
-    // Configuración de urgencia para Firma Responsiva
+    // Configuración de urgencia para Firma Responsiva.
+    // Semáforo: verdes (recién creado) → ámbar (por vencer) → rojo (baja de registro).
+    const responsivaDaysRemaining = $derived(
+        Math.max(0, settingsState.responsivaPickupDays - (ticket.daysElapsed ?? 0)),
+    );
     const responsivaUrgency = $derived(
         ticket.type === "Firma Responsiva" && ticket.daysElapsed != null
             ? ticket.needsBaja
                 ? { variant: "rose" as const, label: "Baja de Registro" }
                 : ticket.daysElapsed >= settingsState.responsivaWarnDays
-                    ? { variant: "emerald" as const, label: "Por vencer" }
-                    : { variant: "amber" as const, label: "Pendiente" }
+                    ? { variant: "amber" as const, label: "Por vencer" }
+                    : { variant: "emerald" as const, label: "Pendiente" }
             : null
     );
 
@@ -268,6 +266,7 @@
         >
             {ticket.priority}
         </Badge>
+        <TicketStateBadge status={ticket.status} followup={(ticket.payload as any)?.estado} type={ticket.type} />
     </div>
 
     <!-- Cuerpo: Título y descripción -->
@@ -312,18 +311,18 @@
                     <span>{formatDate(ticket.created_at)}</span>
                 </div>
 
-                {#if responsivaUrgency}
-                    <span
-                        class="flex items-center gap-1"
-                        style="color: {URGENCY_COLORS[responsivaUrgency.variant]}"
-                    >
-                        <span
-                            class="w-1.5 h-1.5 rounded-full shrink-0"
-                            style="background-color: {URGENCY_COLORS[responsivaUrgency.variant]}"
-                        ></span>
-                        {ticket.daysElapsed} día{ticket.daysElapsed !== 1 ? "s" : ""} · {responsivaUrgency.label}
-                    </span>
-                {/if}
+                        {#if responsivaUrgency}
+                            <Badge
+                                variant={responsivaUrgency.variant}
+                                class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5"
+                            >
+                                {#if ticket.needsBaja}
+                                    {responsivaUrgency.label}
+                                {:else}
+                                    Restan {responsivaDaysRemaining} día{responsivaDaysRemaining !== 1 ? "s" : ""} · {responsivaUrgency.label}
+                                {/if}
+                            </Badge>
+                        {/if}
             </div>
 
             {#if ticket.cardFolio}
@@ -340,25 +339,20 @@
     <div class="p-3 bg-slate-50/50 border-t border-slate-100 flex gap-2">
         <PermissionGuard requireEdit disabledOnly>
             {#snippet children({ disabled })}
-                {#if (ticket.type === "Programación" || ticket.type === "Firma Responsiva" || ticket.type === "Modificación" || ticket.type === "Modificación de datos") && onComplete}
+                {#if ticket.type === "Programación" || ticket.type === "Firma Responsiva"}
                     <Button
                         variant="primary"
                         size="sm"
                         class="flex-1 shadow-md shadow-slate-200/50"
-                        onclick={() => onComplete(ticket)}
-                        disabled={disabled || !networkStore.isOnline}
-                    >
-                        <CheckCircle2 size={16} class="mr-2" />
-                        Completar
-                    </Button>
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        class="w-10 p-0"
                         onclick={() => onManage?.(ticket)}
                         disabled={disabled || !networkStore.isOnline}
+                        title="Abre el perfil de la persona para completar la gestión. El ticket se cerrará automáticamente al resolver."
                     >
-                        <MoreHorizontal size={18} class="text-slate-400" />
+                        Gestionar en perfil
+                        <ArrowRight
+                            size={16}
+                            class="ml-2 group-hover:translate-x-1 transition-transform"
+                        />
                     </Button>
                 {:else}
                     <Button

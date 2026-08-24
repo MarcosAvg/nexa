@@ -5,6 +5,8 @@
     import Button from "../Button.svelte";
     import Input from "../Input.svelte";
     import Modal from "../Modal.svelte";
+    import DeleteConfirmTypedModal from "../DeleteConfirmTypedModal.svelte";
+    import CatalogSectionHeader from "./CatalogSectionHeader.svelte";
     import { Plus, Edit2, Trash2, Building2, GripVertical, X, ArrowUp, ArrowDown } from "lucide-svelte";
 
     /**
@@ -44,7 +46,6 @@
     // Delete modal state
     let isDeleteModalOpen = $state(false);
     let deleteTarget = $state<any>(null);
-    let deleteConfirmation = $state("");
 
     function addFloor() {
         const label = newFloorInput.trim();
@@ -211,12 +212,11 @@
 
     function openDeleteModal(building: any) {
         deleteTarget = { ...building, type: "building" };
-        deleteConfirmation = "";
         isDeleteModalOpen = true;
     }
 
     async function confirmDelete() {
-        if (!deleteTarget || deleteConfirmation !== deleteTarget.name) return;
+        if (!deleteTarget) return;
         try {
             await catalogService.deleteCatalogItem("buildings", deleteTarget.id, deleteTarget.name);
             await fetchBuildings();
@@ -230,23 +230,20 @@
 </script>
 
 <div>
-    <div class="flex justify-between items-center mb-8">
-        <div>
-            <h3 class="text-xl font-black text-slate-900 tracking-tight">Edificios y Pisos</h3>
-            <p class="text-sm font-medium text-slate-500 mt-0.5">Gestión de infraestructura física</p>
-        </div>
-        {#if canEdit}
-            <Button variant="primary" size="sm" class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10" onclick={() => openModal()}>
-                <Plus size={18} strokeWidth={3} class="mr-2" /> Nuevo Edificio
-            </Button>
-        {/if}
-    </div>
+    <CatalogSectionHeader
+        title="Edificios y Pisos"
+        subtitle="Gestión de infraestructura física"
+        actionLabel="Nuevo Edificio"
+        icon={Plus}
+        {canEdit}
+        onNew={() => openModal()}
+    />
 
     <div class="grid sm:grid-cols-2 lg:grid-cols-2 gap-6" role="list">
         {#each buildings as building, i}
             <div
                 role="listitem"
-                class="group p-6 border border-slate-200/50 rounded-[24px] bg-white/40 hover:bg-white transition-all duration-500 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden {canEdit && !isReordering ? 'cursor-grab active:cursor-grabbing' : ''} {draggingIndex === i ? 'opacity-40' : ''} {draggingIndex !== null && dragOverIndex === i && draggingIndex !== i ? 'ring-2 ring-blue-400 border-blue-200 scale-[1.02]' : ''}"
+                class="group p-6 border border-slate-200/50 rounded-2xl bg-white/40 hover:bg-white transition-all duration-500 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden {canEdit && !isReordering ? 'cursor-grab active:cursor-grabbing' : ''} {draggingIndex === i ? 'opacity-40' : ''} {draggingIndex !== null && dragOverIndex === i && draggingIndex !== i ? 'ring-2 ring-blue-400 border-blue-200 scale-[1.02]' : ''}"
                 draggable={canEdit && !isReordering}
                 ondragstart={(e) => buildingDragStart(e, i)}
                 ondragover={(e) => buildingDragOver(e, i)}
@@ -405,24 +402,11 @@
 </Modal>
 
 <!-- Delete Building Modal -->
-<Modal bind:isOpen={isDeleteModalOpen} title="Eliminar Edificio" description={`Estás a punto de eliminar "${deleteTarget?.name}". Esta acción es irreversible.`} size="sm">
-    <div class="space-y-4">
-        <div class="p-4 bg-rose-50 rounded-xl border border-rose-100">
-            <div class="flex gap-3">
-                <div class="mt-0.5 text-rose-600"><Trash2 size={20} /></div>
-                <div>
-                    <h4 class="text-sm font-bold text-rose-900">Confirmación requerida</h4>
-                    <p class="text-sm text-rose-800 mt-1">Para confirmar, escribe <strong>{deleteTarget?.name}</strong> en el campo de abajo.</p>
-                </div>
-            </div>
-        </div>
-        <div>
-            <label for="building-delete-confirm" class="block text-sm font-medium text-slate-700 mb-1">Confirmación</label>
-            <Input id="building-delete-confirm" placeholder={deleteTarget?.name} bind:value={deleteConfirmation} class="border-rose-300 focus:ring-rose-500" />
-        </div>
-    </div>
-    {#snippet footer()}
-        <Button variant="secondary" onclick={() => (isDeleteModalOpen = false)}>Cancelar</Button>
-        <Button variant="danger" onclick={confirmDelete} disabled={deleteConfirmation !== deleteTarget?.name}>Eliminar permanentemente</Button>
-    {/snippet}
-</Modal>
+<DeleteConfirmTypedModal
+    bind:isOpen={isDeleteModalOpen}
+    title="Eliminar Edificio"
+    targetName={deleteTarget?.name ?? ""}
+    confirmText="Eliminar permanentemente"
+    onConfirm={confirmDelete}
+    onCancel={() => (isDeleteModalOpen = false)}
+/>

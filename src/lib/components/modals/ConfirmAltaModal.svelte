@@ -11,8 +11,11 @@
     import { personnelService } from "../../services/personnel";
     import { HistoryService } from "../../services/history";
     import { toast } from "svelte-sonner";
-    import { handleError, parseFloors } from "../../utils";
-    import { wantsAccessProCard } from "../../utils/matchAnalysis";
+    import { handleError, parseFloors, fullName } from "../../utils";
+    import { wantsCard } from "../../utils/matchAnalysis";
+    import { activeMediaTypes } from "../../utils/mediaContract";
+    import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
+    import { catalogState } from "../../stores";
     import Badge from "../Badge.svelte";
     import {
         AlertTriangle,
@@ -44,6 +47,17 @@
     let p = $derived(ticket?.payload ?? {});            // Construir objeto prefill desde los nombres de campo del payload
     let prefill = $derived.by(() => {
         if (!p) return null;
+        // Estructuras dinámicas por clave de medio (contrato genérico).
+        const medias = activeMediaTypes(catalogState.mediaTypes);
+        const pisosPorMedio: Record<string, string[]> = {};
+        const foliosPorMedio: Record<string, string> = {};
+        for (const media of medias) {
+            if (media.has_floors) {
+                pisosPorMedio[media.key] = parseFloors(p[`pisos_${media.key}`]);
+            } else {
+                foliosPorMedio[media.key] = p[`${media.key}_folio`];
+            }
+        }
         return {
             nombres: p.nombres,
             apellidos: p.apellidos,
@@ -57,28 +71,20 @@
             horaEntrada: p.hora_entrada,
             horaSalida: p.hora_salida,
             correo: p.correo?.replace(/^mailto:\s*/i, "").trim(),
-            pisosP2000: parseFloors(p.pisos_p2000),
-            pisosKone: parseFloors(p.pisos_kone),
+            pisosPorMedio,
+            foliosPorMedio,
             specialAccesses: [p.acceso1, p.acceso2, p.acceso3]
                 .map((s: string) => s?.trim())
                 .filter(Boolean),
-            folioAccessPro: p.folio_accesspro,
         };
     });
 
     /** Card types requested in the template */
     let allowedCardTypes = $derived.by(() => {
         const types: string[] = [];
-        const wantsP2000 = ["sí", "si"].includes(
-            (p.p2000_req ?? "").toLowerCase(),
-        );
-        const wantsKONE = ["sí", "si"].includes(
-            (p.kone_req ?? "").toLowerCase(),
-        );
-        const wantsAccessPro = wantsAccessProCard(p);
-        if (wantsP2000) types.push("P2000");
-        if (wantsKONE) types.push("KONE");
-        if (wantsAccessPro) types.push("AccessPRO");
+        for (const media of activeMediaTypes(catalogState.mediaTypes)) {
+            if (wantsCard(p, media)) types.push(media.name);
+        }
         return types.length > 0 ? types : null; // null = allow all
     });
 
@@ -135,7 +141,7 @@
         isRejecting = true;
         try {
             await ticketService.delete(ticket.id, "Alta rechazada");
-            const altaName = `${p.apellidos ?? ''}, ${p.nombres ?? ''}`.replace(/^,\s*/, '').trim() || 'Desconocido';
+            const altaName = fullName(p.nombres, p.apellidos) || 'Desconocido';
             await HistoryService.log("PERSONNEL", "", "REJECT_ALTA", {
                 message: `Solicitud de alta rechazada: ${p.apellidos}, ${p.nombres}`,
                 entityName: altaName,
@@ -176,11 +182,7 @@
                 <div class="flex gap-1.5">
                     {#each allowedCardTypes as type}
                         <Badge
-                            variant={type === "KONE"
-                                ? "blue"
-                                : type === "AccessPRO"
-                                  ? "emerald"
-                                  : "amber"}>{type}</Badge
+                            variant={mediaTypeVariant(type)}>{type}</Badge
                         >
                     {/each}
                 </div>
