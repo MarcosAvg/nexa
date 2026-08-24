@@ -103,14 +103,16 @@
 
         <div class="flex items-center gap-3 border-t border-slate-100 pt-6">
             <Button
-                class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-indigo-200/50"
+                variant="indigo"
+                class="flex items-center gap-2 px-6 py-2.5 rounded-xl"
                 onclick={handleSave}
                 disabled={!networkStore.isOnline}
             >
                 <Save size={16} strokeWidth={2.5} /> Guardar configuración
             </Button>
             <Button
-                class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-extrabold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 transition-all duration-200 active:scale-95"
+                variant="secondary"
+                class="flex items-center gap-2 px-5 py-2.5 rounded-xl"
                 onclick={handleReset}
             >
                 <RotateCcw size={16} strokeWidth={2} /> Restablecer

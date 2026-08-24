@@ -6,6 +6,8 @@
     import Button from "../Button.svelte";
     import Card from "../Card.svelte";
     import Badge from "../Badge.svelte";
+    import Input from "../Input.svelte";
+    import Select from "../Select.svelte";
     import { BarChart3, ClipboardX, Power, RotateCcw } from "lucide-svelte";
     import { onMount } from "svelte";
 
@@ -116,8 +118,8 @@
                         {#each fieldsFor(def, id) as field}
                             <div>
                                 <p class="block text-xs font-bold text-slate-600 mb-1">{field.label}</p>
-                                {#if field.type === "media-select"}                                    <select
-                                        class="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50"
+                                {#if field.type === "media-select"}
+                                    <Select
                                         value={field.value || ""}
                                         onchange={(e) => saveField(id, field.key, (e.currentTarget as HTMLSelectElement).value)}
                                     >
@@ -125,13 +127,12 @@
                                         {#each mediaTypes as m}
                                             <option value={m.key}>{m.name}</option>
                                         {/each}
-                                    </select>
+                                    </Select>
                                 {:else if field.type === "number"}
-                                    <input
+                                    <Input
                                         type="number"
                                         min="0"
-                                        class="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50"
-                                        value={field.value ?? field.default ?? 0}
+                                        value={String(field.value ?? field.default ?? 0)}
                                         onchange={(e) => saveField(id, field.key, Number((e.currentTarget as HTMLInputElement).value))}
                                     />
                                 {:else if field.type === "boolean"}
@@ -142,9 +143,8 @@
                                         onchange={(e) => saveField(id, field.key, (e.currentTarget as HTMLInputElement).checked)}
                                     />
                                 {:else}
-                                    <input
+                                    <Input
                                         type="text"
-                                        class="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50"
                                         value={field.value ?? ""}
                                         onchange={(e) => saveField(id, field.key, (e.currentTarget as HTMLInputElement).value)}
                                     />

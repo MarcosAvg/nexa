@@ -13,6 +13,7 @@
         | "danger"
         | "amber"
         | "sky"
+        | "indigo"
         | "soft-blue"
         | "soft-emerald"
         | "soft-slate";
@@ -124,6 +125,8 @@
         danger: "bg-rose-600 text-white hover:bg-rose-700 shadow-md shadow-rose-500/10 border border-rose-500/40",
         amber: "bg-amber-500 text-white hover:bg-amber-600 shadow-md shadow-amber-500/10 border border-amber-400/40",
         sky: "bg-sky-500 text-white hover:bg-sky-600 shadow-md shadow-sky-500/10 border border-sky-400/40",
+        indigo:
+            "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-500/10 border border-indigo-500/40",
         "soft-blue":
             "bg-blue-50/70 text-blue-700 border border-blue-100/60 hover:bg-blue-100 hover:text-blue-800 shadow-none",
         "soft-emerald":

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection, ExportDropdown, PlantillasCatalog, ModulesCatalog } from "../components";
+    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection, ExportDropdown, PlantillasCatalog, ModulesCatalog, Button } from "../components";
     import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard, FileText, Puzzle } from "lucide-svelte";
     import { userState, catalogState, settingsState, moduleState } from "../stores";
     import { networkStore } from "../stores/network.svelte";
@@ -371,21 +371,23 @@
 
                         <!-- Botones de acción -->
                         <div class="flex items-center gap-3 pt-2">
-                            <button
-                                class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-indigo-200/50"
+                            <Button
+                                variant="indigo"
+                                class="flex items-center gap-2 px-6 py-2.5 rounded-xl"
                                 onclick={handleSaveResponsivaSettings}
                                 disabled={!networkStore.isOnline}
                             >
                                 <Settings2 size={16} strokeWidth={2.5} />
                                 Guardar configuración
-                            </button>
-                            <button
-                                class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-extrabold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 transition-all duration-200 active:scale-95"
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                class="flex items-center gap-2 px-5 py-2.5 rounded-xl"
                                 onclick={handleResetResponsivaSettings}
                             >
                                 <RotateCcw size={16} strokeWidth={2} />
                                 Restablecer
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </Card>

@@ -263,23 +263,23 @@
                     <div
                         class="w-full xl:w-auto mt-4 xl:mt-0 flex gap-2 justify-end"
                     >
-                        <button
-                            type="button"
-                            class="flex items-center justify-center gap-2 h-10 px-4 bg-white text-slate-700 border border-slate-200 font-bold rounded-xl hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+                        <Button
+                            variant="secondary"
+                            class="flex items-center justify-center gap-2 h-10 px-4 rounded-xl"
                             onclick={broadcastEmail}
                         >
                             <Send size={16} class="text-slate-400" />
                             Difusión
-                        </button>
-                        <button
-                            type="button"
-                            class="flex items-center justify-center gap-2 h-10 px-6 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/10"
+                        </Button>
+                        <Button
+                            variant="primary"
+                            class="flex items-center justify-center gap-2 h-10 px-6 rounded-xl shadow-lg shadow-slate-900/10"
                             onclick={() => (isAddModalOpen = true)}
                             {disabled}
                         >
                             <Contact size={18} />
                             Asignar Enlace
-                        </button>
+                        </Button>
                     </div>
                 {/snippet}
             </PermissionGuard>
