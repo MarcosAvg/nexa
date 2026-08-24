@@ -17,10 +17,9 @@
     } from "lucide-svelte";
     import { toast } from "svelte-sonner";
 
-    import { responsivaService } from "../services/responsiva";
+    import { responsivaService, fetchLegalText } from "../services/responsiva";
     import { supabase } from "../supabase";
 
-    import { RESPONSIVA_LEGAL_TEXTS } from "../constants/legal";
     import bgImage from "../../assets/responsiva_bg.png";
 
     /**
@@ -68,6 +67,9 @@
     );
     let isTextMode = $state(false);
 
+    // Texto legal del tipo de medio (desde document_templates.content).
+    let legalTexts = $state<string[]>([]);
+
     // Estado de captura de correo
     let showEmailPrompt = $state(false);
     let tempEmail = $state("");
@@ -89,6 +91,9 @@
             } else {
                 verificationStatus = "none";
             }
+
+            // Texto legal desde el catálogo de plantillas (data-driven)
+            fetchLegalText(card?.type ?? "").then((t) => (legalTexts = t));
 
             // Activar modo texto automático en pantallas pequeñas
             if (window.innerWidth < 480) {
@@ -147,11 +152,7 @@
             const snapshot = data.legal_snapshot || "";
             const paragraphs = snapshot
                 ? snapshot.split("\n")
-                : card?.type?.toUpperCase() === "P2000"
-                  ? RESPONSIVA_LEGAL_TEXTS.P2000
-                  : card?.type?.toUpperCase() === "ACCESSPRO"
-                    ? RESPONSIVA_LEGAL_TEXTS.AccessPRO
-                    : RESPONSIVA_LEGAL_TEXTS.KONE;
+                : legalTexts;
 
             const bgBase64 = (await getBase64Image(bgImage)) as string;
             await generateResponsivaPdf(
@@ -180,13 +181,7 @@
         }
         isSigning = true;
         try {
-            const typeKey =
-                card?.type?.toUpperCase() === "P2000"
-                    ? "P2000"
-                    : card?.type?.toUpperCase() === "ACCESSPRO"
-                      ? "AccessPRO"
-                      : "KONE";
-            const textToUse = RESPONSIVA_LEGAL_TEXTS[typeKey];
+            const textToUse = legalTexts;
 
             const legalSnapshot = textToUse
                 .map((p) =>
@@ -209,6 +204,7 @@
                 person_id: person.id,
                 folio: card.folio,
                 card_type: card.type,
+                access_media_id: card.id ?? null,
                 data: data,
                 signature: signature,
                 legal_hash: legalHash,
@@ -287,11 +283,7 @@ Control de Accesos - Nexa`;
             const snapshot = data.legal_snapshot || "";
             const paragraphs = snapshot
                 ? snapshot.split("\n")
-                : card?.type?.toUpperCase() === "P2000"
-                  ? RESPONSIVA_LEGAL_TEXTS.P2000
-                  : card?.type?.toUpperCase() === "ACCESSPRO"
-                    ? RESPONSIVA_LEGAL_TEXTS.AccessPRO
-                    : RESPONSIVA_LEGAL_TEXTS.KONE;
+                : legalTexts;
 
             const bgBase64 = (await getBase64Image(bgImage)) as string;
 

@@ -15,10 +15,11 @@
     import ScheduleSelect from "../ScheduleSelect.svelte";
 
     import { personnelService, ticketService, accessAssignmentService } from "../../services";
+    import { floorGroupsToIdMap, floorsForKey } from "../../services/accessAssignments";
     import { personnelState, catalogState, userState } from "../../stores";
     import PermissionGuard from "../PermissionGuard.svelte";
     import { toast } from "svelte-sonner";
-    import { handleError } from "../../utils";
+    import { handleError, mediaTypeVariant } from "../../utils";
     import type { Person } from "../../types";
     import { personnelSchema } from "../../schemas";
 
@@ -91,7 +92,7 @@
     let puestoFuncion = $state("");
     let edificio = $state("");
     let pisoBase = $state("");
-    let floorsByBuilding = $state<Record<number, { p2000: string[]; kone: string[] }>>({});
+    let floorsByBuilding = $state<Record<number, Record<string, string[]>>>({});
     let diasHorario = $state("");
     let horaEntrada = $state("08:00");
     let horaSalida = $state("17:00");
@@ -120,27 +121,95 @@
         return b ? Number(b.id) : 0;
     });
 
-    let baseP2000 = $derived(floorsByBuilding[baseBuildingId]?.p2000 ?? []);
-    let baseKone = $derived(floorsByBuilding[baseBuildingId]?.kone ?? []);
+    // Medios con pisos (del catálogo), para renderizar los selectores dinámicamente.
+    let floorMediaTypes = $derived.by(() => {
+        const seen = new Set<string>();
+        const out: { id: string; key: string; name: string }[] = [];
+        for (const m of catalogState.mediaTypes) {
+            if ((m as any).active === false || !(m as any).has_floors) continue;
+            if (seen.has(m.key)) continue;
+            seen.add(m.key);
+            out.push({ id: m.id, key: m.key, name: m.name });
+        }
+         return out;
+    });
+
+    /** Mapa id -> medio, para resolver relaciones medio-edificio al renderizar. */
+    let mediaTypeById = $derived.by(() => {
+        const map: Record<string, any> = {};
+        for (const m of catalogState.mediaTypes) map[m.id] = m;
+        return map;
+    });
+
+    /** Pisos del edificio base para una clave de medio (ej. "p2000"). */
+    function baseFloorsForKey(key: string): string[] {
+        const fm = floorMediaTypes.find((f) => f.key === key);
+        return fm ? (floorsByBuilding[baseBuildingId]?.[fm.id] ?? []) : [];
+    }
+
+    /** Indica si un medio aplica en un edificio (relación medio-edificio). */
+    function mediaAppliesToBuilding(m: any, bid: number): boolean {
+        if (!m.access_media_type_buildings) return true; // fallback: no aplicar filtro si no hay relación cargada
+        return m.access_media_type_buildings.some((r: any) => Number(r.building_id) === bid);
+    }
+
+    let baseP2000 = $derived(baseFloorsForKey("p2000"));
+    let baseKone = $derived(baseFloorsForKey("kone"));
+
+    /** Edificios con acceso seleccionados para esta persona. */
+    let selectedBuildings = $state<number[]>([]);
+
+    function toggleBuilding(bid: number) {
+        if (selectedBuildings.includes(bid)) {
+            // Desmarcar descarta sus pisos y sus accesos especiales del guardado.
+            const next = { ...floorsByBuilding };
+            delete next[bid];
+            floorsByBuilding = next;
+            selectedBuildings = selectedBuildings.filter((b) => b !== bid);
+            const keepNames = new Set(
+                catalogState.specialAccesses
+                    .filter((a) => selectedBuildings.includes(Number(a.building_id)))
+                    .map((a) => a.name),
+            );
+            accesosEspeciales = accesosEspeciales.filter((n) => keepNames.has(n));
+        } else {
+            selectedBuildings = [...selectedBuildings, bid];
+        }
+    }
 
     function updateBuildingFloors(
         buildingId: number,
-        key: "p2000" | "kone",
+        key: string,
         value: string[],
     ) {
+        const current = floorsByBuilding[buildingId] || {};
         floorsByBuilding = {
             ...floorsByBuilding,
-            [buildingId]: {
-                p2000:
-                    key === "p2000"
-                        ? value
-                        : (floorsByBuilding[buildingId]?.p2000 ?? []),
-                kone:
-                    key === "kone"
-                        ? value
-                        : (floorsByBuilding[buildingId]?.kone ?? []),
-            },
+            [buildingId]: { ...current, [key]: value },
         };
+    }
+
+    // El edificio base (radicación) siempre está incluido en el acceso.
+    $effect(() => {
+        if (baseBuildingId && !selectedBuildings.includes(baseBuildingId)) {
+            selectedBuildings = [...selectedBuildings, baseBuildingId];
+        }
+    });
+
+    // Accesos especiales filtrados a los edificios seleccionados.
+    let availableSpecialAccesses = $derived.by(() => {
+        if (selectedBuildings.length === 0) return specialAccesses;
+        return specialAccesses.filter((a) => {
+            const bid = (a as any).building_id;
+            return bid == null || selectedBuildings.includes(Number(bid));
+        });
+    });
+
+    /** Opciones de accesos especiales de un edificio (del catálogo). */
+    function specialOptionsFor(bid: number): string[] {
+        return availableSpecialAccesses
+            .filter((a) => Number((a as any).building_id) === bid)
+            .map((a) => a.name);
     }
 
     // Al cambiar de edificio, reiniciar solo el piso base (los pisos asignados
@@ -203,14 +272,17 @@
     // Poblar formulario
     let lastLoadedPersonId = $state("");
 
-    // Trae los pisos multi-edificio del nuevo modelo y los mezcla con los
-    // legacy del edificio base (fallback mientras no existan permisos).
+    // Trae los pisos multi-edificio del nuevo modelo y los mezcla con el
+    // fallback derivado (mientras no existan permisos para el edificio base).
     async function refreshPersonAccess(personId: string) {
         try {
             const access = await accessAssignmentService.fetchPersonAccess(
                 personId,
             );
-            const merged = { ...access.floorsByBuilding };
+            const merged: Record<number, Record<string, string[]>> = {};
+            for (const [bid, groups] of Object.entries(access.floorsByBuilding)) {
+                merged[Number(bid)] = floorGroupsToIdMap(groups);
+            }
             const bid =
                         Number(
                             buildings.find(
@@ -218,22 +290,26 @@
                             )?.id,
                         ) || undefined;
             if (bid) {
-                const legacyP2000 = editingPerson?.floors_p2000 || [];
-                const legacyKone = editingPerson?.floors_kone || [];
-                if (!merged[bid]) merged[bid] = { p2000: [], kone: [] };
-                if (merged[bid].p2000.length === 0 && legacyP2000.length) {
-                    merged[bid].p2000 = legacyP2000;
-                }
-                if (merged[bid].kone.length === 0 && legacyKone.length) {
-                    merged[bid].kone = legacyKone;
+                if (!merged[bid]) merged[bid] = {};
+                for (const g of editingPerson?.floors || []) {
+                    if ((merged[bid][g.mediaTypeId] || []).length === 0 && g.floors.length) {
+                        merged[bid][g.mediaTypeId] = [...g.floors];
+                    }
                 }
             }
             floorsByBuilding = merged;
+            selectedBuildings = [
+                ...new Set([
+                    ...selectedBuildings,
+                    ...(bid ? [bid] : []),
+                    ...Object.keys(access.floorsByBuilding).map(Number),
+                ]),
+            ];
             if (access.specialAccesses.length > 0) {
                 accesosEspeciales = access.specialAccesses;
             }
         } catch {
-            // No crítico: se mantienen los valores legacy cargados
+            // No crítico: se mantienen los valores cargados
         }
     }
 
@@ -259,12 +335,7 @@
                         )?.id,
                     ) || undefined;
                 floorsByBuilding = bid
-                    ? {
-                          [bid]: {
-                              p2000: [...(editingPerson.floors_p2000 || [])],
-                              kone: [...(editingPerson.floors_kone || [])],
-                          },
-                      }
+                    ? { [bid]: floorGroupsToIdMap(editingPerson.floors) }
                     : {};
 
                 if (editingPerson.schedule) {
@@ -376,6 +447,7 @@
                 }
 
                 lastLoadedPersonId = editingPerson.id;
+                selectedBuildings = bid ? [bid] : [];
                 void refreshPersonAccess(editingPerson.id);
             });
         } else if (
@@ -503,8 +575,6 @@
                 employee_no: noEmpleado,
                 email: email?.replace(/^mailto:\s*/i, "").trim(),
                 floor: pisoBase,
-                floors_p2000: baseP2000,
-                floors_kone: baseKone,
                 floorsByBuilding,
                 schedule_id: schedules.find((s) => s.name === diasHorario)?.id,
                 entry_time: horaEntrada,
@@ -521,8 +591,8 @@
                     noEmpleado: editingPerson.employee_no,
                     dependency: editingPerson.dependency,
                     edificio: editingPerson.building,
-                    pisosP2000: editingPerson.floors_p2000,
-                    pisosKone: editingPerson.floors_kone,
+                    pisosP2000: floorsForKey(editingPerson.floors, "p2000"),
+                    pisosKone: floorsForKey(editingPerson.floors, "kone"),
                     horario: editingPerson.schedule,
                     accesosEspeciales: editingPerson.specialAccesses,
                     tarjetas: editingPerson.cards,
@@ -572,6 +642,7 @@
         edificio = "";
         pisoBase = "";
         floorsByBuilding = {};
+        selectedBuildings = [];
         diasHorario = "";
         horaEntrada = "08:00";
         horaSalida = "17:00";
@@ -850,12 +921,37 @@
             </div>
 
             {#if edificio}
-                <div class="space-y-6">
+                <div class="space-y-4">
+                    <!-- Edificios con acceso: solo se configuran los seleccionados -->
+                    <div>
+                        <p class="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">Edificios con acceso</p>
+                        <div class="flex flex-wrap gap-2">
+                            {#each buildings as b}
+                                {#if (b.floors || []).length > 0 || specialOptionsFor(Number(b.id)).length > 0}
+                                    {@const bid = Number(b.id)}
+                                    {@const isBase = bid === baseBuildingId}
+                                    <button
+                                        type="button"
+                                        disabled={isBase}
+                                        class="px-3 py-1.5 rounded-xl text-[11px] font-bold border-2 transition-all active:scale-95 {selectedBuildings.includes(bid)
+                                            ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                                            : 'border-slate-200 text-slate-500 hover:border-blue-300'} {isBase ? 'opacity-90 cursor-default' : ''}"
+                                        onclick={() => toggleBuilding(bid)}
+                                        title={isBase ? "Edificio de radicación (siempre incluido)" : undefined}
+                                    >
+                                        {b.name}{isBase ? " ★" : ""}
+                                    </button>
+                                {/if}
+                            {/each}
+                        </div>
+                    </div>
+
                     {#each buildings as b}
+                        {@const bid = Number(b.id)}
                         {@const bFloors = b.floors || []}
-                        {#if bFloors.length > 0}
+                        {#if selectedBuildings.includes(bid) && (bFloors.length > 0 || specialOptionsFor(bid).length > 0)}
                             <div
-                                class="rounded-lg border p-3 {Number(b.id) ===
+                                class="rounded-lg border p-3 {bid ===
                                 baseBuildingId
                                     ? 'border-slate-300 bg-slate-50'
                                     : 'border-slate-200 bg-white'}"
@@ -865,7 +961,7 @@
                                         class="text-xs font-bold text-slate-600 uppercase tracking-widest"
                                     >
                                         {b.name}
-                                        {#if Number(b.id) === baseBuildingId}
+                                        {#if bid === baseBuildingId}
                                             <span
                                                 class="ml-1 normal-case text-[10px] font-medium text-blue-600"
                                             >
@@ -875,22 +971,25 @@
                                     </span>
                                 </div>
                                 <div class="space-y-4">
-                                    <ToggleGroup
-                                        label="Pisos P2000 (Puertas)"
-                                        options={bFloors}
-                                        value={floorsByBuilding[Number(b.id)]?.p2000 ?? []}
-                                        onchange={(v) =>
-                                            updateBuildingFloors(Number(b.id), "p2000", v)}
-                                        showSelectAll={true}
-                                    />
-                                    <ToggleGroup
-                                        label="Pisos KONE (Elevadores)"
-                                        options={bFloors}
-                                        value={floorsByBuilding[Number(b.id)]?.kone ?? []}
-                                        onchange={(v) =>
-                                            updateBuildingFloors(Number(b.id), "kone", v)}
-                                        showSelectAll={true}
-                                    />
+                                    {#each floorMediaTypes as fm}
+                                        {#if mediaAppliesToBuilding(mediaTypeById[fm.id], bid)}
+                                            <ToggleGroup
+                                                label={`Pisos ${fm.name}`}
+                                                options={bFloors}
+                                                value={floorsByBuilding[bid]?.[fm.id] ?? []}
+                                                onchange={(v) =>
+                                                    updateBuildingFloors(bid, fm.id, v)}
+                                                showSelectAll={true}
+                                            />
+                                        {/if}
+                                    {/each}
+                                    {#if specialOptionsFor(bid).length > 0}
+                                        <ToggleGroup
+                                            label="Accesos Especiales"
+                                            options={specialOptionsFor(bid)}
+                                            bind:value={accesosEspeciales}
+                                        />
+                                    {/if}
                                 </div>
                             </div>
                         {/if}
@@ -919,15 +1018,6 @@
             </div>
         </FormSection>
 
-        <!-- SECTION: Special Access -->
-        <FormSection title="Accesos Especiales" disabled={!userState.canEdit}>
-            <ToggleGroup
-                label=""
-                options={specialAccesses.map((a) => a.name)}
-                bind:value={accesosEspeciales}
-            />
-        </FormSection>
-
         <!-- SECTION: Cards -->
         {#if !editingPerson || prefill}
             <FormSection title="Gestión de Tarjetas">
@@ -942,12 +1032,7 @@
                                         size={18}
                                         class="text-slate-400"
                                     />
-                                    <Badge
-                                        variant={card.type === "KONE"
-                                            ? "blue"
-                                            : card.type === "AccessPRO"
-                                              ? "emerald"
-                                              : "amber"}>{card.type}</Badge
+                                    <Badge variant={mediaTypeVariant(card.type)}>{card.type}</Badge
                                     >
                                     <span
                                         class="text-sm font-bold text-slate-700"

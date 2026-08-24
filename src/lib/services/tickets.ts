@@ -3,11 +3,18 @@ import { HistoryService } from "./history";
 import type { Ticket } from "../types";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, batchPaginate, handleError } from "../utils";
 import { ticketState } from "../stores";
+import { RESPONSIVA_TICKET_TYPES } from "../constants/tickets";
 
 type CardAssignmentInfo = {
     movementType: string;
     registeredAt: string;
 };
+
+function applySectionFilter(query: any, section: string) {
+    const names = RESPONSIVA_TICKET_TYPES;
+    if (section === "Responsivas") return query.in("type", names);
+    return query.not("type", "in", `(${names.join(",")})`);
+}
 
 async function fetchCardAssignmentTypes(
     cardIds: string[],
@@ -184,8 +191,8 @@ export const ticketService = {
             }
             if (section === "Responsivas") {
                 selectString = dependencyId
-                    ? "*, cards(id, folio, type), personnel!inner(first_name, last_name, dependency_id, created_at)"
-                    : "*, cards(id, folio, type), personnel(first_name, last_name, dependency_id, created_at)";
+                    ? "*, access_media(id, identifier, status, access_media_types(name)), personnel!inner(first_name, last_name, dependency_id, created_at)"
+                    : "*, access_media(id, identifier, status, access_media_types(name)), personnel(first_name, last_name, dependency_id, created_at)";
             }
 
             let query = supabase
@@ -194,9 +201,9 @@ export const ticketService = {
                 .eq("status", "pending");
 
             if (section === "Responsivas") {
-                query = query.eq("type", "Firma Responsiva");
+                query = applySectionFilter(query, "Responsivas");
             } else {
-                query = query.neq("type", "Firma Responsiva");
+                query = applySectionFilter(query, "General");
                 if (typeFilter && typeFilter !== "Todos") {
                     query = query.eq("type", typeFilter);
                 }
@@ -236,7 +243,16 @@ export const ticketService = {
 
             if (error) throw error;
 
-            const mapped = ((data || []) as any[]).map(t => ({ ...t } as unknown as Ticket));
+            // Compatibilidad: exponer el medio como `cards` para consumidores existentes.
+            const mapped = ((data || []) as any[]).map(t => ({
+                ...t,
+                cards: t.access_media
+                    ? {
+                          type: t.access_media.access_media_types?.name ?? "",
+                          folio: t.access_media.identifier ?? "",
+                      }
+                    : undefined,
+            }) as unknown as Ticket);
             const withMedia = await enrichWithAccessMedia(mapped);
 
             if (section === "Responsivas" && withMedia.length > 0) {
@@ -272,9 +288,10 @@ export const ticketService = {
             const allData = await batchPaginate<any>(async (from, to) => {
                 let query = supabase
                     .from("tickets")
-                    .select(`*, cards(id, folio, type), ${personnelSelect}`)
-                    .eq("status", "pending")
-                    .eq("type", "Firma Responsiva");
+                    .select(`*, access_media(id, identifier, status, access_media_types(name)), ${personnelSelect}`)
+                    .eq("status", "pending");
+
+                query = applySectionFilter(query, "Responsivas");
 
                 if (dependencyId) {
                     query = query.eq("personnel.dependency_id", dependencyId);
@@ -293,7 +310,18 @@ export const ticketService = {
                     .range(from, to);
             });
 
-            const withMedia = await enrichWithAccessMedia(allData);
+            // Compatibilidad: exponer el medio como `cards` para consumidores existentes.
+            const withCompat = allData.map((t: any) => ({
+                ...t,
+                cards: t.access_media
+                    ? {
+                          type: t.access_media.access_media_types?.name ?? "",
+                          folio: t.access_media.identifier ?? "",
+                      }
+                    : undefined,
+            }));
+
+            const withMedia = await enrichWithAccessMedia(withCompat);
             return enrichWithMovementType(withMedia);
         }, "Fetch Responsivas for Export", []);
     },
@@ -449,4 +477,3 @@ export const ticketService = {
     },
 
 };
-

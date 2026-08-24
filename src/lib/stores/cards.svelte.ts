@@ -57,7 +57,7 @@ export class CardState {
                 // Las acciones de la vista operan sobre access_media.id.
                 id: m.id as string,
                 access_media_id: m.id,
-                type: m.access_media_types?.name ?? (m.metadata?.legacy_type as string) ?? "",
+                type: m.access_media_types?.name ?? "",
                 folio: m.identifier ?? "",
             })) as unknown as Card[];
             return { data, count: res.count };

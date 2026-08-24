@@ -27,6 +27,7 @@ export class CatalogState {
         this.mediaTypes = data;
     }
 
+
     /** Nombres (distintos) de los medios de acceso activos, para desplegables/filtros. */
     activeMediaTypeNames(): string[] {
         const names = new Set<string>();

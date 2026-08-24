@@ -9,35 +9,26 @@ create or replace function public.get_dashboard_stats()
             SELECT COUNT(DISTINCT p.id)
             FROM personnel p
             INNER JOIN access_media am ON am.person_id = p.id
-            INNER JOIN access_media_types t ON t.id = am.media_type_id
             WHERE p.status = 'active'
               AND am.status = 'active'
               AND am.programming_status = 'done'
               AND am.responsiva_status IN ('signed', 'legacy')
         ),
-        'koneStock', (
-            SELECT COUNT(*)
-            FROM access_media am
-            INNER JOIN access_media_types t ON t.id = am.media_type_id
-            WHERE t.key = 'kone'
-              AND am.status = 'available'
-              AND am.person_id IS NULL
-        ),
-        'p2000Stock', (
-            SELECT COUNT(*)
-            FROM access_media am
-            INNER JOIN access_media_types t ON t.id = am.media_type_id
-            WHERE t.key = 'p2000'
-              AND am.status = 'available'
-              AND am.person_id IS NULL
-        ),
-        'accessproStock', (
-            SELECT COUNT(*)
-            FROM access_media am
-            INNER JOIN access_media_types t ON t.id = am.media_type_id
-            WHERE t.key = 'accesspro'
-              AND am.status = 'available'
-              AND am.person_id IS NULL
+        'stock', (
+            SELECT COALESCE(json_agg(x ORDER BY x."sortOrder"), '[]'::json)
+            FROM (
+                SELECT t.id AS "mediaTypeId",
+                       t.name,
+                       t.sort_order AS "sortOrder",
+                       COUNT(am.id) AS stock
+                FROM access_media_types t
+                LEFT JOIN access_media am
+                  ON am.media_type_id = t.id
+                 AND am.status = 'available'
+                 AND am.person_id IS NULL
+                WHERE t.active
+                GROUP BY t.id, t.name, t.sort_order
+            ) x
         )
     );
 $function$;

@@ -29,11 +29,17 @@
     let buildings = $derived(catalogState.buildings);
     let mediaTypes = $derived(catalogState.mediaTypes);
 
-    // Catálogo por edificio: el usuario elige qué edificio gestionar.
-    let selectedBuildingId = $state<number>(1);
-    let filteredMediaTypes = $derived(
-        mediaTypes.filter((t) => Number(t.building_id) === selectedBuildingId),
-    );
+    /** Edificios asignados por tipo de medio (del embed de la tabla puente). */
+    let buildingsByMedia = $derived.by(() => {
+        const map: Record<string, number[]> = {};
+        for (const m of mediaTypes) {
+            const rels = (m as any).access_media_type_buildings || [];
+            if (rels.length > 0) {
+                map[m.id] = rels.map((r: any) => Number(r.building_id));
+            }
+        }
+        return map;
+    });
 
     // Estado de reordenamiento (evita clics consecutivos en vuelo)
     let isReordering = $state(false);
@@ -41,41 +47,47 @@
     // Add/Edit modal state
     let isModalOpen = $state(false);
     let editingId = $state<string | null>(null);
-    let selectedTemplate = $state<"p2000" | "kone" | "accesspro">("p2000");
     let mediaName = $state("");
     let mediaHasFloors = $state(true);
     let mediaActive = $state(true);
+    /** Edificios seleccionados en el modal (multi-edificio). */
+    let mediaBuildings = $state<number[]>([]);
 
     // Delete modal state
     let isDeleteModalOpen = $state(false);
     let deleteTarget = $state<any>(null);
     let deleteConfirmation = $state("");
 
-    const TEMPLATES = [
-        { key: "p2000", name: "P2000", desc: "Control de puertas" },
-        { key: "kone", name: "KONE", desc: "Elevadores" },
-        { key: "accesspro", name: "AccessPRO", desc: "Acceso secundario" },
-    ] as const;
-
     async function fetchMediaTypes() {
         const data = await catalogService.fetchMediaTypes();
         catalogState.setMediaTypes(data);
     }
 
+    function buildingNames(ids: number[] | undefined): string {
+        return (
+            (ids || [])
+                .map((id) => buildings.find((b) => Number(b.id) === id)?.name ?? "")
+                .filter(Boolean)
+                .join(", ") || "Sin edificio"
+        );
+    }
+
+    function toggleMediaBuilding(bid: number) {
+        mediaBuildings = mediaBuildings.includes(bid)
+            ? mediaBuildings.filter((b) => b !== bid)
+            : [...mediaBuildings, bid];
+    }
+
     /** Mueve un elemento de la posición `from` a la posición `to` y persiste el orden. */
     async function handleDrop(from: number, to: number) {
         if (isReordering || from === to) return;
-        const next = [...filteredMediaTypes];
+        const next = [...mediaTypes];
         const [item] = next.splice(from, 1);
         next.splice(to, 0, item);
         isReordering = true;
         // Actualización optimista: los desplegables reflejan el nuevo orden al instante
         catalogState.setMediaTypes(
-            mediaTypes.map((t) => {
-                if (Number(t.building_id) !== selectedBuildingId) return t;
-                const idx = filteredMediaTypes.indexOf(t);
-                return idx >= 0 ? next[idx] : t;
-            }),
+            next,
         );
         try {
             await catalogService.reorderCatalog("access_media_types", next);
@@ -94,31 +106,26 @@
             mediaName = type.name;
             mediaHasFloors = !!type.has_floors;
             mediaActive = type.active !== false;
+            mediaBuildings = [...(buildingsByMedia[type.id] || [])];
         } else {
             editingId = null;
-            selectedTemplate = "p2000";
             mediaName = "";
             mediaHasFloors = true;
             mediaActive = true;
+            mediaBuildings = [];
         }
         isModalOpen = true;
     }
 
     async function saveMediaType() {
         try {
-            if (editingId) {
-                await catalogService.saveMediaType(editingId, {
-                    name: mediaName.trim() || "Medio de acceso",
-                    has_floors: mediaHasFloors,
-                    active: mediaActive,
-                });
-            } else {
-                await catalogService.saveMediaType(null, {
-                    key: selectedTemplate,
-                    name: mediaName.trim() || undefined,
-                    buildingId: selectedBuildingId,
-                });
-            }
+            const payload = {
+                name: mediaName.trim() || "Medio de acceso",
+                has_floors: mediaHasFloors,
+                active: mediaActive,
+                buildingIds: mediaBuildings,
+            };
+            await catalogService.saveMediaType(editingId, payload);
             await fetchMediaTypes();
             isModalOpen = false;
             toast.success(editingId ? "Medio actualizado" : "Medio creado");
@@ -160,22 +167,6 @@
         {/if}
     </div>
 
-    <div class="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-none">
-        {#each buildings as b}
-            <button
-                type="button"
-                class="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-extrabold whitespace-nowrap transition-all duration-300 active:scale-95 {Number(b.id) ===
-                selectedBuildingId
-                    ? 'bg-slate-900 text-white shadow-md'
-                    : 'bg-slate-100/60 text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
-                onclick={() => (selectedBuildingId = Number(b.id))}
-            >
-                <span class="w-1.5 h-1.5 rounded-full {Number(b.id) === selectedBuildingId ? 'bg-white' : 'bg-slate-300'}"></span>
-                {b.name}
-            </button>
-        {/each}
-    </div>
-
     {#snippet renderMediaName(row: any)}
         <div class="flex items-center gap-3">
             <div class="p-2 bg-slate-100 rounded-lg text-slate-500">
@@ -185,6 +176,18 @@
                 <span class="text-slate-700 font-medium block">{row.name}</span>
                 <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{row.key}</span>
             </div>
+        </div>
+    {/snippet}
+
+    {#snippet renderBuildings(row: any)}
+        <div class="flex flex-wrap gap-1.5">
+            {#each buildingsByMedia[row.id] || [] as bid}
+                <span class="px-2 py-0.5 bg-slate-100 border border-slate-200/60 rounded-lg text-[10px] font-bold text-slate-500">
+                    {buildings.find((b) => Number(b.id) === bid)?.name ?? bid}
+                </span>
+            {:else}
+                <span class="text-[11px] text-slate-400 italic">Sin edificio</span>
+            {/each}
         </div>
     {/snippet}
 
@@ -207,9 +210,10 @@
     {/snippet}
 
     <DataTable
-        data={filteredMediaTypes}
+        data={mediaTypes}
         columns={[
             { key: "name", label: "Medio", render: renderMediaName, sortable: false },
+            { key: "buildings", label: "Edificios", render: renderBuildings, sortable: false },
             { key: "has_floors", label: "Pisos", render: renderHasFloors, sortable: false },
             { key: "active", label: "Estado", render: renderActive, sortable: false },
         ]}
@@ -237,42 +241,45 @@
 <Modal
     bind:isOpen={isModalOpen}
     title={editingId ? "Editar Medio de Acceso" : "Nuevo Medio de Acceso"}
-    description={`${editingId ? "Actualiza" : "Establece"} el sistema de acceso de ${buildings.find((b) => Number(b.id) === selectedBuildingId)?.name ?? "el edificio seleccionado"}.`}
+    description="Define el sistema de acceso y los edificios donde aplica. La misma tarjeta sirve en todos los edificios seleccionados."
 >
     <div class="space-y-4">
-        {#if !editingId}
-            <div>
-                <p class="block text-sm font-medium text-slate-700 mb-2">Sistema de acceso</p>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" role="group" aria-label="Sistema de acceso">
-                    {#each TEMPLATES as t}
-                        <button
-                            type="button"
-                            class="flex flex-col items-start gap-1 p-3 rounded-xl border-2 text-left transition-all active:scale-[0.98] {selectedTemplate === t.key ? 'border-blue-500 bg-blue-50/60' : 'border-slate-200 hover:border-slate-300'}"
-                            onclick={() => (selectedTemplate = t.key)}
-                        >
-                            <span class="text-sm font-extrabold text-slate-800">{t.name}</span>
-                            <span class="text-[10px] font-medium text-slate-500">{t.desc}</span>
-                        </button>
-                    {/each}
-                </div>
-            </div>
-        {/if}
         <div>
             <label for="media-name" class="block text-sm font-medium text-slate-700 mb-1">Nombre del Medio</label>
-            <Input id="media-name" placeholder={editingId ? "Nombre" : selectedTemplate.toUpperCase()} bind:value={mediaName} />
+            <Input id="media-name" placeholder={editingId ? "Nombre" : "Ej. P2000, KONE, AccessPRO…"} bind:value={mediaName} />
         </div>
-        {#if editingId}
-            <div class="space-y-2 pt-1">
-                <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
-                    <span class="text-sm font-bold text-slate-700">Maneja pisos (P2000/KONE)</span>
-                    <input type="checkbox" bind:checked={mediaHasFloors} class="w-5 h-5 accent-blue-600" />
-                </label>
+        <div>
+            <p class="block text-sm font-medium text-slate-700 mb-2">Edificios donde aplica</p>
+            <div class="flex flex-wrap gap-2">
+                {#each buildings as b}
+                    {@const bid = Number(b.id)}
+                    <button
+                        type="button"
+                        class="px-3 py-1.5 rounded-xl text-[11px] font-bold border-2 transition-all active:scale-95 {mediaBuildings.includes(bid)
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                            : 'border-slate-200 text-slate-500 hover:border-blue-300'}"
+                        onclick={() => toggleMediaBuilding(bid)}
+                    >
+                        {b.name}
+                    </button>
+                {/each}
+            </div>
+            {#if mediaBuildings.length === 0}
+                <p class="text-[11px] text-rose-500 mt-1.5">Selecciona al menos un edificio.</p>
+            {/if}
+        </div>
+        <div class="space-y-2 pt-1">
+            <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
+                <span class="text-sm font-bold text-slate-700">Maneja pisos</span>
+                <input type="checkbox" bind:checked={mediaHasFloors} class="w-5 h-5 accent-blue-600" />
+            </label>
+            {#if editingId}
                 <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
                     <span class="text-sm font-bold text-slate-700">Activo</span>
                     <input type="checkbox" bind:checked={mediaActive} class="w-5 h-5 accent-emerald-600" />
                 </label>
-            </div>
-        {/if}
+            {/if}
+        </div>
     </div>
     {#snippet footer()}
         <Button variant="secondary" onclick={() => (isModalOpen = false)}>Cancelar</Button>

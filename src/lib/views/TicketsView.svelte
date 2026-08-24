@@ -148,20 +148,8 @@
         ),
     );
 
-    const ticketTypes = [
-        "Todos",
-        "Alta de Persona",
-        "Programación",
-        "Modificación",
-        "Solicitud de acceso",
-        "Reposición",
-        "Bloqueo de tarjeta",
-        "Baja de tarjeta",
-        "Bloqueo de persona",
-        "Baja de Persona",
-        "Reporte de Falla",
-        "Otro",
-    ];
+    import { GENERAL_TICKET_TYPES } from "../constants/tickets";
+    const ticketTypes = ["Todos", ...GENERAL_TICKET_TYPES];
 
     import { supabase } from "../supabase";
 

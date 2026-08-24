@@ -5,15 +5,17 @@ create table "public"."document_templates" (
   "document_type" text                     not null default 'responsiva',
   "version"       integer                  not null default 1,
   "active"        boolean                  not null default true,
-  "legacy_key"    text,
+  "media_type_id" uuid,
   "content"       text,
   "created_at"    timestamp with time zone not null default now(),
   constraint "document_templates_key_key" unique ("key"),
-  constraint "document_templates_legacy_key_key" unique ("legacy_key"),
-  constraint "document_templates_pkey" primary key ("id")
+  constraint "document_templates_pkey" primary key ("id"),
+  constraint "document_templates_media_type_id_fkey" foreign key ("media_type_id") references public.access_media_types("id") on delete set null
 );
 
 alter table "public"."document_templates" enable row level security;
+
+create unique index idx_document_templates_media_type_id on public.document_templates using btree (media_type_id) where (media_type_id is not null);
 
 create policy "Document templates viewable by authenticated"
   on "public"."document_templates"

@@ -28,7 +28,7 @@
     import { accessAssignmentService } from "../services/accessAssignments";
     import { personnelState, catalogState } from "../stores";
     import { uiState } from "../stores/ui.svelte";
-    import type { Person } from "../types";
+    import type { Person, FloorGroup } from "../types";
 
     /**
      * PersonDetailsPanel — Panel lateral con detalles completos de una persona.
@@ -108,9 +108,22 @@
     let selectedSignature = $state("");
 
 // Pisos leídos del modelo nuevo (access_assignment_permissions), agrupados por
-// edificio, con fallback a las columnas legacy de personnel.
+// edificio y por tipo de medio concreto.
+/** Accesos especiales agrupados por edificio (resueltos desde el catálogo). */
+let specialAccessGroups = $derived.by(() => {
+    const map = new Map<string, string[]>();
+    for (const access of person?.specialAccesses || []) {
+        const sp = catalogState.specialAccesses.find((s) => s.name === access);
+        const bName =
+            catalogState.buildings.find((b) => Number(b.id) === Number(sp?.building_id))?.name ?? "Otros";
+        if (!map.has(bName)) map.set(bName, []);
+        map.get(bName)!.push(access);
+    }
+    return Array.from(map.entries());
+});
+
 let floorsByBuilding = $state<
-    Record<number, { p2000: string[]; kone: string[] }>
+    Record<number, FloorGroup[]>
 >({});
 
 $effect(() => {
@@ -122,8 +135,8 @@ $effect(() => {
 
 async function loadFloors() {
     if (!person?.id) return;
-    const legacyP2000 = person.floors_p2000 || [];
-    const legacyKone = person.floors_kone || [];
+    const fallbackGroups = person.floors || [];
+    const hasFallback = fallbackGroups.some((g) => g.floors.length > 0);
     const bid =
         Number(
             catalogState.buildings.find((b) => b.name === person.building)
@@ -135,17 +148,14 @@ async function loadFloors() {
         const merged = { ...access.floorsByBuilding };
         const hasBase =
             !!bid &&
-            ((merged[bid]?.p2000?.length || 0) > 0 ||
-                (merged[bid]?.kone?.length || 0) > 0);
-        if (bid && !hasBase && (legacyP2000.length || legacyKone.length)) {
-            merged[bid] = { p2000: legacyP2000, kone: legacyKone };
+            (merged[bid] || []).some((g) => g.floors.length > 0);
+        if (bid && !hasBase && hasFallback) {
+            merged[bid] = [...fallbackGroups];
         }
         floorsByBuilding = merged;
     } catch {
         floorsByBuilding =
-            bid && (legacyP2000.length || legacyKone.length)
-                ? { [bid]: { p2000: legacyP2000, kone: legacyKone } }
-                : {};
+            bid && hasFallback ? { [bid]: [...fallbackGroups] } : {};
     }
 }
 
@@ -449,31 +459,28 @@ async function loadFloors() {
                             Pisos Asignados
                         </span>
 
-                        {#each Object.entries(floorsByBuilding) as [bid, floors]}
+                        {#each Object.entries(floorsByBuilding) as [bid, groups]}
                             {@const buildingName =
                                 catalogState.buildings.find(
                                     (b) => Number(b.id) === Number(bid),
                                 )?.name ?? "Edificio"}
-                            {#if floors.p2000.length > 0 || floors.kone.length > 0}
+                            {@const hasAny = groups.some((g) => g.floors.length > 0)}
+                            {#if hasAny}
                                 <div class="space-y-1">
                                     <span
                                         class="text-[10px] font-bold text-slate-400 uppercase tracking-tight"
                                         >{buildingName}</span
                                     >
-                                    {#if floors.p2000.length > 0}
-                                        <div class="flex flex-wrap gap-1.5">
-                                            {#each floors.p2000 as flr}
-                                                <Badge variant="amber">{flr}</Badge>
-                                            {/each}
-                                        </div>
-                                    {/if}
-                                    {#if floors.kone.length > 0}
-                                        <div class="flex flex-wrap gap-1.5">
-                                            {#each floors.kone as flr}
-                                                <Badge variant="blue">{flr}</Badge>
-                                            {/each}
-                                        </div>
-                                    {/if}
+                                    {#each groups as group}
+                                        {#if group.floors.length > 0}
+                                            <div class="flex flex-wrap gap-1.5 items-center">
+                                                <span class="text-[9px] font-extrabold text-slate-400 uppercase">{group.mediaName || group.mediaKey}</span>
+                                                {#each group.floors as flr}
+                                                    <Badge variant="blue">{flr}</Badge>
+                                                {/each}
+                                            </div>
+                                        {/if}
+                                    {/each}
                                 </div>
                             {/if}
                         {/each}
@@ -492,9 +499,14 @@ async function loadFloors() {
                                 >Accesos Especiales</span
                             >
                         </div>
-                        <div class="flex flex-wrap gap-1.5">
-                            {#each person.specialAccesses as access}
-                                <Badge variant="violet">{access}</Badge>
+                        <div class="space-y-1.5">
+                            {#each specialAccessGroups as [bName, names]}
+                                <div class="flex flex-wrap gap-1.5 items-center">
+                                    <span class="text-[9px] font-extrabold text-slate-400 uppercase">{bName}</span>
+                                    {#each names as access}
+                                        <Badge variant="violet">{access}</Badge>
+                                    {/each}
+                                </div>
                             {/each}
                         </div>
                     </div>

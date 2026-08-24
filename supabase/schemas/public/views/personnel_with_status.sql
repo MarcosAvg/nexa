@@ -28,7 +28,7 @@ create view "public"."personnel_with_status" with (security_invoker=true) AS  WI
     COALESCE(d.name, 'N/A'::text) AS dependency_name,
     COALESCE(s.name, 'Sin Horario'::text) AS schedule_name,
         CASE
-            WHEN ((p.status = 'active'::text) AND (prc.core_ready_types >= 2)) THEN 'Activo/a'::text
+            WHEN ((p.status = 'active'::text) AND (prc.core_ready_types >= (SELECT public.core_types_required()))) THEN 'Activo/a'::text
             WHEN ((p.status = 'active'::text) AND (prc.core_ready_types = 1)) THEN 'Parcial'::text
             WHEN ((p.status = 'active'::text) AND (prc.core_ready_types = 0) AND (COALESCE(prc.has_core_cards, false) = false) AND (COALESCE(prc.has_active_noncore, false) = true)) THEN 'Activo/a'::text
             WHEN ((p.status = 'active'::text) AND (prc.core_ready_types = 0)) THEN 'Sin Acceso'::text

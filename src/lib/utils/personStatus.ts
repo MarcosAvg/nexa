@@ -5,13 +5,16 @@
  * medios de acceso y su estado en base de datos.
  *
  * Reglas (generalizadas por `has_floors`):
- *  - "Activo/a": al menos 2 tipos con pisos listos (programados + firmados),
+ *  - "Activo/a": al menos N tipos con pisos listos (programados + firmados),
+ *    donde N es configurable en app_settings (`coreTypesRequired`),
  *    O la persona SOLO tiene tipos sin pisos (ej. AccessPRO) y tiene al menos
  *    uno asignado (activo).
- *  - "Parcial": exactamente 1 tipo con pisos listo.
- *  - Los tipos sin pisos NUNCA cuentan para el umbral de 2 tipos (son accesos
+ *  - "Parcial": menos de N tipos con pisos listos (al menos uno).
+ *  - Los tipos sin pisos NUNCA cuentan para el umbral (son accesos
  *    secundarios), pero una persona cuyo único acceso es de ese tipo se ve Activa.
  */
+
+import { settingsState } from "../stores/settings.svelte";
 
 export interface StatusCardInput {
     type: string;
@@ -25,6 +28,7 @@ export function computePersonStatus(
     dbStatus: string,
     allCards: StatusCardInput[],
 ): string {
+    const coreRequired = settingsState.coreTypesRequired || 2;
     const activeCards = allCards.filter((c) => c.status === "active");
     const readyCards = activeCards.filter(
         (c) =>
@@ -33,7 +37,7 @@ export function computePersonStatus(
                 c.responsiva_status === "legacy"),
     );
 
-    // Solo los tipos con pisos cuentan para el umbral de 2 tipos.
+    // Solo los tipos con pisos cuentan para el umbral de tipos "core".
     const coreReadyTypes = new Set(
         readyCards.filter((c) => c.has_floors).map((c) => c.type),
     );
@@ -44,8 +48,8 @@ export function computePersonStatus(
     );
 
     if (dbStatus === "active") {
-        if (coreReadyTypes.size >= 2) return "Activo/a";
-        if (coreReadyTypes.size === 1) return "Parcial";
+        if (coreReadyTypes.size >= coreRequired) return "Activo/a";
+        if (coreReadyTypes.size > 0) return "Parcial";
         // Solo tipos sin pisos y asignados → Activa
         if (!hasCoreCards && hasActiveNonCore) return "Activo/a";
         if (allCards.length > 0) return "Bloqueado/a";

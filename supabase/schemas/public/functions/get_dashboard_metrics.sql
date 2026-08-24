@@ -11,8 +11,6 @@ DECLARE
     top_buildings json;
     data_quality json;
     operativos_count integer;
-    con_p2000_count integer;
-    con_kone_count integer;
 BEGIN
     SELECT COUNT(*) INTO total_count FROM personnel;
 
@@ -58,32 +56,34 @@ BEGIN
         SELECT p.id
         FROM personnel p
         JOIN access_media am ON am.person_id = p.id
-        JOIN access_media_types t ON t.id = am.media_type_id
         WHERE p.status = 'active'
           AND am.status = 'active'
           AND am.programming_status = 'done'
           AND am.responsiva_status IN ('signed', 'legacy')
         GROUP BY p.id
-        HAVING COUNT(DISTINCT t.id) >= 1
+        HAVING COUNT(DISTINCT am.media_type_id) >= 1
     ) AS op;
 
-    SELECT COUNT(DISTINCT am.person_id) INTO con_p2000_count
-    FROM access_media am
-    INNER JOIN access_media_types t ON t.id = am.media_type_id
-    WHERE t.key = 'p2000' AND am.status = 'active' AND am.person_id IS NOT NULL;
-
-    SELECT COUNT(DISTINCT am.person_id) INTO con_kone_count
-    FROM access_media am
-    INNER JOIN access_media_types t ON t.id = am.media_type_id
-    WHERE t.key = 'kone' AND am.status = 'active' AND am.person_id IS NOT NULL;
-
-    SELECT json_build_object(
-        'operativos', operativos_count,
-        'conP2000', con_p2000_count,
-        'sinP2000', GREATEST(0, operativos_count - con_p2000_count),
-        'conKone', con_kone_count,
-        'sinKone', GREATEST(0, operativos_count - con_kone_count)
-    ) INTO card_coverage;
+    -- Cobertura por tipo de medio activo (genérico).
+    SELECT COALESCE(json_agg(y ORDER BY y.sort_order), '[]'::json)
+    INTO card_coverage
+    FROM (
+        SELECT t.id AS "mediaTypeId",
+               t.name,
+               t.sort_order,
+               (SELECT COUNT(DISTINCT am2.person_id)
+                  FROM access_media am2
+                 WHERE am2.media_type_id = t.id
+                   AND am2.status = 'active'
+                   AND am2.person_id IS NOT NULL) AS con,
+               GREATEST(0, operativos_count - (SELECT COUNT(DISTINCT am3.person_id)
+                  FROM access_media am3
+                 WHERE am3.media_type_id = t.id
+                   AND am3.status = 'active'
+                   AND am3.person_id IS NOT NULL)) AS sin
+        FROM access_media_types t
+        WHERE t.active
+    ) y;
 
     SELECT json_agg(t) INTO top_dependencies FROM (
         SELECT d.name, COUNT(p.id) as total, COUNT(p.id) FILTER (WHERE p.status = 'active') as activos
@@ -115,6 +115,7 @@ BEGIN
         'totalPersonnel', total_count,
         'statusCounts', status_counts,
         'cardCoverage', card_coverage,
+        'operativos', operativos_count,
         'topDependencies', COALESCE(top_dependencies, '[]'::json),
         'topBuildings', COALESCE(top_buildings, '[]'::json),
         'dataQuality', data_quality

@@ -1,73 +1,88 @@
+import { supabase } from "../supabase";
+
 /**
- * SettingsState — Configuración persistente del sistema.
- * Los valores se almacenan en localStorage y se cargan al iniciar.
+ * SettingsState — Configuración persistente del sistema en `app_settings`.
+ * Los valores se cargan de la BD al iniciar y los setters persisten ahí,
+ * de modo que la configuración es compartida por todos los usuarios.
  */
 export class SettingsState {
-    #STORAGE_KEY = "nexa_settings";
-
     responsivaPickupDays = $state(7);
     responsivaWarnDays = $state(5);
+    /** Número de medios "core" (con pisos) requeridos para estado Activo. */
+    coreTypesRequired = $state(2);
 
-    constructor() {
-        this.#load();
-    }
+    #loaded = false;
 
-    /** Cargar configuración desde localStorage. */
-    #load() {
+    /** Carga los settings desde la BD (idempotente). */
+    async loadFromServer() {
+        if (this.#loaded) return;
         try {
-            const raw = localStorage.getItem(this.#STORAGE_KEY);
-            if (raw) {
-                const data = JSON.parse(raw);
-                if (typeof data.responsivaPickupDays === "number") {
-                    this.responsivaPickupDays = data.responsivaPickupDays;
-                }
-                if (typeof data.responsivaWarnDays === "number") {
-                    this.responsivaWarnDays = data.responsivaWarnDays;
-                }
+            const { data, error } = await supabase
+                .from("app_settings")
+                .select("key, value");
+            if (error) throw error;
+            for (const row of data || []) {
+                this.#apply(row.key, row.value);
             }
+            this.#loaded = true;
         } catch {
-            // Ignorar errores de parseo
+            // No crítico: se mantienen los valores por defecto
         }
     }
 
-    /** Persistir configuración actual en localStorage. */
-    #save() {
-        try {
-            localStorage.setItem(
-                this.#STORAGE_KEY,
-                JSON.stringify({
-                    responsivaPickupDays: this.responsivaPickupDays,
-                    responsivaWarnDays: this.responsivaWarnDays,
-                }),
-            );
-        } catch {
-            // localStorage puede fallar (ej. modo privado)
-        }
+    #apply(key: string, value: unknown) {
+        if (typeof value !== "number") return;
+        if (key === "responsivaPickupDays") this.responsivaPickupDays = value;
+        else if (key === "responsivaWarnDays") this.responsivaWarnDays = value;
+        else if (key === "coreTypesRequired") this.coreTypesRequired = Math.max(1, value);
+    }
+
+    async #persist(key: string, value: number) {
+        const { error } = await supabase
+            .from("app_settings")
+            .upsert({ key, value }, { onConflict: "key" });
+        if (error) throw error;
     }
 
     /** Actualizar el umbral de días para baja de registro (plazo recogida). */
-    setResponsivaPickupDays(days: number) {
+    async setResponsivaPickupDays(days: number) {
         const clamped = Math.max(1, Math.min(90, Math.round(days)));
         if (clamped !== this.responsivaPickupDays) {
             this.responsivaPickupDays = clamped;
-            this.#save();
+            await this.#persist("responsivaPickupDays", clamped);
         }
     }
 
     /** Actualizar el umbral de días para advertencia "Por vencer". */
-    setResponsivaWarnDays(days: number) {
+    async setResponsivaWarnDays(days: number) {
         const clamped = Math.max(1, Math.min(this.responsivaPickupDays - 1, 90, Math.round(days)));
         if (clamped !== this.responsivaWarnDays) {
             this.responsivaWarnDays = clamped;
-            this.#save();
+            await this.#persist("responsivaWarnDays", clamped);
         }
     }
 
-    /** Restablecer valores por defecto. */
-    resetToDefaults() {
+    /** Restablecer valores por defecto y persistir. */
+    async resetToDefaults() {
         this.responsivaPickupDays = 7;
         this.responsivaWarnDays = 5;
-        this.#save();
+        try {
+            await Promise.all([
+                this.#persist("responsivaPickupDays", 7),
+                this.#persist("responsivaWarnDays", 5),
+            ]);
+        } catch {
+            // No crítico
+        }
+    }
+
+    /** Actualizar el umbral de tipos "core" para estado Activo/a. */
+    async setCoreTypesRequired(n: number) {
+        const clamped = Math.max(1, Math.min(10, Math.round(n)));
+        if (clamped !== this.coreTypesRequired) {
+            this.coreTypesRequired = clamped;
+            await this.#persist("coreTypesRequired", clamped);
+        }
     }
 }
 

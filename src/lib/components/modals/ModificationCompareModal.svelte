@@ -5,7 +5,7 @@
     import { personnelService } from "../../services";
     import { HistoryService } from "../../services/history";
     import { ticketService } from "../../services/tickets";
-    import { personnelState, ticketState } from "../../stores";
+    import { personnelState, ticketState, catalogState } from "../../stores";
     import { cardService } from "../../services/cards";
     import { toast } from "svelte-sonner";
     import { handleError } from "../../utils";
@@ -195,18 +195,27 @@
 
         try {
             // Construir payload de guardado desde datos modificados.
-            // floorsByBuilding se deriva de las listas completas del ticket para
-            // que savePersonAccess persista los permisos en el modelo nuevo.
-            const p2000 = (modifiedData as any).floors_p2000 ?? [];
-            const kone = (modifiedData as any).floors_kone ?? [];
+            // Las listas de pisos del ticket vienen por clave de medio; se
+            // convierten a id de tipo de medio para savePersonAccess.
+            const byKey: Record<string, string[]> = {
+                p2000: (modifiedData as any).floors_p2000 ?? [],
+                kone: (modifiedData as any).floors_kone ?? [],
+            };
             const specialAccesses =
                 (modifiedData as any).specialAccesses ??
                 (modifiedData as any).special_accesses ??
                 [];
+            const typeMap: Record<string, string[]> = {};
+            for (const m of catalogState.mediaTypes) {
+                if ((m as any).active === false) continue;
+                if (byKey[m.key]?.length) typeMap[m.id] = [...byKey[m.key]];
+            }
+            // Las pisos de la modificación aplican al edificio de radicación.
+            const baseBid = Number(currentPerson.building_id) || 1;
             const saveData = {
                 id: currentPerson.id,
                 ...modifiedData,
-                floorsByBuilding: { 1: { p2000, kone } },
+                floorsByBuilding: { [baseBid]: typeMap },
                 specialAccesses,
             };
 

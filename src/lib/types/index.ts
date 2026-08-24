@@ -20,21 +20,31 @@ export interface Person {
     status: string;
     name: string; // Calculado: first_name + last_name
     building: string;
+    building_id?: number | null;
     dependency: string;
+    dependency_id?: number | null;
     schedule: {
         days: string;
         entry: string;
         exit: string;
     } | null;
     cards: Card[];
-    floors_p2000: string[];
-    floors_kone: string[];
+    /** Pisos asignados agrupados por tipo de medio concreto (instancia por edificio). */
+    floors: FloorGroup[];
     specialAccesses: string[];
     email?: string | null;
     area?: string;
     position?: string;
     floor?: string;
     photo_url?: string | null;
+}
+
+/** Pisos asignados para un tipo de medio concreto (instancia por edificio). */
+export interface FloorGroup {
+    mediaTypeId: string;
+    mediaKey: string;
+    mediaName: string;
+    floors: string[];
 }
 
 export interface Card {
@@ -104,6 +114,28 @@ export interface CatalogItem {
     [key: string]: any;
 }
 
+/** Stock disponible de un tipo de medio (inventario sin asignar). */
+export interface MediaStockEntry {
+    mediaTypeId: string;
+    name: string;
+    stock: number;
+}
+
+/** Cobertura de un tipo de medio entre el personal operativo. */
+export interface CoverageEntry {
+    mediaTypeId: string;
+    name: string;
+    /** Personas operativas que tienen el medio activo. */
+    con: number;
+    /** Operativos que no lo tienen. */
+    sin: number;
+}
+
+export interface DashboardStats {
+    activePersonnel: number;
+    stock: MediaStockEntry[];
+}
+
 export interface DashboardMetrics {
     totalPersonnel: number;
     statusCounts: {
@@ -113,13 +145,9 @@ export interface DashboardMetrics {
         bloqueado: number;
         baja: number;
     };
-    cardCoverage: {
-        conP2000: number;
-        sinP2000: number;
-        conKone: number;
-        sinKone: number;
-        operativos: number;
-    };
+    /** Cobertura por tipo de medio activo. */
+    cardCoverage: CoverageEntry[];
+    operativos: number;
     topDependencies: { name: string; total: number; activos: number }[];
     topBuildings: { name: string; total: number }[];
     dataQuality: {
@@ -175,15 +203,10 @@ export interface AccessMediaType {
     id: string;
     key: string;
     name: string;
-    category: string;
-    identifier_label: string;
-    requires_identifier: boolean;
     requires_programming: boolean;
     requires_responsiva: boolean;
-    supports_replacement: boolean;
     has_floors: boolean;
     active: boolean;
-    legacy_key: string | null;
     sort_order: number | null;
     created_at: string;
 }
@@ -225,7 +248,6 @@ export interface AccessAssignmentPermission {
     id: number;
     assignment_id: string;
     resource_type: string;
-    resource_key: string;
     permission: string;
     building_id?: number | null;
     floor_id?: number | null;
@@ -245,7 +267,6 @@ export interface DocumentTemplate {
     document_type: string;
     version: number;
     active: boolean;
-    legacy_key: string | null;
     content: string | null;
     created_at: string;
 }

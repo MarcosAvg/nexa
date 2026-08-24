@@ -1,4 +1,4 @@
-import type { Person, Card, DashboardMetrics } from "../types";
+import type { Person, Card, DashboardMetrics, DashboardStats } from "../types";
 import { handleError } from "../utils";
 import { PaginatedListState } from "./paginatedList.svelte";
 
@@ -30,16 +30,15 @@ export class PersonnelState {
         buildingId: "",
     });
 
-    dashboardStats = $state({
+    dashboardStats = $state<DashboardStats>({
         activePersonnel: 0,
-        koneStock: 0,
-        p2000Stock: 0,
-        accessproStock: 0
+        stock: [],
     });
     dashboardMetrics = $state<DashboardMetrics>({
         totalPersonnel: 0,
         statusCounts: { activo: 0, parcial: 0, inactivo: 0, bloqueado: 0, baja: 0 },
-        cardCoverage: { conP2000: 0, sinP2000: 0, conKone: 0, sinKone: 0, operativos: 0 },
+        cardCoverage: [],
+        operativos: 0,
         topDependencies: [],
         topBuildings: [],
         dataQuality: { sinEmail: 0, sinSchedule: 0, sinPosition: 0, sinArea: 0, total: 0 },

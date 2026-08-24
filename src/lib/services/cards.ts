@@ -5,22 +5,23 @@ import type { Card } from "../types";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate } from "../utils";
 import { networkStore } from "../stores/network.svelte";
 
-/** Resuelve media_type_id a partir del "type" legacy (P2000/KONE/AccessPRO). */
-async function resolveMediaTypeId(type: string): Promise<string> {
-    const { data: byLegacy } = await supabase
+/** Resuelve el tipo de medio (fila completa) a partir del nombre mostrado. */
+async function resolveMediaType(type: string): Promise<Record<string, any>> {
+    const { data: byKey } = await supabase
         .from("access_media_types")
-        .select("id")
-        .eq("legacy_key", type)
+        .select("*")
+        .ilike("key", type)
+        .limit(1)
         .maybeSingle();
-    if (byLegacy) return byLegacy.id;
+    if (byKey) return byKey;
 
     const { data: byName } = await supabase
         .from("access_media_types")
-        .select("id")
-        .eq("name", type)
+        .select("*")
+        .ilike("name", type)
         .limit(1)
         .maybeSingle();
-    if (byName) return byName.id;
+    if (byName) return byName;
 
     throw new Error(`No existe un tipo de medio de acceso para "${type}"`);
 }
@@ -45,7 +46,7 @@ function toCard(m: any): Card {
 function mediaTypeName(m: any): string {
     const t = m?.access_media_types;
     if (Array.isArray(t)) return (t[0]?.name ?? "") as string;
-    return (t?.name ?? (m?.metadata?.legacy_type as string) ?? "") as string;
+    return (t?.name ?? "") as string;
 }
 
 export const cardService = {
@@ -251,7 +252,10 @@ export const cardService = {
         [key: string]: unknown;
     }, replacementOptions?: { oldCardStatus: string, skipTicket?: boolean }) {
         return withErrorHandling(async () => {
-            const mediaTypeId = await resolveMediaTypeId(data.type);
+            const mediaType = await resolveMediaType(data.type);
+            const mediaTypeId = mediaType.id as string;
+            // Los medios que no requieren programación nacen listos.
+            const needsProgramming = mediaType.requires_programming !== false;
 
             let isNewAssignment = false;
             if (data.id && data.person_id) {
@@ -307,7 +311,9 @@ export const cardService = {
                 media_type_id: mediaTypeId,
                 status: data.status || (data.person_id ? "active" : "available"),
                 person_id: data.person_id || null,
-                programming_status: isNewAssignment ? "pending" : data.programming_status || null,
+                programming_status: isNewAssignment
+                    ? (needsProgramming ? "pending" : "done")
+                    : data.programming_status || null,
                 responsiva_status: data.responsiva_status || null,
             };
 
@@ -319,7 +325,7 @@ export const cardService = {
             } else {
                 const { data: newMedia, error } = await withTimeout(supabase
                     .from("access_media")
-                    .insert([{ ...payload, metadata: { legacy_type: data.type, legacy_folio: data.folio } }])
+                    .insert([payload])
                     .select()
                     .single());
                 if (error) throw error;
@@ -339,17 +345,20 @@ export const cardService = {
             }
 
             if (isNewAssignment) {
-                const { ticketService } = await import("./tickets");
-                await ticketService.create({
-                    type: "Programación",
-                    description: replacementOptions
-                        ? `Reponer tarjeta ${data.type} (Folio anterior dado de baja/liberado). Nuevo folio: ${data.folio}`
-                        : `Programar acceso para tarjeta ${data.type} folio ${data.folio}`,
-                    priority: "alta",
-                    person_id: data.person_id,
-                    access_media_id: cardId,
-                    title: `Programación: ${data.folio}`,
-                });
+                // El ticket de Programación solo aplica a medios que la requieren.
+                if (needsProgramming) {
+                    const { ticketService } = await import("./tickets");
+                    await ticketService.create({
+                        type: "Programación",
+                        description: replacementOptions
+                            ? `Reponer tarjeta ${data.type} (Folio anterior dado de baja/liberado). Nuevo folio: ${data.folio}`
+                            : `Programar acceso para tarjeta ${data.type} folio ${data.folio}`,
+                        priority: "alta",
+                        person_id: data.person_id,
+                        access_media_id: cardId,
+                        title: `Programación: ${data.folio}`,
+                    });
+                }
 
                 if (data.person_id) {
                     const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", data.person_id).single();

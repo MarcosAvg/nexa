@@ -137,18 +137,17 @@ export const catalogService = {
         }, "Fetch Schedules", throwOnError, []);
     },
     async fetchMediaTypes(throwOnError: boolean = false) {
-        const cached = catalogCache.get<any[]>('access_media_types');
+        const cached = catalogCache.get<any[]>('access_media_types_v2');
         if (cached) return cached;
         return withErrorHandlingConditional(async () => {
             const { data, error } = await supabase
                 .from("access_media_types")
-                .select("*")
-                .order("building_id", { ascending: true })
+                .select("*, access_media_type_buildings(building_id)")
                 .order("sort_order", { ascending: true })
                 .order("name", { ascending: true });
             if (error) throw error;
             const result = data || [];
-            catalogCache.set('access_media_types', result, CATALOG_CACHE_TTL_MS);
+            catalogCache.set('access_media_types_v2', result, CATALOG_CACHE_TTL_MS);
             return result;
         }, "Fetch Media Types", throwOnError, []);
     },
@@ -248,21 +247,22 @@ export const catalogService = {
     },
 
     /**
-     * Configuración por defecto de los sistemas de acceso que un edificio
-     * puede establecer. Las llaves son fijas (el frontend las usa para
-     * clasificar pisos P2000/KONE), por lo que la creación se limita a estas
-     * plantillas.
+     * Crea o actualiza un tipo de medio de acceso por edificio.
+     * La creación acepta cualquier key/nombre (la app deriva pisos y estado
+     * dinámicamente de `has_floors`); la key se normaliza a slug.
      */
     async saveMediaType(
         id: string | null,
-        payload: { key?: string; name?: string; has_floors?: boolean; active?: boolean; buildingId?: number },
+        payload: { key?: string; name?: string; has_floors?: boolean; active?: boolean; buildingIds?: number[] },
     ) {
         return withErrorHandling(async () => {
-            const TEMPLATES: Record<string, { name: string; has_floors: boolean }> = {
-                p2000: { name: "P2000", has_floors: true },
-                kone: { name: "KONE", has_floors: true },
-                accesspro: { name: "AccessPRO", has_floors: false },
-            };
+            const slugify = (s: string) =>
+                s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+
+            const buildingIds = (payload.buildingIds || []).filter((b) => Number.isFinite(b));
+            let mediaTypeId = id;
+
             if (id) {
                 const update: Record<string, unknown> = {};
                 if (payload.name !== undefined) update.name = payload.name;
@@ -272,34 +272,42 @@ export const catalogService = {
                 if (error) throw error;
                 await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Medio de acceso actualizado: ${payload.name}`, entityName: `Medio de acceso: ${payload.name}` });
             } else {
-                const key = payload.key ?? "";
-                const template = TEMPLATES[key];
-                if (!template) throw new Error("Sistema de acceso no válido");
-                if (!payload.buildingId) throw new Error("Edificio requerido");
-                const sortOrder = await getNextSortOrder("access_media_types", payload.buildingId);
+                const name = payload.name?.trim();
+                if (!name) throw new Error("El nombre del medio es requerido");
+                if (buildingIds.length === 0) throw new Error("Selecciona al menos un edificio");
+                const key = slugify(payload.key?.trim() || name);
+                if (!key) throw new Error("La clave del medio es inválida");
+                const sortOrder = await getNextSortOrder("access_media_types");
                 const { data, error } = await supabase
                     .from("access_media_types")
                     .insert([{
                         key,
-                        name: payload.name?.trim() || template.name,
-                        building_id: payload.buildingId,
-                        has_floors: template.has_floors,
-                        category: "card",
-                        identifier_label: "Folio",
-                        requires_identifier: true,
+                        name,
+                        has_floors: payload.has_floors ?? false,
                         requires_programming: true,
                         requires_responsiva: true,
-                        supports_replacement: true,
                         active: true,
-                        legacy_key: null,
                         sort_order: sortOrder,
                     }])
                     .select()
                     .single();
                 if (error) throw error;
+                mediaTypeId = data.id;
                 await HistoryService.log("SYSTEM", data.id, "CREATE_CATALOG", { message: `Medio de acceso creado: ${data.name}`, entityName: `Medio de acceso: ${data.name}` });
             }
-            catalogCache.invalidate('access_media_types');
+
+            // Sincronizar edificios donde aplica el medio (N:M).
+            if (mediaTypeId && buildingIds.length > 0) {
+                await supabase
+                    .from("access_media_type_buildings")
+                    .delete()
+                    .eq("media_type_id", mediaTypeId);
+                const { error: jError } = await supabase
+                    .from("access_media_type_buildings")
+                    .insert(buildingIds.map((buildingId) => ({ media_type_id: mediaTypeId, building_id: buildingId })));
+                if (jError) throw jError;
+            }
+            catalogCache.invalidate('access_media_types_v2');
         }, "Save Media Type");
     },
 
