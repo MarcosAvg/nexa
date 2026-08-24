@@ -1,6 +1,7 @@
 import type * as ExcelJSTypes from 'exceljs';
 import { addLogoToSheet, autoRowHeight } from './xlsxShared';
 import { batchPaginate } from './batchPaginate';
+import { settingsState } from '../stores';
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -759,7 +760,7 @@ export async function exportCardlessRegistryToExcel(
 
     worksheet.mergeCells('A1:M1');
     const titleCell = worksheet.getCell('A1');
-    titleCell.value = '       DETALLE — REGISTRO SIN TARJETA - NEXA';
+    titleCell.value = `       DETALLE — REGISTRO SIN TARJETA - ${settingsState.orgName.toUpperCase()}`;
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     worksheet.getRow(1).height = 40;
@@ -949,7 +950,7 @@ export async function exportCardlessRegistryToExcel(
 
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
 
-    let fileNameParts = ['Registro_Sin_Tarjeta_Nexa'];
+    let fileNameParts = [`Registro_Sin_Tarjeta_${settingsState.orgName.replace(/\s+/g, '_')}`];
     if (filters?.dependency) {
         fileNameParts.push(filters.dependency.replace(/\s+/g, '_'));
     }

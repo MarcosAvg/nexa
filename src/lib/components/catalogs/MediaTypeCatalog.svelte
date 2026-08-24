@@ -7,7 +7,8 @@
     import Modal from "../Modal.svelte";
     import DataTable from "../DataTable.svelte";
     import Badge from "../Badge.svelte";
-    import { Plus, Edit2, Trash2, CreditCard, GripVertical, Layers, Power } from "lucide-svelte";
+    import { Plus, Edit2, Trash2, CreditCard, GripVertical, Layers, Power, Palette } from "lucide-svelte";
+    import { MEDIA_COLOR_OPTIONS } from "../../utils/mediaTypeAppearance";
 
     /**
      * MediaTypeCatalog — Gestión de medios de acceso por edificio (CRUD).
@@ -52,6 +53,11 @@
     let mediaActive = $state(true);
     /** Edificios seleccionados en el modal (multi-edificio). */
     let mediaBuildings = $state<number[]>([]);
+    /** Color de la paleta (variante) para el medio. */
+    let mediaColor = $state<string>("emerald");
+    let mediaRequiresProgramming = $state(true);
+    let mediaRequiresResponsiva = $state(true);
+    let mediaRequiresIdentifier = $state(true);
 
     // Delete modal state
     let isDeleteModalOpen = $state(false);
@@ -107,12 +113,20 @@
             mediaHasFloors = !!type.has_floors;
             mediaActive = type.active !== false;
             mediaBuildings = [...(buildingsByMedia[type.id] || [])];
+            mediaColor = type.color || "emerald";
+            mediaRequiresProgramming = type.requires_programming !== false;
+            mediaRequiresResponsiva = type.requires_responsiva !== false;
+            mediaRequiresIdentifier = type.requires_identifier !== false;
         } else {
             editingId = null;
             mediaName = "";
             mediaHasFloors = true;
             mediaActive = true;
             mediaBuildings = [];
+            mediaColor = "emerald";
+            mediaRequiresProgramming = true;
+            mediaRequiresResponsiva = true;
+            mediaRequiresIdentifier = true;
         }
         isModalOpen = true;
     }
@@ -124,6 +138,10 @@
                 has_floors: mediaHasFloors,
                 active: mediaActive,
                 buildingIds: mediaBuildings,
+                color: mediaColor,
+                requires_programming: mediaRequiresProgramming,
+                requires_responsiva: mediaRequiresResponsiva,
+                requires_identifier: mediaRequiresIdentifier,
             };
             await catalogService.saveMediaType(editingId, payload);
             await fetchMediaTypes();
@@ -268,10 +286,42 @@
                 <p class="text-[11px] text-rose-500 mt-1.5">Selecciona al menos un edificio.</p>
             {/if}
         </div>
+        <div>
+            <p class="block text-sm font-medium text-slate-700 mb-2">Color del medio</p>
+            <div class="flex flex-wrap gap-2">
+                {#each MEDIA_COLOR_OPTIONS as opt}
+                    {@const selected = mediaColor === opt.id}
+                    <button
+                        type="button"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold border-2 transition-all active:scale-95 {selected
+                            ? 'border-slate-900 text-slate-900 bg-slate-50'
+                            : 'border-slate-200 text-slate-500 hover:border-slate-400'}"
+                        onclick={() => (mediaColor = opt.id)}
+                        title={`Color ${opt.label}`}
+                    >
+                        <span class="{opt.dot} w-2.5 h-2.5 rounded-full inline-block"></span>
+                        {opt.label}
+                    </button>
+                {/each}
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1.5">Personaliza el color con el que se muestra este medio en la app.</p>
+        </div>
         <div class="space-y-2 pt-1">
             <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
                 <span class="text-sm font-bold text-slate-700">Maneja pisos</span>
                 <input type="checkbox" bind:checked={mediaHasFloors} class="w-5 h-5 accent-blue-600" />
+            </label>
+            <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
+                <span class="text-sm font-bold text-slate-700">Requiere programación</span>
+                <input type="checkbox" bind:checked={mediaRequiresProgramming} class="w-5 h-5 accent-blue-600" />
+            </label>
+            <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
+                <span class="text-sm font-bold text-slate-700">Requiere responsiva</span>
+                <input type="checkbox" bind:checked={mediaRequiresResponsiva} class="w-5 h-5 accent-indigo-600" />
+            </label>
+            <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
+                <span class="text-sm font-bold text-slate-700">Requiere identificador (folio)</span>
+                <input type="checkbox" bind:checked={mediaRequiresIdentifier} class="w-5 h-5 accent-violet-600" />
             </label>
             {#if editingId}
                 <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">

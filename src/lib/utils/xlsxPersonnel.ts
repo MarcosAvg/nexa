@@ -11,6 +11,7 @@ import {
 } from './xlsxShared';    // Re-exportar tipos desde aquí
 import { floorsForKey } from '../services/accessAssignments';
 import type { FloorGroup } from '../types';
+import { settingsState } from '../stores';
 
 export type CardType = string;
 
@@ -453,7 +454,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
 
         worksheet.mergeCells(`A1:${lastCol}1`);
         const titleCell = worksheet.getCell('A1');
-        titleCell.value = `       DIRECTORIO DE PERSONAL - NEXA${filterInfo}`;
+        titleCell.value = `       DIRECTORIO DE PERSONAL - ${settingsState.orgName.toUpperCase()}${filterInfo}`;
         titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
         titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
         worksheet.getRow(1).height = 40;

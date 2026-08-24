@@ -1,5 +1,6 @@
 import type * as ExcelJSTypes from 'exceljs';
 import { addLogoToSheet, autoRowHeight } from './xlsxShared';
+import { settingsState } from '../stores';
 import {
     displayEntityName as fmtEntityName,
     cleanMessage as fmtCleanMessage,
@@ -38,7 +39,7 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
 
     worksheet.mergeCells('A1:D1');
     const titleCell = worksheet.getCell('A1');
-    titleCell.value = `       HISTORIAL DE AUDITORÍA Y ACCIONES - NEXA`;
+    titleCell.value = `       HISTORIAL DE AUDITORÍA Y ACCIONES - ${settingsState.orgName.toUpperCase()}`;
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     worksheet.getRow(1).height = 40;
@@ -157,7 +158,7 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
     });
 
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
-    const finalFileName = `Historial_Nexa_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const finalFileName = `Historial_${settingsState.orgName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
     saveAsFunction(new Blob([buffer]), finalFileName);
 }

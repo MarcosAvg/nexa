@@ -6,10 +6,21 @@ import { supabase } from "../supabase";
  * de modo que la configuración es compartida por todos los usuarios.
  */
 export class SettingsState {
+    // ─── Umbrales de responsiva ──────────────────────────────
     responsivaPickupDays = $state(7);
     responsivaWarnDays = $state(5);
     /** Número de medios "core" (con pisos) requeridos para estado Activo. */
     coreTypesRequired = $state(2);
+
+    // ─── Identidad / datos de la organización ────────────────
+    /** Nombre mostrado del sistema (branding en exports). */
+    orgName = $state("Nexa");
+    /** Correo de contacto/soporte (hoja INSTRUCCIONES de la plantilla). */
+    orgSupportEmail = $state("Control.Accesos@nuevoleon.gob.mx");
+    /** Extensión del área de soporte. */
+    orgSupportExtension = $state("32199");
+    /** Monto de reposición formateado (texto legal). */
+    replacementCost = $state("$300.00 (Trescientos pesos 00/100 M.N.)");
 
     #loaded = false;
 
@@ -31,17 +42,25 @@ export class SettingsState {
     }
 
     #apply(key: string, value: unknown) {
-        if (typeof value !== "number") return;
-        if (key === "responsivaPickupDays") this.responsivaPickupDays = value;
-        else if (key === "responsivaWarnDays") this.responsivaWarnDays = value;
-        else if (key === "coreTypesRequired") this.coreTypesRequired = Math.max(1, value);
+        if (key === "responsivaPickupDays" && typeof value === "number") this.responsivaPickupDays = value;
+        else if (key === "responsivaWarnDays" && typeof value === "number") this.responsivaWarnDays = value;
+        else if (key === "coreTypesRequired" && typeof value === "number") this.coreTypesRequired = Math.max(1, value);
+        else if (key === "orgName" && typeof value === "string") this.orgName = value;
+        else if (key === "orgSupportEmail" && typeof value === "string") this.orgSupportEmail = value;
+        else if (key === "orgSupportExtension" && typeof value === "string") this.orgSupportExtension = value;
+        else if (key === "replacementCost" && typeof value === "string") this.replacementCost = value;
     }
 
-    async #persist(key: string, value: number) {
+    /** Persiste cualquier valor (número o string) como JSON. */
+    async #persistValue(key: string, value: string | number) {
         const { error } = await supabase
             .from("app_settings")
             .upsert({ key, value }, { onConflict: "key" });
         if (error) throw error;
+    }
+
+    async #persist(key: string, value: number) {
+        await this.#persistValue(key, value);
     }
 
     /** Actualizar el umbral de días para baja de registro (plazo recogida). */
@@ -62,28 +81,56 @@ export class SettingsState {
         }
     }
 
-    /** Restablecer valores por defecto y persistir. */
-    async resetToDefaults() {
-        this.responsivaPickupDays = 7;
-        this.responsivaWarnDays = 5;
-        this.coreTypesRequired = 2;
-        try {
-            await Promise.all([
-                this.#persist("responsivaPickupDays", 7),
-                this.#persist("responsivaWarnDays", 5),
-                this.#persist("coreTypesRequired", 2),
-            ]);
-        } catch {
-            // No crítico
-        }
-    }
-
-    /** Actualizar el umbral de tipos "core" para estado Activo/a. */
     async setCoreTypesRequired(n: number) {
         const clamped = Math.max(1, Math.min(10, Math.round(n)));
         if (clamped !== this.coreTypesRequired) {
             this.coreTypesRequired = clamped;
             await this.#persist("coreTypesRequired", clamped);
+        }
+    }
+
+    // ─── Organización ─────────────────────────────────────────
+
+    /** Persiste los datos de organización en bloque. */
+    async setOrganization(cfg: {
+        orgName: string;
+        orgSupportEmail: string;
+        orgSupportExtension: string;
+        replacementCost: string;
+    }) {
+        this.orgName = cfg.orgName.trim() || this.orgName;
+        this.orgSupportEmail = cfg.orgSupportEmail.trim();
+        this.orgSupportExtension = cfg.orgSupportExtension.trim();
+        this.replacementCost = cfg.replacementCost.trim();
+        await Promise.all([
+            this.#persistValue("orgName", this.orgName),
+            this.#persistValue("orgSupportEmail", this.orgSupportEmail),
+            this.#persistValue("orgSupportExtension", this.orgSupportExtension),
+            this.#persistValue("replacementCost", this.replacementCost),
+        ]);
+    }
+
+    /** Restablecer valores por defecto y persistir. */
+    async resetToDefaults() {
+        this.responsivaPickupDays = 7;
+        this.responsivaWarnDays = 5;
+        this.coreTypesRequired = 2;
+        this.orgName = "Nexa";
+        this.orgSupportEmail = "Control.Accesos@nuevoleon.gob.mx";
+        this.orgSupportExtension = "32199";
+        this.replacementCost = "$300.00 (Trescientos pesos 00/100 M.N.)";
+        try {
+            await Promise.all([
+                this.#persist("responsivaPickupDays", 7),
+                this.#persist("responsivaWarnDays", 5),
+                this.#persist("coreTypesRequired", 2),
+                this.#persistValue("orgName", this.orgName),
+                this.#persistValue("orgSupportEmail", this.orgSupportEmail),
+                this.#persistValue("orgSupportExtension", this.orgSupportExtension),
+                this.#persistValue("replacementCost", this.replacementCost),
+            ]);
+        } catch {
+            // No crítico
         }
     }
 }

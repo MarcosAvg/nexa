@@ -1,9 +1,9 @@
 import type * as ExcelJSTypes from 'exceljs';
 import { addLogoToSheet, autoRowHeight } from './xlsxShared';
 
-export const RESPONSIVA_PICKUP_DAYS = 7;
-/** Días a partir de los cuales se muestra advertencia "Por vencer" (ámbar) en la UI. */
-export const RESPONSIVA_WARN_DAYS = 5;
+/** Defaults de respaldo si no se pasa configuración (la fuente real es `settingsState`). */
+const DEFAULT_PICKUP_DAYS = 7;
+const DEFAULT_WARN_DAYS = 5;
 
 function daysSince(dateStr: string, reference: Date = new Date()): number {
     if (!dateStr) return 0;
@@ -58,7 +58,7 @@ export function computeResponsivaManagement(
     movementType: string,
     referenceDate: string,
     ticketCreatedAt: string,
-    pickupDays: number = RESPONSIVA_PICKUP_DAYS
+    pickupDays: number = DEFAULT_PICKUP_DAYS
 ) {
     const isReposicion = movementType === "Reposición";
     const elapsedRef = isReposicion ? referenceDate : ticketCreatedAt;
@@ -76,9 +76,9 @@ export function computeResponsivaManagement(
     };
 }
 
-export async function exportResponsivasToExcel(tickets: any[], dependencyName?: string, returnBuffer?: false): Promise<void>;
-export async function exportResponsivasToExcel(tickets: any[], dependencyName: string | undefined, returnBuffer: true): Promise<{ buffer: ArrayBuffer; filename: string }>;
-export async function exportResponsivasToExcel(tickets: any[], dependencyName?: string, returnBuffer?: boolean): Promise<void | { buffer: ArrayBuffer; filename: string }> {
+export async function exportResponsivasToExcel(tickets: any[], dependencyName?: string, returnBuffer?: false, pickupDays?: number): Promise<void>;
+export async function exportResponsivasToExcel(tickets: any[], dependencyName: string | undefined, returnBuffer: true, pickupDays?: number): Promise<{ buffer: ArrayBuffer; filename: string }>;
+export async function exportResponsivasToExcel(tickets: any[], dependencyName?: string, returnBuffer?: boolean, pickupDays: number = DEFAULT_PICKUP_DAYS): Promise<void | { buffer: ArrayBuffer; filename: string }> {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
         import('file-saver')
@@ -263,7 +263,7 @@ export async function exportResponsivasToExcel(tickets: any[], dependencyName?: 
                 cell.font = { ...cell.font, bold: true, color: { argb: COLORS.rose.sub } };
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.rose.head } };
             }
-            if (colNumber === 9 && entry.daysElapsed > RESPONSIVA_PICKUP_DAYS && !entry.isReposicion) {
+            if (colNumber === 9 && entry.daysElapsed > pickupDays && !entry.isReposicion) {
                 cell.font = { ...cell.font, bold: true, color: { argb: COLORS.amber.sub } };
             }
             if (colNumber === 11) {

@@ -1,12 +1,13 @@
 <script lang="ts">
-    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection, ExportDropdown } from "../components";
-    import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard } from "lucide-svelte";
+    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection, ExportDropdown, PlantillasCatalog } from "../components";
+    import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard, FileText } from "lucide-svelte";
     import { userState, catalogState, settingsState } from "../stores";
     import { networkStore } from "../stores/network.svelte";
     import { generateMediaTemplate, generateKoneUsageTemplate, handleError } from "../utils";
     import { toast } from "svelte-sonner";
+    import GeneralSettingsView from "./GeneralSettingsView.svelte";
 
-    let activeTab = $state<"catalogos" | "usuarios" | "responsiva">("catalogos");
+    let activeTab = $state<"catalogos" | "usuarios" | "general" | "plantillas" | "responsiva">("catalogos");
     let activeCatalog = $state<"edificios" | "dependencias" | "accesos" | "dias" | "medios">("edificios");
 
     // Campos editables de configuración de responsiva
@@ -129,6 +130,20 @@
                     </button>
                 {/each}
                 <button
+                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab === 'general' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
+                    onclick={() => (activeTab = "general")}
+                >
+                    <div class={activeTab === "general" ? "text-white" : "text-slate-400"}><Settings2 size={18} strokeWidth={2.5} /></div>
+                    General
+                </button>
+                <button
+                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab === 'plantillas' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
+                    onclick={() => (activeTab = "plantillas")}
+                >
+                    <div class={activeTab === "plantillas" ? "text-white" : "text-slate-400"}><FileText size={18} strokeWidth={2.5} /></div>
+                    Plantillas
+                </button>
+                <button
                     class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab === 'responsiva' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
                     onclick={() => (activeTab = "responsiva")}
                 >
@@ -217,6 +232,10 @@
                 {/if}
             {:else if activeTab === "usuarios"}
                 <UserManagementSection />
+            {:else if activeTab === "general"}
+                <GeneralSettingsView />
+            {:else if activeTab === "plantillas"}
+                <PlantillasCatalog />
             {:else if activeTab === "responsiva"}
                 <!-- Responsiva Settings -->
                 <div class="flex items-center gap-3 pb-4">
@@ -228,7 +247,7 @@
                 <Card class="p-8 bg-white border border-slate-200 rounded-[22px] shadow-sm relative overflow-hidden max-w-2xl">
                     <div class="max-w-xl space-y-8">
                         <!-- Descripción -->
-                        <div class="flex items-start gap-4 p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100/60">
+                        <div class="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
                             <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
                                 <AlertTriangle size={20} strokeWidth={2.5} />
                             </div>
@@ -262,7 +281,7 @@
                                 min="1"
                                 max="90"
                                 bind:value={pickupDaysInput}
-                                class="w-full h-2 rounded-full appearance-none cursor-pointer accent-rose-500 bg-slate-200"
+                                class="w-full h-2 rounded-full appearance-none cursor-pointer accent-indigo-600 bg-slate-200"
                             />
                             <div class="flex justify-between text-[10px] font-bold text-slate-400 px-1">
                                 <span>1 día</span>
@@ -292,7 +311,7 @@
                                 min="1"
                                 max={Math.max(1, pickupDaysInput - 1)}
                                 bind:value={warnDaysInput}
-                                class="w-full h-2 rounded-full appearance-none cursor-pointer accent-amber-500 bg-slate-200"
+                                class="w-full h-2 rounded-full appearance-none cursor-pointer accent-indigo-600 bg-slate-200"
                             />
                             <div class="flex justify-between text-[10px] font-bold text-slate-400 px-1">
                                 <span>1 día</span>
@@ -307,13 +326,13 @@
                             </h4>
                             <div class="flex flex-wrap items-center gap-3">
                                 <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                                    {warnDaysInput - 1} días · Pendiente
+                                    ≤ {Math.max(0, warnDaysInput - 1)} días · Pendiente
                                 </span>
                                 <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200/60">
-                                    {warnDaysInput} días · Por vencer
+                                    ≥ {warnDaysInput} días · Por vencer
                                 </span>
                                 <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200/60">
-                                    {pickupDaysInput} días · Baja de Registro
+                                    &gt; {pickupDaysInput} días · Baja de Registro
                                 </span>
                             </div>
                         </div>

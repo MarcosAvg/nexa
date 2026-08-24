@@ -346,7 +346,7 @@
                 return;
             }
 
-            await exportResponsivasToExcel(data, depNameFilter);
+            await exportResponsivasToExcel(data, depNameFilter, undefined, settingsState.responsivaPickupDays);
             toast.success("Exportación completada", { id: loadingToast });
         } catch (error) {
             toast.dismiss(loadingToast);
