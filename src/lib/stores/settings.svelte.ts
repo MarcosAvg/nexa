@@ -66,10 +66,12 @@ export class SettingsState {
     async resetToDefaults() {
         this.responsivaPickupDays = 7;
         this.responsivaWarnDays = 5;
+        this.coreTypesRequired = 2;
         try {
             await Promise.all([
                 this.#persist("responsivaPickupDays", 7),
                 this.#persist("responsivaWarnDays", 5),
+                this.#persist("coreTypesRequired", 2),
             ]);
         } catch {
             // No crítico
