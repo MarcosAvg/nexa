@@ -8,7 +8,7 @@
     import { personnelState, ticketState, catalogState } from "../../stores";
     import { cardService } from "../../services/cards";
     import { toast } from "svelte-sonner";
-    import { handleError, capitalize } from "../../utils";
+    import { handleError, capitalize, fetchCurrentVersion } from "../../utils";
     import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
     import { ArrowRight, Plus, Minus, User } from "lucide-svelte";
     import type { Ticket, Person } from "../../types";
@@ -221,11 +221,16 @@
 
         try {
             // Construir payload de guardado desde datos modificados.
-            // Las listas de pisos del ticket vienen por clave de medio; se
-            // convierten a id de tipo de medio para savePersonAccess.
+            // Las listas de pisos vienen por clave de medio (pisos<Cap>/floors_<key>
+            // para la plantilla, o pisosPorMedio para la ruta manual).
             const byKey: Record<string, string[]> = {};
+            const pisosPorMedio = (modifiedData as any).pisosPorMedio ?? {};
             for (const f of floorMediaFields) {
-                const raw = (modifiedData as any)[f.modifiedKey] ?? (modifiedData as any)[f.fallbackKey] ?? [];
+                const raw =
+                    (modifiedData as any)[f.modifiedKey] ??
+                    (modifiedData as any)[f.fallbackKey] ??
+                    pisosPorMedio[f.key] ??
+                    [];
                 if (Array.isArray(raw) && raw.length > 0) byKey[f.key] = raw;
             }
             const specialAccesses =
@@ -243,14 +248,27 @@
                 if ((m as any).active === false) continue;
                 if (byKey[m.key]?.length) typeMap[m.id] = [...byKey[m.key]];
             }
-            // Las pisos de la modificación aplican al edificio de radicación.
+            // La modificación aplica a TODOS los edificios con pisos del payload
+            // (floorsByBuilding ya viene con claves mediaTypeId); si no viene, solo
+            // el edificio de radicación.
             const baseBid = Number(currentPerson.building_id) || 1;
+            const floorsByBuilding =
+                (modifiedData as any).floorsByBuilding ??
+                ({ [baseBid]: typeMap } as Record<number, Record<string, string[]>>);
             const saveData = {
                 id: currentPerson.id,
                 ...modifiedData,
-                floorsByBuilding: { [baseBid]: typeMap },
+                floorsByBuilding,
                 specialAccesses: specialAccessIds,
             };
+
+            // Optimistic lock: si la persona cambió desde que se cargó, avisar.
+            const freshVersion = await fetchCurrentVersion("personnel", currentPerson.id);
+            const currentUpdatedAt = (currentPerson as any).updated_at;
+            if (freshVersion && currentUpdatedAt && freshVersion !== currentUpdatedAt) {
+                toast.error("Esta persona fue modificada por otra persona. Recarga e inténtalo de nuevo.");
+                return;
+            }
 
             await personnelService.save(saveData);
 

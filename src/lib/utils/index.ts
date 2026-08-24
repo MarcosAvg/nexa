@@ -62,6 +62,8 @@ export { generateMediaTemplate, generateUsageTemplate } from './xlsxTemplate';
 
 export { capitalize, fullName, personDisplayName, formatDate, formatDateTime } from './format';
 
+export { updateWithLock, fetchCurrentVersion } from './optimisticLock';
+
 export { computePersonStatus } from './personStatus';
 export type { StatusCardInput } from './personStatus';
 
