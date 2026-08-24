@@ -1173,7 +1173,7 @@
                         loading={isSubmitting}
                         >{editingPerson
                             ? forceDirectSave
-                                ? "Aplicar Alta a Persona"
+                                ? "Vincular Alta a Persona"
                                 : "Actualizar (Ticket)"
                             : "Guardar Alta"}</Button
                     >

@@ -488,7 +488,9 @@
         emptyDescription="No hay tickets pendientes en este momento. Todo está en orden."
         emptyDescriptionFiltered="No encontramos tickets con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={ClipboardList}
-        emptyIconBgClass="from-amber-50 to-amber-100 ring-1 ring-amber-200/50 text-amber-400"
+        emptyIconBgClass={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || depNameFilter !== "Todas")
+            ? "from-slate-50 to-slate-100 ring-1 ring-slate-200/60 text-slate-400"
+            : "from-emerald-50 to-emerald-100 ring-1 ring-emerald-200/60 text-emerald-400"}
         hasFilters={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || depNameFilter !== "Todas")}
         onClearFilters={() => {
             ticketState.filters.type = 'Todos';
