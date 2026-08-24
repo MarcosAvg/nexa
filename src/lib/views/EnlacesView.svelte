@@ -6,7 +6,7 @@
     import {
         SectionHeader, FloatingActionButton, PermissionGuard,
         DataTable, FilterSelect, Button, ContentView, SearchInput,
-        AddEnlaceModal, EditEnlaceModal, ConfirmationModal,
+        AddEnlaceModal, EditEnlaceModal,
     } from "../components";
     import { catalogState } from "../stores";
     import {
@@ -373,17 +373,6 @@
     bind:isOpen={isEditOpen}
     enlace={selectedEnlaceForEdit}
     onComplete={loadData}
-/>
-
-<ConfirmationModal
-    bind:isOpen={confirm.isOpen}
-    title={confirm.title}
-    description={confirm.description}
-    variant={confirm.variant}
-    confirmText={confirm.confirmText}
-    cancelText={confirm.cancelText}
-    onConfirm={confirm.onConfirm}
-    onCancel={() => confirm.close()}
 />
 
 <PermissionGuard requireEdit>

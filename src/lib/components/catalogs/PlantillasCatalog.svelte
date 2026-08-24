@@ -12,6 +12,8 @@
     import Input from "../Input.svelte";
     import Modal from "../Modal.svelte";
     import Badge from "../Badge.svelte";
+    import DeleteConfirmTypedModal from "../DeleteConfirmTypedModal.svelte";
+    import CatalogSectionHeader from "./CatalogSectionHeader.svelte";
     import { Plus, Edit2, Trash2, FileText, ArrowUp, ArrowDown, Copy, Power, Eye } from "lucide-svelte";
 
     /** Placeholders disponibles para insertar en el texto del documento. */
@@ -48,7 +50,6 @@
 
     let isDeleteModalOpen = $state(false);
     let deleteTarget = $state<DocumentTemplate | null>(null);
-    let deleteConfirmation = $state("");
 
     // Versión (optimistic locking) de la plantilla al abrir el editor.
     let editingTemplateUpdatedAt = $state<string | null>(null);
@@ -197,12 +198,11 @@
 
     function openDeleteModal(t: DocumentTemplate) {
         deleteTarget = t;
-        deleteConfirmation = "";
         isDeleteModalOpen = true;
     }
 
     async function confirmDelete() {
-        if (!deleteTarget || deleteConfirmation !== deleteTarget.name) return;
+        if (!deleteTarget) return;
         try {
             await documentService.deleteTemplate(deleteTarget.id);
             toast.success("Plantilla eliminada");
@@ -220,15 +220,13 @@
 </script>
 
 <div>
-    <div class="flex justify-between items-center mb-8">
-        <div>
-            <h3 class="text-xl font-black text-slate-900 tracking-tight">Editor de Plantillas</h3>
-            <p class="text-sm font-medium text-slate-500 mt-0.5">Documentos por medio de acceso (textos legales, etc.)</p>
-        </div>
-        <Button variant="primary" size="sm" class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10" onclick={openCreate}>
-            <Plus size={18} strokeWidth={3} class="mr-2" /> Nueva Plantilla
-        </Button>
-    </div>
+    <CatalogSectionHeader
+        title="Editor de Plantillas"
+        subtitle="Documentos por medio de acceso (textos legales, etc.)"
+        actionLabel="Nueva Plantilla"
+        icon={Plus}
+        onNew={openCreate}
+    />
 
     <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         {#if isLoading}
@@ -391,24 +389,11 @@
 </Modal>
 
 <!-- Confirmar eliminación -->
-<Modal bind:isOpen={isDeleteModalOpen} title="Eliminar Plantilla" description={`Estás a punto de eliminar "${deleteTarget?.name}". Esta acción es irreversible.`} size="sm">
-    <div class="space-y-4">
-        <div class="p-4 bg-rose-50 rounded-xl border border-rose-100">
-            <div class="flex gap-3">
-                <div class="mt-0.5 text-rose-600"><Trash2 size={20} /></div>
-                <div>
-                    <h4 class="text-sm font-bold text-rose-900">Confirmación requerida</h4>
-                    <p class="text-sm text-rose-800 mt-1">Para confirmar, escribe <strong>{deleteTarget?.name}</strong> en el campo de abajo.</p>
-                </div>
-            </div>
-        </div>
-        <div>
-            <label for="tpl-delete-confirm" class="block text-sm font-medium text-slate-700 mb-1">Confirmación</label>
-            <Input id="tpl-delete-confirm" placeholder={deleteTarget?.name} bind:value={deleteConfirmation} class="border-rose-300 focus:ring-rose-500" />
-        </div>
-    </div>
-    {#snippet footer()}
-        <Button variant="secondary" onclick={() => (isDeleteModalOpen = false)}>Cancelar</Button>
-        <Button variant="danger" onclick={confirmDelete} disabled={deleteConfirmation !== deleteTarget?.name}>Eliminar plantilla</Button>
-    {/snippet}
-</Modal>
+<DeleteConfirmTypedModal
+    bind:isOpen={isDeleteModalOpen}
+    title="Eliminar Plantilla"
+    targetName={deleteTarget?.name ?? ""}
+    confirmText="Eliminar plantilla"
+    onConfirm={confirmDelete}
+    onCancel={() => (isDeleteModalOpen = false)}
+/>

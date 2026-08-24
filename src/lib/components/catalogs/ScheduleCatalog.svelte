@@ -6,6 +6,8 @@
     import Input from "../Input.svelte";
     import Modal from "../Modal.svelte";
     import DataTable from "../DataTable.svelte";
+    import DeleteConfirmTypedModal from "../DeleteConfirmTypedModal.svelte";
+    import CatalogSectionHeader from "./CatalogSectionHeader.svelte";
     import { Plus, Edit2, Trash2, Calendar, GripVertical } from "lucide-svelte";
 
     /**
@@ -35,7 +37,6 @@
     // Delete modal state
     let isDeleteModalOpen = $state(false);
     let deleteTarget = $state<any>(null);
-    let deleteConfirmation = $state("");
 
     async function fetchSchedules() {
         const data = await catalogService.fetchSchedules();
@@ -107,12 +108,11 @@
 
     function openDeleteModal(item: any) {
         deleteTarget = { ...item, type: "schedule" };
-        deleteConfirmation = "";
         isDeleteModalOpen = true;
     }
 
     async function confirmDelete() {
-        if (!deleteTarget || deleteConfirmation !== deleteTarget.name) return;
+        if (!deleteTarget) return;
         try {
             await catalogService.deleteCatalogItem("schedules", deleteTarget.id, deleteTarget.name);
             await fetchSchedules();
@@ -126,17 +126,14 @@
 </script>
 
 <div>
-    <div class="flex justify-between items-center mb-8">
-        <div>
-            <h3 class="text-xl font-black text-slate-900 tracking-tight">Horarios</h3>
-            <p class="text-sm font-medium text-slate-500 mt-0.5">Configuración de jornadas</p>
-        </div>
-        {#if canEdit}
-            <Button variant="primary" size="sm" class="h-10 px-5 rounded-xl shadow-lg shadow-blue-500/10" onclick={() => openModal()}>
-                <Plus size={18} strokeWidth={3} class="mr-2" /> Nuevo Horario
-            </Button>
-        {/if}
-    </div>
+    <CatalogSectionHeader
+        title="Horarios"
+        subtitle="Configuración de jornadas"
+        actionLabel="Nuevo Horario"
+        icon={Plus}
+        {canEdit}
+        onNew={() => openModal()}
+    />
 
     {#snippet renderDays(row: any)}
         <div class="flex flex-wrap gap-1">
@@ -203,24 +200,11 @@
 </Modal>
 
 <!-- Delete Schedule Modal -->
-<Modal bind:isOpen={isDeleteModalOpen} title="Eliminar Horario" description={`Estás a punto de eliminar "${deleteTarget?.name}". Esta acción es irreversible.`} size="sm">
-    <div class="space-y-4">
-        <div class="p-4 bg-rose-50 rounded-xl border border-rose-100">
-            <div class="flex gap-3">
-                <div class="mt-0.5 text-rose-600"><Trash2 size={20} /></div>
-                <div>
-                    <h4 class="text-sm font-bold text-rose-900">Confirmación requerida</h4>
-                    <p class="text-sm text-rose-800 mt-1">Para confirmar, escribe <strong>{deleteTarget?.name}</strong> en el campo de abajo.</p>
-                </div>
-            </div>
-        </div>
-        <div>
-            <label for="schedule-delete-confirm" class="block text-sm font-medium text-slate-700 mb-1">Confirmación</label>
-            <Input id="schedule-delete-confirm" placeholder={deleteTarget?.name} bind:value={deleteConfirmation} class="border-rose-300 focus:ring-rose-500" />
-        </div>
-    </div>
-    {#snippet footer()}
-        <Button variant="secondary" onclick={() => (isDeleteModalOpen = false)}>Cancelar</Button>
-        <Button variant="danger" onclick={confirmDelete} disabled={deleteConfirmation !== deleteTarget?.name}>Eliminar permanentemente</Button>
-    {/snippet}
-</Modal>
+<DeleteConfirmTypedModal
+    bind:isOpen={isDeleteModalOpen}
+    title="Eliminar Horario"
+    targetName={deleteTarget?.name ?? ""}
+    confirmText="Eliminar permanentemente"
+    onConfirm={confirmDelete}
+    onCancel={() => (isDeleteModalOpen = false)}
+/>

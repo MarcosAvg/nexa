@@ -6,7 +6,7 @@
         SectionHeader, FilterGroup, FilterSelect, Button, Card,
         DataTable, Badge, PermissionGuard, FloatingActionButton,
         ContentView, SearchInput, Pagination,
-        AddCardModal, ConfirmationModal,
+        AddCardModal,
     } from "../components";
     import {
         User,
@@ -410,17 +410,6 @@
         replacingCard = null;
         isModalOpen = false;
     }}
-/>
-
-<ConfirmationModal
-    bind:isOpen={confirm.isOpen}
-    title={confirm.title}
-    description={confirm.description}
-    variant={confirm.variant}
-    confirmText={confirm.confirmText}
-    cancelText={confirm.cancelText}
-    onConfirm={confirm.onConfirm}
-    onCancel={() => confirm.close()}
 />
 
 <PermissionGuard requireEdit>
