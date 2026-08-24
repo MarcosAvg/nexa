@@ -46,6 +46,7 @@
     let dependencies = $derived(catalogState.dependencies);
     let specialAccesses = $derived(catalogState.specialAccesses);
     let schedules = $derived(catalogState.schedules);
+    let mediaTypes = $derived(catalogState.mediaTypes);
 
     let canEdit = $derived(
         (currentUser.role === "admin" || currentUser.role === "operator") && networkStore.isOnline,
@@ -59,7 +60,7 @@
         isGeneratingTemplate = true;
         const loadingToast = toast.loading("Generando plantilla...");
         try {
-            await generateRequestTemplate({ buildings: buildings as any[], dependencies: dependencies as any[], specialAccesses: specialAccesses as any[], schedules: schedules as any[] });
+            await generateRequestTemplate({ buildings: buildings as any[], dependencies: dependencies as any[], specialAccesses: specialAccesses as any[], schedules: schedules as any[], mediaTypes: mediaTypes as any[] });
             toast.success("Plantilla generada correctamente", { id: loadingToast });
         } catch (e) {
             toast.dismiss(loadingToast);
@@ -87,7 +88,7 @@
         isGeneratingAccessProTemplate = true;
         const loadingToast = toast.loading("Generando plantilla de AccessPRO...");
         try {
-            await generateAccessProTemplate({ buildings: buildings as any[], dependencies: dependencies as any[], specialAccesses: specialAccesses as any[], schedules: schedules as any[] });
+            await generateAccessProTemplate({ buildings: buildings as any[], dependencies: dependencies as any[], specialAccesses: specialAccesses as any[], schedules: schedules as any[], mediaTypes: mediaTypes as any[] });
             toast.success("Plantilla generada correctamente", { id: loadingToast });
         } catch (e) {
             toast.dismiss(loadingToast);

@@ -15,6 +15,8 @@ interface TemplateCatalogs {
     dependencies: CatalogItem[];
     specialAccesses: CatalogItem[];
     schedules: CatalogItem[];
+    /** Tipos de medio activos (del catálogo) para armar columnas/dropdowns. */
+    mediaTypes?: CatalogItem[];
 }
 
 // ─────────────────────────────────────────
@@ -189,6 +191,14 @@ function prepareCatalogData(catalogs: TemplateCatalogs) {
     catalogs.buildings.forEach(b => (b.floors || []).forEach(f => allFloors.add(f)));
     const floorList = sortFloors(Array.from(allFloors));
 
+    // Tipos de tarjeta derivados del catálogo de medios (activos); "Ambas" al final.
+    // Se usa el nombre visible (P2000/KONE/AccessPRO) para no romper el contrato
+    // de la hoja Reporte de Falla; la key queda como identificador interno.
+    const mediaNames = (catalogs.mediaTypes || [])
+        .filter((m) => m.active !== false)
+        .map((m) => m.name || m.key);
+    const cardTypeList = [...mediaNames, 'Ambas'];
+
     const refs = {
         depsRef: () => `CATALOGOS!$A$1:$A$${depsNames.length}`,
         buildingsRef: () => `CATALOGOS!$B$1:$B$${buildingNames.length}`,
@@ -196,13 +206,13 @@ function prepareCatalogData(catalogs: TemplateCatalogs) {
         accessRef: () => `CATALOGOS!$D$1:$D$${accessNames.length}`,
         schedulesRef: () => `CATALOGOS!$E$1:$E$${scheduleNames.length}`,
         tipoPersonalRef: () => `CATALOGOS!$F$1:$F$6`,
-        tipoTarjetaRef: () => `CATALOGOS!$G$1:$G$3`,
+        tipoTarjetaRef: () => `CATALOGOS!$G$1:$G$${cardTypeList.length}`,
         accionPisosRef: () => `CATALOGOS!$H$1:$H$3`,
         tipoBajaRef: () => `CATALOGOS!$I$1:$I$2`,
         motivoReposRef: () => `CATALOGOS!$J$1:$J$4`,
         urgenciaRef: () => `CATALOGOS!$K$2:$K$4`,
     };
-    return { refs, lists: { depsNames, buildingNames, accessNames, scheduleNames, floorList } };
+    return { refs, lists: { depsNames, buildingNames, accessNames, scheduleNames, floorList, cardTypeList } };
 }
 
 function writeCatalogSheet(wb: ExcelJS.Workbook, lists: ReturnType<typeof prepareCatalogData>['lists']) {
@@ -216,7 +226,7 @@ function writeCatalogSheet(wb: ExcelJS.Workbook, lists: ReturnType<typeof prepar
     write(4, lists.accessNames);
     write(5, lists.scheduleNames);
     write(6, ['Trabajador de planta', 'Honorarios Profesionales', 'Servicio Social', 'Otro']);
-    write(7, ['P2000', 'KONE', 'Ambas']);
+    write(7, lists.cardTypeList);
     write(8, ['Reemplazar', 'Sumar', 'Quitar']);
     write(9, ['Definitiva', 'Temporal']);
     write(10, ['Extravío', 'Daño', 'Robo', 'Otro']);
