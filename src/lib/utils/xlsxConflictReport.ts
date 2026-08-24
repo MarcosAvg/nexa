@@ -25,7 +25,7 @@ import {
     saveWorkbook,
 } from './xlsxShared';
 import type { ImportParseResult } from './xlsxImporter';
-import type { AltaConflictAnalysis, ModificacionConflictAnalysis } from './matchAnalysis';
+import type { AltaConflictAnalysis, ModificacionConflictAnalysis, FloorChange } from './matchAnalysis';
 
 // ─────────────────────────────────────────
 // Paleta local (formato { bg, fg } que esperan addKpiCard, addTableHeader, addTableRow)
@@ -257,7 +257,7 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     let altaCounter = 0;
 
     for (const sheet of input.parseResult.sheets) {
-        if (sheet.key !== 'altas' && sheet.key !== 'altas_accesspro') continue;
+        if (sheet.key !== 'altas') continue;
         for (const rowData of sheet.rows) {
             if (!rowData.isValid) continue;
             const rk = `${sheet.key}-${rowData.rowNumber}`;
@@ -276,43 +276,26 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
             r.getCell(4).value = person?.building || rowData.fields.edificio || '';
 
             if (analysis) {
-                if (sheet.key === 'altas') {
-                    // P2000
-                    const p2000 = analysis.conflicts.find(c => c.cardType === 'P2000');
-                    r.getCell(5).value = p2000?.requested ? 'Sí' : 'No';
-                    r.getCell(6).value = p2000?.existingFolio || (p2000?.hasCard ? 'Sí' : '—');
-                    r.getCell(7).value = p2000?.conflict ? '⚠ Conflicto' : '✓ OK';
+                // P2000
+                const p2000 = analysis.conflicts.find(c => c.mediaName === 'P2000');
+                r.getCell(5).value = p2000?.requested ? 'Sí' : 'No';
+                r.getCell(6).value = p2000?.existingFolio || (p2000?.hasCard ? 'Sí' : '—');
+                r.getCell(7).value = p2000?.conflict ? '⚠ Conflicto' : '✓ OK';
 
-                    // KONE
-                    const kone = analysis.conflicts.find(c => c.cardType === 'KONE');
-                    r.getCell(8).value = kone?.requested ? 'Sí' : 'No';
-                    r.getCell(9).value = kone?.existingFolio || (kone?.hasCard ? 'Sí' : '—');
-                    r.getCell(10).value = kone?.conflict ? '⚠ Conflicto' : '✓ OK';
-                } else {
-                    // ALTAS ACCESSPRO: solo aplica esa tarjeta
-                    const ap = analysis.conflicts.find(c => c.cardType === 'AccessPRO');
-                    r.getCell(5).value = '—';
-                    r.getCell(6).value = '—';
-                    r.getCell(7).value = '—';
-                    r.getCell(8).value = '—';
-                    r.getCell(9).value = '—';
-                    r.getCell(10).value = '—';
-                    if (ap) {
-                        r.getCell(11).value = `AccessPRO ${ap.requested ? 'Sí' : 'No'} — ${ap.existingFolio ? `tiene ${ap.existingFolio}` : 'sin tarjeta'} — ${ap.conflict ? '⚠ Conflicto' : '✓ OK'}`;
-                    }
-                }
+                // KONE
+                const kone = analysis.conflicts.find(c => c.mediaName === 'KONE');
+                r.getCell(8).value = kone?.requested ? 'Sí' : 'No';
+                r.getCell(9).value = kone?.existingFolio || (kone?.hasCard ? 'Sí' : '—');
+                r.getCell(10).value = kone?.conflict ? '⚠ Conflicto' : '✓ OK';
             } else {
                 // Sin análisis (persona no encontrada en BD)
                 r.getCell(5).value = '—';
                 r.getCell(6).value = '—';
-                r.getCell(7).value = sheet.key === 'altas_accesspro' ? '—' : '⚠';
+                r.getCell(7).value = '⚠';
                 r.getCell(8).value = '—';
                 r.getCell(9).value = '—';
-                r.getCell(10).value = sheet.key === 'altas_accesspro' ? '—' : '⚠';
-                r.getCell(11).value =
-                    sheet.key === 'altas_accesspro'
-                        ? 'Persona nueva — sin conflictos (AccessPRO)'
-                        : 'Persona nueva — sin conflictos';
+                r.getCell(10).value = '⚠';
+                r.getCell(11).value = 'Persona nueva — sin conflictos';
             }
 
             // Styling: cada celda toma el fill de su GRUPO (como en xlsxExport)
@@ -346,12 +329,12 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 ? 'conflict' : (!analysis ? 'new-person' : 'ok');
             if (altaConflictStatus === 'conflict') {
                 // P2000 conflicto badge
-                if (analysis!.conflicts.find(c => c.cardType === 'P2000' && c.conflict)) {
+                if (analysis!.conflicts.find(c => c.mediaName === 'P2000' && c.conflict)) {
                     r.getCell(7).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
                     r.getCell(7).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
                 }
                 // KONE conflicto badge
-                if (analysis!.conflicts.find(c => c.cardType === 'KONE' && c.conflict)) {
+                if (analysis!.conflicts.find(c => c.mediaName === 'KONE' && c.conflict)) {
                     r.getCell(10).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
                     r.getCell(10).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
                 }
@@ -530,27 +513,21 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 const newExit = rowData.fields.hora_salida?.trim();
                 r.getCell(14).value = newEntry && newExit ? `${newEntry} - ${newExit}` : (newEntry || newExit || '—');
 
-                // Floor changes
+                // Floor changes: por clave de medio con pisos + accesos especiales
                 const fc = analysis.floorChanges;
-                if (fc?.p2000) {
+                const floorMediaKeys = Object.keys(fc || {}).filter((k) => k !== 'accesses');
+                let floorCol = 15;
+                for (const key of floorMediaKeys) {
+                    if (floorCol > 16) break; // solo 2 slots de pisos (O, P)
+                    const change = (fc as Record<string, FloorChange>)[key];
                     const parts: string[] = [];
-                    if (fc.p2000.added.length) parts.push(`+${fc.p2000.added.join(',')}`);
-                    if (fc.p2000.removed.length) parts.push(`-${fc.p2000.removed.join(',')}`);
-                    if (fc.p2000.kept.length) parts.push(`=${fc.p2000.kept.join(',')}`);
-                    r.getCell(15).value = parts.join(' ') || 'Sin cambios';
-                } else {
-                    r.getCell(15).value = '—';
+                    if (change.added.length) parts.push(`+${change.added.join(',')}`);
+                    if (change.removed.length) parts.push(`-${change.removed.join(',')}`);
+                    if (change.kept.length) parts.push(`=${change.kept.join(',')}`);
+                    r.getCell(floorCol).value = parts.join(' ') || 'Sin cambios';
+                    floorCol++;
                 }
-
-                if (fc?.kone) {
-                    const parts: string[] = [];
-                    if (fc.kone.added.length) parts.push(`+${fc.kone.added.join(',')}`);
-                    if (fc.kone.removed.length) parts.push(`-${fc.kone.removed.join(',')}`);
-                    if (fc.kone.kept.length) parts.push(`=${fc.kone.kept.join(',')}`);
-                    r.getCell(16).value = parts.join(' ') || 'Sin cambios';
-                } else {
-                    r.getCell(16).value = '—';
-                }
+                for (; floorCol <= 16; floorCol++) r.getCell(floorCol).value = '—';
 
                 if (fc?.accesses) {
                     const parts: string[] = [];
@@ -564,8 +541,10 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
                 changedCount = analysis.changes.filter((c) => c.changed).length;
                 if (fc) {
-                    if (fc.p2000?.added.length || fc.p2000?.removed.length) changedCount++;
-                    if (fc.kone?.added.length || fc.kone?.removed.length) changedCount++;
+                    for (const [key, change] of Object.entries(fc)) {
+                        if (key === 'accesses') continue;
+                        if ((change as FloorChange).added.length || (change as FloorChange).removed.length) changedCount++;
+                    }
                     if (fc.accesses?.added.length || fc.accesses?.removed.length) changedCount++;
                 }
                 r.getCell(18).value = changedCount;
@@ -722,7 +701,7 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
     let bajaRowIdx = 6, bajaCt = 0;
     for (const sheet of input.parseResult.sheets) {
-        if (sheet.key !== 'baja_persona' && sheet.key !== 'baja_accesspro') continue;
+        if (sheet.key !== 'baja_persona') continue;
         for (const rd of sheet.rows) {
             if (!rd.isValid) continue;
             const rk = `${sheet.key}-${rd.rowNumber}`;
@@ -848,7 +827,7 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
     let repoRowIdx = 6, repoCt = 0;
     for (const sheet of input.parseResult.sheets) {
-        if (sheet.key !== 'reposicion' && sheet.key !== 'reposicion_accesspro') continue;
+        if (sheet.key !== 'reposicion') continue;
         for (const rd of sheet.rows) {
             if (!rd.isValid) continue;
             const rk = `${sheet.key}-${rd.rowNumber}`;
@@ -858,17 +837,17 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
             r.getCell(2).value = person ? `${person.last_name}, ${person.first_name}` : `${rd.fields.apellidos}, ${rd.fields.nombres}`;
             r.getCell(3).value = person?.dependency || rd.fields.dependencia || '';
             r.getCell(4).value = person?.building || '';
-            if (sheet.key === 'reposicion_accesspro') {
-                r.getCell(5).value = 'AccessPRO';
-                r.getCell(6).value = rd.fields.folio_accesspro || '—';
-                r.getCell(7).value = '—';
-                r.getCell(8).value = '—';
-            } else {
-                r.getCell(5).value = rd.fields.reponer_p2000 || '—';
-                r.getCell(6).value = rd.fields.folio_p2000 || '—';
-                r.getCell(7).value = rd.fields.reponer_kone || '—';
-                r.getCell(8).value = rd.fields.folio_kone || '—';
+            // Columnas de medio dinámicas derivadas del payload (reponer_<key> / folio_<key>).
+            const repoKeys = Object.keys(rd.fields)
+                .filter((k) => k.startsWith('reponer_'))
+                .map((k) => k.slice('reponer_'.length));
+            let repoCol = 5;
+            for (const key of repoKeys) {
+                if (repoCol > 8) break; // solo 2 slots (E,F) y (G,H)
+                r.getCell(repoCol++).value = rd.fields[`reponer_${key}`] || '—';
+                r.getCell(repoCol++).value = rd.fields[`folio_${key}`] || '—';
             }
+            for (; repoCol <= 8; repoCol++) r.getCell(repoCol).value = '—';
             r.getCell(9).value = rd.fields.motivo || '—';
             r.getCell(10).value = rd.fields.observaciones || '—';
             r.getCell(11).value = person ? '✓ Encontrado' : '✖ No encontrado';
@@ -984,7 +963,7 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
     let fallaRowIdx = 6, fallaCt = 0;
     for (const sheet of input.parseResult.sheets) {
-        if (sheet.key !== 'reporte_falla' && sheet.key !== 'reporte_falla_accesspro') continue;
+        if (sheet.key !== 'reporte_falla') continue;
         for (const rd of sheet.rows) {
             if (!rd.isValid) continue;
             const rk = `${sheet.key}-${rd.rowNumber}`;
@@ -994,10 +973,7 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
             r.getCell(2).value = person ? `${person.last_name}, ${person.first_name}` : `${rd.fields.apellidos}, ${rd.fields.nombres}`;
             r.getCell(3).value = person?.dependency || rd.fields.dependencia || '';
             r.getCell(4).value = rd.fields.ubicacion || person?.building || '';
-            r.getCell(5).value =
-                sheet.key === 'reporte_falla_accesspro'
-                    ? 'AccessPRO'
-                    : rd.fields.tipo_tarjeta || '—';
+            r.getCell(5).value = rd.fields.tipo_tarjeta || '—';
             r.getCell(6).value = rd.fields.folio || '—';
             r.getCell(7).value = (rd.fields.descripcion || '').substring(0, 80);
             r.getCell(8).value = rd.fields.desde_cuando || '—';
@@ -1050,7 +1026,6 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
 const SHEET_LABELS: Record<string, string> = {
     altas: 'Alta',
-    altas_accesspro: 'Alta AccessPRO',
     modificaciones: 'Modificación',
     baja_persona: 'Baja',
     reposicion: 'Reposición',
@@ -1077,7 +1052,7 @@ function buildSheetSummary(input: ConflictReportInput): { label: string; total: 
             if (!input.selectedRows.has(rk)) continue;
             selected++;
 
-            if (sheet.key === 'altas' || sheet.key === 'altas_accesspro') {
+            if (sheet.key === 'altas') {
                 const analysis = input.altaAnalyses.get(rk);
                 if (analysis?.hasConflicts) conflicts++;
             } else if (sheet.key === 'modificaciones') {

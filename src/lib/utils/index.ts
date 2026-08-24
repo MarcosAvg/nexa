@@ -58,7 +58,7 @@ export {
 } from './xlsxKoneUsage';
 export type { KoneUsageEntry, KoneUsageMatchedEntry, KoneUsageMatchResult, DuplicateFolioInfo } from './xlsxKoneUsage';
 
-export { generateRequestTemplate, generateKoneUsageTemplate, generateAccessProTemplate } from './xlsxTemplate';
+export { generateMediaTemplate, generateKoneUsageTemplate } from './xlsxTemplate';
 
 export { computePersonStatus } from './personStatus';
 export type { StatusCardInput } from './personStatus';

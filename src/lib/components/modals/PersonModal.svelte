@@ -55,10 +55,9 @@
             horaEntrada?: string;
             horaSalida?: string;
             correo?: string;
-            pisosP2000?: string[];
-            pisosKone?: string[];
+            pisosPorMedio?: Record<string, string[]>;
+            foliosPorMedio?: Record<string, string>;
             specialAccesses?: string[];
-            folioAccessPro?: string;
         } | null;
         /** If set, only these card types can be added ('P2000', 'KONE') */
         allowedCardTypes?: string[] | null;
@@ -153,8 +152,12 @@
         return m.access_media_type_buildings.some((r: any) => Number(r.building_id) === bid);
     }
 
-    let baseP2000 = $derived(baseFloorsForKey("p2000"));
-    let baseKone = $derived(baseFloorsForKey("kone"));
+    /** Pisos base por clave de medio (dinámico, para el payload de guardado). */
+    let pisosPorMedio = $derived.by(() => {
+        const out: Record<string, string[]> = {};
+        for (const fm of floorMediaTypes) out[fm.key] = baseFloorsForKey(fm.key);
+        return out;
+    });
 
     /** Edificios con acceso seleccionados para esta persona. */
     let selectedBuildings = $state<number[]>([]);
@@ -378,12 +381,9 @@
 
                 // Si también tenemos precarga (vinculando ticket de Alta), sobrescribir datos solicitados
                 if (prefill) {
-                    const wantsP2000 =
-                        !allowedCardTypes || allowedCardTypes.includes("P2000");
-                    const wantsKONE =
-                        !allowedCardTypes || allowedCardTypes.includes("KONE");
-
-                    if (wantsP2000) {
+                    // Pisos por medio con pisos: sobrescribir sólo los medios
+                    // solicitados, conservando los pisos ya existentes del resto.
+                    if (prefill.pisosPorMedio) {
                         const pid =
                             Number(
                                 buildings.find(
@@ -391,51 +391,23 @@
                                 )?.id,
                             ) || undefined;
                         if (pid) {
+                            const merged = {
+                                ...(floorsByBuilding[pid] ?? {}),
+                            };
+                            for (const fm of floorMediaTypes) {
+                                const wanted =
+                                    !allowedCardTypes ||
+                                    allowedCardTypes.includes(fm.name);
+                                if (wanted && prefill.pisosPorMedio[fm.key]) {
+                                    merged[fm.id] = [
+                                        ...prefill.pisosPorMedio[fm.key],
+                                    ];
+                                }
+                            }
                             floorsByBuilding = {
                                 ...floorsByBuilding,
-                                [pid]: {
-                                    p2000: prefill.pisosP2000
-                                        ? [...prefill.pisosP2000]
-                                        : [],
-                                    kone: floorsByBuilding[pid]?.kone ?? [],
-                                },
+                                [pid]: merged,
                             };
-                        }
-                    }
-
-                    if (wantsKONE) {
-                        if (prefill.pisosKone && prefill.pisosKone.length > 0) {
-                            const pid =
-                                Number(
-                                    buildings.find(
-                                        (b) => b.name === prefill.edificio,
-                                    )?.id,
-                                ) || undefined;
-                            if (pid) {
-                                floorsByBuilding = {
-                                    ...floorsByBuilding,
-                                    [pid]: {
-                                        p2000: floorsByBuilding[pid]?.p2000 ?? [],
-                                        kone: [...prefill.pisosKone],
-                                    },
-                                };
-                            }
-                        } else if (prefill.pisosKone) {
-                            const pid =
-                                Number(
-                                    buildings.find(
-                                        (b) => b.name === prefill.edificio,
-                                    )?.id,
-                                ) || undefined;
-                            if (pid) {
-                                floorsByBuilding = {
-                                    ...floorsByBuilding,
-                                    [pid]: {
-                                        p2000: floorsByBuilding[pid]?.p2000 ?? [],
-                                        kone: [],
-                                    },
-                                };
-                            }
                         }
                     }
 
@@ -455,22 +427,27 @@
                     if (prefill.horaEntrada) horaEntrada = prefill.horaEntrada;
                     if (prefill.horaSalida) horaSalida = prefill.horaSalida;
 
-                    // Tarjeta AccessPRO solicitada en el ticket de alta
-                    if (
-                        prefill.folioAccessPro &&
-                        !tarjetasAsignadas.some(
-                            (c) =>
-                                c.type === "AccessPRO" &&
-                                c.folio === prefill.folioAccessPro,
-                        )
-                    ) {
-                        tarjetasAsignadas = [
-                            ...tarjetasAsignadas,
-                            {
-                                type: "AccessPRO",
-                                folio: prefill.folioAccessPro,
-                            },
-                        ];
+                    // Tarjetas sin pisos (folio) solicitadas en el ticket de alta
+                    if (prefill.foliosPorMedio) {
+                        for (const [key, folio] of Object.entries(prefill.foliosPorMedio)) {
+                            if (!folio) continue;
+                            const mediaName =
+                                catalogState.mediaTypes.find(
+                                    (m: any) => m.key === key,
+                                )?.name ?? key;
+                            if (
+                                !tarjetasAsignadas.some(
+                                    (c) =>
+                                        c.type === mediaName &&
+                                        c.folio === folio,
+                                )
+                            ) {
+                                tarjetasAsignadas = [
+                                    ...tarjetasAsignadas,
+                                    { type: mediaName, folio },
+                                ];
+                            }
+                        }
                     }
                 }
 
@@ -509,16 +486,26 @@
                     ) || undefined;
                 floorsByBuilding = prefillBid
                     ? {
-                          [prefillBid]: {
-                              p2000: prefill.pisosP2000 ?? [],
-                              kone: prefill.pisosKone ?? [],
-                          },
+                          [prefillBid]: Object.fromEntries(
+                              floorMediaTypes.map((fm) => [
+                                  fm.id,
+                                  prefill.pisosPorMedio?.[fm.key] ?? [],
+                              ]),
+                          ),
                       }
                     : {};
                 accesosEspeciales = namesToSpecialIds(prefill.specialAccesses ?? []);
-                tarjetasAsignadas = prefill.folioAccessPro
-                    ? [{ type: "AccessPRO", folio: prefill.folioAccessPro }]
-                    : [];
+                tarjetasAsignadas = [];
+                if (prefill.foliosPorMedio) {
+                    for (const [key, folio] of Object.entries(prefill.foliosPorMedio)) {
+                        if (!folio) continue;
+                        const mediaName =
+                            catalogState.mediaTypes.find(
+                                (m: any) => m.key === key,
+                            )?.name ?? key;
+                        tarjetasAsignadas.push({ type: mediaName, folio });
+                    }
+                }
                 lastLoadedPersonId = "__prefill__";
             });
         } else if (
@@ -596,8 +583,7 @@
                 edificio,
                 building_id: buildings.find((b) => b.name === edificio)?.id,
                 pisoBase,
-                pisosP2000: baseP2000,
-                pisosKone: baseKone,
+                pisosPorMedio,
                 first_name: nombres,
                 last_name: apellidos,
                 employee_no: noEmpleado,
@@ -619,8 +605,13 @@
                     noEmpleado: editingPerson.employee_no,
                     dependency: editingPerson.dependency,
                     edificio: editingPerson.building,
-                    pisosP2000: floorsForKey(editingPerson.floors, "p2000"),
-                    pisosKone: floorsForKey(editingPerson.floors, "kone"),
+                    pisosPorMedio: (() => {
+                        const out: Record<string, string[]> = {};
+                        for (const fm of floorMediaTypes) {
+                            out[fm.key] = floorsForKey(editingPerson.floors, fm.key);
+                        }
+                        return out;
+                    })(),
                     horario: editingPerson.schedule,
                     accesosEspeciales: editingPerson.specialAccesses,
                     tarjetas: editingPerson.cards,

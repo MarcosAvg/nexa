@@ -16,6 +16,7 @@
     import { floorsForKey } from "../../services/accessAssignments";
     import { HistoryService } from "../../services/history";
     import { catalogState, personnelState } from "../../stores";
+    import { activeMediaTypes } from "../../utils/mediaContract";
     import InfoCard from "../InfoCard.svelte";
     import CardCheckItem from "../CardCheckItem.svelte";
     import { toast } from "svelte-sonner";
@@ -104,6 +105,36 @@
             catalog.find((c) => c.name.toLowerCase() === value.toLowerCase()) ??
             null
         );
+    }
+
+    // ── Medios (catálogo genérico con fallback por defecto) ──────────────
+    type MediaInfoLike = { key: string; name: string; has_floors: boolean };
+
+    const DEFAULT_MEDIAS: MediaInfoLike[] = [
+        { key: 'p2000', name: 'P2000', has_floors: true },
+        { key: 'kone', name: 'KONE', has_floors: true },
+        { key: 'accesspro', name: 'AccessPRO', has_floors: false },
+    ];
+
+    /** Medios activos del catálogo (con fallback al catálogo por defecto). */
+    let activeMedias = $derived.by((): MediaInfoLike[] => {
+        const list = activeMediaTypes(catalogState.mediaTypes);
+        return list.length > 0 ? list : DEFAULT_MEDIAS;
+    });
+
+    /** Medios con pisos (para la sección de MODIFICACIÓN). */
+    let floorMedias = $derived.by(() => activeMedias.filter((m) => m.has_floors));
+
+    /** Clave de medio a partir del nombre (p.ej. "P2000" → "p2000"). */
+    function mediaKeyForName(name: string): string {
+        const m = activeMedias.find((mm) => mm.name === name);
+        return m ? m.key : name.toLowerCase();
+    }
+
+    /** Folio solicitado en el payload para el tipo de tarjeta dado. */
+    function folioForType(type: string): string | undefined {
+        const key = mediaKeyForName(type);
+        return (p as any)[`folio_${key}`] || undefined;
     }
 
     // ── MODIFICACIÓN: build compareTicket for ModificationCompareModal ──
@@ -338,12 +369,12 @@
      */
     function resolveTipos(raw: string): string[] {
         const t = raw.toLowerCase().trim();
-        if (t.includes("ambas")) return ["P2000", "KONE"];
-        if (t.includes("p2000")) return ["P2000"];
-        if (t.includes("kone")) return ["KONE"];
-        if (t.includes("accesspro") || t.includes("access pro")) {
-            return ["AccessPRO"];
-        }
+        if (!t) return [];
+        if (t.includes("ambas")) return activeMedias.map((m) => m.name);
+        const matching = activeMedias.filter(
+            (m) => t.includes(m.name.toLowerCase()) || t.includes(m.key),
+        );
+        if (matching.length > 0) return matching.map((m) => m.name);
         return [raw];
     }
 
@@ -452,17 +483,11 @@
 
             // Usar resolveTipos para manejar "Tarjeta P2000", "Tarjeta KONE" y "Ambas tarjetas"
             const tipos = resolveTipos(rawTipo);
-            if (tipos.includes("P2000")) {
-                repoPayload.reponer_p2000 = "sí";
-                repoPayload.folio_p2000 = folio;
-            }
-            if (tipos.includes("KONE")) {
-                repoPayload.reponer_kone = "sí";
-                repoPayload.folio_kone = folio;
-            }
-            if (tipos.includes("AccessPRO")) {
-                repoPayload.reponer_accesspro = "sí";
-                repoPayload.folio_accesspro = folio;
+            for (const media of activeMedias) {
+                if (tipos.includes(media.name)) {
+                    repoPayload[`reponer_${media.key}`] = "sí";
+                    repoPayload[`folio_${media.key}`] = folio;
+                }
             }
 
             await ticketService.create({
@@ -696,18 +721,14 @@
                         <div class="text-amber-800 font-medium">
                             {p.hora_salida}
                         </div>{/if}
-                    {#if p.accion_p2000}<div class="text-slate-500">
-                            Acción P2000
-                        </div>
-                        <div class="text-amber-800 font-medium">
-                            {p.accion_p2000}: {p.pisos_p2000 || "N/A"}
-                        </div>{/if}
-                    {#if p.accion_kone}<div class="text-slate-500">
-                            Acción KONE
-                        </div>
-                        <div class="text-amber-800 font-medium">
-                            {p.accion_kone}: {p.pisos_kone || "N/A"}
-                        </div>{/if}
+                    {#each floorMedias as media}
+                        {#if p[`accion_${media.key}`]}<div class="text-slate-500">
+                                Acción {media.name}
+                            </div>
+                            <div class="text-amber-800 font-medium">
+                                {p[`accion_${media.key}`]}: {p[`pisos_${media.key}`] || "N/A"}
+                            </div>{/if}
+                    {/each}
                     {#if p.accion_acc}<div class="text-slate-500">
                             Acción Acc. Esp.
                         </div>
@@ -826,9 +847,7 @@
                                                 asignada.
                                             {:else}
                                                 Folio en plantilla (<strong
-                                                    >{check.card.type === "P2000"
-                                                        ? p.folio_p2000
-                                                        : p.folio_kone}</strong
+                                                    >{folioForType(check.card.type)}</strong
                                                 >) no coincide con la tarjeta
                                                 asignada (<strong
                                                     >{check.card.folio}</strong
@@ -853,7 +872,7 @@
                             <AlertCircle size={14} class="mt-0.5 shrink-0" />
                             <span
                                 >No se identificaron tarjetas a reponer según el
-                                payload. Revise los campos "¿Reponer P2000/KONE?".</span
+                                payload. Revise los campos "¿Reponer {activeMedias.map((m) => m.name).join("/")}?".</span
                             >
                         </div>
                     {/if}

@@ -32,11 +32,13 @@
         type ParsedRow,
     } from "../../utils";
     import type { Person } from "../../types";
+    import { catalogState } from "../../stores";
     import {
         analyzeAltaConflicts,
         analyzeModificacionConflicts,
-        wantsAccessProCard,
+        wantsCard,
     } from "../../utils/matchAnalysis";
+    import { activeMediaTypes } from "../../utils/mediaContract";
     import type {
         AltaConflictAnalysis,
         ModificacionConflictAnalysis,
@@ -68,6 +70,7 @@
     let step = $state<Step>("idle");
     let parseResult = $state<ImportParseResult | null>(null);
     let isParsing = $state(false);
+    let mediaTypes = $derived(catalogState.mediaTypes);
     let isImporting = $state(false);
     let importResult = $state<{ created: number; errors: any[] } | null>(null);
 
@@ -97,7 +100,7 @@
 
     function rowMatchesTab(sheetKey: string, row: ParsedRow, tab: string): boolean {
         const rk = `${sheetKey}-${row.rowNumber}`;
-        if (sheetKey === 'altas' || sheetKey === 'altas_accesspro') {
+        if (sheetKey === 'altas') {
             const ana = altaAnalyses.get(rk);
             const hasConflict = ana ? ana.hasConflicts : false;
             return tab === 'conflict' ? hasConflict : !hasConflict;
@@ -149,7 +152,7 @@
 
         isParsing = true;
         try {
-            const result = await parseTemplateFile(file);
+            const result = await parseTemplateFile(file, mediaTypes);
             if (!result.hasAnyData) {
                 toast.warning("El archivo no contiene datos en ninguna hoja.");
                 return;
@@ -232,20 +235,22 @@
                 if (sheet.key === "altas") {
                     newAltaAnalyses.set(
                         rk,
-                        analyzeAltaConflicts(rk, person, row.fields),
-                    );
-                } else if (sheet.key === "altas_accesspro") {
-                    // La hoja AccessPRO solo solicita esa tarjeta
-                    newAltaAnalyses.set(
-                        rk,
-                        analyzeAltaConflicts(rk, person, row.fields, [
-                            "AccessPRO",
-                        ]),
+                        analyzeAltaConflicts(
+                            rk,
+                            person,
+                            row.fields,
+                            mediaTypes,
+                        ),
                     );
                 } else if (sheet.key === "modificaciones") {
                     newModAnalyses.set(
                         rk,
-                        analyzeModificacionConflicts(rk, person, row.fields),
+                        analyzeModificacionConflicts(
+                            rk,
+                            person,
+                            row.fields,
+                            mediaTypes,
+                        ),
                     );
                 }
             }
@@ -290,49 +295,29 @@
 
     /** For Altas: which card types are requested */
     function getRequestedCards(fields: Record<string, string>): string[] {
-        const types: string[] = [];
-        const yes = ["sí", "si"];
-        if (yes.includes((fields.p2000_req ?? "").toLowerCase()))
-            types.push("P2000");
-        if (yes.includes((fields.kone_req ?? "").toLowerCase()))
-            types.push("KONE");
-        if (wantsAccessProCard(fields)) types.push("AccessPRO");
-        return types;
+        if (!mediaTypes || mediaTypes.length === 0) return [];
+        return activeMediaTypes(mediaTypes)
+            .filter((media) => wantsCard(fields, media))
+            .map((media) => media.name);
     }
 
     /** For Reposición: which card types to replace */
     function getReposicionCards(
         fields: Record<string, string>,
-        implicitType?: string,
     ): { type: string; folio: string }[] {
         const cards: { type: string; folio: string }[] = [];
         const yes = ["sí", "si"];
-        if (yes.includes((fields.reponer_p2000 ?? "").toLowerCase())) {
-            cards.push({ type: "P2000", folio: fields.folio_p2000 ?? "" });
-        }
-        if (yes.includes((fields.reponer_kone ?? "").toLowerCase())) {
-            cards.push({ type: "KONE", folio: fields.folio_kone ?? "" });
-        }
-        if (
-            yes.includes((fields.reponer_accesspro ?? "").toLowerCase()) ||
-            (fields.folio_accesspro_repo ?? "").trim().length > 0 ||
-            (fields.folio_accesspro ?? "").trim().length > 0
-        ) {
-            cards.push({
-                type: "AccessPRO",
-                folio:
-                    fields.folio_accesspro_repo ||
-                    fields.folio_accesspro ||
-                    "",
-            });
-        }
-        // Hoja dedicada (REPOSICIÓN ACCESSPRO): la tarjeta se repone siempre
-        // aunque el folio venga vacío.
-        if (implicitType && cards.length === 0) {
-            cards.push({
-                type: implicitType,
-                folio: fields.folio_accesspro_repo || "",
-            });
+        for (const media of activeMediaTypes(mediaTypes)) {
+            if (
+                yes.includes(
+                    (fields[`reponer_${media.key}`] ?? "").toLowerCase(),
+                )
+            ) {
+                cards.push({
+                    type: media.name,
+                    folio: fields[`folio_${media.key}`] ?? "",
+                });
+            }
         }
         return cards;
     }
@@ -356,17 +341,17 @@
         for (const [field, label] of map) {
             if (fields[field]) changes.push({ label, value: fields[field] });
         }
-        if (fields.accion_p2000) {
-            changes.push({
-                label: "Acción P2000",
-                value: `${fields.accion_p2000}: ${fields.pisos_p2000 || "N/A"}`,
-            });
-        }
-        if (fields.accion_kone) {
-            changes.push({
-                label: "Acción KONE",
-                value: `${fields.accion_kone}: ${fields.pisos_kone || "N/A"}`,
-            });
+        for (const media of activeMediaTypes(mediaTypes).filter(
+            (m) => m.has_floors,
+        )) {
+            if (fields[`accion_${media.key}`]) {
+                changes.push({
+                    label: `Acción ${media.name}`,
+                    value: `${fields[`accion_${media.key}`]}: ${
+                        fields[`pisos_${media.key}`] || "N/A"
+                    }`,
+                });
+            }
         }
         if (fields.accion_acc) {
             const accesses =
@@ -402,19 +387,6 @@
         const fields = { ...(fieldsOverride ?? row.fields) };
         const type = SHEET_TO_TICKET_TYPE[sheetKey] ?? sheetKey;
 
-        // La hoja ALTAS ACCESSPRO siempre solicita la tarjeta AccessPRO:
-        // se inyecta accesspro_req para que ConfirmAltaModal la incluya.
-        if (sheetKey === "altas_accesspro" && !fields.accesspro_req) {
-            fields.accesspro_req = "sí";
-        }
-        // Las hojas AccessPRO de reposición/reporte fijan el tipo de tarjeta
-        if (sheetKey === "reposicion_accesspro" && !fields.reponer_accesspro) {
-            fields.reponer_accesspro = "sí";
-        }
-        if (sheetKey === "reporte_falla_accesspro" && !fields.tipo_tarjeta) {
-            fields.tipo_tarjeta = "AccessPRO";
-        }
-
         let priority = "media";
         if (fields.urgencia) {
             const urg = fields.urgencia.toLowerCase();
@@ -443,13 +415,6 @@
         const modifiedFields = { ...row.fields };
         const extraTickets: any[] = [];
 
-        // La hoja ALTAS ACCESSPRO solicita la tarjeta implícitamente:
-        // se normaliza el campo para que el ticket la incluya siempre
-        // (a menos que el usuario elija omitirla en la resolución).
-        if (sheetKey === "altas_accesspro" && !modifiedFields.accesspro_req) {
-            modifiedFields.accesspro_req = "sí";
-        }
-
         for (const conflict of analysis.conflicts) {
             if (!conflict.requested) continue;
 
@@ -458,29 +423,24 @@
                 conflict.resolution === "convert_to_reposicion"
             ) {
                 // Remover esta tarjeta del payload de alta
-                if (conflict.cardType === "P2000") {
-                    delete modifiedFields.p2000_req;
-                    delete modifiedFields.pisos_p2000;
-                } else if (conflict.cardType === "KONE") {
-                    delete modifiedFields.kone_req;
-                    delete modifiedFields.pisos_kone;
-                } else if (conflict.cardType === "AccessPRO") {
-                    delete modifiedFields.accesspro_req;
-                    delete modifiedFields.folio_accesspro;
+                delete modifiedFields[`${conflict.mediaKey}_req`];
+                if (conflict.has_floors) {
+                    delete modifiedFields[`pisos_${conflict.mediaKey}`];
+                } else {
+                    delete modifiedFields[`${conflict.mediaKey}_folio`];
                 }
 
                 // Si es conversión a reposición, crear ticket adicional
                 if (conflict.resolution === "convert_to_reposicion") {
-                    const lowerType = conflict.cardType.toLowerCase();
                     extraTickets.push({
                         type: "Reposición",
-                        title: `Reposición ${conflict.cardType} — ${row.fields.apellidos}, ${row.fields.nombres}`,
-                        description: `Reposición automática desde importación de Altas (${conflict.cardType} existente: ${conflict.existingFolio || "N/A"})`,
+                        title: `Reposición ${conflict.mediaName} — ${row.fields.apellidos}, ${row.fields.nombres}`,
+                        description: `Reposición automática desde importación de Altas (${conflict.mediaName} existente: ${conflict.existingFolio || "N/A"})`,
                         priority: "media",
                         payload: {
                             ...row.fields,
-                            [`reponer_${lowerType}`]: "sí",
-                            [`folio_${lowerType}`]:
+                            [`reponer_${conflict.mediaKey}`]: "sí",
+                            [`folio_${conflict.mediaKey}`]:
                                 conflict.existingFolio || "",
                             origen:
                                 "Conversión desde Alta (matching inteligente)",
@@ -492,15 +452,12 @@
         }
 
         // Verificar si aún quedan tarjetas solicitadas
-        const stillWantsP2000 = ["sí", "si"].includes(
-            (modifiedFields.p2000_req ?? "").toLowerCase(),
-        );
-        const stillWantsKONE = ["sí", "si"].includes(
-            (modifiedFields.kone_req ?? "").toLowerCase(),
-        );
-        const stillWantsAccessPro = wantsAccessProCard(modifiedFields);
+        const stillWants =
+            activeMediaTypes(mediaTypes).filter((m) =>
+                wantsCard(modifiedFields, m),
+            ).length > 0;
 
-        if (stillWantsP2000 || stillWantsKONE || stillWantsAccessPro) {
+        if (stillWants) {
             extraTickets.unshift(buildTicketDef(sheetKey, row, modifiedFields));
         }
 
@@ -565,8 +522,7 @@
                 if (!selectedRows.has(rowKey)) continue;
 
                 if (
-                    (sheet.key === "altas" ||
-                        sheet.key === "altas_accesspro") &&
+                    sheet.key === "altas" &&
                     altaAnalyses.has(rowKey)
                 ) {
                     const analysis = altaAnalyses.get(rowKey)!;
@@ -645,7 +601,6 @@
         "emerald" | "amber" | "rose" | "blue" | "violet" | "slate"
     > = {
         altas: "emerald",
-        altas_accesspro: "emerald",
         modificaciones: "amber",
         baja_persona: "rose",
         reposicion: "blue",
@@ -970,14 +925,10 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                             <!-- Tabs por tipo de solicitud -->
                             {@const sheetTabs = [
                                 { key: 'altas', label: 'ALTAS' },
-                                { key: 'altas_accesspro', label: 'ALTAS ACCESSPRO' },
                                 { key: 'modificaciones', label: 'MODIFICACIONES' },
                                 { key: 'baja_persona', label: 'BAJA' },
-                                { key: 'baja_accesspro', label: 'BAJA ACCESSPRO' },
                                 { key: 'reposicion', label: 'REPOSICIÓN' },
-                                { key: 'reposicion_accesspro', label: 'REPO ACCESSPRO' },
                                 { key: 'reporte_falla', label: 'REPORTE FALLA' },
-                                { key: 'reporte_falla_accesspro', label: 'FALLA ACCESSPRO' },
                             ]}
                             <div class="flex gap-1.5 flex-wrap pb-2 px-1">
                                 {#each sheetTabs as tab}
@@ -1058,7 +1009,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                 size={13}
                                                             />
                                                         </div>
-                                                    {:else if reviewSheetTab === "altas" || reviewSheetTab === "altas_accesspro"}
+                                                    {:else if reviewSheetTab === "altas"}
                                                         <div
                                                             class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0"
                                                         >
@@ -1100,7 +1051,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                     >{matches.length}
                                                                     coincidencia(s)</span
                                                                 >
-                                                            {:else if reviewSheetTab === "altas" || reviewSheetTab === "altas_accesspro"}
+                                                            {:else if reviewSheetTab === "altas"}
                                                                 · <span
                                                                     class="text-emerald-600 font-medium"
                                                                     >Persona nueva
@@ -1139,7 +1090,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                     class="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3"
                                                 >
                                                     <!-- ── TYPE: ALTAS (SMART) ── -->
-                                                    {#if (reviewSheetTab === "altas" || reviewSheetTab === "altas_accesspro") && altaAnalyses.has(rowKey)}
+                                                    {#if (reviewSheetTab === "altas") && altaAnalyses.has(rowKey)}
                                                         {@const analysis =
                                                             altaAnalyses.get(
                                                                 rowKey,
@@ -1175,12 +1126,12 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                         Estado
                                                                     </div>
 
-                                                                    {#each analysis.conflicts as conflict}
-                                                                        <div
-                                                                            class="bg-white px-3 py-2.5 font-semibold text-slate-700"
-                                                                        >
-                                                                            {conflict.cardType}
-                                                                        </div>
+                                                                     {#each analysis.conflicts as conflict}
+                                                                         <div
+                                                                             class="bg-white px-3 py-2.5 font-semibold text-slate-700"
+                                                                         >
+                                                                             {conflict.mediaName}
+                                                                         </div>
                                                                         <div
                                                                             class="bg-white px-3 py-2.5 text-center"
                                                                         >
@@ -1251,17 +1202,17 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
 
                                                             <!-- Pisos solicitados / Folio solicitado -->
                                                             {#each analysis.conflicts as conflict}
-                                                                {#if conflict.requested && conflict.requestedFloors}
-                                                                    {#if conflict.cardType === "AccessPRO"}
+                                                                {#if conflict.requested && conflict.requestedValue}
+                                                                    {#if conflict.has_floors}
                                                                         <p
                                                                             class="text-[10px] text-slate-500"
                                                                         >
                                                                             <span
                                                                                 class="font-semibold"
-                                                                                >Folio
-                                                                                AccessPRO:</span
+                                                                                >Pisos
+                                                                                {conflict.mediaName}:</span
                                                                             >
-                                                                            {conflict.requestedFloors}
+                                                                            {conflict.requestedValue}
                                                                         </p>
                                                                     {:else}
                                                                         <p
@@ -1269,10 +1220,10 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                         >
                                                                             <span
                                                                                 class="font-semibold"
-                                                                                >Pisos
-                                                                                {conflict.cardType}:</span
+                                                                                >Folio
+                                                                                {conflict.mediaName}:</span
                                                                             >
-                                                                            {conflict.requestedFloors}
+                                                                            {conflict.requestedValue}
                                                                         </p>
                                                                     {/if}
                                                                 {/if}
@@ -1300,16 +1251,16 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                                 <p
                                                                                     class="text-[10px] font-medium text-amber-700"
                                                                                 >
-                                                                                    Acción
-                                                                                    para
-                                                                                    {conflict.cardType}:
-                                                                                </p>
+                                                                                     Acción
+                                                                                     para
+                                                                                     {conflict.mediaName}:
+                                                                                 </p>
                                                                                 <label
                                                                                     class="flex items-center gap-2 p-2 rounded-lg bg-white border border-amber-200 cursor-pointer hover:bg-amber-50 transition-colors"
                                                                                 >
                                                                                     <input
                                                                                         type="radio"
-                                                                                        name="alta-resolve-{rowKey}-{conflict.cardType}"
+                                                                                        name="alta-resolve-{rowKey}-{conflict.mediaKey}"
                                                                                         checked={conflict.resolution ===
                                                                                             "skip_card"}
                                                                                         onchange={() => {
@@ -1328,37 +1279,25 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                                             esta
                                                                                             tarjeta
                                                                                         </p>
-                                                                                        <p
-                                                                                            class="text-[10px] text-slate-500"
-                                                                                        >
-                                                                                            {#if conflict.cardType === "AccessPRO"}
-                                                                                                La
-                                                                                                fila
-                                                                                                de
-                                                                                                alta
-                                                                                                se
-                                                                                                omitirá
-                                                                                                por
-                                                                                                completo
-                                                                                            {:else}
-                                                                                                Dar
-                                                                                                alta
-                                                                                                solo
-                                                                                                de
-                                                                                                la(s)
-                                                                                                otra(s)
-                                                                                                tarjeta(s)
-                                                                                            {/if}
-                                                                                        </p>
-                                                                                    </div>
-                                                                                </label>
-                                                                                {#if conflict.cardType !== "AccessPRO"}
-                                                                                <label
+                                                                                         <p
+                                                                                             class="text-[10px] text-slate-500"
+                                                                                         >
+                                                                                             Dar
+                                                                                             alta
+                                                                                             solo
+                                                                                             de
+                                                                                             la(s)
+                                                                                             otra(s)
+                                                                                             tarjeta(s)
+                                                                                         </p>
+                                                                                     </div>
+                                                                                 </label>
+                                                                                 <label
                                                                                     class="flex items-center gap-2 p-2 rounded-lg bg-white border border-amber-200 cursor-pointer hover:bg-amber-50 transition-colors"
                                                                                 >
                                                                                     <input
                                                                                         type="radio"
-                                                                                        name="alta-resolve-{rowKey}-{conflict.cardType}"
+                                                                                        name="alta-resolve-{rowKey}-{conflict.mediaKey}"
                                                                                         checked={conflict.resolution ===
                                                                                             "convert_to_reposicion"}
                                                                                         onchange={() => {
@@ -1377,25 +1316,24 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                                             a
                                                                                             Reposición
                                                                                         </p>
-                                                                                        <p
-                                                                                            class="text-[10px] text-slate-500"
-                                                                                        >
-                                                                                            Crear
-                                                                                            ticket
-                                                                                            de
-                                                                                            reposición
-                                                                                            para
-                                                                                            {conflict.cardType}
-                                                                                        </p>
-                                                                                    </div>
-                                                                                </label>
-                                                                                {/if}
-                                                                                <label
+                                                                                         <p
+                                                                                             class="text-[10px] text-slate-500"
+                                                                                         >
+                                                                                             Crear
+                                                                                             ticket
+                                                                                             de
+                                                                                             reposición
+                                                                                             para
+                                                                                             {conflict.mediaName}
+                                                                                         </p>
+                                                                                     </div>
+                                                                                 </label>
+                                                                                 <label
                                                                                     class="flex items-center gap-2 p-2 rounded-lg bg-white border border-amber-200 cursor-pointer hover:bg-amber-50 transition-colors"
                                                                                 >
                                                                                     <input
                                                                                         type="radio"
-                                                                                        name="alta-resolve-{rowKey}-{conflict.cardType}"
+                                                                                        name="alta-resolve-{rowKey}-{conflict.mediaKey}"
                                                                                         checked={conflict.resolution ===
                                                                                             "proceed"}
                                                                                         onchange={() => {
@@ -1543,11 +1481,21 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
 
                                                             <!-- Cambios de pisos/accesos -->
                                                             {#if analysis.floorChanges}
-                                                                {#if analysis.floorChanges.p2000}
-                                                                    {@const fc =
-                                                                        analysis
-                                                                            .floorChanges
-                                                                            .p2000}
+                                                                {#each Object.entries(analysis.floorChanges) as [key, fc]}
+                                                                    {@const isAccesses =
+                                                                        key ===
+                                                                        "accesses"}
+                                                                    {@const mediaLabel =
+                                                                        activeMediaTypes(
+                                                                            mediaTypes,
+                                                                        )
+                                                                            .find(
+                                                                                (m) =>
+                                                                                    m.key ===
+                                                                                    key,
+                                                                            )
+                                                                            ?.name ??
+                                                                        key}
                                                                     {#if fc.added.length > 0 || fc.removed.length > 0}
                                                                         <div
                                                                             class="rounded-lg bg-amber-50/50 border border-amber-100 p-3 space-y-1.5"
@@ -1555,11 +1503,9 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                             <p
                                                                                 class="text-[10px] font-bold text-amber-700 uppercase tracking-widest flex items-center gap-1.5"
                                                                             >
-                                                                                P2000
-                                                                                —
-                                                                                Cambio
-                                                                                de
-                                                                                Pisos
+                                                                                {isAccesses
+                                                                                    ? "Accesos Especiales"
+                                                                                    : `${mediaLabel} — Cambio de Pisos`}
                                                                             </p>
                                                                             {#if fc.added.length > 0}
                                                                                 <p
@@ -1595,112 +1541,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                             {/if}
                                                                         </div>
                                                                     {/if}
-                                                                {/if}
-
-                                                                {#if analysis.floorChanges.kone}
-                                                                    {@const fc =
-                                                                        analysis
-                                                                            .floorChanges
-                                                                            .kone}
-                                                                    {#if fc.added.length > 0 || fc.removed.length > 0}
-                                                                        <div
-                                                                            class="rounded-lg bg-amber-50/50 border border-amber-100 p-3 space-y-1.5"
-                                                                        >
-                                                                            <p
-                                                                                class="text-[10px] font-bold text-amber-700 uppercase tracking-widest flex items-center gap-1.5"
-                                                                            >
-                                                                                KONE
-                                                                                —
-                                                                                Cambio
-                                                                                de
-                                                                                Pisos
-                                                                            </p>
-                                                                            {#if fc.added.length > 0}
-                                                                                <p
-                                                                                    class="text-[11px] text-emerald-600 flex items-center gap-1"
-                                                                                >
-                                                                                    <span
-                                                                                        class="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center text-[9px] font-bold"
-                                                                                    >
-                                                                                        +
-                                                                                    </span>
-                                                                                    Se
-                                                                                    añadirán:
-                                                                                    {fc.added.join(
-                                                                                        ", ",
-                                                                                    )}
-                                                                                </p>
-                                                                            {/if}
-                                                                            {#if fc.removed.length > 0}
-                                                                                <p
-                                                                                    class="text-[11px] text-rose-600 flex items-center gap-1"
-                                                                                >
-                                                                                    <span
-                                                                                        class="w-4 h-4 rounded-full bg-rose-100 flex items-center justify-center text-[9px] font-bold"
-                                                                                    >
-                                                                                        −
-                                                                                    </span>
-                                                                                    Se
-                                                                                    quitarán:
-                                                                                    {fc.removed.join(
-                                                                                        ", ",
-                                                                                    )}
-                                                                                </p>
-                                                                            {/if}
-                                                                        </div>
-                                                                    {/if}
-                                                                {/if}
-
-                                                                {#if analysis.floorChanges.accesses}
-                                                                    {@const fc =
-                                                                        analysis
-                                                                            .floorChanges
-                                                                            .accesses}
-                                                                    {#if fc.added.length > 0 || fc.removed.length > 0}
-                                                                        <div
-                                                                            class="rounded-lg bg-amber-50/50 border border-amber-100 p-3 space-y-1.5"
-                                                                        >
-                                                                            <p
-                                                                                class="text-[10px] font-bold text-amber-700 uppercase tracking-widest flex items-center gap-1.5"
-                                                                            >
-                                                                                Accesos
-                                                                                Especiales
-                                                                            </p>
-                                                                            {#if fc.added.length > 0}
-                                                                                <p
-                                                                                    class="text-[11px] text-emerald-600 flex items-center gap-1"
-                                                                                >
-                                                                                    <span
-                                                                                        class="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center text-[9px] font-bold"
-                                                                                    >
-                                                                                        +
-                                                                                    </span>
-                                                                                    Se
-                                                                                    añadirán:
-                                                                                    {fc.added.join(
-                                                                                        ", ",
-                                                                                    )}
-                                                                                </p>
-                                                                            {/if}
-                                                                            {#if fc.removed.length > 0}
-                                                                                <p
-                                                                                    class="text-[11px] text-rose-600 flex items-center gap-1"
-                                                                                >
-                                                                                    <span
-                                                                                        class="w-4 h-4 rounded-full bg-rose-100 flex items-center justify-center text-[9px] font-bold"
-                                                                                    >
-                                                                                        −
-                                                                                    </span>
-                                                                                    Se
-                                                                                    quitarán:
-                                                                                    {fc.removed.join(
-                                                                                        ", ",
-                                                                                    )}
-                                                                                </p>
-                                                                            {/if}
-                                                                        </div>
-                                                                    {/if}
-                                                                {/if}
+                                                                {/each}
                                                             {/if}
 
                                                             <!-- Acción global -->
@@ -1760,7 +1601,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         </div>
 
                                                         <!-- ── TYPE: ALTAS (NUEVA / SIN CONFLICTOS) ── -->
-                                                    {:else if reviewSheetTab === "altas" || reviewSheetTab === "altas_accesspro"}
+                                                    {:else if reviewSheetTab === "altas"}
                                                         {@const requestedCards =
                                                             getRequestedCards(
                                                                 row.fields,
@@ -1866,7 +1707,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         {/if}
 
                                                         <!-- ── TYPE: BAJA ── -->
-                                                    {:else if reviewSheetTab === "baja_persona" || reviewSheetTab === "baja_accesspro"}
+                                                    {:else if reviewSheetTab === "baja_persona"}
                                                         <div
                                                             class="rounded-lg bg-rose-50 border border-rose-100 p-3 space-y-1"
                                                         >
@@ -1897,14 +1738,10 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         </div>
 
                                                         <!-- ── TYPE: REPOSICIÓN ── -->
-                                                    {:else if reviewSheetTab === "reposicion" || reviewSheetTab === "reposicion_accesspro"}
+                                                    {:else if reviewSheetTab === "reposicion"}
                                                         {@const repoCards =
                                                             getReposicionCards(
                                                                 row.fields,
-                                                                reviewSheetTab ===
-                                                                    "reposicion_accesspro"
-                                                                    ? "AccessPRO"
-                                                                    : undefined,
                                                             )}
                                                         {#if repoCards.length > 0}
                                                             <div
@@ -1956,11 +1793,11 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         {/if}
 
                                                         <!-- ── TYPE: REPORTE DE FALLA ── -->
-                                                    {:else if reviewSheetTab === "reporte_falla" || reviewSheetTab === "reporte_falla_accesspro"}
+                                                    {:else if reviewSheetTab === "reporte_falla"}
                                                         <div
                                                             class="rounded-lg bg-violet-50 border border-violet-100 p-3 space-y-1"
                                                         >
-                                                            {#if row.fields.tipo_tarjeta || reviewSheetTab === "reporte_falla_accesspro"}
+                                                            {#if row.fields.tipo_tarjeta}
                                                                 <p
                                                                     class="text-xs text-violet-700"
                                                                 >
@@ -1968,11 +1805,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                         class="font-semibold"
                                                                         >Tarjeta:</span
                                                                     >
-                                                                    {reviewSheetTab ===
-                                                                    "reporte_falla_accesspro"
-                                                                        ? "AccessPRO"
-                                                                        : row.fields
-                                                                              .tipo_tarjeta}
+                                                                    {row.fields.tipo_tarjeta}
                                                                     {row.fields
                                                                         .folio
                                                                         ? `(${row.fields.folio})`
@@ -2017,7 +1850,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                             {/if}
                                                         </div>
                                                     {/if}                                                    <!-- ── MATCH RESULTS (only for types WITHOUT smart analysis) ── -->
-                                                    {#if !(reviewSheetTab === "altas") && !(reviewSheetTab === "altas_accesspro") && !(reviewSheetTab === "modificaciones" && modAnalyses.has(rowKey))}
+                                                    {#if !(reviewSheetTab === "altas") && !(reviewSheetTab === "modificaciones" && modAnalyses.has(rowKey))}
                                                         {#if matches.length > 0}
                                                             <div
                                                                 class="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3"
@@ -2267,7 +2100,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                             .nombres}</strong
                                                                     >" en la base de
                                                                     datos.
-                                                                    {#if reviewSheetTab === "altas" || reviewSheetTab === "altas_accesspro"}
+                                                                    {#if reviewSheetTab === "altas"}
                                                                         Se creará
                                                                         como persona
                                                                         nueva al

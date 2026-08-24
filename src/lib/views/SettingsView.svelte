@@ -1,9 +1,9 @@
 <script lang="ts">
-    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection } from "../components";
+    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection, ExportDropdown } from "../components";
     import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard } from "lucide-svelte";
     import { userState, catalogState, settingsState } from "../stores";
     import { networkStore } from "../stores/network.svelte";
-    import { generateRequestTemplate, generateKoneUsageTemplate, generateAccessProTemplate, handleError } from "../utils";
+    import { generateMediaTemplate, generateKoneUsageTemplate, handleError } from "../utils";
     import { toast } from "svelte-sonner";
 
     let activeTab = $state<"catalogos" | "usuarios" | "responsiva">("catalogos");
@@ -54,13 +54,26 @@
 
     let isGeneratingTemplate = $state(false);
     let isGeneratingKoneTemplate = $state(false);
-    let isGeneratingAccessProTemplate = $state(false);
+
+    // Medios activos seleccionados para incluir en la plantilla (por defecto: todos)
+    let selectedMediaKeys = $state<string[]>([]);
+    $effect(() => {
+        const active = mediaTypes.filter((m) => m.active !== false).map((m) => m.key);
+        if (selectedMediaKeys.length === 0 && active.length > 0) selectedMediaKeys = active;
+    });
+
+    function toggleMedia(key: string) {
+        selectedMediaKeys = selectedMediaKeys.includes(key)
+            ? selectedMediaKeys.filter((k) => k !== key)
+            : [...selectedMediaKeys, key];
+    }
 
     async function handleGenerateTemplate() {
         isGeneratingTemplate = true;
         const loadingToast = toast.loading("Generando plantilla...");
         try {
-            await generateRequestTemplate({ buildings: buildings as any[], dependencies: dependencies as any[], specialAccesses: specialAccesses as any[], schedules: schedules as any[], mediaTypes: mediaTypes as any[] });
+            const selected = mediaTypes.filter((m) => selectedMediaKeys.includes(m.key));
+            await generateMediaTemplate({ buildings: buildings as any[], dependencies: dependencies as any[], specialAccesses: specialAccesses as any[], schedules: schedules as any[], mediaTypes: selected as any[] });
             toast.success("Plantilla generada correctamente", { id: loadingToast });
         } catch (e) {
             toast.dismiss(loadingToast);
@@ -81,20 +94,6 @@
             handleError(e, "Generar Plantilla KONE");
         } finally {
             isGeneratingKoneTemplate = false;
-        }
-    }
-
-    async function handleGenerateAccessProTemplate() {
-        isGeneratingAccessProTemplate = true;
-        const loadingToast = toast.loading("Generando plantilla de AccessPRO...");
-        try {
-            await generateAccessProTemplate({ buildings: buildings as any[], dependencies: dependencies as any[], specialAccesses: specialAccesses as any[], schedules: schedules as any[], mediaTypes: mediaTypes as any[] });
-            toast.success("Plantilla generada correctamente", { id: loadingToast });
-        } catch (e) {
-            toast.dismiss(loadingToast);
-            handleError(e, "Generar Plantilla AccessPRO");
-        } finally {
-            isGeneratingAccessProTemplate = false;
         }
     }
 
@@ -140,20 +139,46 @@
             </nav>
             <div class="p-4 border-t border-slate-100/60">
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-3">Herramientas</p>
-                <button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-                    onclick={handleGenerateTemplate} disabled={isGeneratingTemplate || !networkStore.isOnline}>
-                    <FileDown size={18} strokeWidth={2.5} class="text-emerald-500" />
-                    {isGeneratingTemplate ? "Generando..." : "Plantilla de Solicitudes"}
-                </button>
+                <ExportDropdown
+                    icon={FileDown}
+                    label={isGeneratingTemplate ? "Generando..." : "Plantilla de Solicitudes"}
+                    disabled={isGeneratingTemplate || !networkStore.isOnline}
+                    menuWidth="w-72"
+                >
+                    {#snippet items()}
+                        <div class="p-3 space-y-1">
+                            <p class="px-1 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                Medios a incluir
+                            </p>
+                            {#each mediaTypes.filter((m) => m.active !== false) as m}
+                                <label class="flex items-center gap-2.5 px-1 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm font-semibold text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        class="accent-emerald-600 w-4 h-4"
+                                        checked={selectedMediaKeys.includes(m.key)}
+                                        onchange={() => toggleMedia(m.key)}
+                                    />
+                                    <span>{m.name || m.key}</span>
+                                </label>
+                            {/each}
+                            {#if mediaTypes.filter((m) => m.active !== false).length === 0}
+                                <p class="px-1 py-2 text-xs text-slate-400">No hay medios configurados.</p>
+                            {/if}
+                            <button
+                                class="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                                onclick={handleGenerateTemplate}
+                                disabled={isGeneratingTemplate || selectedMediaKeys.length === 0}
+                            >
+                                <FileDown size={16} />
+                                Descargar plantilla
+                            </button>
+                        </div>
+                    {/snippet}
+                </ExportDropdown>
                 <button class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
                     onclick={handleGenerateKoneTemplate} disabled={isGeneratingKoneTemplate || !networkStore.isOnline}>
                     <FileDown size={18} strokeWidth={2.5} class="text-sky-500" />
                     {isGeneratingKoneTemplate ? "Generando..." : "Plantilla de Uso KONE"}
-                </button>
-                <button class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-                    onclick={handleGenerateAccessProTemplate} disabled={isGeneratingAccessProTemplate || !networkStore.isOnline}>
-                    <FileDown size={18} strokeWidth={2.5} class="text-emerald-500" />
-                    {isGeneratingAccessProTemplate ? "Generando..." : "Plantilla AccessPRO"}
                 </button>
             </div>
         </Card>

@@ -4,47 +4,35 @@
  * Analiza conflictos entre lo solicitado en una fila de la plantilla
  * de importación y lo que la persona coincidente ya tiene en el sistema.
  *
- * ─── ALTAS ─────────────────────────────────────────────────
- * Detecta si la persona ya tiene una tarjeta P2000/KONE activa
- * y sugiere resoluciones: skip_card, convert_to_reposicion, proceed.
- *
- * ─── MODIFICACIONES ─────────────────────────────────────────
- * Compara campo por campo los datos actuales vs. los propuestos
- * y detecta qué campos cambiarían realmente.
+ * Es agnóstico a los medios: itera sobre el catálogo de medios (`mediaTypes`)
+ * y deriva las claves de columnas del contrato (`<key>_req`, `pisos_<key>`,
+ * `accion_<key>`, `reponer_<key>`, `<key>_folio`) de `mediaContract`.
  */
 
 import type { Person } from "../types";
 import { floorsForKey } from "../services/accessAssignments";
+import { activeMediaTypes, type MediaInfo } from "./mediaContract";
 
 // ─── Types ──────────────────────────────────────────────────
 
-/** Acción de resolución para un conflicto de tarjeta en ALTAS */
 export type CardConflictAction = "proceed" | "skip_card" | "convert_to_reposicion";
 
-/** Análisis individual por tipo de tarjeta (ALTAS) */
 export interface AltaCardConflict {
-    cardType: "P2000" | "KONE" | "AccessPRO";
-    /** Si la persona solicitó esta tarjeta en la plantilla */
+    mediaKey: string;
+    mediaName: string;
+    has_floors: boolean;
     requested: boolean;
-    /** Si la persona ya tiene una tarjeta de este tipo activa */
     hasCard: boolean;
-    /** Folio de la tarjeta existente (si aplica) */
     existingFolio?: string;
-    /** ID de la tarjeta existente (si aplica) */
     existingCardId?: string;
-    /** Estado de la tarjeta existente */
     existingStatus?: string;
-    /** Pisos solicitados en la plantilla para esta tarjeta */
-    requestedFloors?: string;
-    /** true si hay conflicto (solicitada pero ya existe) */
+    /** Pisos (medio con pisos) o folio (medio sin pisos) solicitados. */
+    requestedValue?: string;
     conflict: boolean;
-    /** Descripción legible del conflicto */
     description: string;
-    /** Resolución elegida por el usuario */
     resolution: CardConflictAction;
 }
 
-/** Análisis completo para una fila de ALTAS */
 export interface AltaConflictAnalysis {
     type: "altas";
     rowKey: string;
@@ -53,39 +41,37 @@ export interface AltaConflictAnalysis {
     hasConflicts: boolean;
 }
 
-/** Cambio de campo individual (MODIFICACIONES) */
 export interface ModificacionFieldChange {
     field: string;
     label: string;
-    /** Valor actual en BD */
     currentValue: string;
-    /** Valor propuesto en la plantilla */
     newValue: string;
-    /** true si el valor realmente cambia */
     changed: boolean;
 }
 
-/** Resolución para una modificación */
 export type ModificacionResolution = "apply" | "reject" | null;
 
-/** Análisis completo para una fila de MODIFICACIONES */
+export interface FloorChange {
+    added: string[];
+    removed: string[];
+    kept: string[];
+}
+
 export interface ModificacionConflictAnalysis {
     type: "modificaciones";
     rowKey: string;
     person: Person;
     changes: ModificacionFieldChange[];
-    /** Cambios de pisos/accesos (derivados) */
-    floorChanges?: {
-        p2000?: { added: string[]; removed: string[]; kept: string[] };
-        kone?: { added: string[]; removed: string[]; kept: string[] };
-        accesses?: { added: string[]; removed: string[]; kept: string[] };
-    };
+    /**
+     * Cambios de pisos por clave de medio (solo medios con pisos), más la clave
+     * especial `accesses` para los accesos especiales cuando `accion_acc` está
+     * presente.
+     */
+    floorChanges?: Record<string, FloorChange>;
     hasChanges: boolean;
-    /** Resolución elegida */
     resolution: ModificacionResolution;
 }
 
-/** Unión de todos los análisis posibles */
 export type RowAnalysis = AltaConflictAnalysis | ModificacionConflictAnalysis;
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -93,15 +79,13 @@ export type RowAnalysis = AltaConflictAnalysis | ModificacionConflictAnalysis;
 const YES_VALUES = ["sí", "si"];
 
 /**
- * Detecta si una fila de alta solicita tarjeta AccessPRO.
- * Puede ser explícito (columna accesspro_req = sí) o implícito
- * (la hoja ALTAS ACCESSPRO solo pide el folio de la tarjeta).
+ * Detecta si una fila solicita un medio concreto (hoja ALTAS).
+ * Para medios SIN pisos, un folio relleno también implica solicitud.
  */
-export function wantsAccessProCard(fields: Record<string, string>): boolean {
-    return (
-        YES_VALUES.includes((fields.accesspro_req ?? "").toLowerCase()) ||
-        (fields.folio_accesspro ?? "").trim().length > 0
-    );
+export function wantsCard(fields: Record<string, string>, media: MediaInfo): boolean {
+    if (YES_VALUES.includes((fields[`${media.key}_req`] ?? "").toLowerCase())) return true;
+    if (!media.has_floors && (fields[`${media.key}_folio`] ?? "").trim().length > 0) return true;
+    return false;
 }
 
 function parseFloors(floorsStr: string | null | undefined): string[] {
@@ -116,94 +100,50 @@ function parseFloors(floorsStr: string | null | undefined): string[] {
 // ─── Alta Analysis ──────────────────────────────────────────
 
 /**
- * Analiza conflictos entre lo que se solicita en la fila de ALTAS
- * y lo que la persona coincidente ya tiene.
+ * Analiza conflictos entre lo que se solicita en la fila de ALTAS y lo que la
+ * persona coincidente ya tiene, para cada medio activo del catálogo.
  *
- * @param onlyTypes Si se pasa, solo se analizan esos tipos de tarjeta
- * (útil para la hoja ALTAS ACCESSPRO, que solo solicita AccessPRO).
+ * @param onlyKeys Si se pasa, solo se analizan esas claves de medio.
  */
 export function analyzeAltaConflicts(
     rowKey: string,
     person: Person,
     fields: Record<string, string>,
-    onlyTypes?: Array<"P2000" | "KONE" | "AccessPRO">,
+    mediaTypes?: any[],
+    onlyKeys?: string[],
 ): AltaConflictAnalysis {
+    const medias = activeMediaTypes(mediaTypes);
     const activeCards = (person.cards ?? []).filter((c) => c.status === "active");
-
-    const wantsP2000 = YES_VALUES.includes((fields.p2000_req ?? "").toLowerCase());
-    const wantsKONE = YES_VALUES.includes((fields.kone_req ?? "").toLowerCase());
-    // En la hoja ALTAS ACCESSPRO la tarjeta se solicita SIEMPRE
-    // (la hoja está dedicada a ese tipo); el folio es opcional.
-    const wantsAccessPro = onlyTypes?.includes("AccessPRO")
-        ? true
-        : wantsAccessProCard(fields);
-
-    const p2000Card = activeCards.find((c) => c.type === "P2000");
-    const koneCard = activeCards.find((c) => c.type === "KONE");
-    const accessproCard = activeCards.find((c) => c.type === "AccessPRO");
 
     const conflicts: AltaCardConflict[] = [];
 
-    // P2000 analysis
-    if (!onlyTypes || onlyTypes.includes("P2000")) {
-        const hasP2000Conflict = wantsP2000 && !!p2000Card;
-        conflicts.push({
-            cardType: "P2000",
-            requested: wantsP2000,
-            hasCard: !!p2000Card,
-            existingFolio: p2000Card?.folio,
-            existingCardId: p2000Card?.id,
-            existingStatus: p2000Card?.status,
-            requestedFloors: fields.pisos_p2000,
-            conflict: hasP2000Conflict,
-            description: hasP2000Conflict
-                ? `Ya tiene P2000 activa (${p2000Card!.folio})`
-                : wantsP2000
-                  ? "No tiene P2000 — sin conflicto"
-                  : "No solicitó P2000",
-            resolution: hasP2000Conflict ? "skip_card" : "proceed",
-        });
-    }
+    for (const media of medias) {
+        if (onlyKeys && !onlyKeys.includes(media.key)) continue;
 
-    // KONE analysis
-    if (!onlyTypes || onlyTypes.includes("KONE")) {
-        const hasKONEConflict = wantsKONE && !!koneCard;
-        conflicts.push({
-            cardType: "KONE",
-            requested: wantsKONE,
-            hasCard: !!koneCard,
-            existingFolio: koneCard?.folio,
-            existingCardId: koneCard?.id,
-            existingStatus: koneCard?.status,
-            requestedFloors: fields.pisos_kone,
-            conflict: hasKONEConflict,
-            description: hasKONEConflict
-                ? `Ya tiene KONE activa (${koneCard!.folio})`
-                : wantsKONE
-                  ? "No tiene KONE — sin conflicto"
-                  : "No solicitó KONE",
-            resolution: hasKONEConflict ? "skip_card" : "proceed",
-        });
-    }
+        const requested = wantsCard(fields, media);
+        const requestedValue = media.has_floors
+            ? fields[`pisos_${media.key}`]
+            : fields[`${media.key}_folio`];
+        const existing = activeCards.find((c) => c.type === media.name);
+        const conflict = requested && !!existing;
 
-    // AccessPRO analysis
-    if (!onlyTypes || onlyTypes.includes("AccessPRO")) {
-        const hasAccessProConflict = wantsAccessPro && !!accessproCard;
         conflicts.push({
-            cardType: "AccessPRO",
-            requested: wantsAccessPro,
-            hasCard: !!accessproCard,
-            existingFolio: accessproCard?.folio,
-            existingCardId: accessproCard?.id,
-            existingStatus: accessproCard?.status,
-            requestedFloors: fields.folio_accesspro,
-            conflict: hasAccessProConflict,
-            description: hasAccessProConflict
-                ? `Ya tiene AccessPRO activa (${accessproCard!.folio})`
-                : wantsAccessPro
-                  ? "No tiene AccessPRO — sin conflicto"
-                  : "No solicitó AccessPRO",
-            resolution: hasAccessProConflict ? "skip_card" : "proceed",
+            mediaKey: media.key,
+            mediaName: media.name,
+            has_floors: media.has_floors,
+            requested,
+            hasCard: !!existing,
+            existingFolio: existing?.folio,
+            existingCardId: existing?.id,
+            existingStatus: existing?.status,
+            requestedValue,
+            conflict,
+            description: conflict
+                ? `Ya tiene ${media.name} activa (${existing!.folio})`
+                : requested
+                  ? `No tiene ${media.name} — sin conflicto`
+                  : `No solicitó ${media.name}`,
+            resolution: conflict ? "skip_card" : "proceed",
         });
     }
 
@@ -219,17 +159,17 @@ export function analyzeAltaConflicts(
 // ─── Modificación Analysis ──────────────────────────────────
 
 /**
- * Analiza los cambios solicitados en una fila de MODIFICACIONES
- * comparándolos con los datos actuales de la persona.
+ * Analiza los cambios solicitados en una fila de MODIFICACIONES comparándolos
+ * con los datos actuales de la persona, incluyendo pisos por medio con pisos.
  */
 export function analyzeModificacionConflicts(
     rowKey: string,
     person: Person,
     fields: Record<string, string>,
+    mediaTypes?: any[],
 ): ModificacionConflictAnalysis {
     const changes: ModificacionFieldChange[] = [];
 
-    // Campos básicos de persona
     const fieldMap: [string, string, keyof Person | undefined][] = [
         ["nuevo_apellido", "Apellidos", "last_name"],
         ["nuevo_nombre", "Nombres", "first_name"],
@@ -257,7 +197,6 @@ export function analyzeModificacionConflicts(
         }
     }
 
-    // Horario
     if (fields.hora_entrada?.trim()) {
         const currentEntry = person.schedule?.entry || "—";
         changes.push({
@@ -279,25 +218,21 @@ export function analyzeModificacionConflicts(
         });
     }
 
-    // Análisis de pisos / accesos
-    const floorChanges: ModificacionConflictAnalysis["floorChanges"] = {};
+    // Pisos por medio con pisos + accesos especiales
+    const floorChanges: Record<string, FloorChange> = {};
+    const addFloorChange = (groupKey: string, current: string[], requested: string[]) => {
+        floorChanges[groupKey] = {
+            added: requested.filter((f) => !current.includes(f)),
+            removed: current.filter((f) => !requested.includes(f)),
+            kept: requested.filter((f) => current.includes(f)),
+        };
+    };
 
-    if (fields.accion_p2000) {
-        const currentFloors = floorsForKey(person.floors, "p2000");
-        const requestedFloors = parseFloors(fields.pisos_p2000);
-        const added = requestedFloors.filter((f) => !currentFloors.includes(f));
-        const removed = currentFloors.filter((f) => !requestedFloors.includes(f));
-        const kept = requestedFloors.filter((f) => currentFloors.includes(f));
-        floorChanges.p2000 = { added, removed, kept };
-    }
-
-    if (fields.accion_kone) {
-        const currentFloors = floorsForKey(person.floors, "kone");
-        const requestedFloors = parseFloors(fields.pisos_kone);
-        const added = requestedFloors.filter((f) => !currentFloors.includes(f));
-        const removed = currentFloors.filter((f) => !requestedFloors.includes(f));
-        const kept = requestedFloors.filter((f) => currentFloors.includes(f));
-        floorChanges.kone = { added, removed, kept };
+    const medias = activeMediaTypes(mediaTypes).filter((m) => m.has_floors);
+    for (const media of medias) {
+        if (fields[`accion_${media.key}`]) {
+            addFloorChange(media.key, floorsForKey(person.floors, media.key), parseFloors(fields[`pisos_${media.key}`]));
+        }
     }
 
     if (fields.accion_acc) {
@@ -305,11 +240,12 @@ export function analyzeModificacionConflicts(
         const requestedAccesses = [fields.acceso1, fields.acceso2, fields.acceso3]
             .map((s) => s?.trim())
             .filter(Boolean);
-        const added = requestedAccesses.filter((a) => !currentAccesses.includes(a));
-        const removed = currentAccesses.filter((a) => !requestedAccesses.includes(a));
-        const kept = requestedAccesses.filter((a) => currentAccesses.includes(a));
-        floorChanges.accesses = { added, removed, kept };
+        addFloorChange("accesses", currentAccesses, requestedAccesses);
     }
+
+    const anyFloorChange = Object.values(floorChanges).some(
+        (f) => f.added.length > 0 || f.removed.length > 0,
+    );
 
     return {
         type: "modificaciones",
@@ -317,13 +253,7 @@ export function analyzeModificacionConflicts(
         person,
         changes,
         floorChanges: Object.keys(floorChanges).length > 0 ? floorChanges : undefined,
-        hasChanges: changes.some((c) => c.changed) ||
-            !!floorChanges.p2000?.added.length ||
-            !!floorChanges.p2000?.removed.length ||
-            !!floorChanges.kone?.added.length ||
-            !!floorChanges.kone?.removed.length ||
-            !!floorChanges.accesses?.added.length ||
-            !!floorChanges.accesses?.removed.length,
+        hasChanges: changes.some((c) => c.changed) || anyFloorChange,
         resolution: null,
     };
 }
