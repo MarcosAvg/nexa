@@ -345,20 +345,8 @@ export const cardService = {
             }
 
             if (isNewAssignment) {
-                // El ticket de Programación solo aplica a medios que la requieren.
-                if (needsProgramming) {
-                    const { ticketService } = await import("./tickets");
-                    await ticketService.create({
-                        type: "Programación",
-                        description: replacementOptions
-                            ? `Reponer tarjeta ${data.type} (Folio anterior dado de baja/liberado). Nuevo folio: ${data.folio}`
-                            : `Programar acceso para tarjeta ${data.type} folio ${data.folio}`,
-                        priority: "alta",
-                        person_id: data.person_id,
-                        access_media_id: cardId,
-                        title: `Programación: ${data.folio}`,
-                    });
-                }
+                // El ticket de "Programación" lo crea el trigger
+                // (handle_access_media_ticket_effects) al asignar la persona.
 
                 if (data.person_id) {
                     const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", data.person_id).single();
@@ -378,24 +366,11 @@ export const cardService = {
 
     async updateProgrammingStatus(cardId: string, status: string | null) {
         return withErrorHandling(async () => {
-            const { data: media } = await supabase.from("access_media")
-                .select("identifier, responsiva_status, person_id, access_media_types(name)")
-                .eq("id", cardId).single();
-
             const { error } = await supabase.from("access_media")
                 .update({ programming_status: status }).eq("id", cardId);
             if (error) throw error;
-
-            if (status === "done" && media && media.responsiva_status !== "signed" && media.person_id) {
-                const typeName = mediaTypeName(media);
-                const { ticketService } = await import("./tickets");
-                await ticketService.create({
-                    type: "Firma Responsiva",
-                    description: `Firma de responsiva para tarjeta ${typeName} folio ${media.identifier}`,
-                    priority: "media", person_id: media.person_id, access_media_id: cardId,
-                    title: `Firma: ${media.identifier}`
-                });
-            }
+            // El ticket "Firma Responsiva" se crea/limpia en la BD vía trigger
+            // (handle_access_media_ticket_effects).
         }, "Update Programming Status");
     },
 
@@ -404,11 +379,7 @@ export const cardService = {
             const { error } = await supabase.from("access_media")
                 .update({ responsiva_status: status }).eq("id", cardId);
             if (error) throw error;
-
-            if (status === "signed") {
-                const { ticketService } = await import("./tickets");
-                await ticketService.deleteByCard(cardId, ["Firma Responsiva"], "Ticket completado/atendido");
-            }
+            // El trigger limpia los tickets "Firma Responsiva" al firmar.
         }, "Update Responsiva Status");
     },
 
