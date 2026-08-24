@@ -8,7 +8,8 @@
     import DataTable from "../DataTable.svelte";
     import DeleteConfirmTypedModal from "../DeleteConfirmTypedModal.svelte";
     import CatalogSectionHeader from "./CatalogSectionHeader.svelte";
-    import { Plus, Edit2, Trash2, Key, GripVertical } from "lucide-svelte";
+    import CatalogRowActions from "./CatalogRowActions.svelte";
+    import { Plus, Key } from "lucide-svelte";
 
     /**
      * AccessCatalog — Gestión de accesos especiales (CRUD).
@@ -165,17 +166,7 @@
     >
         {#snippet actions(row: any)}
             {#if canEdit}
-                <div class="flex justify-end gap-1">
-                    <span class="p-1.5 text-slate-300 group-hover:text-slate-400 cursor-grab transition-colors" title="Arrastrar para reordenar" aria-hidden="true">
-                        <GripVertical size={16} />
-                    </span>
-                    <button class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" onclick={() => openModal(row)} title="Editar acceso especial" aria-label="Editar acceso especial">
-                        <Edit2 size={16} />
-                    </button>
-                    <button class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" onclick={() => openDeleteModal(row)} title="Eliminar acceso especial" aria-label="Eliminar acceso especial">
-                        <Trash2 size={16} />
-                    </button>
-                </div>
+                <CatalogRowActions onEdit={() => openModal(row)} onDelete={() => openDeleteModal(row)} />
             {/if}
         {/snippet}
     </DataTable>

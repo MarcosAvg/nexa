@@ -9,7 +9,9 @@
     import Badge from "../Badge.svelte";
     import DeleteConfirmTypedModal from "../DeleteConfirmTypedModal.svelte";
     import CatalogSectionHeader from "./CatalogSectionHeader.svelte";
-    import { Plus, Edit2, Trash2, CreditCard, GripVertical, Layers, Power, Palette } from "lucide-svelte";
+    import CatalogRowActions from "./CatalogRowActions.svelte";
+    import { useCatalogReorder } from "./useCatalogReorder.svelte";
+    import { Plus, CreditCard, Layers, Power, Palette } from "lucide-svelte";
     import { MEDIA_COLOR_OPTIONS } from "../../utils/mediaTypeAppearance";
 
     /**
@@ -44,8 +46,13 @@
         return map;
     });
 
-    // Estado de reordenamiento (evita clics consecutivos en vuelo)
-    let isReordering = $state(false);
+    // Reordenamiento con actualización optimista y rollback
+    const { isReordering, handleDrop } = useCatalogReorder({
+        table: "access_media_types",
+        getItems: () => mediaTypes,
+        setItems: (items: any[]) => catalogState.setMediaTypes(items),
+        fetchFn: fetchMediaTypes,
+    });
 
     // Add/Edit modal state
     let isModalOpen = $state(false);
@@ -83,28 +90,6 @@
         mediaBuildings = mediaBuildings.includes(bid)
             ? mediaBuildings.filter((b) => b !== bid)
             : [...mediaBuildings, bid];
-    }
-
-    /** Mueve un elemento de la posición `from` a la posición `to` y persiste el orden. */
-    async function handleDrop(from: number, to: number) {
-        if (isReordering || from === to) return;
-        const next = [...mediaTypes];
-        const [item] = next.splice(from, 1);
-        next.splice(to, 0, item);
-        isReordering = true;
-        // Actualización optimista: los desplegables reflejan el nuevo orden al instante
-        catalogState.setMediaTypes(
-            next,
-        );
-        try {
-            await catalogService.reorderCatalog("access_media_types", next);
-            toast.success("Orden actualizado");
-        } catch {
-            toast.error("Error al actualizar el orden");
-            await fetchMediaTypes();
-        } finally {
-            isReordering = false;
-        }
     }
 
     function openModal(type?: any) {
@@ -236,17 +221,7 @@
     >
         {#snippet actions(row: any)}
             {#if canEdit}
-                <div class="flex justify-end gap-1">
-                    <span class="p-1.5 text-slate-300 group-hover:text-slate-400 cursor-grab transition-colors" title="Arrastrar para reordenar" aria-hidden="true">
-                        <GripVertical size={16} />
-                    </span>
-                    <button class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" onclick={() => openModal(row)} title="Editar medio de acceso" aria-label="Editar medio de acceso">
-                        <Edit2 size={16} />
-                    </button>
-                    <button class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" onclick={() => openDeleteModal(row)} title="Eliminar medio de acceso" aria-label="Eliminar medio de acceso">
-                        <Trash2 size={16} />
-                    </button>
-                </div>
+                <CatalogRowActions onEdit={() => openModal(row)} onDelete={() => openDeleteModal(row)} />
             {/if}
         {/snippet}
     </DataTable>
