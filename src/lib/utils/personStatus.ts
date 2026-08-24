@@ -52,7 +52,7 @@ export function computePersonStatus(
         if (coreReadyTypes.size > 0) return "Parcial";
         // Solo tipos sin pisos y asignados → Activa
         if (!hasCoreCards && hasActiveNonCore) return "Activo/a";
-        if (allCards.length > 0) return "Bloqueado/a";
+        // Alineado con personnel_with_status: con tarjetas core pero 0 listas → Sin Acceso.
         return "Sin Acceso";
     }
     if (dbStatus === "blocked") return "Bloqueado/a";
