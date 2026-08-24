@@ -382,7 +382,7 @@
             { id: "Responsivas", label: "Firmas de Responsiva" },
         ]}
         active={currentSection}
-        onSelect={(id) => switchSection(id)}
+        onSelect={(id) => switchSection(id as "General" | "Responsivas")}
     />
 
     <SectionHeader

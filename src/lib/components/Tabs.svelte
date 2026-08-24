@@ -1,5 +1,5 @@
-<script lang="ts">
-    type Props<T extends string> = {
+<script lang="ts" generics="T extends string">
+    type Props = {
         tabs: { id: T; label: string }[];
         active: T;
         onSelect: (id: T) => void;
@@ -13,7 +13,7 @@
         onSelect,
         variant = "underline",
         className = "",
-    }: Props<string> = $props();
+    }: Props = $props();
 </script>
 
 <div
