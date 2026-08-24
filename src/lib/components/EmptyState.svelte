@@ -52,7 +52,7 @@
 
 <div class="flex flex-col items-center justify-center py-20 px-8">
     {#if Icon}
-        <div class="w-20 h-20 rounded-[28px] bg-gradient-to-br {iconBgClass} flex items-center justify-center mb-6 shadow-inner">
+        <div class="w-20 h-20 rounded-2xl bg-gradient-to-br {iconBgClass} flex items-center justify-center mb-6 shadow-inner">
             <Icon size={40} strokeWidth={1.5} />
         </div>
     {/if}

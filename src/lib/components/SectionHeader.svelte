@@ -25,7 +25,7 @@
 </script>
 
 <div
-    class="relative z-30 bg-white/80 backdrop-blur-md p-5 lg:p-7 rounded-[22px] border border-slate-200/50 shadow-sm transition-all duration-300 hover:shadow-md"
+    class="relative z-30 bg-white/80 backdrop-blur-md p-5 lg:p-7 rounded-2xl border border-slate-200/50 shadow-sm transition-all duration-300 hover:shadow-md"
 >
     <div class="flex flex-col gap-4 sm:gap-6">
         <!-- Fila de título con búsqueda y acciones -->

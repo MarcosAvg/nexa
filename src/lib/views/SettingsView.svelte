@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection, ExportDropdown, PlantillasCatalog, ModulesCatalog, Button } from "../components";
+    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection, ExportDropdown, PlantillasCatalog, ModulesCatalog, Button, SectionPill } from "../components";
     import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard, FileText, Puzzle } from "lucide-svelte";
     import { userState, catalogState, settingsState, moduleState } from "../stores";
     import { networkStore } from "../stores/network.svelte";
@@ -252,12 +252,13 @@
             {:else if activeTab === "responsiva"}
                 <!-- Responsiva Settings -->
                 <div class="flex items-center gap-3 pb-4">
-                    <div class="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-indigo-50 text-indigo-700">
-                        <FileSignature size={16} strokeWidth={2.5} />
-                        <span class="text-[13px] font-extrabold">Configuración de Responsiva</span>
-                    </div>
+                    <SectionPill
+                        icon={FileSignature}
+                        label="Configuración de Responsiva"
+                        className="bg-indigo-50 text-indigo-700"
+                    />
                 </div>
-                <Card class="p-8 bg-white border border-slate-200 rounded-[22px] shadow-sm relative overflow-hidden max-w-2xl">
+                <Card class="p-8 bg-white border border-slate-200 rounded-2xl shadow-sm relative overflow-hidden max-w-2xl">
                     <div class="max-w-xl space-y-8">
                         <!-- Descripción -->
                         <div class="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">

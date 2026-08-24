@@ -6,6 +6,7 @@
     import Button from "../components/Button.svelte";
     import Card from "../components/Card.svelte";
     import Input from "../components/Input.svelte";
+    import SectionPill from "../components/SectionPill.svelte";
     import { Save, RotateCcw, Building2, Mail, Phone, Coins } from "lucide-svelte";
 
     let orgName = $state(settingsState.orgName);
@@ -44,13 +45,10 @@
 
 <div class="max-w-2xl">
     <div class="flex items-center gap-3 pb-4">
-        <div class="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-slate-100 text-slate-700">
-            <Building2 size={16} strokeWidth={2.5} />
-            <span class="text-[13px] font-extrabold">Configuración General</span>
-        </div>
+        <SectionPill icon={Building2} label="Configuración General" className="bg-slate-100 text-slate-700" />
     </div>
 
-    <Card class="p-8 bg-white border border-slate-200 rounded-[22px] shadow-sm space-y-8">
+    <Card class="p-8 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-8">
         <div class="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
             <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
                 <Building2 size={20} strokeWidth={2.5} />

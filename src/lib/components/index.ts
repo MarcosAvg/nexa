@@ -20,6 +20,7 @@ export { default as FilterGroup } from './FilterGroup.svelte';
 export { default as FilterSelect } from './FilterSelect.svelte';
 export { default as ToggleGroup } from './ToggleGroup.svelte';
 export { default as SectionHeader } from './SectionHeader.svelte';
+export { default as SectionPill } from './SectionPill.svelte';
 
 // ─── Data Display ──────────────────────────────────────────
 export { default as DataTable } from './DataTable.svelte';

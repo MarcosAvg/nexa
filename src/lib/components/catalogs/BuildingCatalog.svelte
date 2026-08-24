@@ -243,7 +243,7 @@
         {#each buildings as building, i}
             <div
                 role="listitem"
-                class="group p-6 border border-slate-200/50 rounded-[24px] bg-white/40 hover:bg-white transition-all duration-500 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden {canEdit && !isReordering ? 'cursor-grab active:cursor-grabbing' : ''} {draggingIndex === i ? 'opacity-40' : ''} {draggingIndex !== null && dragOverIndex === i && draggingIndex !== i ? 'ring-2 ring-blue-400 border-blue-200 scale-[1.02]' : ''}"
+                class="group p-6 border border-slate-200/50 rounded-2xl bg-white/40 hover:bg-white transition-all duration-500 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden {canEdit && !isReordering ? 'cursor-grab active:cursor-grabbing' : ''} {draggingIndex === i ? 'opacity-40' : ''} {draggingIndex !== null && dragOverIndex === i && draggingIndex !== i ? 'ring-2 ring-blue-400 border-blue-200 scale-[1.02]' : ''}"
                 draggable={canEdit && !isReordering}
                 ondragstart={(e) => buildingDragStart(e, i)}
                 ondragover={(e) => buildingDragOver(e, i)}

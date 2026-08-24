@@ -221,7 +221,7 @@
         <div class="grid lg:grid-cols-3 gap-6">
             {#each [1, 2, 3, 4, 5] as _}
                 <Card
-                    class="p-8 border border-slate-200/50 bg-white/50 backdrop-blur-md rounded-[22px]"
+                    class="p-8 border border-slate-200/50 bg-white/50 backdrop-blur-md rounded-2xl"
                 >
                     <div class="animate-pulse space-y-4">
                         <div class="h-5 bg-slate-200 rounded w-1/3"></div>
@@ -235,7 +235,7 @@
     {:else if metrics.totalPersonnel > 0}                <!-- Fila 1: Estado + Cobertura + Calidad de datos -->
         <div class="grid lg:grid-cols-3 gap-6">                    <!-- Distribución de estados -->
             <Card
-                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-[22px]"
+                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
             >
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
@@ -293,7 +293,7 @@
                 </div>
             </Card>                    <!-- Cobertura de tarjetas + Stock -->
             <Card
-                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-[22px]"
+                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
             >
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
@@ -371,7 +371,7 @@
                 </div>
             </Card>                    <!-- Calidad de datos -->
             <Card
-                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-[22px]"
+                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
             >
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
@@ -453,7 +453,7 @@
         </div>                <!-- Fila 2: Dependencias (2/3) + Edificios (1/3) -->
         <div class="grid lg:grid-cols-3 gap-6">                    <!-- Dependencias -->
             <Card
-                class="lg:col-span-2 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-[22px]"
+                class="lg:col-span-2 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
             >
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
@@ -531,7 +531,7 @@
                 </div>
             </Card>                    <!-- Edificios -->
             <Card
-                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-[22px]"
+                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
             >
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
@@ -603,7 +603,7 @@
         </div>
     {:else}
         <Card
-            class="p-12 text-center border border-slate-200/50 bg-white/50 backdrop-blur-md rounded-[22px]"
+            class="p-12 text-center border border-slate-200/50 bg-white/50 backdrop-blur-md rounded-2xl"
         >
             <div class="text-slate-400 italic">Cargando métricas...</div>
         </Card>
