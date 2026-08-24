@@ -219,7 +219,6 @@ export interface AccessMedia {
     person_id: string | null;
     programming_status: string;
     responsiva_status: string;
-    metadata: Record<string, unknown>;
     created_at: string;
     updated_at: string;
     // Propiedades de join
