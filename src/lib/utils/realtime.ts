@@ -1,5 +1,6 @@
 import { supabase } from "../supabase";
 import { networkStore } from "../stores/network.svelte";
+import { catalogState } from "../stores/catalogs.svelte";
 
 let globalRealtimeStarted = false;
 let channelRef: ReturnType<typeof supabase.channel> | null = null;
@@ -10,7 +11,6 @@ const MAX_DELAY_MS = 30000; // 30 seconds
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 let isReconnecting = false;
 
-// Referencias a los listeners para poder limpiarlos en destroy
 let onlineListener: (() => void) | null = null;
 let offlineListener: (() => void) | null = null;
 
@@ -24,11 +24,6 @@ function logSubscribeStatus(channelName: string, status: string, err?: Error) {
     }
 }
 
-/**
- * Calcula el delay de reconexión con exponential backoff + jitter.
- * Fórmula: min(BASE * 2^attempt, MAX) * (0.5 + random * 0.5)
- * Esto distribuye los reintentos evitando el "thundering herd" effect.
- */
 function getReconnectDelay(): number {
     const exponential = Math.min(
         BASE_DELAY_MS * Math.pow(2, reconnectAttempts),
@@ -71,7 +66,6 @@ function reconnect(channelName: string) {
 
     console.log(`[Realtime] ${channelName}: Reintentando conexión...`);
 
-    // Limpiar el canal anterior si existe
     if (channelRef) {
         try {
             supabase.removeChannel(channelRef);
@@ -81,7 +75,6 @@ function reconnect(channelName: string) {
         channelRef = null;
     }
 
-    // Crear nueva suscripción
     const newChannel = createChannel(channelName);
     if (newChannel) {
         channelRef = newChannel;
@@ -90,33 +83,79 @@ function reconnect(channelName: string) {
     }
 }
 
+/** Refresca una colección de catálogo tras un cambio. */
+async function refreshCatalog(table: string) {
+    try {
+        const { catalogService } = await import("../services/catalogs");
+        if (table === "dependencies") {
+            catalogState.setDependencies(await catalogService.fetchDependencies());
+        } else if (table === "buildings") {
+            catalogState.setBuildings(await catalogService.fetchBuildings());
+        } else if (table === "special_accesses") {
+            catalogState.setSpecialAccesses(await catalogService.fetchAccesses());
+        } else if (table === "schedules") {
+            catalogState.setSchedules(await catalogService.fetchSchedules());
+        } else if (table === "access_media_types") {
+            catalogState.setMediaTypes(await catalogService.fetchMediaTypes());
+        } else if (table === "floors") {
+            // Los pisos viajan dentro de buildings; recargar buildings para reflejarlos.
+            catalogState.setBuildings(await catalogService.fetchBuildings());
+        }
+    } catch (e) {
+        console.warn("[Realtime] No se pudo refrescar catálogo:", e);
+    }
+}
+
+/** Refresca un store de listado tras un cambio. */
+async function refreshStore(storeName: string) {
+    try {
+        if (storeName === "tickets") {
+            const { ticketState } = await import("../stores/tickets.svelte");
+            await ticketState.refresh();
+        } else if (storeName === "access_media" || storeName === "access_assignments") {
+            const { cardState } = await import("../stores/cards.svelte");
+            await cardState.refresh();
+        } else if (storeName === "cardless_registry") {
+            const { cardlessRegistryState } = await import("../stores/cardlessRegistry.svelte");
+            await cardlessRegistryState.refresh();
+        }
+    } catch (e) {
+        console.warn("[Realtime] No se pudo refrescar store:", e);
+    }
+}
+
 function createChannel(channelName: string) {
     try {
         const channel = supabase
-            .channel("global-app-data")
-            .on(
-                "postgres_changes",
-                { event: "*", schema: "public", table: "tickets" },
-                (payload) => {
-                    console.log("[Realtime: Tickets]", payload.eventType, payload);
-                },
-            )
-            .on(
-                "postgres_changes",
-                { event: "*", schema: "public", table: "access_media" },
-                (payload) => {
-                    console.log("[Realtime: Access Media]", payload.eventType, payload);
-                },
-            )
-            .on(
-                "postgres_changes",
-                { event: "*", schema: "public", table: "history_logs" },
-                (payload) => {
-                    console.log("[Realtime: history_logs]", payload.eventType, payload);
-                },
-            )
-            .subscribe((status, err) => logSubscribeStatus(channelName, status, err));
+            .channel("global-app-data");
 
+        // Tablas de catálogo → recargar catálogo
+        for (const table of [
+            "dependencies", "buildings", "schedules", "special_accesses",
+            "access_media_types", "floors",
+        ]) {
+            channel.on(
+                "postgres_changes",
+                { event: "*", schema: "public", table },
+                () => { refreshCatalog(table); },
+            );
+        }
+
+        // Stores de listado → refrescar página actual
+        for (const [table, storeName] of [
+            ["tickets", "tickets"],
+            ["access_media", "access_media"],
+            ["access_assignments", "access_assignments"],
+            ["cardless_registry", "cardless_registry"],
+        ] as [string, string][]) {
+            channel.on(
+                "postgres_changes",
+                { event: "*", schema: "public", table },
+                () => { refreshStore(storeName); },
+            );
+        }
+
+        channel.subscribe((status, err) => logSubscribeStatus(channelName, status, err));
         return channel;
     } catch (error) {
         console.error(`[Realtime] Error al crear canal ${channelName}:`, error);
@@ -125,15 +164,12 @@ function createChannel(channelName: string) {
 }
 
 /**
- * Una sola conexión de canales con postgres_changes para tickets, cards e historial.
- * Incluye reconexión automática con exponential backoff y manejo de conectividad.
- *
- * Nota: en el panel de Supabase (Database → Publications) las tablas deben estar
- * en la publicación `supabase_realtime` o no llegará ningún evento.
+ * Suscripción global a cambios de datos (catálogos + listados principales),
+ * con reconexión automática y manejo de conectividad.
+ * Nota: las tablas deben estar en la publicación `supabase_realtime`.
  */
 export function initGlobalRealtime() {
     if (globalRealtimeStarted) {
-        // Si ya se inició pero se perdió la conexión, permitir reconexión
         if (!channelRef && !isReconnecting) {
             scheduleReconnect("global-app-data");
         }
@@ -141,13 +177,11 @@ export function initGlobalRealtime() {
     }
     globalRealtimeStarted = true;
 
-    console.log("[Realtime] Conectando subscripciones globales (tickets, cards, history_logs)...");
+    console.log("[Realtime] Conectando subscripciones globales...");
 
     channelRef = createChannel("global-app-data");
 
-    // Guardar referencias a los listeners para poder limpiarlos después
     const handleOnline = () => {
-        console.log("[Realtime] Detectada conexión restaurada. Reconectando...");
         reconnectAttempts = 0;
         if (reconnectTimeout) {
             clearTimeout(reconnectTimeout);
@@ -157,10 +191,7 @@ export function initGlobalRealtime() {
         reconnect("global-app-data");
     };
 
-    const handleOffline = () => {
-        console.log("[Realtime] Detectada pérdida de conexión. Esperando reconexión...");
-        // No hacemos nada aquí, scheduleReconnect se encargará cuando detecte !networkStore.isOnline
-    };
+    const handleOffline = () => {};
 
     onlineListener = handleOnline;
     offlineListener = handleOffline;
@@ -169,18 +200,12 @@ export function initGlobalRealtime() {
     window.addEventListener("offline", handleOffline);
 }
 
-/**
- * Cierra todas las suscripciones, remueve los event listeners y limpia temporizadores.
- * Útil para logout o cuando se quiere reiniciar manualmente las suscripciones.
- */
 export function destroyGlobalRealtime() {
-    // Limpiar timeout pendiente
     if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
         reconnectTimeout = null;
     }
 
-    // Remover canal de Supabase
     if (channelRef) {
         try {
             supabase.removeChannel(channelRef);
@@ -190,7 +215,6 @@ export function destroyGlobalRealtime() {
         channelRef = null;
     }
 
-    // Remover event listeners de conectividad para evitar memory leaks
     if (onlineListener) {
         window.removeEventListener("online", onlineListener);
         onlineListener = null;
@@ -200,7 +224,6 @@ export function destroyGlobalRealtime() {
         offlineListener = null;
     }
 
-    // Resetear estado global
     globalRealtimeStarted = false;
     reconnectAttempts = 0;
     isReconnecting = false;
