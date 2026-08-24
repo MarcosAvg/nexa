@@ -1279,12 +1279,12 @@
                 {:else if ticketType === "Baja de Persona"}
                     <Button
                         variant="outline"
-                        class="border-rose-200 text-rose-600 hover:bg-rose-50 group"
+                        class="border-slate-200 text-slate-600 hover:bg-slate-50 group"
                         disabled={!selectedPerson}
                         onclick={handleBaja}
                     >
                         <User size={15} class="mr-1.5" />
-                        Revisar perfil
+                        Ver perfil
                         <ArrowRight
                             size={16}
                             class="ml-1.5 group-hover:translate-x-0.5 transition-transform"
@@ -1293,6 +1293,19 @@
 
                     <!-- REPOSICIÓN -->
                 {:else if ticketType === "Reposición"}
+                    <Button
+                        variant="outline"
+                        class="border-slate-200 text-slate-600 hover:bg-slate-50 group"
+                        disabled={!selectedPerson}
+                        onclick={handleViewPersonProfile}
+                    >
+                        <User size={15} class="mr-1.5" />
+                        Ver perfil
+                        <ArrowRight
+                            size={16}
+                            class="ml-1.5 group-hover:translate-x-0.5 transition-transform"
+                        />
+                    </Button>
                     <Button
                         variant="outline"
                         class="border-amber-200 text-amber-600 hover:bg-amber-50 group"
@@ -1312,7 +1325,7 @@
                 {:else if ticketType === "Reporte de Falla"}
                     <Button
                         variant="outline"
-                        class="border-orange-200 text-orange-600 hover:bg-orange-50 group"
+                        class="border-slate-200 text-slate-600 hover:bg-slate-50 group"
                         disabled={!selectedPerson}
                         onclick={handleViewPersonProfile}
                     >
