@@ -154,11 +154,10 @@ export const accessAssignmentService = {
     async savePersonAccess(
         personId: string,
         floorsByBuilding: Record<number, FloorGroups>,
-        specialAccesses: string[],
+        specialAccessIds: number[],
     ): Promise<void> {
         return withErrorHandling(async () => {
-            // Resolver referencias estables por edificio:
-            // floors.label -> floors.id (por edificio) y special_accesses.name -> id + building.
+            // Resolver referencias estables por edificio.
             const { data: allFloors } = await supabase
                 .from("floors")
                 .select("id, label, building_id");
@@ -172,13 +171,10 @@ export const accessAssignmentService = {
 
             const { data: specials } = await supabase
                 .from("special_accesses")
-                .select("id, name, building_id");
-            const specialByName = new Map<string, { id: number; buildingId: number | null }>();
-            for (const s of specials || []) {
-                if (!specialByName.has(s.name)) {
-                    specialByName.set(s.name, { id: s.id, buildingId: s.building_id });
-                }
-            }
+                .select("id, building_id");
+            const specialById = new Map<number, number | null>(
+                (specials || []).map((s) => [s.id, s.building_id]),
+            );
 
             // Relaciones medio-edificio: un medio solo aplica en los edificios asignados.
             const { data: mediaBuildings } = await supabase
@@ -226,20 +222,17 @@ export const accessAssignmentService = {
                 }
 
                 // Accesos especiales: heredan el edificio de su catálogo.
-                // Solo se escriben si el acceso existe en el catálogo.
-                for (const s of specialAccesses) {
-                    if (!s || !s.trim()) continue;
-                    const name = s.trim();
-                    const dedupeKey = name.toLowerCase();
-                    if (seenSpecials.has(dedupeKey)) continue;
-                    seenSpecials.add(dedupeKey);
-                    const sp = specialByName.get(name);
-                    if (!sp) continue; // acceso no catalogado: omitir
+                // Se resuelven por id (sin ambigüedad entre edificios).
+                for (const id of specialAccessIds) {
+                    if (seenSpecials.has(String(id))) continue;
+                    seenSpecials.add(String(id));
+                    const buildingId = specialById.get(id);
+                    if (buildingId === undefined) continue; // acceso no catalogado: omitir
                     rows.push({
                         assignment_id: assignment.id,
                         resource_type: "special_access",
-                        building_id: sp.buildingId ?? 0,
-                        special_access_id: sp.id,
+                        building_id: buildingId ?? 0,
+                        special_access_id: id,
                     });
                 }
 
@@ -310,6 +303,16 @@ export const accessAssignmentService = {
         for (const [bid, groups] of Object.entries(access.floorsByBuilding)) {
             idKeyed[Number(bid)] = floorGroupsToIdMap(groups);
         }
-        await this.savePersonAccess(personId, idKeyed, access.specialAccesses);
+        // access.specialAccesses son nombres; resolver a ids del catálogo.
+        const { data: specials } = await supabase
+            .from("special_accesses")
+            .select("id, name");
+        const idByName = new Map<string, number>(
+            (specials || []).map((s: any) => [s.name, s.id]),
+        );
+        const specialIds = access.specialAccesses
+            .map((n) => idByName.get(n))
+            .filter((id): id is number => id !== undefined);
+        await this.savePersonAccess(personId, idKeyed, specialIds);
     },
 };

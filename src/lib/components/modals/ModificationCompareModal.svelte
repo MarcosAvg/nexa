@@ -205,6 +205,12 @@
                 (modifiedData as any).specialAccesses ??
                 (modifiedData as any).special_accesses ??
                 [];
+            // Convertir nombres de accesos especiales a ids del catálogo.
+            const specialAccessIds: number[] = [];
+            for (const n of specialAccesses as string[]) {
+                const id = catalogState.specialAccesses.find((s) => s.name === n)?.id;
+                if (id !== undefined) specialAccessIds.push(Number(id));
+            }
             const typeMap: Record<string, string[]> = {};
             for (const m of catalogState.mediaTypes) {
                 if ((m as any).active === false) continue;
@@ -216,7 +222,7 @@
                 id: currentPerson.id,
                 ...modifiedData,
                 floorsByBuilding: { [baseBid]: typeMap },
-                specialAccesses,
+                specialAccesses: specialAccessIds,
             };
 
             await personnelService.save(saveData);

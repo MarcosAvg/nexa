@@ -324,7 +324,7 @@ export const personnelService = {
         scheduleId?: string;
         entry_time?: string | null;
         exit_time?: string | null;
-        specialAccesses?: string[];
+        specialAccesses?: number[];
         special_accesses?: string[];
         status?: string;
         cards?: any[];
@@ -380,7 +380,18 @@ export const personnelService = {
             // Reconciliar permisos (pisos + accesos especiales) directamente sobre
             // el modelo nuevo, sin depender de columnas legacy ni triggers.
             const { accessAssignmentService } = await import("./accessAssignments");
-            const specialAccesses = data.specialAccesses || data.special_accesses || [];
+            let specialAccesses: number[];
+            if (Array.isArray(data.specialAccesses)) {
+                specialAccesses = data.specialAccesses;
+            } else {
+                // fallback: nombres legacy -> ids del catálogo
+                const names = (data.special_accesses || []) as string[];
+                const { data: rows } = await supabase
+                    .from("special_accesses")
+                    .select("id, name");
+                const idByName = new Map((rows || []).map((r: any) => [r.name, r.id]));
+                specialAccesses = names.map((n) => idByName.get(n)).filter((id): id is number => id !== undefined);
+            }
             const floorsByBuilding = (data as any).floorsByBuilding || {};
             await accessAssignmentService.savePersonAccess(
                 String(personId),

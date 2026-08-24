@@ -97,7 +97,7 @@
     let horaEntrada = $state("08:00");
     let horaSalida = $state("17:00");
     let email = $state("");
-    let accesosEspeciales = $state<string[]>([]);
+    let accesosEspeciales = $state<number[]>([]);
     let tarjetasAsignadas = $state<{ type: string; folio: string }[]>([]);
 
     // Estado del modal anidado
@@ -166,12 +166,12 @@
             delete next[bid];
             floorsByBuilding = next;
             selectedBuildings = selectedBuildings.filter((b) => b !== bid);
-            const keepNames = new Set(
-                catalogState.specialAccesses
-                    .filter((a) => selectedBuildings.includes(Number(a.building_id)))
-                    .map((a) => a.name),
+            const removedIds = new Set(
+                availableSpecialAccesses
+                    .filter((a) => Number((a as any).building_id) === bid)
+                    .map((a) => Number(a.id)),
             );
-            accesosEspeciales = accesosEspeciales.filter((n) => keepNames.has(n));
+            accesosEspeciales = accesosEspeciales.filter((id) => !removedIds.has(id));
         } else {
             selectedBuildings = [...selectedBuildings, bid];
         }
@@ -205,11 +205,39 @@
         });
     });
 
-    /** Opciones de accesos especiales de un edificio (del catálogo). */
-    function specialOptionsFor(bid: number): string[] {
+    /** Opciones de accesos especiales de un edificio: id + nombre (para mostrar). */
+    function specialOptionsFor(bid: number): { id: number; name: string }[] {
         return availableSpecialAccesses
             .filter((a) => Number((a as any).building_id) === bid)
-            .map((a) => a.name);
+            .map((a) => ({ id: Number(a.id), name: a.name }));
+    }
+
+    /** Nombres de accesos especiales seleccionados pertenecientes a un edificio. */
+    function selectedSpecialNames(bid: number): string[] {
+        const opts = specialOptionsFor(bid);
+        return accesosEspeciales
+            .filter((id) => opts.some((o) => o.id === id))
+            .map((id) => opts.find((o) => o.id === id)!.name);
+    }
+
+    /** Actualiza la selección de accesos especiales por edificio (nombres → ids). */
+    function onSpecialChange(bid: number, names: string[]) {
+        const opts = specialOptionsFor(bid);
+        const otherIds = accesosEspeciales.filter((id) => !opts.some((o) => o.id === id));
+        const newIds = names
+            .map((n) => opts.find((o) => o.name === n)?.id)
+            .filter((id): id is number => id !== undefined);
+        accesosEspeciales = [...otherIds, ...newIds];
+    }
+
+    /** Convierte nombres de accesos especiales a sus ids (para prefill/import). */
+    function namesToSpecialIds(names: string[]): number[] {
+        const ids: number[] = [];
+        for (const n of names) {
+            const id = catalogState.specialAccesses.find((s) => s.name === n)?.id;
+            if (id !== undefined) ids.push(Number(id));
+        }
+        return ids;
     }
 
     // Al cambiar de edificio, reiniciar solo el piso base (los pisos asignados
@@ -306,7 +334,7 @@
                 ]),
             ];
             if (access.specialAccesses.length > 0) {
-                accesosEspeciales = access.specialAccesses;
+                accesosEspeciales = namesToSpecialIds(access.specialAccesses);
             }
         } catch {
             // No crítico: se mantienen los valores cargados
@@ -345,7 +373,7 @@
                 }
 
                 email = editingPerson.email || "";
-                accesosEspeciales = [...(editingPerson.specialAccesses || [])];
+                accesosEspeciales = namesToSpecialIds(editingPerson.specialAccesses || []);
                 tarjetasAsignadas = [...(editingPerson.cards || [])];
 
                 // Si también tenemos precarga (vinculando ticket de Alta), sobrescribir datos solicitados
@@ -415,7 +443,7 @@
                         prefill.specialAccesses &&
                         prefill.specialAccesses.length > 0
                     ) {
-                        accesosEspeciales = [...prefill.specialAccesses];
+                        accesosEspeciales = namesToSpecialIds(prefill.specialAccesses);
                     } else if (prefill.specialAccesses) {
                         accesosEspeciales = [];
                     }
@@ -487,7 +515,7 @@
                           },
                       }
                     : {};
-                accesosEspeciales = prefill.specialAccesses ?? [];
+                accesosEspeciales = namesToSpecialIds(prefill.specialAccesses ?? []);
                 tarjetasAsignadas = prefill.folioAccessPro
                     ? [{ type: "AccessPRO", folio: prefill.folioAccessPro }]
                     : [];
@@ -986,8 +1014,9 @@
                                     {#if specialOptionsFor(bid).length > 0}
                                         <ToggleGroup
                                             label="Accesos Especiales"
-                                            options={specialOptionsFor(bid)}
-                                            bind:value={accesosEspeciales}
+                                            options={specialOptionsFor(bid).map((o) => o.name)}
+                                            value={selectedSpecialNames(bid)}
+                                            onchange={(v) => onSpecialChange(bid, v)}
                                         />
                                     {/if}
                                 </div>
