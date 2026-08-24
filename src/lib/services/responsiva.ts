@@ -57,7 +57,9 @@ export async function fetchLegalText(typeOrMediaTypeId: string): Promise<string[
         // Fallback abajo
     }
     const key = (typeOrMediaTypeId || "").toUpperCase();
-    const typeKey = key === "P2000" ? "P2000" : key === "ACCESSPRO" ? "AccessPRO" : "KONE";
+    const typeKey =
+        Object.keys(RESPONSIVA_LEGAL_TEXTS).find((k) => k.toUpperCase() === key) ||
+        "KONE";
     return RESPONSIVA_LEGAL_TEXTS[typeKey as keyof typeof RESPONSIVA_LEGAL_TEXTS];
 }
 

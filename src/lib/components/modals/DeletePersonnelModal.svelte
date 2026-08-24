@@ -3,6 +3,7 @@
     import Button from "../Button.svelte";
     import { AlertTriangle, Trash2, RotateCcw } from "lucide-svelte";
     import type { Person } from "../../types";
+    import { mediaTypeBarClasses } from "../../utils/mediaTypeAppearance";
 
     let {
         /** Controla la visibilidad del modal (two-way bindable). */
@@ -100,10 +101,7 @@
                         >
                             <div class="flex items-center gap-3">
                                 <div
-                                    class="px-2 py-1 rounded text-[10px] font-bold uppercase {card.type ===
-                                    'P2000'
-                                        ? 'bg-amber-100 text-amber-700'
-                                        : 'bg-sky-100 text-sky-700'}"
+                                    class="px-2 py-1 rounded text-[10px] font-bold uppercase {mediaTypeBarClasses(card.type).badge}"
                                 >
                                     {card.type}
                                 </div>

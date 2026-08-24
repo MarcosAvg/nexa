@@ -66,7 +66,7 @@ function cardlessPersonLabel(reg: CardlessRegistryExportRow): { name: string; fi
     return { name, firstName, lastName, employeeNo: reg.employee_no || '' };
 }
 
-async function fetchKoneResponsivaSignDates(): Promise<Map<string, string>> {
+async function fetchResponsivaSignDates(mediaKey: string): Promise<Map<string, string>> {
     const { supabase } = await import('../supabase');
     const signMap = new Map<string, string>();
 
@@ -76,7 +76,7 @@ async function fetchKoneResponsivaSignDates(): Promise<Map<string, string>> {
                 const { data, error } = await supabase
                     .from('signed_documents')
                     .select('person_id, created_at, document_templates!inner(access_media_types!inner(key))')
-                    .eq('document_templates.access_media_types.key', 'kone')
+                    .eq('document_templates.access_media_types.key', mediaKey)
                     .order('created_at', { ascending: false })
                     .range(from, to);
                 return { data, error };
@@ -400,7 +400,8 @@ async function addCardlessEvidenceSheet(
 async function addCardlessReincidenceSheet(
     workbook: ExcelJSTypes.Workbook,
     data: CardlessRegistryExportRow[],
-    filterDescription: string
+    filterDescription: string,
+    mediaLabel: string
 ) {
     const ws = workbook.addWorksheet('Reincidencia');
 
@@ -488,7 +489,7 @@ async function addCardlessReincidenceSheet(
         { label: 'REINCIDENCIA', range: 'H4:J4', colors: COLORS.rose, endCols: [10] },
         { label: 'HISTORIAL', range: 'K4:L4', colors: COLORS.sky, endCols: [12] },
         { label: 'OPERADORES', range: 'M4:M4', colors: COLORS.violet, endCols: [13] },
-        { label: 'TARJETA KONE', range: 'N4:O4', colors: COLORS.emerald, endCols: [15] },
+        { label: `TARJETA ${mediaLabel}`, range: 'N4:O4', colors: COLORS.emerald, endCols: [15] },
     ];
 
     groups.forEach((group) => {
@@ -521,7 +522,7 @@ async function addCardlessReincidenceSheet(
         { label: 'PRIMER REGISTRO', group: groups[4], col: 11 },
         { label: 'ÚLTIMO REGISTRO', group: groups[4], col: 12 },
         { label: 'OPERADORES', group: groups[5], col: 13 },
-        { label: 'TARJETA KONE', group: groups[6], col: 14 },
+        { label: `TARJETA ${mediaLabel}`, group: groups[6], col: 14 },
         { label: 'FECHA ENTREGA', group: groups[6], col: 15 },
     ];
     const groupEndCols = new Set(groups.flatMap((g) => g.endCols));
@@ -684,23 +685,28 @@ async function addCardlessReincidenceSheet(
 export async function exportCardlessRegistryToExcel(
     data: CardlessRegistryExportRow[],
     filters?: CardlessRegistryExportFilters,
-    returnBuffer?: false
+    returnBuffer?: false,
+    mediaKey?: string
 ): Promise<void>;
 export async function exportCardlessRegistryToExcel(
     data: CardlessRegistryExportRow[],
     filters: CardlessRegistryExportFilters | undefined,
-    returnBuffer: true
+    returnBuffer: true,
+    mediaKey?: string
 ): Promise<{ buffer: ArrayBuffer; filename: string }>;
 export async function exportCardlessRegistryToExcel(
     data: CardlessRegistryExportRow[],
     filters?: CardlessRegistryExportFilters,
-    returnBuffer?: boolean
+    returnBuffer?: boolean,
+    mediaKey = 'kone'
 ): Promise<void | { buffer: ArrayBuffer; filename: string }> {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
         import('file-saver')
     ]);
     const workbook = new (ExcelJSModule.default || ExcelJSModule).Workbook();
+
+    const mediaLabel = mediaKey === 'kone' ? 'KONE' : mediaKey.toUpperCase();
 
     const COLORS = {
         title: 'FF1E293B',
@@ -723,14 +729,14 @@ export async function exportCardlessRegistryToExcel(
     if (filters?.search) filterParts.push(`Búsqueda: "${filters.search}"`);
     const filterDescription = filterParts.length ? `  |  ${filterParts.join('  |  ')}` : '';
 
-    const signDateMap = await fetchKoneResponsivaSignDates();
+    const signDateMap = await fetchResponsivaSignDates(mediaKey);
     const enrichedData: CardlessRegistryExportRow[] = data.map(row => ({
         ...row,
         koneResponsivaSignedAt: row.person_id ? (signDateMap.get(row.person_id) ?? null) : null,
     }));
 
     await addCardlessEvidenceSheet(workbook, enrichedData, filterDescription);
-    await addCardlessReincidenceSheet(workbook, enrichedData, filterDescription);
+    await addCardlessReincidenceSheet(workbook, enrichedData, filterDescription, mediaLabel);
 
     // Hoja 3: Detalle
     const worksheet = workbook.addWorksheet('Detalle');
@@ -799,7 +805,7 @@ export async function exportCardlessRegistryToExcel(
     const headerLabels = [
         'VÍNCULO', 'NOMBRES', 'APELLIDOS', '# EMPLEADO',
         'DEPENDENCIA', 'EDIFICIO', 'PISO BASE', 'MOTIVO',
-        'COMENTARIOS', 'FECHA / HORA', 'REGISTRADO POR', 'TARJETA KONE', 'FECHA ENTREGA',
+        'COMENTARIOS', 'FECHA / HORA', 'REGISTRADO POR', `TARJETA ${mediaLabel}`, 'FECHA ENTREGA',
     ];
 
     const groupEnds = new Set(groups.map((g) => g.endCol));

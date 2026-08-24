@@ -584,6 +584,7 @@
                 matchResults,
                 selectedRows,
                 totalSelected,
+                mediaTypes,
             };
             await exportConflictReportToExcel(input);
             toast.success("Reporte exportado correctamente");

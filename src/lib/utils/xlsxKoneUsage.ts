@@ -255,12 +255,14 @@ export function getDuplicateFoliosSummary(duplicates: DuplicateFolioInfo[]): str
 // ─────────────────────────────────────────
 
 /**
- * Looks up KONE cards by folio in the database, joining personnel data.
- * Returns matched entries with full person data and unmatched entries.
- * Handles Supabase 1000-record limit and chunks large folio lists.
+ * Busca tarjetas por folio en la base de datos para un medio (por defecto el
+ * de elevadores KONE), uniendo datos del personal.
+ * Devuelve entradas coincidentes con datos completos y las no coincidentes.
+ * Fragmenta los folios por el límite de Supabase (1000 registros).
  */
 export async function matchKoneUsageToPersonnel(
-    entries: KoneUsageEntry[]
+    entries: KoneUsageEntry[],
+    mediaKey: string = 'kone'
 ): Promise<KoneUsageMatchResult> {
     if (entries.length === 0) {
         return { matched: [], unmatched: [], totalImported: 0 };
@@ -291,7 +293,7 @@ export async function matchKoneUsageToPersonnel(
                     const { data, error } = await supabase
                         .from('access_media')
                         .select(`
-                            id, identifier, status, person_id, access_media_types ( name ),
+                            id, identifier, status, person_id, access_media_types ( name, key ),
                             personnel (
                                 id, first_name, last_name, employee_no, email, area, position, floor, status,
                                 buildings ( name ),
@@ -302,7 +304,7 @@ export async function matchKoneUsageToPersonnel(
                                 entry_time, exit_time
                             )
                         `)
-                        .eq('access_media_types.name', 'KONE')
+                        .eq('access_media_types.key', mediaKey)
                         .in('identifier', chunk)
                         .range(from, to);
                     return { data, error };

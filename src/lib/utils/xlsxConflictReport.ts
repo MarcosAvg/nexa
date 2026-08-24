@@ -26,6 +26,7 @@ import {
 } from './xlsxShared';
 import type { ImportParseResult } from './xlsxImporter';
 import type { AltaConflictAnalysis, ModificacionConflictAnalysis, FloorChange } from './matchAnalysis';
+import { activeMediaTypes, type MediaInfo } from './mediaContract';
 
 // ─────────────────────────────────────────
 // Paleta local (formato { bg, fg } que esperan addKpiCard, addTableHeader, addTableRow)
@@ -67,6 +68,41 @@ const C = {
 };
 
 // ─────────────────────────────────────────
+// Helpers de columnas y paleta cíclica de medios
+// ─────────────────────────────────────────
+
+/** Convierte un índice de columna 1-based (A→1) a letra(s) de columna (A, B, ..., Z, AA, ...). */
+const colKey = (n: number): string => {
+    let s = '';
+    let x = n;
+    while (x > 0) {
+        const r = (x - 1) % 26;
+        s = String.fromCharCode(65 + r) + s;
+        x = Math.floor((x - 1) / 26);
+    }
+    return s;
+};
+
+type GroupColor = { head: string; sub: string; fill: string };
+
+/** Normaliza un color de grupo a { head, sub, fill }, aceptando también el formato { bg, fg }. */
+const toGroup = (g: { head: string; sub: string; fill: string } | { bg: string; fg: string }): GroupColor =>
+    'head' in g ? g : { head: g.bg, sub: g.fg, fill: g.bg };
+
+/** Paleta cíclica de colores para los super-encabezados por medio (se repite si hay más medios). */
+const MEDIA_GROUP_COLORS: GroupColor[] = [
+    toGroup(C.p2000Group),
+    toGroup(C.koneGroup),
+    toGroup(C.amber),
+    toGroup(C.sky),
+    toGroup(C.emerald),
+    toGroup(C.blue),
+    toGroup(C.violet),
+    toGroup(C.rose),
+    toGroup(C.slate),
+];
+
+// ─────────────────────────────────────────
 // Tipos de entrada para el reporte
 // ─────────────────────────────────────────
 
@@ -77,6 +113,8 @@ export interface ConflictReportInput {
     matchResults: Map<string, PersonSimplified[]>;
     selectedRows: Set<string>;
     totalSelected: number;
+    /** Catálogo de medios activos; define las columnas por medio. */
+    mediaTypes?: any[];
 }
 
 interface PersonSimplified {
@@ -104,6 +142,10 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     const totalNoMatch = [...input.matchResults.values()].filter((v) => v.length === 0).length;
     const totalConflicts = [...input.altaAnalyses.values()].filter((a) => a.hasConflicts).length;
     const resolutionsMap = buildResolutionsSummary(input);
+
+    // Fuente de verdad de medios: define las columnas de tarjeta (ALTAS) y de pisos (MODIFICACIONES).
+    const medias: MediaInfo[] = activeMediaTypes(input.mediaTypes);
+    const mediasConPisos = medias.filter((m) => m.has_floors);
 
     // ════════════════════════════════════════════════
     // HOJA 1: RESUMEN
@@ -169,30 +211,38 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     // HOJA 2: ALTAS — CONFLICTOS POR PERSONA
     // ════════════════════════════════════════════════
     // Diseño: super-encabezados agrupados + sub-encabezados
-    // Grupos: # | PERSONA | P2000 | KONE | CONFLICTOS
+    // Grupos: # | PERSONA | <medio>×N | DETALLE
+    const mediaStartCol = 5;
+    const detailCol = mediaStartCol + medias.length * 3;
     const wsAltas = workbook.addWorksheet('ALTAS - Conflictos');
     wsAltas.columns = [
         { width: 5 },   // A: #
         { width: 24 },  // B: Persona
         { width: 22 },  // C: Dependencia
         { width: 22 },  // D: Edificio
-        { width: 14 },  // E: P2000 Solicitó
-        { width: 18 },  // F: P2000 Tiene
-        { width: 14 },  // G: P2000 Conflicto
-        { width: 14 },  // H: KONE Solicitó
-        { width: 18 },  // I: KONE Tiene
-        { width: 14 },  // J: KONE Conflicto
-        { width: 24 },  // K: Conflictos detectados
+        ...medias.map(() => ({ width: 14 })), // SOLICITÓ
+        ...medias.map(() => ({ width: 18 })), // TIENE
+        ...medias.map(() => ({ width: 14 })), // CONFLICTO
+        { width: 24 },  // DETALLE
     ];
-    const LAST_A = 'K';
-    const ALTA_GROUPS = [
+    const LAST_A = colKey(detailCol);
+    const altaMediaBaseIdx = 2; // índice del primer grupo de medio en ALTA_GROUPS
+    const ALTA_GROUPS: { label: string; range: string; colors: GroupColor; endCol: number }[] = [
         { label: '#', range: 'A4:A4', colors: C.altasGroup, endCol: 1 },
         { label: 'PERSONA', range: 'B4:D4', colors: C.altasGroup, endCol: 4 },
-        { label: 'P2000', range: 'E4:G4', colors: C.p2000Group, endCol: 7 },
-        { label: 'KONE', range: 'H4:J4', colors: C.koneGroup, endCol: 10 },
-        { label: 'CONFLICTOS', range: 'K4:K4', colors: C.altasGroup, endCol: 11 },
+        ...medias.map((m, i) => {
+            const start = mediaStartCol + i * 3;
+            return {
+                label: m.name.toUpperCase(),
+                range: `${colKey(start)}4:${colKey(start + 2)}4`,
+                colors: MEDIA_GROUP_COLORS[i % MEDIA_GROUP_COLORS.length],
+                endCol: start + 2,
+            };
+        }),
+        { label: 'DETALLE', range: `${colKey(detailCol)}4:${colKey(detailCol)}4`, colors: C.altasGroup, endCol: detailCol },
     ];
     const ALTA_GROUP_END_COLS = new Set(ALTA_GROUPS.map((g) => g.endCol));
+    const altaDetailGroup = ALTA_GROUPS[ALTA_GROUPS.length - 1];
 
     await addTitleAndMetaRow({
         worksheet: wsAltas,
@@ -225,13 +275,16 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
         { label: 'PERSONA', group: ALTA_GROUPS[1], col: 2 },
         { label: 'DEPENDENCIA', group: ALTA_GROUPS[1], col: 3 },
         { label: 'EDIFICIO', group: ALTA_GROUPS[1], col: 4 },
-        { label: 'SOLICITÓ', group: ALTA_GROUPS[2], col: 5 },
-        { label: 'TIENE', group: ALTA_GROUPS[2], col: 6 },
-        { label: 'CONFLICTO', group: ALTA_GROUPS[2], col: 7 },
-        { label: 'SOLICITÓ', group: ALTA_GROUPS[3], col: 8 },
-        { label: 'TIENE', group: ALTA_GROUPS[3], col: 9 },
-        { label: 'CONFLICTO', group: ALTA_GROUPS[3], col: 10 },
-        { label: 'DETALLE', group: ALTA_GROUPS[4], col: 11 },
+        ...medias.flatMap((_, i) => {
+            const base = mediaStartCol + i * 3;
+            const group = ALTA_GROUPS[altaMediaBaseIdx + i];
+            return [
+                { label: 'SOLICITÓ', group, col: base },
+                { label: 'TIENE', group, col: base + 1 },
+                { label: 'CONFLICTO', group, col: base + 2 },
+            ];
+        }),
+        { label: 'DETALLE', group: altaDetailGroup, col: detailCol },
     ];
 
     const subRowAltas = wsAltas.getRow(5);
@@ -276,31 +329,35 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
             r.getCell(4).value = person?.building || rowData.fields.edificio || '';
 
             if (analysis) {
-                // P2000
-                const p2000 = analysis.conflicts.find(c => c.mediaName === 'P2000');
-                r.getCell(5).value = p2000?.requested ? 'Sí' : 'No';
-                r.getCell(6).value = p2000?.existingFolio || (p2000?.hasCard ? 'Sí' : '—');
-                r.getCell(7).value = p2000?.conflict ? '⚠ Conflicto' : '✓ OK';
-
-                // KONE
-                const kone = analysis.conflicts.find(c => c.mediaName === 'KONE');
-                r.getCell(8).value = kone?.requested ? 'Sí' : 'No';
-                r.getCell(9).value = kone?.existingFolio || (kone?.hasCard ? 'Sí' : '—');
-                r.getCell(10).value = kone?.conflict ? '⚠ Conflicto' : '✓ OK';
+                // Por cada medio (dinámico): SOLICITÓ | TIENE | CONFLICTO
+                medias.forEach((m, i) => {
+                    const conflict = analysis.conflicts.find((x) => x.mediaName === m.name);
+                    const base = mediaStartCol + i * 3;
+                    if (conflict) {
+                        r.getCell(base).value = conflict.requested ? 'Sí' : 'No';
+                        r.getCell(base + 1).value = conflict.existingFolio || (conflict.hasCard ? 'Sí' : '—');
+                        r.getCell(base + 2).value = conflict.conflict ? '⚠ Conflicto' : '✓ OK';
+                    } else {
+                        // Medio no analizado
+                        r.getCell(base).value = '—';
+                        r.getCell(base + 1).value = '—';
+                        r.getCell(base + 2).value = '—';
+                    }
+                });
             } else {
                 // Sin análisis (persona no encontrada en BD)
-                r.getCell(5).value = '—';
-                r.getCell(6).value = '—';
-                r.getCell(7).value = '⚠';
-                r.getCell(8).value = '—';
-                r.getCell(9).value = '—';
-                r.getCell(10).value = '⚠';
-                r.getCell(11).value = 'Persona nueva — sin conflictos';
+                medias.forEach((_, i) => {
+                    const base = mediaStartCol + i * 3;
+                    r.getCell(base).value = '—';
+                    r.getCell(base + 1).value = '—';
+                    r.getCell(base + 2).value = '—';
+                });
+                r.getCell(detailCol).value = 'Persona nueva — sin conflictos';
             }
 
             // Styling: cada celda toma el fill de su GRUPO (como en xlsxExport)
             // + badges especiales para columnas de conflicto/match
-            for (let c = 1; c <= 11; c++) {
+            for (let c = 1; c <= detailCol; c++) {
                 const cell = r.getCell(c);
                 const subEntry = altaSubHeaders.find((s) => s.col === c);
                 const grp = subEntry?.group ?? ALTA_GROUPS[0];
@@ -312,7 +369,7 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 cell.font = { name: 'Arial', size: 9, color: { argb: C.black } };
                 cell.alignment = {
                     vertical: 'middle',
-                    horizontal: [1, 5, 6, 7, 8, 9, 10].includes(c) ? 'center' : 'left',
+                    horizontal: c === 1 || (c >= mediaStartCol && c < detailCol) ? 'center' : 'left',
                     wrapText: true,
                 };
                 cell.border = {
@@ -328,27 +385,22 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
             const altaConflictStatus = analysis?.hasConflicts
                 ? 'conflict' : (!analysis ? 'new-person' : 'ok');
             if (altaConflictStatus === 'conflict') {
-                // P2000 conflicto badge
-                if (analysis!.conflicts.find(c => c.mediaName === 'P2000' && c.conflict)) {
-                    r.getCell(7).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
-                    r.getCell(7).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
-                }
-                // KONE conflicto badge
-                if (analysis!.conflicts.find(c => c.mediaName === 'KONE' && c.conflict)) {
-                    r.getCell(10).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
-                    r.getCell(10).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
-                }
-                r.getCell(11).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
-                r.getCell(11).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
+                // badge de conflicto por medio (columna CONFLICTO de cada medio)
+                medias.forEach((m, i) => {
+                    const conflict = analysis!.conflicts.find((x) => x.mediaName === m.name && x.conflict);
+                    if (conflict) {
+                        const badgeCol = mediaStartCol + i * 3 + 2;
+                        r.getCell(badgeCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
+                        r.getCell(badgeCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
+                    }
+                });
+                r.getCell(detailCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
+                r.getCell(detailCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
             }
             if (altaConflictStatus === 'new-person') {
-                r.getCell(7).value = '—';
-                r.getCell(7).font = { name: 'Arial', size: 9, color: { argb: C.emeraldFill.fg } };
-                r.getCell(10).value = '—';
-                r.getCell(10).font = { name: 'Arial', size: 9, color: { argb: C.emeraldFill.fg } };
-                r.getCell(11).value = 'Persona nueva — sin conflictos';
-                r.getCell(11).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.emeraldFill.fg } };
-                r.getCell(11).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.emeraldFill.fill } };
+                r.getCell(detailCol).value = 'Persona nueva — sin conflictos';
+                r.getCell(detailCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.emeraldFill.fg } };
+                r.getCell(detailCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.emeraldFill.fill } };
             }
 
             autoRowHeight(wsAltas, altaRowIdx, 22);
@@ -362,6 +414,10 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     // Diseño: super-encabezados agrupados + sub-encabezados (como en xlsxExport)
     // Grupos: # | PERSONA | DATOS ACTUALES | DATOS NUEVOS | PISOS | CAMBIOS
     const wsMod = workbook.addWorksheet('MODIFICACIONES - Cambios');
+    const modFloorStart = 15;
+    const modAccesosCol = modFloorStart + mediasConPisos.length;
+    const modTotalCol = modAccesosCol + 1;
+    const LAST_M = colKey(modTotalCol);
     wsMod.columns = [
         { width: 5 },   // A: #
         { width: 24 },  // B: Persona
@@ -377,19 +433,17 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
         { width: 18 },  // L: Área (Nuevo)
         { width: 20 },  // M: Puesto (Nuevo)
         { width: 14 },  // N: Horario (Nuevo)
-        { width: 18 },  // O: P2000 (+/-/=)
-        { width: 18 },  // P: KONE (+/-/=)
-        { width: 18 },  // Q: Accesos (+/-/=)
-        { width: 10 },  // R: Cambios
+        ...mediasConPisos.map(() => ({ width: 18 })), // pisos por medio (+/-/=)
+        { width: 18 },  // Accesos (+/-/=)
+        { width: 10 },  // Cambios
     ];
-    const LAST_M = 'R';
-    const MOD_GROUPS = [
+    const MOD_GROUPS: { label: string; range: string; colors: GroupColor; endCol: number }[] = [
         { label: '#', range: 'A4:A4', colors: C.modGroup, endCol: 1 },
         { label: 'PERSONA', range: 'B4:D4', colors: C.modGroup, endCol: 4 },
         { label: 'DATOS ACTUALES', range: 'E4:I4', colors: C.actualGroup, endCol: 9 },
         { label: 'DATOS NUEVOS', range: 'J4:N4', colors: C.nuevoGroup, endCol: 14 },
-        { label: 'PISOS', range: 'O4:Q4', colors: C.pisosGroup, endCol: 17 },
-        { label: 'CAMBIOS', range: 'R4:R4', colors: C.modGroup, endCol: 18 },
+        { label: 'PISOS', range: `${colKey(modFloorStart)}4:${colKey(modAccesosCol)}4`, colors: C.pisosGroup, endCol: modAccesosCol },
+        { label: 'CAMBIOS', range: `${colKey(modTotalCol)}4:${colKey(modTotalCol)}4`, colors: C.modGroup, endCol: modTotalCol },
     ];
     const MOD_GROUP_END_COLS = new Set(MOD_GROUPS.map((g) => g.endCol));
 
@@ -434,10 +488,9 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
         { label: 'ÁREA', group: MOD_GROUPS[3], col: 12 },
         { label: 'PUESTO', group: MOD_GROUPS[3], col: 13 },
         { label: 'HORARIO', group: MOD_GROUPS[3], col: 14 },
-        { label: 'P2000', group: MOD_GROUPS[4], col: 15 },
-        { label: 'KONE', group: MOD_GROUPS[4], col: 16 },
-        { label: 'ACC. ESP.', group: MOD_GROUPS[4], col: 17 },
-        { label: 'TOTAL', group: MOD_GROUPS[5], col: 18 },
+        ...mediasConPisos.map((m, i) => ({ label: m.name, group: MOD_GROUPS[4], col: modFloorStart + i })),
+        { label: 'ACC. ESP.', group: MOD_GROUPS[4], col: modAccesosCol },
+        { label: 'TOTAL', group: MOD_GROUPS[5], col: modTotalCol },
     ];
 
     const subRow = wsMod.getRow(5);
@@ -513,30 +566,31 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 const newExit = rowData.fields.hora_salida?.trim();
                 r.getCell(14).value = newEntry && newExit ? `${newEntry} - ${newExit}` : (newEntry || newExit || '—');
 
-                // Floor changes: por clave de medio con pisos + accesos especiales
+                // Floor changes: por medio con pisos + accesos especiales
                 const fc = analysis.floorChanges;
-                const floorMediaKeys = Object.keys(fc || {}).filter((k) => k !== 'accesses');
-                let floorCol = 15;
-                for (const key of floorMediaKeys) {
-                    if (floorCol > 16) break; // solo 2 slots de pisos (O, P)
-                    const change = (fc as Record<string, FloorChange>)[key];
-                    const parts: string[] = [];
-                    if (change.added.length) parts.push(`+${change.added.join(',')}`);
-                    if (change.removed.length) parts.push(`-${change.removed.join(',')}`);
-                    if (change.kept.length) parts.push(`=${change.kept.join(',')}`);
-                    r.getCell(floorCol).value = parts.join(' ') || 'Sin cambios';
-                    floorCol++;
-                }
-                for (; floorCol <= 16; floorCol++) r.getCell(floorCol).value = '—';
+                const floorChangeMap = (fc as Record<string, FloorChange> | undefined) || {};
+                mediasConPisos.forEach((m, i) => {
+                    const col = modFloorStart + i;
+                    const change = floorChangeMap[m.key];
+                    if (change) {
+                        const parts: string[] = [];
+                        if (change.added.length) parts.push(`+${change.added.join(',')}`);
+                        if (change.removed.length) parts.push(`-${change.removed.join(',')}`);
+                        if (change.kept.length) parts.push(`=${change.kept.join(',')}`);
+                        r.getCell(col).value = parts.join(' ') || 'Sin cambios';
+                    } else {
+                        r.getCell(col).value = '—';
+                    }
+                });
 
                 if (fc?.accesses) {
                     const parts: string[] = [];
                     if (fc.accesses.added.length) parts.push(`+${fc.accesses.added.join(',')}`);
                     if (fc.accesses.removed.length) parts.push(`-${fc.accesses.removed.join(',')}`);
                     if (fc.accesses.kept.length) parts.push(`=${fc.accesses.kept.join(',')}`);
-                    r.getCell(17).value = parts.join(' ') || 'Sin cambios';
+                    r.getCell(modAccesosCol).value = parts.join(' ') || 'Sin cambios';
                 } else {
-                    r.getCell(17).value = '—';
+                    r.getCell(modAccesosCol).value = '—';
                 }
 
                 changedCount = analysis.changes.filter((c) => c.changed).length;
@@ -547,20 +601,20 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                     }
                     if (fc.accesses?.added.length || fc.accesses?.removed.length) changedCount++;
                 }
-                r.getCell(18).value = changedCount;
+                r.getCell(modTotalCol).value = changedCount;
             } else if (!person) {
                 // Person not found — fill with dashes and warning
-                for (let c = 5; c <= 17; c++) r.getCell(c).value = '—';
-                r.getCell(18).value = '⚠';
+                for (let c = 5; c <= modAccesosCol; c++) r.getCell(c).value = '—';
+                r.getCell(modTotalCol).value = '⚠';
             } else {
                 // No analysis (likely no changes at all)
-                for (let c = 5; c <= 17; c++) r.getCell(c).value = '—';
-                r.getCell(18).value = '0';
+                for (let c = 5; c <= modAccesosCol; c++) r.getCell(c).value = '—';
+                r.getCell(modTotalCol).value = '0';
             }
 
             // Styling: cada celda toma el fill de su GRUPO (como en xlsxExport)
             // + badges para cambios detectados o persona no encontrada
-            for (let c = 1; c <= 18; c++) {
+            for (let c = 1; c <= modTotalCol; c++) {
                 const cell = r.getCell(c);
                 const subEntry = modSubHeaders.find((s) => s.col === c);
                 const grp = subEntry?.group ?? MOD_GROUPS[0];
@@ -572,7 +626,7 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 cell.font = { name: 'Arial', size: 9, color: { argb: C.black } };
                 cell.alignment = {
                     vertical: 'middle',
-                    horizontal: [1, 15, 16, 17, 18].includes(c) ? 'center' : 'left',
+                    horizontal: c === 1 || c >= modFloorStart ? 'center' : 'left',
                     wrapText: true,
                 };
                 cell.border = {
@@ -586,8 +640,8 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
             // Badges para cambios detectados
             if (changedCount > 0) {
-                r.getCell(18).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
-                r.getCell(18).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
+                r.getCell(modTotalCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
+                r.getCell(modTotalCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
 
                 if (analysis) {
                     analysis.changes.forEach((ch) => {
@@ -615,8 +669,8 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 }
             }
             if (!person) {
-                r.getCell(18).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
-                r.getCell(18).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
+                r.getCell(modTotalCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
+                r.getCell(modTotalCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
             }
 
             autoRowHeight(wsMod, modRowIdx, 22);
@@ -746,27 +800,31 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     // HOJA 5: REPOSICIÓN DE TARJETA
     // ════════════════════════════════════════════════
     const wsRepo = workbook.addWorksheet('Reposición de Tarjeta');
+    const repoMediaStart = 5;
+    const repoMediaEnd = repoMediaStart + medias.length * 2 - 1; // 2 cols por medio
+    const repoMotivoCol = repoMediaEnd + 1;
+    const repoObsCol = repoMotivoCol + 1;
+    const repoMatchCol = repoObsCol + 1;
+    const LAST_RE = colKey(repoMatchCol);
     wsRepo.columns = [
         { width: 5 },   // A: #
         { width: 24 },  // B: Persona
         { width: 22 },  // C: Dependencia
         { width: 22 },  // D: Edificio
-        { width: 14 },  // E: Repone P2000
-        { width: 18 },  // F: Folio P2000
-        { width: 14 },  // G: Repone KONE
-        { width: 18 },  // H: Folio KONE
-        { width: 22 },  // I: Motivo
-        { width: 22 },  // J: Observaciones
-        { width: 14 },  // K: Match
+        ...medias.flatMap(() => [{ width: 14 }, { width: 18 }]), // ¿Repone? / Folio por medio
+        { width: 22 },  // Motivo
+        { width: 22 },  // Observaciones
+        { width: 14 },  // Match
     ];
-    const LAST_RE = 'K';
-    const REPO_GROUPS = [
+    const REPO_GROUPS: { label: string; range: string; colors: GroupColor; endCol: number }[] = [
         { label: '#', range: 'A4:A4', colors: C.otrosGroup, endCol: 1 },
         { label: 'PERSONA', range: 'B4:D4', colors: C.otrosGroup, endCol: 4 },
-        { label: 'P2000', range: 'E4:F4', colors: C.p2000Group, endCol: 6 },
-        { label: 'KONE', range: 'G4:H4', colors: C.koneGroup, endCol: 8 },
-        { label: 'REPOSICIÓN', range: 'I4:J4', colors: C.repoGroup, endCol: 10 },
-        { label: 'ESTADO', range: 'K4:K4', colors: C.otrosGroup, endCol: 11 },
+        ...medias.map((m, i) => {
+            const start = repoMediaStart + i * 2;
+            return { label: m.name.toUpperCase(), range: `${colKey(start)}4:${colKey(start + 1)}4`, colors: MEDIA_GROUP_COLORS[i % MEDIA_GROUP_COLORS.length], endCol: start + 1 };
+        }),
+        { label: 'REPOSICIÓN', range: `${colKey(repoMotivoCol)}4:${colKey(repoObsCol)}4`, colors: C.repoGroup, endCol: repoObsCol },
+        { label: 'ESTADO', range: `${colKey(repoMatchCol)}4:${colKey(repoMatchCol)}4`, colors: C.otrosGroup, endCol: repoMatchCol },
     ];
     const REPO_GROUP_END_COLS = new Set(REPO_GROUPS.map((g) => g.endCol));
 
@@ -775,7 +833,7 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
         workbook,
         title: 'REPOSICIÓN DE TARJETA',
         lastCol: LAST_RE,
-        metaLines: ['Solicitudes de reposición de tarjetas P2000 y KONE.'],
+        metaLines: ['Solicitudes de reposición de tarjetas. Cada medio activo se muestra en dos columnas (¿Repone? / Folio).'],
     });
 
     REPO_GROUPS.forEach((group) => {
@@ -799,13 +857,17 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
         { label: 'PERSONA', group: REPO_GROUPS[1], col: 2 },
         { label: 'DEPENDENCIA', group: REPO_GROUPS[1], col: 3 },
         { label: 'EDIFICIO', group: REPO_GROUPS[1], col: 4 },
-        { label: '¿REPONE?', group: REPO_GROUPS[2], col: 5 },
-        { label: 'FOLIO', group: REPO_GROUPS[2], col: 6 },
-        { label: '¿REPONE?', group: REPO_GROUPS[3], col: 7 },
-        { label: 'FOLIO', group: REPO_GROUPS[3], col: 8 },
-        { label: 'MOTIVO', group: REPO_GROUPS[4], col: 9 },
-        { label: 'OBSERVACIONES', group: REPO_GROUPS[4], col: 10 },
-        { label: 'MATCH', group: REPO_GROUPS[5], col: 11 },
+        ...medias.flatMap((_, i) => {
+            const base = repoMediaStart + i * 2;
+            const group = REPO_GROUPS[2 + i];
+            return [
+                { label: '¿REPONE?', group, col: base },
+                { label: 'FOLIO', group, col: base + 1 },
+            ];
+        }),
+        { label: 'MOTIVO', group: REPO_GROUPS[REPO_GROUPS.length - 2], col: repoMotivoCol },
+        { label: 'OBSERVACIONES', group: REPO_GROUPS[REPO_GROUPS.length - 2], col: repoObsCol },
+        { label: 'MATCH', group: REPO_GROUPS[REPO_GROUPS.length - 1], col: repoMatchCol },
     ];
     const srRepo = wsRepo.getRow(5);
     srRepo.height = 32;
@@ -837,22 +899,18 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
             r.getCell(2).value = person ? `${person.last_name}, ${person.first_name}` : `${rd.fields.apellidos}, ${rd.fields.nombres}`;
             r.getCell(3).value = person?.dependency || rd.fields.dependencia || '';
             r.getCell(4).value = person?.building || '';
-            // Columnas de medio dinámicas derivadas del payload (reponer_<key> / folio_<key>).
-            const repoKeys = Object.keys(rd.fields)
-                .filter((k) => k.startsWith('reponer_'))
-                .map((k) => k.slice('reponer_'.length));
-            let repoCol = 5;
-            for (const key of repoKeys) {
-                if (repoCol > 8) break; // solo 2 slots (E,F) y (G,H)
-                r.getCell(repoCol++).value = rd.fields[`reponer_${key}`] || '—';
-                r.getCell(repoCol++).value = rd.fields[`folio_${key}`] || '—';
-            }
-            for (; repoCol <= 8; repoCol++) r.getCell(repoCol).value = '—';
-            r.getCell(9).value = rd.fields.motivo || '—';
-            r.getCell(10).value = rd.fields.observaciones || '—';
-            r.getCell(11).value = person ? '✓ Encontrado' : '✖ No encontrado';
+            // Columnas de medio dinámicas derivadas de `medias` (reponer_<key> / folio_<key>).
+            let repoCol = repoMediaStart;
+            medias.forEach((m) => {
+                r.getCell(repoCol++).value = rd.fields[`reponer_${m.key}`] || '—';
+                r.getCell(repoCol++).value = rd.fields[`folio_${m.key}`] || '—';
+            });
+            for (; repoCol <= repoMediaEnd; repoCol++) r.getCell(repoCol).value = '—';
+            r.getCell(repoMotivoCol).value = rd.fields.motivo || '—';
+            r.getCell(repoObsCol).value = rd.fields.observaciones || '—';
+            r.getCell(repoMatchCol).value = person ? '✓ Encontrado' : '✖ No encontrado';
 
-            for (let c = 1; c <= 11; c++) {
+            for (let c = 1; c <= repoMatchCol; c++) {
                 const cell = r.getCell(c);
                 const se = repoSubHeaders.find(s => s.col === c);
                 const g = se?.group ?? REPO_GROUPS[0];
@@ -868,11 +926,11 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 };
             }
             if (!person) {
-                r.getCell(11).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
-                r.getCell(11).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
+                r.getCell(repoMatchCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
+                r.getCell(repoMatchCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
             } else {
-                r.getCell(11).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.emeraldFill.fg } };
-                r.getCell(11).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.emeraldFill.fill } };
+                r.getCell(repoMatchCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.emeraldFill.fg } };
+                r.getCell(repoMatchCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.emeraldFill.fill } };
             }
             autoRowHeight(wsRepo, repoRowIdx, 22); repoRowIdx++;
         }

@@ -115,12 +115,14 @@
             let cardFolio = t.cardFolio || t.cards?.folio;
 
             if (!cardFolio && t.payload) {
-                if (t.payload.folio_p2000) {
-                    cardType = "P2000";
-                    cardFolio = t.payload.folio_p2000;
-                } else if (t.payload.folio_kone) {
-                    cardType = "KONE";
-                    cardFolio = t.payload.folio_kone;
+                // Derivar de forma multi-medio: claves del payload `folio_<key>`.
+                const matchedKey = Object.keys(t.payload).find((k) =>
+                    /^folio_.+/.test(k) && t.payload[k],
+                );
+                if (matchedKey) {
+                    const mediaKey = matchedKey.replace(/^folio_/, "");
+                    cardType = mediaKey.toUpperCase();
+                    cardFolio = t.payload[matchedKey];
                 } else if (t.payload.folio) {
                     cardType = t.payload.tipo_tarjeta || "N/A";
                     cardFolio = t.payload.folio;
