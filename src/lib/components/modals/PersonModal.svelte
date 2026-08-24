@@ -20,10 +20,15 @@
     import PermissionGuard from "../PermissionGuard.svelte";
     import { toast } from "svelte-sonner";
     import { handleError, mediaTypeVariant } from "../../utils";
+    import { updateWithLock } from "../../utils/optimisticLock";
     import type { Person } from "../../types";
     import { personnelSchema } from "../../schemas";
 
     import { type Snippet } from "svelte";
+
+    /** Mensaje cuando otro usuario modificó la persona mientras se editaba. */
+    const CONFLICT_MSG =
+        "Este registro fue modificado por otra persona. Recarga e inténtalo de nuevo.";
 
     let {
         isOpen = $bindable(false),
@@ -81,6 +86,9 @@
     let schedules = $derived(catalogState.schedules);
     let specialAccesses = $derived(catalogState.specialAccesses);
     let availableCards = $derived(personnelState.extraCards);
+
+    // Versión (optimistic locking) de la persona al abrir el modal de edición.
+    let editingUpdatedAt = $state<string | null>(null);
 
     // Estado del formulario
     let nombres = $state("");
@@ -452,6 +460,7 @@
                 }
 
                 lastLoadedPersonId = editingPerson.id;
+                editingUpdatedAt = (editingPerson as any).updated_at ?? null;
                 selectedBuildings = bid ? [bid] : [];
                 void refreshPersonAccess(editingPerson.id);
             });
@@ -507,6 +516,7 @@
                     }
                 }
                 lastLoadedPersonId = "__prefill__";
+                editingUpdatedAt = null;
             });
         } else if (
             isOpen &&
@@ -636,6 +646,35 @@
                     description: "Los cambios se han enviado a aprobación.",
                 });
             } else {
+                // Optimistic locking: solo en guardado directo (no ticket). Si la
+                // fila cambió desde que se abrió, abortamos sin sobrescribir.
+                if (editingPerson && editingUpdatedAt) {
+                    const personRowPayload = {
+                        first_name: nombres,
+                        last_name: apellidos,
+                        employee_no: (noEmpleado || "").trim() || null,
+                        area: areaEquipo || null,
+                        position: puestoFuncion || null,
+                        dependency_id: dependencies.find((d) => d.name === dependency)?.id ?? null,
+                        building_id: buildings.find((b) => b.name === edificio)?.id ?? null,
+                        floor: pisoBase || null,
+                        schedule_id: schedules.find((s) => s.name === diasHorario)?.id ?? null,
+                        entry_time: horaEntrada || null,
+                        exit_time: horaSalida || null,
+                        email: email?.replace(/^mailto:\s*/i, "").trim() || null,
+                        status: editingPerson?.status_raw || "active",
+                    };
+                    const lock = await updateWithLock(
+                        "personnel",
+                        editingPerson.id,
+                        personRowPayload,
+                        editingUpdatedAt,
+                    );
+                    if (!lock.ok) {
+                        toast.error(CONFLICT_MSG);
+                        return;
+                    }
+                }
                 await personnelService.save(data);
                 const updated = await personnelService.fetchAll();
                 personnelState.pagination.setItems(updated.data, updated.count);
@@ -652,6 +691,7 @@
     }
 
     function resetForm() {
+        editingUpdatedAt = null;
         nombres = "";
         apellidos = "";
         noEmpleado = "";

@@ -10,6 +10,11 @@
     import type { CardlessRegistry, Person } from "../../types";
     import { toast } from "svelte-sonner";
     import { networkStore } from "../../stores/network.svelte";
+    import { updateWithLock } from "../../utils/optimisticLock";
+
+    /** Mensaje cuando otro usuario modificó el registro mientras se editaba. */
+    const CONFLICT_MSG =
+        "Este registro fue modificado por otra persona. Recarga e inténtalo de nuevo.";
 
     let {
         /** Controla la visibilidad del modal (two-way bindable). */
@@ -56,6 +61,9 @@
     let recordedAt     = $state("");
 
     let isSubmitting = $state(false);
+
+    // Versión (optimistic locking) del registro al abrir la edición.
+    let editingUpdatedAt = $state<string | null>(null);
 
     // ── helpers ──────────────────────────────────────────────────
 
@@ -128,6 +136,7 @@
     // ── form lifecycle ───────────────────────────────────────────
 
     function resetForm() {
+        editingUpdatedAt = null;
         selectedPerson   = null;
         searchResults    = [];
         manualFirstName  = "";
@@ -168,6 +177,7 @@
         selectedReason   = reg.reason        || "";
         comments         = reg.comments      || "";
         recordedAt       = toDatetimeLocalValue(reg.recorded_at);
+        editingUpdatedAt = (reg as any).updated_at ?? null;
     }
 
     let formKey = $state<string | null>(null);
@@ -272,16 +282,33 @@
                 responsiva_status_at_registration: responsivaStatusSnapshot,
             };
 
-            let result: CardlessRegistry | null;
+            let result: CardlessRegistry | null = null;
             if (editingRegistry) {
-                result = await cardlessRegistryService.update(editingRegistry.id, payload);
-                if (result) toast.success("Registro actualizado");
+                if (editingUpdatedAt) {
+                    // Optimistic locking: la edición aplica la condición de versión.
+                    const lock = await updateWithLock(
+                        "cardless_registry",
+                        editingRegistry.id,
+                        payload,
+                        editingUpdatedAt,
+                    );
+                    if (!lock.ok) {
+                        toast.error(CONFLICT_MSG);
+                        return;
+                    }
+                    toast.success("Registro actualizado");
+                } else {
+                    // Sin versión conocida (registro legacy): comportamiento actual.
+                    result = await cardlessRegistryService.update(editingRegistry.id, payload);
+                    if (!result) return; // error ya reportado por el servicio
+                    toast.success("Registro actualizado");
+                }
             } else {
                 result = await cardlessRegistryService.create(payload);
                 if (result) toast.success("Registro creado exitosamente");
             }
 
-            if (result) { isOpen = false; onSave?.(); }
+            if (editingRegistry || result) { isOpen = false; onSave?.(); }
         } catch {
             toast.error("Error al guardar registro");
         } finally {

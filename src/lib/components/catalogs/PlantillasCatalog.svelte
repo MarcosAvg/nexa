@@ -2,7 +2,12 @@
     import { toast } from "svelte-sonner";
     import { documentService } from "../../services/documents";
     import { catalogState } from "../../stores";
+    import { updateWithLock } from "../../utils/optimisticLock";
     import type { DocumentTemplate } from "../../types";
+
+    /** Mensaje cuando otro usuario modificó la plantilla mientras se editaba. */
+    const CONFLICT_MSG =
+        "Este registro fue modificado por otra persona. Recarga e inténtalo de nuevo.";
     import Button from "../Button.svelte";
     import Input from "../Input.svelte";
     import Modal from "../Modal.svelte";
@@ -45,6 +50,9 @@
     let deleteTarget = $state<DocumentTemplate | null>(null);
     let deleteConfirmation = $state("");
 
+    // Versión (optimistic locking) de la plantilla al abrir el editor.
+    let editingTemplateUpdatedAt = $state<string | null>(null);
+
     async function loadTemplates() {
         isLoading = true;
         try {
@@ -68,6 +76,7 @@
 
     function openCreate() {
         editingId = null;
+        editingTemplateUpdatedAt = null;
         name = "";
         documentType = "responsiva";
         mediaTypeId = "";
@@ -79,6 +88,7 @@
 
     function openEdit(t: DocumentTemplate) {
         editingId = t.id;
+        editingTemplateUpdatedAt = (t as any).updated_at ?? null;
         name = t.name;
         documentType = t.document_type;
         mediaTypeId = (t as any).media_type_id ?? "";
@@ -115,6 +125,26 @@
         if (cleaned.length === 0) { toast.error("Agrega al menos un párrafo de contenido"); return; }
         try {
             if (editingId) {
+                if (editingTemplateUpdatedAt) {
+                    // Optimistic locking: valida la versión antes de la actualización
+                    // real (updateTemplate incrementa la versión internamente).
+                    const lock = await updateWithLock(
+                        "document_templates",
+                        editingId,
+                        {
+                            name: name.trim(),
+                            document_type: documentType,
+                            media_type_id: mediaTypeId || null,
+                            active,
+                            content: JSON.stringify(cleaned),
+                        },
+                        editingTemplateUpdatedAt,
+                    );
+                    if (!lock.ok) {
+                        toast.error(CONFLICT_MSG);
+                        return;
+                    }
+                }
                 await documentService.updateTemplate(editingId, {
                     name,
                     document_type: documentType,

@@ -1,6 +1,11 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
-import { withErrorHandling, withErrorHandlingConditional, catalogCache } from "../utils";
+import { withErrorHandling, withErrorHandlingConditional, catalogCache, AppError } from "../utils";
+import { updateWithLock } from "../utils/optimisticLock";
+
+/** Mensaje cuando otro usuario modificó un catálogo mientras se editaba. */
+const CONFLICT_MSG =
+    "Este registro fue modificado por otra persona. Recarga e inténtalo de nuevo.";
 
 /** Tablas de catálogo que soportan orden personalizado. */
 const CATALOG_TABLES = ["buildings", "dependencies", "schedules", "special_accesses", "access_media_types"] as const;
@@ -179,12 +184,12 @@ export const catalogService = {
     },
 
     // --- Save (Create/Update) ---
-    async saveBuilding(id: number | null, payload: { name: string; floors: string[] }) {
+    async saveBuilding(id: number | null, payload: { name: string; floors: string[] }, expectedUpdatedAt?: string | null) {
         return withErrorHandling(async () => {
             let buildingId = id;
             if (id) {
-                const { error } = await supabase.from("buildings").update({ name: payload.name }).eq("id", id);
-                if (error) throw error;
+                const lock = await updateWithLock("buildings", id, { name: payload.name }, expectedUpdatedAt);
+                if (!lock.ok) throw new AppError(CONFLICT_MSG, "CONFLICT");
                 await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Edificio actualizado: ${payload.name}`, entityName: `Edificio: ${payload.name}` });
             } else {
                 const sortOrder = await getNextSortOrder("buildings");
@@ -254,6 +259,7 @@ export const catalogService = {
     async saveMediaType(
         id: string | null,
         payload: { key?: string; name?: string; has_floors?: boolean; active?: boolean; buildingIds?: number[]; color?: string; requires_programming?: boolean; requires_responsiva?: boolean; requires_identifier?: boolean },
+        expectedUpdatedAt?: string | null,
     ) {
         return withErrorHandling(async () => {
             const slugify = (s: string) =>
@@ -272,8 +278,8 @@ export const catalogService = {
                 if (payload.requires_programming !== undefined) update.requires_programming = payload.requires_programming;
                 if (payload.requires_responsiva !== undefined) update.requires_responsiva = payload.requires_responsiva;
                 if (payload.requires_identifier !== undefined) update.requires_identifier = payload.requires_identifier;
-                const { error } = await supabase.from("access_media_types").update(update).eq("id", id);
-                if (error) throw error;
+                const lock = await updateWithLock("access_media_types", id, update, expectedUpdatedAt);
+                if (!lock.ok) throw new AppError(CONFLICT_MSG, "CONFLICT");
                 await HistoryService.log("SYSTEM", id, "UPDATE_CATALOG", { message: `Medio de acceso actualizado: ${payload.name}`, entityName: `Medio de acceso: ${payload.name}` });
             } else {
                 const name = payload.name?.trim();
