@@ -11,7 +11,7 @@
     import { personnelService } from "../../services/personnel";
     import { HistoryService } from "../../services/history";
     import { toast } from "svelte-sonner";
-    import { handleError, parseFloors } from "../../utils";
+    import { handleError, parseFloors, fullName } from "../../utils";
     import { wantsCard } from "../../utils/matchAnalysis";
     import { activeMediaTypes } from "../../utils/mediaContract";
     import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
@@ -141,7 +141,7 @@
         isRejecting = true;
         try {
             await ticketService.delete(ticket.id, "Alta rechazada");
-            const altaName = `${p.apellidos ?? ''}, ${p.nombres ?? ''}`.replace(/^,\s*/, '').trim() || 'Desconocido';
+            const altaName = fullName(p.nombres, p.apellidos) || 'Desconocido';
             await HistoryService.log("PERSONNEL", "", "REJECT_ALTA", {
                 message: `Solicitud de alta rechazada: ${p.apellidos}, ${p.nombres}`,
                 entityName: altaName,

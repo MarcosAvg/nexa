@@ -4,6 +4,7 @@
     import Input from "../Input.svelte";
     import { personnelService } from "../../services/personnel";
     import { enlaceService } from "../../services/enlaces";
+    import { fullName } from "../../utils";
     import { Search, UserPlus } from "lucide-svelte";
     import { toast } from "svelte-sonner";
 
@@ -58,7 +59,7 @@
 
     function selectPerson(p: any) {
         selectedPersonId = p.id;
-        selectedPersonName = `${p.first_name} ${p.last_name}`;
+        selectedPersonName = fullName(p.first_name, p.last_name);
         searchQuery = "";
     }
 

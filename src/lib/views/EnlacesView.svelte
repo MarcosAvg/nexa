@@ -3,6 +3,7 @@
     import { enlaceService } from "../services/enlaces";
     import type { Enlace } from "../types";
     import { confirm } from "../utils/confirmModal.svelte";
+    import { fullName } from "../utils";
     import {
         SectionHeader, FloatingActionButton, PermissionGuard,
         DataTable, FilterSelect, Button, ContentView, SearchInput,
@@ -71,7 +72,7 @@
 
             return {
                 ...e,
-                name: `${e.personnel?.first_name || ""} ${e.personnel?.last_name || ""}`.trim() || "Desconocido",
+                name: fullName(e.personnel?.first_name, e.personnel?.last_name) || "Desconocido",
                 dependency: dependencyName,
                 building: buildingName,
                 floor: e.personnel?.floor || "N/A",
@@ -147,7 +148,7 @@
     ];
 
     function requestRemove(enlace: Enlace) {
-        const name = `${enlace.personnel?.first_name || ""} ${enlace.personnel?.last_name || ""}`.trim();
+        const name = fullName(enlace.personnel?.first_name, enlace.personnel?.last_name);
         confirm.open({
             title: "Remover Enlace",
             description: `¿Estás seguro de que deseas quitar a ${name} de los enlaces administrativos?`,
@@ -199,9 +200,7 @@
 </script>
 
 {#snippet renderName(row: Enlace)}
-    <span class="font-bold text-slate-900"
-        >{`${row.personnel?.first_name || ""} ${row.personnel?.last_name || ""}`.trim() ||
-            "Desconocido"}</span
+    <span class="font-bold text-slate-900">{fullName(row.personnel?.first_name, row.personnel?.last_name) || "Desconocido"}</span
     >
 {/snippet}
 

@@ -20,7 +20,7 @@
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
     import { toast } from "svelte-sonner";
-    import { handleError, exportResponsivasToExcel, exportResponsivasAllDependenciesAsZip } from "../utils";
+    import { handleError, exportResponsivasToExcel, exportResponsivasAllDependenciesAsZip, fullName } from "../utils";
     import { settingsState } from "../stores";
     import { computeResponsivaManagement, matchesResponsivaFilters } from "../utils/xlsxResponsivas";
     import {
@@ -99,14 +99,9 @@
         tickets.map((t) => {
             let personName = "Desconocido";
             if (t.personnel) {
-                personName = `${t.personnel.first_name} ${t.personnel.last_name}`;
+                personName = fullName(t.personnel.first_name, t.personnel.last_name);
             } else if (t.payload?.nombres || t.payload?.apellidos) {
-                personName =
-                    `${t.payload.apellidos || ""}, ${t.payload.nombres || ""}`.trim();
-                if (personName.startsWith(","))
-                    personName = personName.slice(1).trim();
-                if (personName.endsWith(","))
-                    personName = personName.slice(0, -1).trim();
+                personName = fullName(t.payload.nombres, t.payload.apellidos);
             } else if (t.payload?.relatedPerson?.name) {
                 personName = t.payload.relatedPerson.name;
             }
