@@ -52,7 +52,8 @@ export async function exportPersonnelAllDependenciesAsZip(
     dependencies: { id: string; name: string }[],
     globalFilters: { status?: string; search?: string; buildingId?: string; buildingName?: string } = {},
     onProgress?: ZipProgressCallback,
-    cardTypes?: CardType[]
+    cardTypes?: CardType[],
+    mediaTypes?: any[]
 ): Promise<void> {
     const dateStr = new Date().toISOString().split('T')[0];
     const files: { buffer: ArrayBuffer; filename: string }[] = [];
@@ -80,6 +81,7 @@ export async function exportPersonnelAllDependenciesAsZip(
             },
             splitByDependency: false,
             ...(cardTypes && cardTypes.length > 0 ? { cardTypes } : {}),
+            ...(mediaTypes && mediaTypes.length > 0 ? { mediaTypes } : {}),
         };
 
         const result = await exportPersonnelToExcel(data as any[], options, true);

@@ -14,40 +14,79 @@ import type { FloorGroup } from '../types';
 
 export type CardType = string;
 
-const ALL_CARD_TYPES: CardType[] = ["P2000", "KONE", "AccessPRO"];
+/** Configuración de columnas por tipo de medio para la hoja Directorio. */
+export interface MediaExportConfig {
+    key: string;
+    name: string;
+    has_floors: boolean;
+    colors: { head: string; sub: string; fill: string };
+    groupLabel: string;
+    headers: { key: string; width: number; label: string }[];
+    /** Campo donde se guarda el folio (ej. folioP2000). */
+    folioField: string;
+    /** Campo donde se guardan los pisos (medios con pisos). */
+    floorsField?: string;
+}
+
+const DEFAULT_MEDIAS: { key: string; name: string; has_floors: boolean }[] = [
+    { key: 'p2000', name: 'P2000', has_floors: true },
+    { key: 'kone', name: 'KONE', has_floors: true },
+    { key: 'accesspro', name: 'AccessPRO', has_floors: false },
+];
+
+const MEDIA_PALETTE: { head: string; sub: string; fill: string }[] = [
+    { head: 'FFFEF3C7', sub: 'FF92400E', fill: 'FFFEFCE8' }, // ámbar
+    { head: 'FFE0F2FE', sub: 'FF075985', fill: 'FFF0F9FF' }, // sky
+    { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' }, // esmeralda
+    { head: 'FFDBEAFE', sub: 'FF1E40AF', fill: 'FFEFF6FF' }, // azul
+    { head: 'FFEDE9FE', sub: 'FF5B21B6', fill: 'FFFAF5FF' }, // violeta
+    { head: 'FFFCE7F3', sub: 'FF9D174D', fill: 'FFFFF1F2' }, // rosa
+    { head: 'FFFED7AA', sub: 'FF9A3412', fill: 'FFFFF7ED' }, // naranja
+];
+
+const pascal = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function buildMediaConfig(media: { key: string; name: string; has_floors: boolean }, idx: number): MediaExportConfig {
+    const colors = MEDIA_PALETTE[idx % MEDIA_PALETTE.length];
+    const base = pascal(media.key);
+    const headers: MediaExportConfig['headers'] = media.has_floors
+        ? [
+            { key: `folio${base}`, width: 20, label: 'FOLIO ACCESO' },
+            { key: `pisos${base}Text`, width: 25, label: 'PISOS ASIGNADOS' },
+        ]
+        : [
+            { key: `folio${base}`, width: 20, label: 'FOLIO ACCESO' },
+        ];
+    return {
+        key: media.key,
+        name: media.name,
+        has_floors: media.has_floors,
+        colors,
+        groupLabel: `ACCESO ${media.name.toUpperCase()}${media.has_floors ? ' (PISOS)' : ''}`,
+        headers,
+        folioField: `folio${base}`,
+        floorsField: media.has_floors ? `pisos${base}Text` : undefined,
+    };
+}
 
 /**
- * Configuración de columnas por tipo de tarjeta para la hoja Directorio.
- * P2000/KONE incluyen folio + pisos; AccessPRO solo folio (no usa pisos).
+ * Construye la configuración de columnas por medio a partir del catálogo.
+ * Si no se pasan `mediaTypes`, usa la configuración conocida por defecto
+ * (P2000/KONE/AccessPRO) para preservar el comportamiento anterior.
  */
-export const CARD_TYPE_COLUMNS: Record<
-    CardType,
-    { groupLabel: string; colors: { head: string; sub: string; fill: string }; headers: { key: string; width: number; label: string }[] }
-> = {
-    P2000: {
-        groupLabel: 'ACCESO PUERTAS (P2000)',
-        colors: { head: 'FFFEF3C7', sub: 'FF92400E', fill: 'FFFEFCE8' },
-        headers: [
-            { key: 'folioP2000', width: 20, label: 'FOLIO ACCESO' },
-            { key: 'pisosP2000Text', width: 25, label: 'PISOS ASIGNADOS' },
-        ],
-    },
-    KONE: {
-        groupLabel: 'ACCESO ELEVADORES (KONE)',
-        colors: { head: 'FFE0F2FE', sub: 'FF075985', fill: 'FFF0F9FF' },
-        headers: [
-            { key: 'folioKone', width: 22, label: 'FOLIO ACCESO' },
-            { key: 'pisosKoneText', width: 25, label: 'PISOS ASIGNADOS' },
-        ],
-    },
-    AccessPRO: {
-        groupLabel: 'ACCESO ENTRADA (ACCESSPRO)',
-        colors: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
-        headers: [
-            { key: 'folioAccesspro', width: 20, label: 'FOLIO ACCESPRO' },
-        ],
-    },
-};
+function buildMediaConfigs(mediaTypes?: any[]): MediaExportConfig[] {
+    if (mediaTypes && mediaTypes.length > 0) {
+        return mediaTypes.map((m, i) =>
+            buildMediaConfig({ key: m.key, name: m.name || m.key, has_floors: m.has_floors === true }, i),
+        );
+    }
+    return DEFAULT_MEDIAS.map((m, i) => buildMediaConfig(m, i));
+}
+
+/** Configuración por defecto (compatibilidad con exportaciones previas). */
+export const CARD_TYPE_COLUMNS: Record<CardType, MediaExportConfig> = Object.fromEntries(
+    buildMediaConfigs().map((c) => [c.name, c]),
+);
 
 export interface ExportPersonnelData {
     first_name: string;
@@ -83,13 +122,18 @@ export interface ExportOptions {
     splitByDependency?: boolean;
     /**
      * Tipos de tarjeta cuyas columnas (Directorio) y KPIs (Resumen) se incluyen.
-     * Vacío u omitido = todos (P2000 + KONE + AccessPRO).
+     * Vacío u omitido = todos (según el catálogo o la config por defecto).
      */
     cardTypes?: CardType[];
+    /**
+     * Catálogo de medios del sistema (`{key, name, has_floors, ...}`).
+     * Define las columnas por medio; si se omite se usa la config por defecto.
+     */
+    mediaTypes?: any[];
 }
 
 // ─── Statistics Sheet Helper ───────────────────────────────────────────
-async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPersonnelData[], filterInfo: string, cardTypes?: CardType[]) {
+async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPersonnelData[], filterInfo: string, cardTypes?: CardType[], mediaTypes?: any[]) {
     const ws = workbook.addWorksheet('Resumen Ejecutivo');
 
     const C = {
@@ -131,13 +175,10 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     const bajas = data.filter(p => p.status === 'Baja').length;
     const activosOperativos = activos + parciales;
     const operativos = data.filter(p => p.status === 'Activo/a' || p.status === 'Parcial');
-    const selected = cardTypes && cardTypes.length > 0 ? cardTypes : ALL_CARD_TYPES;
-    const conP2000 = operativos.filter(p => p.cards?.some(c => c.type.toUpperCase() === 'P2000')).length;
-    const conKone = operativos.filter(p => p.cards?.some(c => c.type.toUpperCase() === 'KONE')).length;
-    const conAccesspro = operativos.filter(p => p.cards?.some(c => c.type.toUpperCase() === 'ACCESSPRO')).length;
-    const sinP2000 = activosOperativos - conP2000;
-    const sinKone = activosOperativos - conKone;
-    const sinAccesspro = activosOperativos - conAccesspro;
+    const selected = (cardTypes && cardTypes.length > 0 ? cardTypes : null);
+    const mediaConfigs = buildMediaConfigs(mediaTypes).filter((m) => !selected || selected.includes(m.name));
+    const conByMedia = (name: string) => operativos.filter(p => p.cards?.some(c => c.type.toUpperCase() === name.toUpperCase())).length;
+    const sinByMedia = (name: string) => activosOperativos - conByMedia(name);
     const sinEmail = data.filter(p => !p.email).length;
     const sinSchedule = data.filter(p => !p.schedule?.days).length;
     const sinPosition = data.filter(p => !p.position).length;
@@ -224,17 +265,18 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     row = addSectionTitle(ws, row, '🪪  COBERTURA DE TARJETAS DE ACCESO', 'H', C);
     ws.mergeCells(`B${row}:H${row}`);
     const noteCell = ws.getCell(`B${row}`);
-    const typesLabel = selected.map((t) => (t === 'AccessPRO' ? 'AccessPRO' : t)).join(' + ');
+    const typesLabel = mediaConfigs.map((m) => m.name).join(' + ');
     noteCell.value = `Calculado sobre personal operativo (Activo/a + Parcial): ${activosOperativos} personas  |  Tipos incluidos: ${typesLabel}`;
     noteCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: C.meta } };
     ws.getRow(row).height = 18;
     row++;
 
-    const coverage: { label: string; con: number; sin: number; colors: { bg: string; fg: string } }[] = selected.map((t) => {
-        if (t === 'P2000') return { label: 'P2000', con: conP2000, sin: sinP2000, colors: C.amber };
-        if (t === 'KONE') return { label: 'KONE', con: conKone, sin: sinKone, colors: C.sky };
-        return { label: 'AccessPRO', con: conAccesspro, sin: sinAccesspro, colors: C.emerald };
-    });
+    const coverage = mediaConfigs.map((m) => ({
+        label: m.name,
+        con: conByMedia(m.name),
+        sin: sinByMedia(m.name),
+        colors: { bg: m.colors.fill, fg: m.colors.sub },
+    }));
 
     coverage.forEach((k) => {
         ws.getRow(row).height = 28;
@@ -246,7 +288,7 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     // "Sin ninguna tarjeta" ocupa el hueco cuando la cantidad de tipos seleccionados
     // es impar (1 o 3): mide personas sin NINGUNA tarjeta de los tipos seleccionados.
     const conCualquiera = operativos.filter((p) =>
-        p.cards?.some((c) => selected.some((s) => s.toUpperCase() === c.type.toUpperCase()))
+        p.cards?.some((c) => mediaConfigs.some((m) => m.name.toUpperCase() === c.type.toUpperCase()))
     ).length;
     const sinNinguna = activosOperativos - conCualquiera;
 
@@ -369,10 +411,11 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         emerald: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
     };
 
-    const addDataSheet = async (sheetName: string, sheetData: ExportPersonnelData[], filterInfo: string, cardTypes?: CardType[]) => {
+    const addDataSheet = async (sheetName: string, sheetData: ExportPersonnelData[], filterInfo: string, cardTypes?: CardType[], mediaTypes?: any[]) => {
         const safeName = sheetName.replace(/[:\\/?*[\]]/g, '').substring(0, 31) || 'Hoja';
         const worksheet = workbook.addWorksheet(safeName);
-        const selected = cardTypes && cardTypes.length > 0 ? cardTypes : ALL_CARD_TYPES;
+        const selected = (cardTypes && cardTypes.length > 0 ? cardTypes : null);
+        const mediaConfigs = buildMediaConfigs(mediaTypes).filter((m) => !selected || selected.includes(m.name));
         // Conversor base-26 (A, B, …, Z, AA, AB) para columnas más allá de la Z.
         const colLetter = (n: number) => {
             let s = '';
@@ -394,8 +437,8 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
             { key: 'position', width: 28 },
             { key: 'floor', width: 12 },
         ];
-        const cardColumns = selected.flatMap((t) =>
-            CARD_TYPE_COLUMNS[t].headers.map((h) => ({ key: h.key, width: h.width }))
+        const cardColumns = mediaConfigs.flatMap((m) =>
+            m.headers.map((h) => ({ key: h.key, width: h.width }))
         );
         const tailColumns: { key: string; width: number }[] = [
             { key: 'status', width: 15 },
@@ -433,11 +476,10 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         ];
         // Las columnas de tarjetas empiezan justo después de baseColumns (A–H).
         let typeCol = baseColumns.length + 1; // 9 → I
-        selected.forEach((t) => {
-            const cfg = CARD_TYPE_COLUMNS[t];
+        mediaConfigs.forEach((m) => {
             const start = typeCol;
-            const end = typeCol + cfg.headers.length - 1;
-            groups.push({ label: cfg.groupLabel, range: `${colLetter(start)}3:${colLetter(end)}3`, colors: cfg.colors });
+            const end = typeCol + m.headers.length - 1;
+            groups.push({ label: m.groupLabel, range: `${colLetter(start)}3:${colLetter(end)}3`, colors: m.colors });
             typeCol = end + 1;
         });
         const tailStart = typeCol;
@@ -474,7 +516,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         headerRow.height = 30;
         const headerLabels = [
             'APELLIDOS', 'NOMBRES', 'NO. EMPLEADO', 'EDIFICIO', 'DEPENDENCIA', 'EQUIPO', 'PUESTO', 'PISO BASE',
-            ...selected.flatMap((t) => CARD_TYPE_COLUMNS[t].headers.map((h) => h.label)),
+            ...mediaConfigs.flatMap((m) => m.headers.map((h) => h.label)),
             'ESTADO', 'ACCESOS ESPECIALES', 'DIAS LABORALES', 'ENTRADA', 'SALIDA', 'CORREO ELECTRÓNICO'
         ];
 
@@ -499,10 +541,6 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         });
 
         sheetData.forEach((person) => {
-            const folioP2000 = person.cards?.filter(c => c.type.toUpperCase() === 'P2000').map(c => c.folio).join(', ') || '-';
-            const folioKone = person.cards?.filter(c => c.type.toUpperCase() === 'KONE').map(c => c.folio).join(', ') || '-';
-            const folioAccesspro = person.cards?.filter(c => c.type.toUpperCase() === 'ACCESSPRO').map(c => c.folio).join(', ') || '-';
-
             const rowData: Record<string, string> = {
                 last_name: person.last_name || '-',
                 first_name: person.first_name || '-',
@@ -519,17 +557,13 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
                 exit: person.schedule?.exit || '-',
                 email: person.email || '-'
             };
-            if (selected.includes('P2000')) {
-                rowData.folioP2000 = folioP2000;
-                rowData.pisosP2000Text = floorsForKey(person.floors, "p2000").join(', ') || "-";
-            }
-            if (selected.includes('KONE')) {
-                rowData.folioKone = folioKone;
-                rowData.pisosKoneText = floorsForKey(person.floors, "kone").join(', ') || "-";
-            }
-            if (selected.includes('AccessPRO')) {
-                rowData.folioAccesspro = folioAccesspro;
-            }
+            mediaConfigs.forEach((m) => {
+                const folio = person.cards?.filter(c => c.type.toUpperCase() === m.name.toUpperCase()).map(c => c.folio).join(', ') || '-';
+                rowData[m.folioField] = folio;
+                if (m.floorsField) {
+                    rowData[m.floorsField] = floorsForKey(person.floors, m.key).join(', ') || "-";
+                }
+            });
 
             const row = worksheet.addRow(rowData);
 
@@ -618,7 +652,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         }
     }
 
-    await addStatsSheet(workbook, data, filterDescription, options?.cardTypes);
+    await addStatsSheet(workbook, data, filterDescription, options?.cardTypes, options?.mediaTypes);
 
     if (options?.splitByDependency) {
         const groupedData: Record<string, ExportPersonnelData[]> = {};
@@ -629,11 +663,11 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         });
         const deps = Object.keys(groupedData).sort();
         for (const dep of deps) {
-            await addDataSheet(dep, groupedData[dep], filterDescription, options?.cardTypes);
+            await addDataSheet(dep, groupedData[dep], filterDescription, options?.cardTypes, options?.mediaTypes);
         }
         fileNameParts.push('Por_Dependencia');
     } else {
-        await addDataSheet('Directorio', data, filterDescription, options?.cardTypes);
+        await addDataSheet('Directorio', data, filterDescription, options?.cardTypes, options?.mediaTypes);
     }
 
     const finalFileName = `${fileNameParts.join('_')}_${new Date().toISOString().split('T')[0]}.xlsx`;

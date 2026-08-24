@@ -147,6 +147,7 @@
                 },
                 splitByDependency,
                 cardTypes: exportCardTypes,
+                mediaTypes: catalogState.mediaTypes,
             });
             toast.success("Exportación completada", { id: loadingToast });
         } catch (error) {
@@ -179,6 +180,7 @@
                     toast.loading(`Procesando: ${label}`, { id: loadingToast });
                 },
                 exportCardTypes,
+                catalogState.mediaTypes,
             );
             toast.success("ZIP descargado", { id: loadingToast });
         } catch (error) {

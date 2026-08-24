@@ -108,27 +108,28 @@
 
 <div class="space-y-6">
     <SectionHeader title="Configuración del Sistema" />
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <!-- Sidebar Navigation -->
-        <Card class="lg:col-span-1 p-0 overflow-hidden h-fit bg-white/50 backdrop-blur-md border border-slate-200/50 rounded-[22px] shadow-sm">
-            <div class="p-6 border-b border-slate-100/60">
+
+    <div class="flex flex-col lg:flex-row gap-6 items-start">
+        <!-- Sidebar Navigation (sólida y ancha en desktop, pestañas horizontales en móvil) -->
+        <aside class="w-full lg:w-80 shrink-0 lg:sticky lg:top-6 bg-white border border-slate-200 rounded-3xl shadow-sm">
+            <div class="px-6 py-5 border-b border-slate-100 rounded-t-3xl">
                 <h3 class="font-extrabold text-slate-900 tracking-tight uppercase text-xs tracking-[0.1em]">Administración</h3>
                 <p class="text-[11px] font-bold text-slate-400 mt-1">Configura el ecosistema Nexa</p>
             </div>
-            <nav class="flex flex-col p-3 gap-1.5">
+
+            <nav class="flex lg:flex-col p-3 gap-1.5 overflow-x-auto scrollbar-none">
                 {#each [{ id: "catalogos", label: "Catálogos", icon: Building2 }, ...(currentUser.role === "admin" ? [{ id: "usuarios", label: "Usuarios", icon: Users }] : [])] as item}
                     {@const Icon = item.icon}
                     <button
-                        class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 text-left active:scale-[0.98] {activeTab === item.id ? 'bg-slate-900 text-white shadow-lg shadow-blue-500/5' : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'}"
+                        class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab === item.id ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
                         onclick={() => (activeTab = item.id as typeof activeTab)}
                     >
                         <div class={activeTab === item.id ? "text-white" : "text-slate-400"}><Icon size={18} strokeWidth={2.5} /></div>
                         {item.label}
                     </button>
                 {/each}
-                <div class="my-2 border-t border-slate-100/60"></div>
                 <button
-                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 text-left active:scale-[0.98] {activeTab === 'responsiva' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/10' : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900'}"
+                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab === 'responsiva' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
                     onclick={() => (activeTab = "responsiva")}
                 >
                     <div class={activeTab === "responsiva" ? "text-white" : "text-indigo-500"}>
@@ -137,13 +138,14 @@
                     Responsiva
                 </button>
             </nav>
-            <div class="p-4 border-t border-slate-100/60">
+
+            <div class="px-4 py-4 border-t border-slate-100">
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-3">Herramientas</p>
                 <ExportDropdown
                     icon={FileDown}
                     label={isGeneratingTemplate ? "Generando..." : "Plantilla de Solicitudes"}
                     disabled={isGeneratingTemplate || !networkStore.isOnline}
-                    menuWidth="w-72"
+                    menuWidth="w-80"
                 >
                     {#snippet items()}
                         <div class="p-3 space-y-1">
@@ -175,42 +177,44 @@
                         </div>
                     {/snippet}
                 </ExportDropdown>
-                <button class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-                    onclick={handleGenerateKoneTemplate} disabled={isGeneratingKoneTemplate || !networkStore.isOnline}>
+                <button
+                    class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                    onclick={handleGenerateKoneTemplate}
+                    disabled={isGeneratingKoneTemplate || !networkStore.isOnline}
+                >
                     <FileDown size={18} strokeWidth={2.5} class="text-sky-500" />
                     {isGeneratingKoneTemplate ? "Generando..." : "Plantilla de Uso KONE"}
                 </button>
             </div>
-        </Card>
+        </aside>
 
         <!-- Content Area -->
-        <div class="lg:col-span-3 space-y-6">
+        <div class="flex-1 min-w-0 space-y-6">
             {#if activeTab === "catalogos"}
                 <!-- Catalog sub-tabs -->
-                <div class="flex items-center gap-3 overflow-x-auto pb-4 scrollbar-none">
+                <div class="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-none">
                     {#each catalogTabs as item}
                         {@const Icon = item.icon}
                         <button
-                            class="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[13px] font-extrabold whitespace-nowrap transition-all duration-300 active:scale-95 {activeCatalog === item.id ? 'bg-white text-slate-900 shadow-md ring-1 ring-slate-200' : 'bg-slate-100/50 text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
+                            class="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[13px] font-extrabold whitespace-nowrap transition-all duration-200 active:scale-95 {activeCatalog === item.id ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800'}"
                             onclick={() => (activeCatalog = item.id)}
                         >
                             <Icon size={16} strokeWidth={2.5} /> {item.label}
                         </button>
                     {/each}
                 </div>
-                <Card class="p-8 min-h-[400px] bg-white/60 backdrop-blur-md rounded-[22px] border border-slate-200/50 shadow-sm relative overflow-hidden">
-                    {#if activeCatalog === "edificios"}
-                        <BuildingCatalog {canEdit} />
-                    {:else if activeCatalog === "dependencias"}
-                        <DependencyCatalog {canEdit} />
-                    {:else if activeCatalog === "accesos"}
-                        <AccessCatalog {canEdit} />
-                    {:else if activeCatalog === "medios"}
-                        <MediaTypeCatalog {canEdit} />
-                    {:else if activeCatalog === "dias"}
-                        <ScheduleCatalog {canEdit} />
-                    {/if}
-                </Card>
+
+                {#if activeCatalog === "edificios"}
+                    <BuildingCatalog {canEdit} />
+                {:else if activeCatalog === "dependencias"}
+                    <DependencyCatalog {canEdit} />
+                {:else if activeCatalog === "accesos"}
+                    <AccessCatalog {canEdit} />
+                {:else if activeCatalog === "medios"}
+                    <MediaTypeCatalog {canEdit} />
+                {:else if activeCatalog === "dias"}
+                    <ScheduleCatalog {canEdit} />
+                {/if}
             {:else if activeTab === "usuarios"}
                 <UserManagementSection />
             {:else if activeTab === "responsiva"}
@@ -221,7 +225,7 @@
                         <span class="text-[13px] font-extrabold">Configuración de Responsiva</span>
                     </div>
                 </div>
-                <Card class="p-8 bg-white/60 backdrop-blur-md rounded-[22px] border border-slate-200/50 shadow-sm relative overflow-hidden">
+                <Card class="p-8 bg-white border border-slate-200 rounded-[22px] shadow-sm relative overflow-hidden max-w-2xl">
                     <div class="max-w-xl space-y-8">
                         <!-- Descripción -->
                         <div class="flex items-start gap-4 p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100/60">
@@ -297,7 +301,7 @@
                         </div>
 
                         <!-- Vista previa de etiquetas -->
-                        <div class="p-5 rounded-2xl bg-slate-50/80 border border-slate-100/60 space-y-3">
+                        <div class="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
                             <h4 class="text-[10px] font-black uppercase tracking-widest text-slate-500">
                                 Vista previa de etiquetas
                             </h4>
@@ -315,7 +319,7 @@
                         </div>
 
                         <!-- Umbral de tipos core para estado Activo -->
-                        <div class="pt-3 border-t border-slate-100/60 space-y-2">
+                        <div class="pt-3 border-t border-slate-100 space-y-2">
                             <label for="core-types-required" class="text-sm font-bold text-slate-800 block">
                                 Tipos de acceso requeridos para "Activo/a"
                             </label>
