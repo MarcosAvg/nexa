@@ -1,13 +1,13 @@
 <script lang="ts">
-    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, TicketTypesCatalog, UserManagementSection } from "../components";
-    import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard, Ticket } from "lucide-svelte";
+    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection } from "../components";
+    import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard } from "lucide-svelte";
     import { userState, catalogState, settingsState } from "../stores";
     import { networkStore } from "../stores/network.svelte";
     import { generateRequestTemplate, generateKoneUsageTemplate, generateAccessProTemplate, handleError } from "../utils";
     import { toast } from "svelte-sonner";
 
     let activeTab = $state<"catalogos" | "usuarios" | "responsiva">("catalogos");
-    let activeCatalog = $state<"edificios" | "dependencias" | "accesos" | "dias" | "medios" | "tickets">("edificios");
+    let activeCatalog = $state<"edificios" | "dependencias" | "accesos" | "dias" | "medios">("edificios");
 
     // Campos editables de configuración de responsiva
     let pickupDaysInput = $state(settingsState.responsivaPickupDays);
@@ -103,7 +103,6 @@
         { id: "accesos", label: "Accesos", icon: Key },
         { id: "medios", label: "Medios", icon: CreditCard },
         { id: "dias", label: "Horarios", icon: Calendar },
-        { id: "tickets", label: "Tickets", icon: Ticket },
     ] as const;
 </script>
 
@@ -184,8 +183,6 @@
                         <MediaTypeCatalog {canEdit} />
                     {:else if activeCatalog === "dias"}
                         <ScheduleCatalog {canEdit} />
-                    {:else if activeCatalog === "tickets"}
-                        <TicketTypesCatalog {canEdit} />
                     {/if}
                 </Card>
             {:else if activeTab === "usuarios"}

@@ -21,7 +21,6 @@
     "public/functions/normalize_floor_label.sql",
     "public/schema.sql",
     "public/tables/app_settings.sql",
-    "public/tables/ticket_types.sql",
     "public/functions/core_types_required.sql",
     "public/tables/access_assignment_permissions.sql",
     "public/tables/access_assignments.sql",

@@ -95,14 +95,13 @@ import { fade } from "svelte/transition";
 
       // 1. Critical data for immediate UI (Dashboard / Catalogs)
       // Reemplazado el antiguo personnelService.fetchOptions con uno nuevo eficiente si está disponible
-      const [_pOptions, _d, _b, _a, _s, _m, _tt] = await Promise.all([
+      const [_pOptions, _d, _b, _a, _s, _m] = await Promise.all([
         personnelService.fetchOptions(true),
         catalogService.fetchDependencies(true),
         catalogService.fetchBuildings(true),
         catalogService.fetchAccesses(true),
         catalogService.fetchSchedules(true),
         catalogService.fetchMediaTypes(true),
-        catalogService.fetchTicketTypes(true),
       ]);
 
       personnelState.setPersonnelOptions(_pOptions);
@@ -111,7 +110,6 @@ import { fade } from "svelte/transition";
       catalogState.setSpecialAccesses(_a);
       catalogState.setSchedules(_s);
       catalogState.setMediaTypes(_m);
-      catalogState.setTicketTypes(_tt);
       void settingsState.loadFromServer();
 
       // 2. Secondary data loaded in background (Non-blocking)

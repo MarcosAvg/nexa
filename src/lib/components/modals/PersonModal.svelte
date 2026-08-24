@@ -131,13 +131,26 @@
             seen.add(m.key);
             out.push({ id: m.id, key: m.key, name: m.name });
         }
-        return out;
+         return out;
+    });
+
+    /** Mapa id -> medio, para resolver relaciones medio-edificio al renderizar. */
+    let mediaTypeById = $derived.by(() => {
+        const map: Record<string, any> = {};
+        for (const m of catalogState.mediaTypes) map[m.id] = m;
+        return map;
     });
 
     /** Pisos del edificio base para una clave de medio (ej. "p2000"). */
     function baseFloorsForKey(key: string): string[] {
         const fm = floorMediaTypes.find((f) => f.key === key);
         return fm ? (floorsByBuilding[baseBuildingId]?.[fm.id] ?? []) : [];
+    }
+
+    /** Indica si un medio aplica en un edificio (relación medio-edificio). */
+    function mediaAppliesToBuilding(m: any, bid: number): boolean {
+        if (!m.access_media_type_buildings) return true; // fallback: no aplicar filtro si no hay relación cargada
+        return m.access_media_type_buildings.some((r: any) => Number(r.building_id) === bid);
     }
 
     let baseP2000 = $derived(baseFloorsForKey("p2000"));
@@ -959,14 +972,16 @@
                                 </div>
                                 <div class="space-y-4">
                                     {#each floorMediaTypes as fm}
-                                        <ToggleGroup
-                                            label={`Pisos ${fm.name}`}
-                                            options={bFloors}
-                                            value={floorsByBuilding[bid]?.[fm.id] ?? []}
-                                            onchange={(v) =>
-                                                updateBuildingFloors(bid, fm.id, v)}
-                                            showSelectAll={true}
-                                        />
+                                        {#if mediaAppliesToBuilding(mediaTypeById[fm.id], bid)}
+                                            <ToggleGroup
+                                                label={`Pisos ${fm.name}`}
+                                                options={bFloors}
+                                                value={floorsByBuilding[bid]?.[fm.id] ?? []}
+                                                onchange={(v) =>
+                                                    updateBuildingFloors(bid, fm.id, v)}
+                                                showSelectAll={true}
+                                            />
+                                        {/if}
                                     {/each}
                                     {#if specialOptionsFor(bid).length > 0}
                                         <ToggleGroup

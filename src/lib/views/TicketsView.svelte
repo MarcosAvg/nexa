@@ -148,13 +148,8 @@
         ),
     );
 
-    // Tipos de ticket desde el catálogo (activos de la sección General).
-    let generalTicketTypeNames = $derived(
-        catalogState.ticketTypes
-            .filter((t) => t.active !== false && t.section === "general")
-            .map((t) => t.name),
-    );
-    let ticketTypes = $derived(["Todos", ...generalTicketTypeNames]);
+    import { GENERAL_TICKET_TYPES } from "../constants/tickets";
+    const ticketTypes = ["Todos", ...GENERAL_TICKET_TYPES];
 
     import { supabase } from "../supabase";
 

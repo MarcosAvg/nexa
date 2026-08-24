@@ -9,6 +9,7 @@ create table "public"."access_assignment_permissions" (
   constraint "access_assignment_permissions_pkey" primary key ("id"),
   constraint "access_assignment_permissions_assignment_id_fkey" foreign key ("assignment_id") references public.access_assignments("id") on delete cascade,
   constraint "access_assignment_permissions_floor_building_check" check (resource_type <> 'floor' or building_id is not null),
+  constraint "access_assignment_permissions_resource_check" check ((resource_type = 'floor' and floor_id is not null and special_access_id is null) or (resource_type = 'special_access' and special_access_id is not null and floor_id is null)),
   constraint "access_assignment_permissions_floor_id_fkey" foreign key ("floor_id") references public.floors("id") on delete cascade,
   constraint "access_assignment_permissions_special_access_id_fkey" foreign key ("special_access_id") references public.special_accesses("id") on delete cascade
 );

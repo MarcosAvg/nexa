@@ -9,7 +9,8 @@ create table "public"."document_templates" (
   "content"       text,
   "created_at"    timestamp with time zone not null default now(),
   constraint "document_templates_key_key" unique ("key"),
-  constraint "document_templates_pkey" primary key ("id")
+  constraint "document_templates_pkey" primary key ("id"),
+  constraint "document_templates_media_type_id_fkey" foreign key ("media_type_id") references public.access_media_types("id") on delete set null
 );
 
 alter table "public"."document_templates" enable row level security;

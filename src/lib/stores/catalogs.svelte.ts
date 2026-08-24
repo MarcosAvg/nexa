@@ -6,7 +6,6 @@ export class CatalogState {
     specialAccesses = $state<CatalogItem[]>([]);
     schedules = $state<CatalogItem[]>([]);
     mediaTypes = $state<CatalogItem[]>([]);
-    ticketTypes = $state<CatalogItem[]>([]);
 
     setDependencies(data: CatalogItem[]) {
         this.dependencies = data;
@@ -28,9 +27,6 @@ export class CatalogState {
         this.mediaTypes = data;
     }
 
-    setTicketTypes(data: CatalogItem[]) {
-        this.ticketTypes = data;
-    }
 
     /** Nombres (distintos) de los medios de acceso activos, para desplegables/filtros. */
     activeMediaTypeNames(): string[] {

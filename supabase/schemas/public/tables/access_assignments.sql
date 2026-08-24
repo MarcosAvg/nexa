@@ -8,7 +8,8 @@ create table "public"."access_assignments" (
   "status"          text                     not null default 'active',
   constraint "access_assignments_pkey" primary key ("id"),
   constraint "access_assignments_media_type_id_fkey" foreign key ("media_type_id") references public.access_media_types("id"),
-  constraint "access_assignments_person_id_fkey" foreign key ("person_id") references public.personnel("id") on delete cascade
+  constraint "access_assignments_person_id_fkey" foreign key ("person_id") references public.personnel("id") on delete cascade,
+  constraint "access_assignments_access_media_id_fkey" foreign key ("access_media_id") references public.access_media("id") on delete set null
 );
 
 alter table "public"."access_assignments" enable row level security;

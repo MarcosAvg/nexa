@@ -29,8 +29,17 @@
     let buildings = $derived(catalogState.buildings);
     let mediaTypes = $derived(catalogState.mediaTypes);
 
-    /** Edificios asignados por tipo de medio (de la tabla puente). */
-    let buildingsByMedia = $state<Record<string, number[]>>({});
+    /** Edificios asignados por tipo de medio (del embed de la tabla puente). */
+    let buildingsByMedia = $derived.by(() => {
+        const map: Record<string, number[]> = {};
+        for (const m of mediaTypes) {
+            const rels = (m as any).access_media_type_buildings || [];
+            if (rels.length > 0) {
+                map[m.id] = rels.map((r: any) => Number(r.building_id));
+            }
+        }
+        return map;
+    });
 
     // Estado de reordenamiento (evita clics consecutivos en vuelo)
     let isReordering = $state(false);
@@ -52,17 +61,6 @@
     async function fetchMediaTypes() {
         const data = await catalogService.fetchMediaTypes();
         catalogState.setMediaTypes(data);
-        // Cargar asignaciones de edificios desde la tabla puente.
-        const { supabase } = await import("../../supabase");
-        const { data: rows } = await supabase
-            .from("access_media_type_buildings")
-            .select("media_type_id, building_id");
-        const map: Record<string, number[]> = {};
-        for (const r of rows || []) {
-            if (!map[r.media_type_id]) map[r.media_type_id] = [];
-            map[r.media_type_id].push(Number(r.building_id));
-        }
-        buildingsByMedia = map;
     }
 
     function buildingNames(ids: number[] | undefined): string {

@@ -180,6 +180,16 @@ export const accessAssignmentService = {
                 }
             }
 
+            // Relaciones medio-edificio: un medio solo aplica en los edificios asignados.
+            const { data: mediaBuildings } = await supabase
+                .from("access_media_type_buildings")
+                .select("media_type_id, building_id");
+            const mediaBuildingsSet = new Set<string>(
+                (mediaBuildings || []).map((r) => `${r.media_type_id}:${r.building_id}`),
+            );
+            const mediaApplies = (mediaTypeId: string, bid: number) =>
+                mediaBuildingsSet.has(`${mediaTypeId}:${bid}`);
+
             const assignments = await this.fetchForPerson(personId);
             for (const assignment of assignments) {
                 const rows: {
@@ -193,11 +203,14 @@ export const accessAssignmentService = {
                 const seenSpecials = new Set<string>();
 
                 // Pisos por edificio seleccionado, con el building_id real.
+                // Solo se escriben si el medio de la asignación aplica a ese edificio.
                 for (const [bidStr, typeMap] of Object.entries(floorsByBuilding)) {
                     const bid = Number(bidStr);
                     if (!Number.isFinite(bid)) continue;
-                    const labelMap = floorIdByBuilding.get(bid);
                     const list = typeMap[assignment.media_type_id] || [];
+                    if (list.length === 0) continue;
+                    if (!mediaApplies(assignment.media_type_id, bid)) continue;
+                    const labelMap = floorIdByBuilding.get(bid);
                     for (const f of list) {
                         const key = f.trim();
                         const dedupeKey = `${bid}:${key.toLowerCase()}`;
@@ -213,6 +226,7 @@ export const accessAssignmentService = {
                 }
 
                 // Accesos especiales: heredan el edificio de su catálogo.
+                // Solo se escriben si el acceso existe en el catálogo.
                 for (const s of specialAccesses) {
                     if (!s || !s.trim()) continue;
                     const name = s.trim();
@@ -220,11 +234,12 @@ export const accessAssignmentService = {
                     if (seenSpecials.has(dedupeKey)) continue;
                     seenSpecials.add(dedupeKey);
                     const sp = specialByName.get(name);
+                    if (!sp) continue; // acceso no catalogado: omitir
                     rows.push({
                         assignment_id: assignment.id,
                         resource_type: "special_access",
-                        building_id: sp?.buildingId ?? 0,
-                        special_access_id: sp?.id ?? null,
+                        building_id: sp.buildingId ?? 0,
+                        special_access_id: sp.id,
                     });
                 }
 

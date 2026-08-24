@@ -11,6 +11,8 @@ create table "public"."access_media_types" (
   constraint "access_media_types_pkey" primary key ("id")
 );
 
+create unique index access_media_types_key_unique on public.access_media_types using btree ("key");
+
 alter table "public"."access_media_types" enable row level security;
 
 create policy "Access media types viewable by authenticated"

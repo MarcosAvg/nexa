@@ -15,11 +15,11 @@ create or replace function public.get_dashboard_stats()
               AND am.responsiva_status IN ('signed', 'legacy')
         ),
         'stock', (
-            SELECT COALESCE(json_agg(x ORDER BY x.building_id, x.sort_order), '[]'::json)
+            SELECT COALESCE(json_agg(x ORDER BY x."sortOrder"), '[]'::json)
             FROM (
                 SELECT t.id AS "mediaTypeId",
                        t.name,
-                       t.sort_order,
+                       t.sort_order AS "sortOrder",
                        COUNT(am.id) AS stock
                 FROM access_media_types t
                 LEFT JOIN access_media am
@@ -27,7 +27,7 @@ create or replace function public.get_dashboard_stats()
                  AND am.status = 'available'
                  AND am.person_id IS NULL
                 WHERE t.active
-                GROUP BY t.id, t.name, t.building_id, t.sort_order
+                GROUP BY t.id, t.name, t.sort_order
             ) x
         )
     );
