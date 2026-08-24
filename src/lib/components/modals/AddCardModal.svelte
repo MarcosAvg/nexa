@@ -64,7 +64,7 @@
     let personnel = $derived(personnelState.pagination.items);
     let extraCards = $derived(personnelState.extraCards);
 
-    let cardType = $state<string>("P2000");
+    let cardType = $state<string>("");
     // Medios de acceso activos, para renderizar el selector dinámicamente.
     let mediaTypes = $derived.by(() =>
         catalogState.mediaTypes

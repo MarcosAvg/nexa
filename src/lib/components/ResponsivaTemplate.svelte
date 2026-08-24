@@ -41,7 +41,7 @@
         mode = "hidden",
         signature = "",
         legalSnapshot = "",
-        cardType = "KONE",
+        cardType = "",
     }: Props = $props();
 
     let fallbackTexts = $state<string[]>([]);

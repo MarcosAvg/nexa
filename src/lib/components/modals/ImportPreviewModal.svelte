@@ -33,6 +33,7 @@
     } from "../../utils";
     import type { Person } from "../../types";
     import { catalogState } from "../../stores";
+    import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
     import {
         analyzeAltaConflicts,
         analyzeModificacionConflicts,
@@ -608,11 +609,17 @@
         reporte_falla: "violet",
     };
 
-    const CARD_TYPE_COLORS: Record<string, string> = {
-        P2000: "bg-amber-100 text-amber-700 border-amber-200",
-        KONE: "bg-blue-100 text-blue-700 border-blue-200",
-        AccessPRO: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    // Clases de badge por tipo de medio, derivadas de mediaTypeVariant (paleta estable).
+    const VARIANT_BADGE_CLASSES: Record<string, string> = {
+        amber: "bg-amber-100 text-amber-700 border-amber-200",
+        blue: "bg-blue-100 text-blue-700 border-blue-200",
+        emerald: "bg-emerald-100 text-emerald-700 border-emerald-200",
+        violet: "bg-violet-100 text-violet-700 border-violet-200",
+        rose: "bg-rose-100 text-rose-700 border-rose-200",
     };
+    function cardTypeClasses(type: string): string {
+        return VARIANT_BADGE_CLASSES[mediaTypeVariant(type)] ?? "bg-slate-100 text-slate-600 border-slate-200";
+    }
 
 function cardStatusBadge(status: string): { text: string; color: "emerald" | "rose" | "slate" } {
     if (status === "active") return { text: "Activa", color: "emerald" };
@@ -1652,10 +1659,9 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                     >
                                                                     {#each requestedCards as type}
                                                                         <span
-                                                                            class="text-[10px] font-bold px-2 py-0.5 rounded border {CARD_TYPE_COLORS[
+                                                                            class="text-[10px] font-bold px-2 py-0.5 rounded border {cardTypeClasses(
                                                                                 type
-                                                                            ] ??
-                                                                                'bg-slate-100 text-slate-600 border-slate-200'}"
+                                                                            )}"
                                                                             >{type}</span
                                                                         >
                                                                     {/each}
@@ -1762,11 +1768,9 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                             class="flex items-center gap-2 text-xs"
                                                                         >
                                                                             <span
-                                                                                class="font-bold px-1.5 py-0.5 rounded {CARD_TYPE_COLORS[
-                                                                                    rc
-                                                                                        .type
-                                                                                ] ??
-                                                                                    'bg-slate-100'} text-[10px]"
+                                                                                class="font-bold px-1.5 py-0.5 rounded {cardTypeClasses(
+                                                                                    rc.type
+                                                                                )} text-[10px]"
                                                                                 >{rc.type}</span
                                                                             >
                                                                             <span

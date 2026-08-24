@@ -295,7 +295,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div class="sm:col-span-1">
                 <label for="tpl-name" class="block text-sm font-medium text-slate-700 mb-1">Nombre</label>
-                <Input id="tpl-name" placeholder="Ej. Responsiva KONE" bind:value={name} />
+                <Input id="tpl-name" placeholder="Ej. Responsiva del medio" bind:value={name} />
             </div>
             <div>
                 <label for="tpl-type" class="block text-sm font-medium text-slate-700 mb-1">Tipo de documento</label>
