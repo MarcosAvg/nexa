@@ -255,47 +255,45 @@
                     <SectionPill
                         icon={FileSignature}
                         label="Configuración de Responsiva"
-                        className="bg-indigo-50 text-indigo-700"
+                        className="bg-slate-100 text-slate-700"
                     />
                 </div>
                 <Card class="p-8 bg-white border border-slate-200 rounded-2xl shadow-sm relative overflow-hidden max-w-2xl">
                     <div class="max-w-xl space-y-8">
                         <!-- Descripción -->
                         <div class="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                            <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                            <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
                                 <AlertTriangle size={20} strokeWidth={2.5} />
                             </div>
                             <div>
-                                <h4 class="text-sm font-bold text-indigo-900 mb-1">Umbrales de Firma Responsiva</h4>
-                                <p class="text-xs font-medium text-indigo-700/70 leading-relaxed">
+                                <h4 class="text-sm font-bold text-slate-800 mb-1">Umbrales de Firma Responsiva</h4>
+                                <p class="text-xs font-medium text-slate-500 leading-relaxed">
                                     Estos valores determinan cuándo se muestran las etiquetas de advertencia en las tarjetas de Firma Responsiva.
                                     Afectan tanto a la vista de tickets como a la exportación a Excel.
                                 </p>
                             </div>
                         </div>
 
-                        <!-- Días para baja de registro -->
-                        <div class="space-y-3">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <label for="pickup-days" class="text-sm font-bold text-slate-800">
-                                        Días para baja de registro
-                                    </label>
-                                    <p class="text-[11px] font-medium text-slate-400 mt-0.5">
-                                        Si el acceso no se recoge después de este plazo, se marca como "Baja de Registro" (etiqueta roja).
-                                    </p>
-                                </div>
-                                <span class="text-xs font-black text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg ml-4 shrink-0">
+                        <!-- Ajuste: Días para baja de registro -->
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between gap-4">
+                                <label for="pickup-days" class="text-sm font-bold text-slate-800">
+                                    Días para baja de registro
+                                </label>
+                                <span class="inline-flex items-center gap-1 text-xs font-black text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg shrink-0">
                                     {settingsState.responsivaPickupDays} días
                                 </span>
                             </div>
+                            <p class="text-[11px] font-medium text-slate-400">
+                                Si el acceso no se recoge después de este plazo, se marca como "Baja de Registro" (etiqueta roja).
+                            </p>
                             <input
                                 id="pickup-days"
                                 type="range"
                                 min="1"
                                 max="90"
                                 bind:value={pickupDaysInput}
-                                class="w-full h-2 rounded-full appearance-none cursor-pointer accent-indigo-600 bg-slate-200"
+                                class="w-full h-2 rounded-full appearance-none cursor-pointer accent-blue-600 bg-slate-200"
                             />
                             <div class="flex justify-between text-[10px] font-bold text-slate-400 px-1">
                                 <span>1 día</span>
@@ -303,29 +301,26 @@
                             </div>
                         </div>
 
-                        <!-- Días para advertencia -->
-                        <div class="space-y-3">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <label for="warn-days" class="text-sm font-bold text-slate-800">
-                                        Días para advertencia "Por vencer"
-                                    </label>
-                                    <p class="text-[11px] font-medium text-slate-400 mt-0.5">
-                                        A partir de este número de días sin recoger, se muestra la etiqueta ámbar de advertencia.
-                                        Debe ser menor al plazo de baja.
-                                    </p>
-                                </div>
-                                <span class="text-xs font-black text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg ml-4 shrink-0">
+                        <!-- Ajuste: Días para advertencia "Por vencer" -->
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between gap-4">
+                                <label for="warn-days" class="text-sm font-bold text-slate-800">
+                                    Días para advertencia "Por vencer"
+                                </label>
+                                <span class="inline-flex items-center gap-1 text-xs font-black text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg shrink-0">
                                     {settingsState.responsivaWarnDays} días
                                 </span>
                             </div>
+                            <p class="text-[11px] font-medium text-slate-400">
+                                A partir de este número de días sin recoger, se muestra la etiqueta ámbar. Debe ser menor al plazo de baja.
+                            </p>
                             <input
                                 id="warn-days"
                                 type="range"
                                 min="1"
                                 max={Math.max(1, pickupDaysInput - 1)}
                                 bind:value={warnDaysInput}
-                                class="w-full h-2 rounded-full appearance-none cursor-pointer accent-indigo-600 bg-slate-200"
+                                class="w-full h-2 rounded-full appearance-none cursor-pointer accent-blue-600 bg-slate-200"
                             />
                             <div class="flex justify-between text-[10px] font-bold text-slate-400 px-1">
                                 <span>1 día</span>
@@ -354,10 +349,12 @@
 
                         <!-- Umbral de tipos core para estado Activo -->
                         <div class="pt-3 border-t border-slate-100 space-y-2">
-                            <label for="core-types-required" class="text-sm font-bold text-slate-800 block">
-                                Tipos de acceso requeridos para "Activo/a"
-                            </label>
-                            <p class="text-[11px] text-slate-500">
+                            <div class="flex items-center justify-between gap-4">
+                                <label for="core-types-required" class="text-sm font-bold text-slate-800">
+                                    Tipos de acceso requeridos para "Activo/a"
+                                </label>
+                            </div>
+                            <p class="text-[11px] text-slate-400">
                                 Cantidad de medios con pisos listos (programados y firmados) que una persona necesita.
                                 Aplica al listado, dashboard e historial tras recargar.
                             </p>
