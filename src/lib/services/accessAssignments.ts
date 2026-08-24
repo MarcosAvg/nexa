@@ -187,14 +187,15 @@ export const accessAssignmentService = {
                 mediaBuildingsSet.has(`${mediaTypeId}:${bid}`);
 
             const assignments = await this.fetchForPerson(personId);
+            const allRows: {
+                assignment_id: string;
+                resource_type: string;
+                building_id: number;
+                floor_id?: number | null;
+                special_access_id?: number | null;
+            }[] = [];
+
             for (const assignment of assignments) {
-                const rows: {
-                    assignment_id: string;
-                    resource_type: string;
-                    building_id: number;
-                    floor_id?: number | null;
-                    special_access_id?: number | null;
-                }[] = [];
                 const seenFloors = new Set<string>();
                 const seenSpecials = new Set<string>();
 
@@ -212,7 +213,7 @@ export const accessAssignmentService = {
                         const dedupeKey = `${bid}:${key.toLowerCase()}`;
                         if (!key || seenFloors.has(dedupeKey)) continue;
                         seenFloors.add(dedupeKey);
-                        rows.push({
+                        allRows.push({
                             assignment_id: assignment.id,
                             resource_type: "floor",
                             building_id: bid,
@@ -228,27 +229,21 @@ export const accessAssignmentService = {
                     seenSpecials.add(String(id));
                     const buildingId = specialById.get(id);
                     if (buildingId === undefined) continue; // acceso no catalogado: omitir
-                    rows.push({
+                    allRows.push({
                         assignment_id: assignment.id,
                         resource_type: "special_access",
                         building_id: buildingId ?? 0,
                         special_access_id: id,
                     });
                 }
-
-                const { error: delError } = await supabase
-                    .from("access_assignment_permissions")
-                    .delete()
-                    .eq("assignment_id", assignment.id);
-                if (delError) throw delError;
-
-                if (rows.length > 0) {
-                    const { error: insError } = await supabase
-                        .from("access_assignment_permissions")
-                        .insert(rows);
-                    if (insError) throw insError;
-                }
             }
+
+            // Escritura atómica: delete + insert en un solo RPC transaccional.
+            const { error } = await supabase.rpc("set_person_access_permissions", {
+                p_person_id: personId,
+                p_rows: allRows,
+            });
+            if (error) throw error;
         }, "Save Person Access");
     },
 

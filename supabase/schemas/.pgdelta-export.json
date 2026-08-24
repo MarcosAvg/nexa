@@ -17,6 +17,7 @@
     "public/functions/handle_new_user.sql",
     "public/functions/reorder_catalog.sql",
     "public/functions/reorder_media_types.sql",
+    "public/functions/set_person_access_permissions.sql",
     "public/functions/search_personnel_fuzzy.sql",
     "public/schema.sql",
     "public/tables/app_settings.sql",
