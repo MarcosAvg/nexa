@@ -99,6 +99,9 @@
             cardType = replacingCard.type;
         } else if (allowedCardTypes?.length === 1) {
             cardType = allowedCardTypes[0];
+        } else if (mediaTypes.length > 0 && !mediaTypes.some((m) => m.name === cardType)) {
+            // default al primer medio activo del catálogo (no hardcodeado)
+            cardType = mediaTypes[0].name;
         }
     });
 
