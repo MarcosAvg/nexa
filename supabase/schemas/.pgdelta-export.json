@@ -18,7 +18,6 @@
     "public/functions/reorder_catalog.sql",
     "public/functions/reorder_media_types.sql",
     "public/functions/search_personnel_fuzzy.sql",
-    "public/functions/normalize_floor_label.sql",
     "public/schema.sql",
     "public/tables/app_settings.sql",
     "public/functions/core_types_required.sql",

@@ -150,7 +150,9 @@
 
     function getCurrentFloors(key: string): string[] {
         if (!currentPerson) return [];
-        return (currentPerson as any)[key] || [];
+        // Leer desde el modelo nuevo (floorGroup por clave de medio).
+        const group = (currentPerson.floors || []).find((g) => g.mediaKey === key);
+        return group ? group.floors : [];
     }
 
     function getModifiedFloors(key: string, fallbackKey?: string): string[] {
@@ -161,6 +163,29 @@
             []
         );
     }
+
+    // Medios con pisos del catálogo: deriva los campos de comparación de pisos.
+    // Para una clave de medio "p2000", se mapen a floors_p2000 / pisosP2000,
+    // heredando el nombre de campo legado para compatibilidad con la plantilla.
+    let floorMediaFields = $derived.by(() => {
+        const seen = new Set<string>();
+        const fields: { key: string; label: string; currentKey: string; modifiedKey: string; fallbackKey: string }[] = [];
+        for (const m of catalogState.mediaTypes) {
+            if ((m as any).active === false || !(m as any).has_floors) continue;
+            const key = m.key;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const cap = key.charAt(0).toUpperCase() + key.slice(1);
+            fields.push({
+                key,
+                label: `Pisos ${m.name}`,
+                currentKey: `floors_${key}`,
+                modifiedKey: `pisos${cap}`,
+                fallbackKey: `floors_${key}`,
+            });
+        }
+        return fields;
+    });
 
     // Comparación de horario
     function getCurrentScheduleEntry(): string {
@@ -197,10 +222,11 @@
             // Construir payload de guardado desde datos modificados.
             // Las listas de pisos del ticket vienen por clave de medio; se
             // convierten a id de tipo de medio para savePersonAccess.
-            const byKey: Record<string, string[]> = {
-                p2000: (modifiedData as any).floors_p2000 ?? [],
-                kone: (modifiedData as any).floors_kone ?? [],
-            };
+            const byKey: Record<string, string[]> = {};
+            for (const f of floorMediaFields) {
+                const raw = (modifiedData as any)[f.modifiedKey] ?? (modifiedData as any)[f.fallbackKey] ?? [];
+                if (Array.isArray(raw) && raw.length > 0) byKey[f.key] = raw;
+            }
             const specialAccesses =
                 (modifiedData as any).specialAccesses ??
                 (modifiedData as any).special_accesses ??
@@ -656,11 +682,11 @@
             {/if}
 
             <!-- Floor Arrays Comparison -->
-            {#each [{ label: "Pisos P2000", currentKey: "floors_p2000", modifiedKey: "pisosP2000", fallbackKey: "floors_p2000" }, { label: "Pisos Kone", currentKey: "floors_kone", modifiedKey: "pisosKone", fallbackKey: "floors_kone" }] as floorField}
-                {@const currentFloors = getCurrentFloors(floorField.currentKey)}
+            {#each floorMediaFields as field}
+                {@const currentFloors = getCurrentFloors(field.key)}
                 {@const modifiedFloors = getModifiedFloors(
-                    floorField.modifiedKey,
-                    floorField.fallbackKey,
+                    field.modifiedKey,
+                    field.fallbackKey,
                 )}
                 {@const changes = getFloorChanges(
                     currentFloors,
@@ -674,7 +700,7 @@
                         <p
                             class="text-xs font-bold text-slate-500 uppercase tracking-widest px-1"
                         >
-                            {floorField.label}
+                            {field.label}
                         </p>
 
                         <div

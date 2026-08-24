@@ -165,38 +165,32 @@
             return false;
         };
 
-        let proposedP2000 = [...floorsForKey(selectedPerson.floors, "p2000")];
-        if (p.accion_p2000) {
-            const action = p.accion_p2000;
-            const parsedFloors = parseFloors(p.pisos_p2000);
-
-            if (isAction(action, "clear")) proposedP2000 = [];
-            else if (isAction(action, "replace")) proposedP2000 = parsedFloors;
-            else if (isAction(action, "add"))
-                proposedP2000 = parseFloors([...proposedP2000, ...parsedFloors].join(","));
-            else if (isAction(action, "remove"))
-                proposedP2000 = proposedP2000.filter(
-                    (f) => !parsedFloors.includes(f),
-                );
+        // Pisos por clave de medio (derivados del catálogo con has_floors).
+        const floorMediaKeys = Array.from(new Set(
+            catalogState.mediaTypes
+                .filter((m: any) => m.active !== false && m.has_floors)
+                .map((m: any) => m.key),
+        ));
+        for (const key of floorMediaKeys) {
+            const cap = key.charAt(0).toUpperCase() + key.slice(1);
+            const proposed = [...floorsForKey(selectedPerson.floors, key)];
+            const action = (p as any)[`accion_${key}`];
+            const pisos = (p as any)[`pisos_${key}`];
+            if (action) {
+                const parsedFloors = parseFloors(pisos);
+                if (isAction(action, "clear")) proposed.length = 0;
+                else if (isAction(action, "replace")) proposed.splice(0, proposed.length, ...parsedFloors);
+                else if (isAction(action, "add"))
+                    proposed.splice(0, proposed.length,
+                        ...Array.from(new Set([...proposed, ...parsedFloors])));
+                else if (isAction(action, "remove"))
+                    proposed.splice(0, proposed.length,
+                        ...proposed.filter((f) => !parsedFloors.includes(f)));
+            }
+            // Forzar al modal de comparación a mostrar diferencias pasando los arrays generados
+            modifiedPayload[`floors_${key}`] = proposed;
+            modifiedPayload[`pisos${cap}`] = proposed;
         }
-        // Forzar al modal de comparación a mostrar diferencias pasando los arrays generados
-        modifiedPayload.floors_p2000 = proposedP2000;
-
-        let proposedKONE = [...floorsForKey(selectedPerson.floors, "kone")];
-        if (p.accion_kone) {
-            const action = p.accion_kone;
-            const parsedFloors = parseFloors(p.pisos_kone);
-
-            if (isAction(action, "clear")) proposedKONE = [];
-            else if (isAction(action, "replace")) proposedKONE = parsedFloors;
-            else if (isAction(action, "add"))
-                proposedKONE = parseFloors([...proposedKONE, ...parsedFloors].join(","));
-            else if (isAction(action, "remove"))
-                proposedKONE = proposedKONE.filter(
-                    (f) => !parsedFloors.includes(f),
-                );
-        }
-        modifiedPayload.floors_kone = proposedKONE;
 
         let proposedAccesses = [...(selectedPerson.specialAccesses || [])];
         if (p.accion_acc) {
@@ -271,65 +265,31 @@
         const cards: any[] = (selectedPerson.cards ?? []).filter(
             (c: any) => c.status === "active",
         );
-        const wantsP2000 = ["sí", "si"].includes(
-            (p.reponer_p2000 ?? "").toLowerCase(),
-        );
-        const wantsKONE = ["sí", "si"].includes(
-            (p.reponer_kone ?? "").toLowerCase(),
-        );
-        const wantsAccessPro =
-            ["sí", "si"].includes(
-                (p.reponer_accesspro ?? "").toLowerCase(),
-            ) || (p.folio_accesspro ?? "").trim().length > 0;
+        const YES = ["sí", "si"];
 
         const checks: FolioCheck[] = [];
 
-        if (wantsP2000) {
-            const folioSought = p.folio_p2000?.trim();
-            const p2000Cards = cards.filter((c: any) => c.type === "P2000");
-            if (p2000Cards.length === 0) {
-                // Sin tarjeta P2000 activa
+        // Deriva los tipos de medio desde el catálogo; cada uno se busca por
+        // sus columnas de reposición (reponer_<key> / folio_<key>).
+        const replacementMediaKeys = Array.from(new Set(
+            catalogState.mediaTypes
+                .filter((m: any) => m.active !== false)
+                .map((m: any) => ({ key: m.key, name: m.name })),
+        ));
+        for (const media of replacementMediaKeys) {
+            const wanted = YES.includes(((`reponer_${media.key}` as any) in p ? (p as any)[`reponer_${media.key}`] : "").toLowerCase());
+            const folioSought = (p as any)[`folio_${media.key}`]?.trim();
+            const wantFolio = (p as any)[`folio_${media.key}`]?.trim().length > 0 || YES.includes((p[`reponer_${media.key}`] ?? "").toLowerCase());
+            if (!wanted && !wantFolio) continue;
+            const mediaCards = cards.filter((c: any) => c.type === media.name);
+            if (mediaCards.length === 0) {
                 checks.push({
-                    card: { type: "P2000", folio: folioSought ?? "—" },
+                    card: { type: media.name, folio: folioSought ?? "—" },
                     match: false,
                     warning: true,
                 });
             } else {
-                for (const c of p2000Cards) {
-                    const match = !folioSought || c.folio === folioSought;
-                    checks.push({ card: c, match, warning: !match });
-                }
-            }
-        }
-        if (wantsKONE) {
-            const folioSought = p.folio_kone?.trim();
-            const koneCards = cards.filter((c: any) => c.type === "KONE");
-            if (koneCards.length === 0) {
-                checks.push({
-                    card: { type: "KONE", folio: folioSought ?? "—" },
-                    match: false,
-                    warning: true,
-                });
-            } else {
-                for (const c of koneCards) {
-                    const match = !folioSought || c.folio === folioSought;
-                    checks.push({ card: c, match, warning: !match });
-                }
-            }
-        }
-        if (wantsAccessPro) {
-            const folioSought = (p.folio_accesspro_repo ?? p.folio_accesspro)?.trim();
-            const accessproCards = cards.filter(
-                (c: any) => c.type === "AccessPRO",
-            );
-            if (accessproCards.length === 0) {
-                checks.push({
-                    card: { type: "AccessPRO", folio: folioSought ?? "—" },
-                    match: false,
-                    warning: true,
-                });
-            } else {
-                for (const c of accessproCards) {
+                for (const c of mediaCards) {
                     const match = !folioSought || c.folio === folioSought;
                     checks.push({ card: c, match, warning: !match });
                 }
