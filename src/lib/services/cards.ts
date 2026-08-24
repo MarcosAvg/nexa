@@ -74,16 +74,11 @@ export const cardService = {
                 .select("*, access_media_types(*), personnel(first_name, last_name, status)", { count: "exact" });
 
             if (search) {
-                const terms = search.trim().split(/\s+/).filter(Boolean);
                 const searchTerm = `%${search}%`;
 
-                let peopleQuery = supabase.from("personnel").select("id");
-                for (const term of terms) {
-                    const termPattern = `%${term}%`;
-                    peopleQuery = peopleQuery.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern}`);
-                }
-                const { data: people } = await peopleQuery;
-                const personIds = people?.map(p => p.id) || [];
+                // Búsqueda de personas vía RPC (un round-trip con unaccent).
+                const { data: people } = await supabase.rpc("search_personnel_ids", { p_search: search });
+                const personIds = people || [];
 
                 if (personIds.length > 0) {
                     query = query.or(`identifier.ilike.${searchTerm},person_id.in.(${personIds.join(',')})`);
@@ -143,13 +138,8 @@ export const cardService = {
         return withErrorHandlingSafe(async () => {
             let personIds: string[] = [];
             if (search) {
-                const terms = search.trim().split(/\s+/).filter(Boolean);
-                let peopleQuery = supabase.from("personnel").select("id");
-                for (const term of terms) {
-                    peopleQuery = peopleQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
-                }
-                const { data: people } = await peopleQuery;
-                personIds = people?.map(p => p.id) || [];
+                const { data: people } = await supabase.rpc("search_personnel_ids", { p_search: search });
+                personIds = people || [];
             }
 
             let depPersonIds: string[] | null = null;
