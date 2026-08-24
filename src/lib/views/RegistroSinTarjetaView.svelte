@@ -19,6 +19,7 @@
     } from "lucide-svelte";
     import { cardlessRegistryService } from "../services/cardlessRegistry";
     import { exportCardlessRegistryAllDependenciesAsZip, handleError, formatDate } from "../utils";
+    import { reasonVariant } from "../constants/appearance";
     import type { CardlessRegistry } from "../types";
     import { toast } from "svelte-sonner";
     
@@ -198,33 +199,6 @@
         refreshData();
     }
 
-    function getReasonVariant(reason: string) {
-        if (
-            reason.includes("Olvidada") ||
-            reason === "No la porta" ||
-            reason === "En resguardo de Enlace Administrativo"
-        ) {
-            return "amber";
-        }
-        if (reason === "Extraviada" || reason === "Robada") return "rose";
-        if (
-            reason === "Dañada" ||
-            reason === "Desmagnetizada / No funciona" ||
-            reason === "Bloqueada por Seguridad"
-        ) {
-            return "slate";
-        }
-        if (
-            reason === "No se le ha entregado" ||
-            reason.includes("proceso") ||
-            reason.includes("ingreso") ||
-            reason.includes("Reposición")
-        ) {
-            return "blue";
-        }
-        return "slate";
-    }
-
 </script>
 
 {#snippet renderPersonName(row: CardlessRegistry)}
@@ -259,7 +233,7 @@
 {/snippet}
 
 {#snippet renderReason(row: CardlessRegistry)}
-    <Badge variant={getReasonVariant(row.reason)}>
+    <Badge variant={reasonVariant(row.reason)}>
         {row.reason}
     </Badge>
 {/snippet}
