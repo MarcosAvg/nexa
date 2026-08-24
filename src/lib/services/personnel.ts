@@ -404,25 +404,11 @@ export const personnelService = {
 
     async updateStatus(id: string, status: string) {
         return withErrorHandling(async () => {
-            const { error } = await withTimeout(supabase.from("personnel").update({ status }).eq("id", id));
+            const { error } = await withTimeout(supabase.rpc("update_person_status", {
+                p_person_id: id,
+                p_status: status,
+            }));
             if (error) throw error;
-
-            const { error: cardError } = await withTimeout(supabase.from("access_media").update({ status }).eq("person_id", id));
-            if (cardError) throw cardError;
-
-            if (status === "inactive" || status === "baja") {
-                const { ticketService } = await import("./tickets");
-                await ticketService.deleteByPerson(id);
-            }
-
-            const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", id).single();
-            const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${id})`;
-            const statusLabel = status === 'active' ? 'activo' : status === 'blocked' ? 'bloqueado/a' : 'BAJA';
-
-            await HistoryService.log("PERSONNEL", id, "UPDATE_STATUS", {
-                message: `Estado actualizado a ${statusLabel} (incluye tarjetas)`,
-                entityName: personName
-            });
         }, "Update Personnel Status");
     },
 
