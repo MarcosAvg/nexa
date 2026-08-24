@@ -24,6 +24,9 @@ export { default as SectionHeader } from './SectionHeader.svelte';
 // ─── Data Display ──────────────────────────────────────────
 export { default as DataTable } from './DataTable.svelte';
 export { default as ExportDropdown } from './ExportDropdown.svelte';
+export { default as ExportMenuItem } from './ExportMenuItem.svelte';
+export { default as ResponsivaProgramBadges } from './ResponsivaProgramBadges.svelte';
+export { default as ToggleRow } from './ToggleRow.svelte';
 export { default as TaskBanner } from './TaskBanner.svelte';
 export { default as HistoryFilters } from './HistoryFilters.svelte';
 export { default as InfoCard } from './InfoCard.svelte';

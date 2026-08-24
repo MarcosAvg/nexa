@@ -9,7 +9,7 @@
     import {
         SectionHeader, FilterGroup, FilterSelect, Button, DataTable,
         Badge, PermissionGuard, FloatingActionButton, Pagination,
-        ContentView, SearchInput, ExportDropdown,
+        ContentView, SearchInput, ExportDropdown, ExportMenuItem,
         UsoTarjetasImportModal,
     } from "../components";
     import {
@@ -339,28 +339,18 @@
                 class="h-10 px-5"
             >
                 {#snippet items()}
-                    <button
-                        class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                    <ExportMenuItem
+                        icon={FileSpreadsheet}
+                        label="Hoja Única"
+                        iconBgClass="bg-blue-50"
+                        iconColorClass="text-blue-600"
                         onclick={() => handleExportExcel(false)}
-                    >
-                        <span
-                            class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600"
-                        >
-                            <FileSpreadsheet size={16} />
-                        </span>
-                        Hoja Única
-                    </button>
-                    <button
-                        class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                    />
+                    <ExportMenuItem
+                        icon={FileStack}
+                        label="Separado por Dependencia"
                         onclick={() => handleExportExcel(true)}
-                    >
-                        <span
-                            class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600"
-                        >
-                            <FileStack size={16} />
-                        </span>
-                        Separado por Dependencia
-                    </button>
+                    />
                     <div class="mx-3 my-1 border-t border-slate-100"></div>
                     <div class="px-4 py-2">
                         <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1.5">
@@ -392,18 +382,14 @@
                         </p>
                     </div>
                     <div class="mx-3 my-1 border-t border-slate-100"></div>
-                    <button
-                        class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
-                        onclick={handleExportAllDepsZip}
+                    <ExportMenuItem
+                        icon={FolderArchive}
+                        label="Todas las Dependencias (ZIP)"
+                        iconBgClass="bg-violet-50"
+                        iconColorClass="text-violet-600"
                         disabled={isZipExporting || dependencies.length === 0}
-                    >
-                        <span
-                            class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600"
-                        >
-                            <FolderArchive size={16} />
-                        </span>
-                        Todas las Dependencias (ZIP)
-                    </button>
+                        onclick={handleExportAllDepsZip}
+                    />
                 {/snippet}
             </ExportDropdown>
 

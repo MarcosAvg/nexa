@@ -11,6 +11,7 @@
     import CatalogSectionHeader from "./CatalogSectionHeader.svelte";
     import CatalogRowActions from "./CatalogRowActions.svelte";
     import { useCatalogReorder } from "./useCatalogReorder.svelte";
+    import ToggleRow from "../ToggleRow.svelte";
     import { Plus, CreditCard, Layers, Power, Palette } from "lucide-svelte";
     import { MEDIA_COLOR_OPTIONS } from "../../utils/mediaTypeAppearance";
 
@@ -279,27 +280,12 @@
             <p class="text-[11px] text-slate-400 mt-1.5">Personaliza el color con el que se muestra este medio en la app.</p>
         </div>
         <div class="space-y-2 pt-1">
-            <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
-                <span class="text-sm font-bold text-slate-700">Maneja pisos</span>
-                <input type="checkbox" bind:checked={mediaHasFloors} class="w-5 h-5 accent-blue-600" />
-            </label>
-            <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
-                <span class="text-sm font-bold text-slate-700">Requiere programación</span>
-                <input type="checkbox" bind:checked={mediaRequiresProgramming} class="w-5 h-5 accent-blue-600" />
-            </label>
-            <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
-                <span class="text-sm font-bold text-slate-700">Requiere responsiva</span>
-                <input type="checkbox" bind:checked={mediaRequiresResponsiva} class="w-5 h-5 accent-indigo-600" />
-            </label>
-            <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
-                <span class="text-sm font-bold text-slate-700">Requiere identificador (folio)</span>
-                <input type="checkbox" bind:checked={mediaRequiresIdentifier} class="w-5 h-5 accent-violet-600" />
-            </label>
+            <ToggleRow label="Maneja pisos" checked={mediaHasFloors} onChange={(v) => (mediaHasFloors = v)} />
+            <ToggleRow label="Requiere programación" checked={mediaRequiresProgramming} onChange={(v) => (mediaRequiresProgramming = v)} />
+            <ToggleRow label="Requiere responsiva" checked={mediaRequiresResponsiva} onChange={(v) => (mediaRequiresResponsiva = v)} />
+            <ToggleRow label="Requiere identificador (folio)" checked={mediaRequiresIdentifier} onChange={(v) => (mediaRequiresIdentifier = v)} />
             {#if editingId}
-                <label class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50 cursor-pointer">
-                    <span class="text-sm font-bold text-slate-700">Activo</span>
-                    <input type="checkbox" bind:checked={mediaActive} class="w-5 h-5 accent-emerald-600" />
-                </label>
+                <ToggleRow label="Activo" checked={mediaActive} onChange={(v) => (mediaActive = v)} />
             {/if}
         </div>
     </div>

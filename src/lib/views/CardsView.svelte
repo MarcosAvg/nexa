@@ -6,7 +6,7 @@
         SectionHeader, FilterGroup, FilterSelect, Button, Card,
         DataTable, Badge, PermissionGuard, FloatingActionButton,
         ContentView, SearchInput, Pagination,
-        AddCardModal,
+        AddCardModal, ResponsivaProgramBadges,
     } from "../components";
     import {
         User,
@@ -176,14 +176,7 @@
     <div class="flex items-center gap-2">
         <span class="font-medium text-slate-700">{row.folio}</span>
         {#if row.personId}
-            {#if row.responsiva_status === "legacy"}
-                <Badge variant="slate" class="text-[8px] px-1 py-0 h-4">LEGACY</Badge>
-            {:else if row.responsiva_status !== "signed"}
-                <Badge variant="rose" class="text-[8px] px-1 py-0 h-4">SIN RESPONSIVA</Badge>
-            {/if}
-            {#if row.programming_status !== "done"}
-                <Badge variant="blue" class="text-[8px] px-1 py-0 h-4">SIN PROGRAMAR</Badge>
-            {/if}
+            <ResponsivaProgramBadges responsiva_status={row.responsiva_status} programming_status={row.programming_status} />
         {/if}
     </div>
 {/snippet}

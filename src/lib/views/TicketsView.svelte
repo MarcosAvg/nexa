@@ -7,7 +7,7 @@
     import {
         SectionHeader, TaskBanner, Button, FilterGroup, FilterSelect,
         Input, PermissionGuard, ContentView,
-        Pagination, ExportDropdown,
+        Pagination, ExportDropdown, ExportMenuItem,
         ModificationCompareModal,
     } from "../components";
     import {
@@ -483,26 +483,20 @@
                     menuWidth="w-64"
                 >
                     {#snippet items()}
-                        <button
-                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                        <ExportMenuItem
+                            icon={FileSpreadsheet}
+                            label="Exportar (Filtro actual)"
                             onclick={handleExportResponsivas}
-                        >
-                            <span class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                                <FileSpreadsheet size={16} />
-                            </span>
-                            Exportar (Filtro actual)
-                        </button>
+                        />
                         <div class="mx-3 my-1 border-t border-slate-100"></div>
-                        <button
-                            class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left disabled:opacity-50"
-                            onclick={handleExportResponsivasAllDepsZip}
+                        <ExportMenuItem
+                            icon={FolderArchive}
+                            label="Todas las Dependencias (ZIP)"
+                            iconBgClass="bg-violet-50"
+                            iconColorClass="text-violet-600"
                             disabled={isZipExporting}
-                        >
-                            <span class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600">
-                                <FolderArchive size={16} />
-                            </span>
-                            Todas las Dependencias (ZIP)
-                        </button>
+                            onclick={handleExportResponsivasAllDepsZip}
+                        />
                     {/snippet}
                 </ExportDropdown>
             {/if}
