@@ -217,6 +217,14 @@
                           100
                       ).toFixed(1)
                     : "0",
+            pctFiltered:
+                matchResult && matchResult.totalImported > 0
+                    ? (
+                          (filteredResult.matched.length /
+                              matchResult.totalImported) *
+                          100
+                      ).toFixed(1)
+                    : "0",
             totalUsos,
             promedio,
         };
@@ -395,6 +403,11 @@
                     <p class="text-xs font-medium text-sky-500 mt-1">
                         Coincidencia Global
                     </p>
+                    {#if selectedDependency}
+                        <p class="text-[9px] font-medium text-sky-400 mt-0.5">
+                            Filtro: {stats.pctFiltered}% del total
+                        </p>
+                    {/if}
                 </div>
             </div>
  

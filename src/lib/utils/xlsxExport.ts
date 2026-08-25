@@ -790,7 +790,9 @@ export async function exportUsageToExcel(
     ws2.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1 };
 
     // ─── "Personal Bajo Uso" sheet ───
-    const bajoUso = filteredMatched.filter((m) => m.conteo < usageThreshold);
+    // Misma definición que el KPI del resumen: al menos 1 uso y por debajo del umbral.
+    // Con umbral 0 la lista queda vacía (no puede haber uso positivo menor a 0).
+    const bajoUso = filteredMatched.filter((m) => m.conteo > 0 && m.conteo < usageThreshold);
     if (bajoUso.length > 0) {
         const wsUso = workbook.addWorksheet('Bajo Uso');
         wsUso.columns = [
