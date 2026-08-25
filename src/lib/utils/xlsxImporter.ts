@@ -331,6 +331,21 @@ function parseSheet(ws: ExcelJS.Worksheet, key: SheetKey, cols: ColDef[]): Parse
         }
     }
 
+    // Soportar plantillas que descartan medios del catálogo actual: si una
+    // columna de medio obligatoria (${key}_req / reponer_${key}) NO está presente
+    // en el archivo, no exigirla (ese medio simplemente no aplica a esta plantilla).
+    // Las columnas base obligatorias (apellidos, dependencia, etc.) no se relajan.
+    const presentFields = new Set(Array.from(colToDef.values()).map((c) => c.field));
+    for (const c of cols) {
+        if (
+            c.required &&
+            (c.field.endsWith('_req') || c.field.startsWith('reponer_')) &&
+            !presentFields.has(c.field)
+        ) {
+            c.required = false;
+        }
+    }
+
     ws.eachRow((row, rowNumber) => {
         if (rowNumber < def.dataStartRow) return;
 
