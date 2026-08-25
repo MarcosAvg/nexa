@@ -35,6 +35,12 @@ export interface DuplicateFolioInfo {
     rows: { conteo: number; diasInactividad: number | null }[];
 }
 
+export interface UsageParseResult {
+    entries: UsageEntry[];
+    /** Filas válidas leídas del archivo (folio + conteo), ANTES de aplicar filtros de fechas. */
+    totalRows: number;
+}
+
 // ─────────────────────────────────────────
 // Parsear archivo Excel
 // ─────────────────────────────────────────
@@ -42,6 +48,7 @@ export interface DuplicateFolioInfo {
 /**
  * Reads an Excel file with "Folio" and "Conteo" columns.
  * Prioritizes Column A for Folios and treats them as text (preserving leading zeros).
+ * Returns the parsed entries plus the raw row count read before date filters.
  */
 function parseExcelDate(value: any): Date | null {
     if (!value) return null;
@@ -77,13 +84,22 @@ function parseExcelDate(value: any): Date | null {
     const parts = strValue.split(/[/: .\-]/).filter(Boolean);
     if (parts.length >= 3) {
         let d = parseInt(parts[0], 10);
-        let m = parseInt(parts[1], 10) - 1;
+        let m = parseInt(parts[1], 10);
         let y = parseInt(parts[2], 10);
+        // Desambiguar dd/mm vs mm/dd: si el primer segmento > 12, es dd/mm (original mm/dd)
+        if (d > 12 && m <= 12) {
+            const tmp = d;
+            d = m;
+            m = tmp;
+        }
+        m -= 1;
         if (y < 100) y += 2000;
-        const maybeDate = new Date(y, m, d);
-        if (!isNaN(maybeDate.getTime())) return maybeDate;
+        if (m >= 0 && m <= 11 && d >= 1 && d <= 31) {
+            const maybeDate = new Date(y, m, d);
+            if (!isNaN(maybeDate.getTime())) return maybeDate;
+        }
     }
-    
+
     return null;
 }
 
@@ -91,52 +107,85 @@ export async function parseUsageFile(
     file: File,
     creationLimitDate: string,
     inactivityLimitDate: string
-): Promise<UsageEntry[]> {
-    const workbook = new ExcelJS.Workbook();
-    const buffer = await file.arrayBuffer();
-    await workbook.xlsx.load(buffer);
+): Promise<UsageParseResult> {
+    let workbook: ExcelJS.Workbook;
+    try {
+        const buffer = await file.arrayBuffer();
+        workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
+    } catch {
+        throw new Error(
+            'El archivo no es un Excel válido o está dañado. Asegúrese de usar la Plantilla de Conteo de Uso (.xlsx).',
+        );
+    }
 
-    const worksheet = workbook.worksheets[0];
-    if (!worksheet) throw new Error('El archivo Excel no contiene hojas.');
+    const normalize = (s: string) =>
+        s.normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s*\*\s*$/, '') // columnas obligatorias de la plantilla llevan '*'
+            .toLowerCase();
 
-    // Encontrar índices de columnas escaneando encabezados
+    // Buscar entre TODAS las hojas la que contenga las columnas "folio" y "conteo".
+    let worksheet: ExcelJS.Worksheet | null = null;
     let folioCol = -1;
     let conteoCol = -1;
     let ultimaModCol = -1;
     let ultimoRegCol = -1;
     let headerRow = -1;
 
-    worksheet.eachRow((row, rowNumber) => {
-        if (folioCol >= 0 && conteoCol >= 0 && ultimaModCol >= 0 && ultimoRegCol >= 0) return;        // Ya encontrado
+    for (const ws of workbook.worksheets) {
+        let fCol = -1;
+        let cCol = -1;
+        let umCol = -1;
+        let urCol = -1;
+        let hRow = -1;
 
-        row.eachCell((cell, colNumber) => {
-            const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-            const valNorm = normalize(String(cell.value ?? '').trim());
-            // Buscamos "folio" y "conteo".
-            // Si encontramos folio en Columna A (colNumber 1), lo fijamos.
-            if (valNorm === 'folio') {
-                folioCol = colNumber;
-                headerRow = rowNumber;
-            }
-            if (valNorm === 'conteo') {
-                conteoCol = colNumber;
-            }
-            if (valNorm.includes('ultima modificacion') || valNorm.includes('creacion')) {
-                ultimaModCol = colNumber;
-            }
-            if (valNorm.includes('ultimo registro') || valNorm.includes('ultimo evento') || valNorm.includes('ultimo acceso') || valNorm.includes('fecha y hora del evento')) {
-                ultimoRegCol = colNumber;
-            }
+        ws.eachRow((row, rowNumber) => {
+            if (fCol >= 0 && cCol >= 0 && umCol >= 0 && urCol >= 0) return; // Ya encontrado
+
+            row.eachCell((cell, colNumber) => {
+                const valNorm = normalize(String(cell.value ?? '').trim());
+                if (valNorm === 'folio') {
+                    fCol = colNumber;
+                    hRow = rowNumber;
+                }
+                if (valNorm === 'conteo') {
+                    cCol = colNumber;
+                }
+                if (valNorm.includes('ultima modificacion') || valNorm.includes('creacion')) {
+                    umCol = colNumber;
+                }
+                if (
+                    valNorm.includes('ultimo registro') ||
+                    valNorm.includes('ultimo evento') ||
+                    valNorm.includes('ultimo acceso') ||
+                    valNorm.includes('fecha y hora del evento')
+                ) {
+                    urCol = colNumber;
+                }
+            });
         });
-    });
 
-    // Validación final de columnas
-    if (folioCol < 0 || conteoCol < 0) {
-        throw new Error('No se encontraron las columnas "Folio" y "Conteo" en el archivo.');
+        if (fCol >= 0 && cCol >= 0) {
+            worksheet = ws;
+            folioCol = fCol;
+            conteoCol = cCol;
+            ultimaModCol = umCol;
+            ultimoRegCol = urCol;
+            headerRow = hRow;
+            break;
+        }
+    }
+
+    if (!worksheet) {
+        throw new Error(
+            'No se encontró una hoja con las columnas "Folio" y "Conteo". Asegúrese de usar la Plantilla de Conteo de Uso.',
+        );
     }
 
     // Extraer filas de datos
     const entries: UsageEntry[] = [];
+    let totalRows = 0;
 
     worksheet.eachRow((row, rowNumber) => {
         if (rowNumber <= headerRow) return;
@@ -148,9 +197,14 @@ export async function parseUsageFile(
         const folio = (folioCell.text || String(folioCell.value ?? '')).trim();
 
         const conteoRaw = conteoCell.value;
-        const conteo = typeof conteoRaw === 'number'
-            ? conteoRaw
-            : parseInt(String(conteoRaw ?? '0').trim(), 10);
+        const conteo =
+            typeof conteoRaw === 'number'
+                ? conteoRaw
+                : parseInt(String(conteoRaw ?? '0').trim(), 10);
+
+        if (!folio || isNaN(conteo)) return;
+
+        totalRows++;
 
         let ultimaModDate: Date | null = null;
         let ultimoRegDate: Date | null = null;
@@ -162,12 +216,16 @@ export async function parseUsageFile(
             ultimoRegDate = parseExcelDate(row.getCell(ultimoRegCol).value);
         }
 
-        const parsedCreationLimit = creationLimitDate ? new Date(creationLimitDate + 'T00:00:00') : null;
-        const parsedInactivityLimit = inactivityLimitDate ? new Date(inactivityLimitDate + 'T00:00:00') : null;
+        const parsedCreationLimit = creationLimitDate
+            ? new Date(creationLimitDate + 'T00:00:00')
+            : null;
+        const parsedInactivityLimit = inactivityLimitDate
+            ? new Date(inactivityLimitDate + 'T00:00:00')
+            : null;
 
         if (parsedCreationLimit && ultimaModDate) {
             if (ultimaModDate > parsedCreationLimit) {
-                return;        // Excluir tarjeta creada/modificada recientemente
+                return; // Excluir tarjeta creada/modificada recientemente
             }
         }
 
@@ -178,12 +236,10 @@ export async function parseUsageFile(
             if (diasInactividad < 0) diasInactividad = 0;
         }
 
-        if (folio && !isNaN(conteo)) {
-            entries.push({ folio, conteo, diasInactividad });
-        }
+        entries.push({ folio, conteo, diasInactividad });
     });
 
-    return entries;
+    return { entries, totalRows };
 }
 
 // ─────────────────────────────────────────    // Encontrar folios duplicados
@@ -342,6 +398,7 @@ export async function matchUsageToPersonnel(
                 programming_status: c.programming_status,
                 responsiva_status: c.responsiva_status,
                 has_floors: c.access_media_types?.has_floors,
+                key: c.access_media_types?.key ?? '',
             }));
             const displayStatus = computePersonStatus(p.status, allCards);
             const access = deriveAccessFromAssignments(p.access_assignments);
@@ -364,7 +421,9 @@ export async function matchUsageToPersonnel(
                     exit: p.exit_time || p.schedules.default_exit || '18:00'
                 } : null,
                 email: p.email,
-                cards: allCards.map((c: any) => ({ type: c.type, folio: c.folio })),
+                cards: allCards
+                    .filter((c: any) => c.key === mediaKey)
+                    .map((c: any) => ({ type: c.type, folio: c.folio })),
             };
 
             matched.push({ folio, conteo: data.conteo, diasInactividad: data.diasInactividad, person });
