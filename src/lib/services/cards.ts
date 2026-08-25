@@ -300,7 +300,12 @@ export const cardService = {
             const payload = {
                 identifier: data.folio,
                 media_type_id: mediaTypeId,
-                status: data.status || (data.person_id ? "active" : "available"),
+                // Con persona asignada el estado NO puede ser "available" (el CHECK
+                // de integridad exige available → person_id NULL); se fuerza
+                // "active" (o se respeta un estado válido no-available).
+                status: data.person_id
+                    ? (data.status && data.status !== "available" ? data.status : "active")
+                    : (data.status || "available"),
                 person_id: data.person_id || null,
                 programming_status: isNewAssignment
                     ? (needsProgramming ? "pending" : "done")
