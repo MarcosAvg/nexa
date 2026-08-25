@@ -307,10 +307,10 @@ export const cardService = {
                     ? (data.status && data.status !== "available" ? data.status : "active")
                     : (data.status || "available"),
                 person_id: data.person_id || null,
-                programming_status: isNewAssignment
-                    ? (needsProgramming ? "pending" : "done")
-                    : data.programming_status || null,
-                responsiva_status: data.responsiva_status || null,
+                programming_status:
+                    data.programming_status ??
+                    (isNewAssignment ? (needsProgramming ? "pending" : "done") : "pending"),
+                responsiva_status: data.responsiva_status ?? "unsigned",
             };
 
             let cardId = data.id;
