@@ -46,3 +46,24 @@ export function formatDateTime(iso?: string | null): string {
         hour: "2-digit", minute: "2-digit",
     });
 }
+
+/** Devuelve un texto relativo ("hace 5 min", "hace 3 h", "hace 2 días") o la fecha si es muy antiguo. */
+export function timeAgo(iso?: string | null): string {
+    const d = toDate(iso);
+    if (!d) return "—";
+    const seconds = Math.floor(Math.abs(Date.now() - d.getTime()) / 1000);
+    const steps: [limit: number, div: number, singular: string, plural: string][] = [
+        [60, 1, "segundo", "segundos"],
+        [3600, 60, "minuto", "minutos"],
+        [86400, 3600, "hora", "horas"],
+        [2592000, 86400, "día", "días"],
+        [31536000, 2592000, "mes", "meses"],
+    ];
+    for (const [limit, div, singular, plural] of steps) {
+        if (seconds < limit) {
+            const n = Math.max(1, Math.round(seconds / div));
+            return `hace ${n} ${n === 1 ? singular : plural}`;
+        }
+    }
+    return formatDate(iso);
+}
