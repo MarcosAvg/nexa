@@ -182,7 +182,7 @@ export async function exportUsageAllDependenciesAsZip(
     matchResult: UsageMatchResult,
     usageThreshold: number = 10,
     onProgress?: ZipProgressCallback,
-    mediaKey: string = 'kone'
+    mediaLabel: string = 'tarjetas'
 ): Promise<void> {
     const dateStr = new Date().toISOString().split('T')[0];
 
@@ -199,12 +199,13 @@ export async function exportUsageAllDependenciesAsZip(
         const dep = depList[i];
         onProgress?.(i, total, dep);
 
-        // Filtrar resultados para esta dependencia
+        // Filtrar resultados para esta dependencia. Los folios no encontrados
+        // no pertenecen a ninguna dependencia, así que se omiten por archivo.
         const filteredResult: UsageMatchResult = {
             matched: matchResult.matched.filter(
                 (m) => (m.person.dependency || 'Sin Dependencia') === dep
             ),
-            unmatched: matchResult.unmatched,
+            unmatched: [],
             totalImported: matchResult.totalImported,
         };
 
@@ -215,6 +216,7 @@ export async function exportUsageAllDependenciesAsZip(
             usageThreshold,
             dep,
             true,
+            mediaLabel,
         );
         files.push(result);
     }

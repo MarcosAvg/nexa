@@ -53,6 +53,17 @@ import {
     autoRowHeight,
 } from './xlsxShared';
 
+/**
+ * Clasifica el nivel de uso de una tarjeta según su conteo y el umbral configurado.
+ * Coherente con las etiquetas y colores usados en las hojas del reporte.
+ */
+function usageLevelOf(conteo: number, threshold: number): string {
+    if (conteo === 0) return 'Sin uso';
+    if (conteo < threshold) return 'Bajo uso';
+    if (conteo < 50) return 'Moderado';
+    return 'Alto uso';
+}
+
 async function addUsageSummarySheet(
     workbook: ExcelJSTypes.Workbook,
     matchedData: UsageMatchedEntry[],
@@ -403,7 +414,7 @@ export async function exportUsageToExcel(
     // ── Row 3: Sub-header note ──
     worksheet.mergeCells(`A3:${LAST_COL}3`);
     const legendCell = worksheet.getCell('A3');
-    legendCell.value = '  🟢 Alto uso (≥50)  |  🟡 Uso moderado (10-49)  |  🟠 Bajo uso (1-9)  |  🔴 Sin uso (0)  |  ⚪ Sin datos de uso';
+    legendCell.value = `  🟢 Alto uso (≥50)  |  🟡 Uso moderado (${usageThreshold}-49)  |  🟠 Bajo uso (1-${Math.max(usageThreshold - 1, 1)})  |  🔴 Sin uso (0)  |  ⚪ Sin datos de uso`;
     legendCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: COLORS.meta } };
     legendCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
     legendCell.alignment = { vertical: 'middle', horizontal: 'left' };
@@ -476,9 +487,7 @@ export async function exportUsageToExcel(
 
     // ── Data Rows ──
     filteredMatched.forEach((entry, idx) => {
-        const usageLevel = entry.conteo === 0 ? 'Sin uso' :
-            entry.conteo < usageThreshold ? 'Bajo uso' :
-            entry.conteo < 50 ? 'Moderado' : 'Alto uso';
+        const usageLevel = usageLevelOf(entry.conteo, usageThreshold);
 
         let usageColors = COLORS.emerald;
         if (entry.conteo === 0) usageColors = COLORS.rose;
@@ -686,9 +695,7 @@ export async function exportUsageToExcel(
     ws2.autoFilter = 'A4:O4';
 
     filteredMatched.forEach((entry, idx) => {
-        const usageLevel = entry.conteo === 0 ? 'Sin uso' :
-            entry.conteo < usageThreshold ? 'Bajo uso' :
-            entry.conteo < 50 ? 'Moderado' : 'Alto uso';
+        const usageLevel = usageLevelOf(entry.conteo, usageThreshold);
 
         const usageColors = entry.conteo === 0 ? COLORS.rose :
             entry.conteo < usageThreshold ? COLORS.amber : COLORS.emerald;
@@ -781,6 +788,109 @@ export async function exportUsageToExcel(
 
     ws2.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
     ws2.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1 };
+
+    // ─── "Personal Bajo Uso" sheet ───
+    // Misma definición que el KPI del resumen: al menos 1 uso y por debajo del umbral.
+    // Con umbral 0 la lista queda vacía (no puede haber uso positivo menor a 0).
+    const bajoUso = filteredMatched.filter((m) => m.conteo > 0 && m.conteo < usageThreshold);
+    if (bajoUso.length > 0) {
+        const wsUso = workbook.addWorksheet('Bajo Uso');
+        wsUso.columns = [
+            { key: 'num', width: 6 },
+            { key: 'last_name', width: 20 },
+            { key: 'first_name', width: 20 },
+            { key: 'dependency', width: 28 },
+            { key: 'building', width: 20 },
+            { key: 'folio', width: 18 },
+            { key: 'conteo', width: 12 },
+            { key: 'daysInactive', width: 16 },
+            { key: 'usageLevel', width: 18 },
+            { key: 'status', width: 14 },
+        ];
+
+        wsUso.mergeCells('A1:J1');
+        const uTitle = wsUso.getCell('A1');
+        uTitle.value = `       PERSONAL CON BAJO USO ${filterSuffix}`;
+        uTitle.font = { name: 'Arial', bold: true, size: 16, color: { argb: COLORS.title } };
+        uTitle.alignment = { vertical: 'middle', horizontal: 'left' };
+        wsUso.getRow(1).height = 40;
+
+        await addLogoToSheet(workbook, wsUso);
+
+        wsUso.mergeCells('A2:J2');
+        const uMeta = wsUso.getCell('A2');
+        uMeta.value = `Reporte generado: ${dateStr}  |  Umbral de bajo uso: ${usageThreshold} usos  |  Personal: ${bajoUso.length}`;
+        uMeta.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
+        uMeta.alignment = { vertical: 'middle', horizontal: 'left' };
+        wsUso.getRow(2).height = 20;
+
+        const uHeaders = [
+            'NO.', 'APELLIDOS', 'NOMBRES', 'DEPENDENCIA', 'EDIFICIO',
+            `FOLIO ${mediaLabel.toUpperCase()}`, 'CONTEO', 'INACTIVIDAD', 'NIVEL DE USO', 'ESTADO',
+        ];
+        const uRow3 = wsUso.getRow(3);
+        uHeaders.forEach((label, i) => {
+            const cell = uRow3.getCell(i + 1);
+            cell.value = label;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.sub } };
+            cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        });
+        wsUso.getRow(3).height = 24;
+
+        wsUso.autoFilter = 'A3:J3';
+
+        bajoUso.forEach((entry, idx) => {
+            const level = usageLevelOf(entry.conteo, usageThreshold);
+            const row = wsUso.addRow({
+                num: idx + 1,
+                last_name: entry.person.last_name || '',
+                first_name: entry.person.first_name || '',
+                dependency: entry.person.dependency || '',
+                building: entry.person.building || '',
+                folio: entry.folio,
+                conteo: entry.conteo,
+                daysInactive: entry.diasInactividad !== null ? `${entry.diasInactividad} días` : 'Sin datos',
+                usageLevel: level,
+                status: entry.person.status || '',
+            });
+
+            row.eachCell((cell, colNumber) => {
+                const uColors = entry.conteo === 0 ? COLORS.rose :
+                    entry.conteo < usageThreshold ? COLORS.amber : COLORS.emerald;
+                cell.font = { name: 'Arial', size: 9, color: { argb: 'FF111827' } };
+                cell.alignment = {
+                    vertical: 'middle',
+                    horizontal: (colNumber === 1 || colNumber >= 6) ? 'center' : 'left',
+                    wrapText: true,
+                };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.fill } };
+                cell.border = {
+                    bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                    right: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                };
+                if (colNumber === 7) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: uColors.head } };
+                    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: uColors.sub } };
+                }
+                if (colNumber === 9) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: uColors.head } };
+                    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: uColors.sub } };
+                }
+                if (colNumber === 10) {
+                    let stColors = COLORS.slate;
+                    if (entry.person.status === 'Activo/a') stColors = COLORS.emerald;
+                    else if (entry.person.status === 'Bloqueado/a') stColors = COLORS.rose;
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: stColors.head } };
+                    cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: stColors.sub } };
+                }
+            });
+            autoRowHeight(wsUso, row.number, 22);
+        });
+
+        wsUso.views = [{ state: 'frozen', xSplit: 0, ySplit: 3 }];
+        wsUso.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1 };
+    }
 
     // ─── Unmatched sheet ───
     if (matchResult.unmatched.length > 0) {

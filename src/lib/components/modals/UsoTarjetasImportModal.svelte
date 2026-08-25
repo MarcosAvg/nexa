@@ -16,7 +16,7 @@
         ChevronDown,
     } from "lucide-svelte";
     import type { UsageMatchResult, DuplicateFolioInfo } from "../../utils";
-    import { moduleState } from "../../stores";
+    import { moduleState, catalogState } from "../../stores";
 
     type Props = {
         isOpen: boolean;
@@ -32,17 +32,35 @@
 
     // Medio configurado para el módulo "conteo_uso" (agnóstico al tipo).
     let mediaKey = $derived(moduleState.config("conteo_uso").mediaKey || "kone");
-    let mediaLabel = $derived(mediaKey ? capitalize(mediaKey) : "tarjetas");
+    // Label real del medio desde el catálogo (cae a la key capitalizada si no se encuentra).
+    let mediaLabel = $derived.by(() => {
+        const found = catalogState.mediaTypes.find((m) => m.key === mediaKey);
+        return found?.name || (mediaKey ? capitalize(mediaKey) : "tarjetas");
+    });
+    // ¿El mediaKey configurado está inactivo en el catálogo?
+    let mediaActive = $derived(
+        !catalogState.mediaTypes.some(
+            (m) => m.key === mediaKey && (m as any).active === false,
+        ),
+    );
 
     let step = $state<"idle" | "parsing" | "matching" | "results">("idle");
     let matchResult = $state<UsageMatchResult | null>(null);
     let rawEntries = $state<any[]>([]);
+    let totalRowsRaw = $state(0);
     let duplicates = $state<DuplicateFolioInfo[]>([]);
     let showDuplicates = $state(false);
     let isExporting = $state(false);
     let isZipExporting = $state(false);
     let showExportMenu = $state(false);
-    let usageThreshold = $state(10);
+    // Umbral: se sincroniza desde la config del módulo hasta que el usuario lo edite.
+    let thresholdOverridden = $state(false);
+    let usageThreshold = $state(moduleState.config("conteo_uso").usageThreshold ?? 10);
+    $effect(() => {
+        if (!thresholdOverridden) {
+            usageThreshold = moduleState.config("conteo_uso").usageThreshold ?? 10;
+        }
+    });
     let creationLimitDate = $state<string>("");
     let inactivityLimitDate = $state<string>("");
     let fileInput = $state<HTMLInputElement>();
@@ -52,6 +70,7 @@
         step = "idle";
         matchResult = null;
         rawEntries = [];
+        totalRowsRaw = 0;
         duplicates = [];
         showDuplicates = false;
         isExporting = false;
@@ -70,9 +89,9 @@
         const file = input.files?.[0];
         if (!file) return;
 
-        if (!creationLimitDate || !inactivityLimitDate) {
+        if (!mediaActive) {
             toast.error(
-                "Por favor seleccione ambas fechas límite para el análisis.",
+                "El medio configurado para el conteo de uso ya no está activo. Revise la configuración del módulo.",
             );
             if (input) input.value = "";
             return;
@@ -80,14 +99,20 @@
 
         step = "parsing";
         try {
-            const entries = await parseUsageFile(
+            const { entries, totalRows } = await parseUsageFile(
                 file,
                 creationLimitDate,
                 inactivityLimitDate,
             );
+            totalRowsRaw = totalRows;
 
             if (entries.length === 0) {
-                toast.error("No se encontraron datos en el archivo.");
+                rawEntries = [];
+                duplicates = [];
+                toast.error(
+                    "No se encontraron datos de folio y conteo en el archivo. Verifique las columnas " +
+                        "(Folio, Conteo) y que estén llenas.",
+                );
                 step = "idle";
                 return;
             }
@@ -136,7 +161,7 @@
                 (_current, _total, label) => {
                     toast.loading(`Procesando: ${label}`, { id: loadingToast });
                 },
-                mediaKey,
+                mediaLabel,
             );
             toast.success("ZIP descargado", { id: loadingToast });
         } catch (err) {
@@ -192,6 +217,14 @@
                           100
                       ).toFixed(1)
                     : "0",
+            pctFiltered:
+                matchResult && matchResult.totalImported > 0
+                    ? (
+                          (filteredResult.matched.length /
+                              matchResult.totalImported) *
+                          100
+                      ).toFixed(1)
+                    : "0",
             totalUsos,
             promedio,
         };
@@ -231,7 +264,7 @@
                             class="text-[10px] text-slate-500 mt-1.5 leading-tight"
                         >
                             Días de inactividad respecto al último registro de
-                            uso.
+                            uso. Opcional.
                         </p>
                     </div>
                     <div
@@ -251,7 +284,7 @@
                             class="text-[10px] text-slate-500 mt-1.5 leading-tight"
                         >
                             Ignorar tarjetas creadas/modificadas después de esta
-                            fecha.
+                            fecha. Opcional.
                         </p>
                     </div>
                 </div>
@@ -274,9 +307,9 @@
                     variant="soft-blue"
                     class="h-10 px-6"
                     onclick={() => {
-                        if (!creationLimitDate || !inactivityLimitDate) {
+                        if (!mediaActive) {
                             toast.error(
-                                "Seleccione ambas fechas límite antes de subir el archivo.",
+                                "El medio configurado para el conteo de uso ya no está activo. Revise la configuración del módulo.",
                             );
                             return;
                         }
@@ -370,6 +403,11 @@
                     <p class="text-xs font-medium text-sky-500 mt-1">
                         Coincidencia Global
                     </p>
+                    {#if selectedDependency}
+                        <p class="text-[9px] font-medium text-sky-400 mt-0.5">
+                            Filtro: {stats.pctFiltered}% del total
+                        </p>
+                    {/if}
                 </div>
             </div>
  
@@ -437,7 +475,7 @@
                             {showDuplicates ? 'Ocultar' : 'Ver'} detalles
                         </Button>
                         <div class="text-[10px] text-amber-500">
-                            Total filas: {rawEntries.length} → Folios únicos: {stats.totalImported}
+                            Total filas archivo: {totalRowsRaw} → Folios únicos: {stats.totalImported}
                         </div>
                     </div>
                     
@@ -511,8 +549,8 @@
                     >
                 </div>
                 <p class="text-[11px] text-slate-400 mb-3">
-                    Define la cantidad de usos para generar la hoja de personal
-                    con bajo uso.
+                    Define la cantidad de usos (umbral) para clasificar el nivel
+                    de uso y generar la hoja de personal con bajo uso.
                 </p>
                 <div class="flex items-center gap-3">
                     <input
@@ -521,12 +559,14 @@
                         max="100"
                         step="1"
                         bind:value={usageThreshold}
+                        oninput={() => (thresholdOverridden = true)}
                         class="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
                     />
                     <input
                         type="number"
                         min="0"
                         bind:value={usageThreshold}
+                        oninput={() => (thresholdOverridden = true)}
                         class="w-16 h-8 text-center text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
                     />
                 </div>

@@ -778,7 +778,7 @@ export async function generateUsageTemplate(mediaLabel: string = "Uso de tarjeta
     const ws = wb.addWorksheet(`Uso ${mediaLabel}`);
 
     ws.columns = [
-        { key: 'folio', width: 20 },
+        { key: 'folio', width: 20, numFmt: '@' },
         { key: 'conteo', width: 15 },
         { key: 'ultima_mod', width: 25 },
         { key: 'ultimo_reg', width: 25 },
