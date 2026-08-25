@@ -396,83 +396,84 @@
                 accesosEspeciales = namesToSpecialIds(editingPerson.specialAccesses || []);
                 tarjetasAsignadas = [...(editingPerson.cards || [])];
 
-                // Si también tenemos precarga (vinculando ticket de Alta), sobrescribir datos solicitados
-                if (prefill) {
-                    // Pisos por medio con pisos: sobrescribir sólo los medios
-                    // solicitados, conservando los pisos ya existentes del resto.
-                    if (prefill.pisosPorMedio) {
-                        const pid =
-                            Number(
-                                buildings.find(
-                                    (b) => b.name === prefill.edificio,
-                                )?.id,
-                            ) || undefined;
-                        if (pid) {
-                            const merged = {
-                                ...(floorsByBuilding[pid] ?? {}),
-                            };
-                            for (const fm of floorMediaTypes) {
-                                const wanted =
-                                    !allowedCardTypes ||
-                                    allowedCardTypes.includes(fm.name);
-                                if (wanted && prefill.pisosPorMedio[fm.key]) {
-                                    merged[fm.id] = [
-                                        ...prefill.pisosPorMedio[fm.key],
-                                    ];
-                                }
-                            }
-                            floorsByBuilding = {
-                                ...floorsByBuilding,
-                                [pid]: merged,
-                            };
-                        }
-                    }
-
-                    if (
-                        prefill.specialAccesses &&
-                        prefill.specialAccesses.length > 0
-                    ) {
-                        accesosEspeciales = namesToSpecialIds(prefill.specialAccesses);
-                    } else if (prefill.specialAccesses) {
-                        accesosEspeciales = [];
-                    }
-
-                    // También sobrescribir edificio, piso base y horario como parte del perfil de acceso
-                    if (prefill.edificio) edificio = prefill.edificio;
-                    if (prefill.pisoBase) pisoBase = prefill.pisoBase;
-                    if (prefill.horario) diasHorario = prefill.horario;
-                    if (prefill.horaEntrada) horaEntrada = prefill.horaEntrada;
-                    if (prefill.horaSalida) horaSalida = prefill.horaSalida;
-
-                    // Tarjetas sin pisos (folio) solicitadas en el ticket de alta
-                    if (prefill.foliosPorMedio) {
-                        for (const [key, folio] of Object.entries(prefill.foliosPorMedio)) {
-                            if (!folio) continue;
-                            const mediaName =
-                                catalogState.mediaTypes.find(
-                                    (m: any) => m.key === key,
-                                )?.name ?? key;
-                            if (
-                                !tarjetasAsignadas.some(
-                                    (c) =>
-                                        c.type === mediaName &&
-                                        c.folio === folio,
-                                )
-                            ) {
-                                tarjetasAsignadas = [
-                                    ...tarjetasAsignadas,
-                                    { type: mediaName, folio },
-                                ];
-                            }
-                        }
-                    }
-                }
-
                 lastLoadedPersonId = editingPerson.id;
                 editingUpdatedAt = (editingPerson as any).updated_at ?? null;
                 selectedBuildings = bid ? [bid] : [];
-                void refreshPersonAccess(editingPerson.id);
                 void checkStale(editingPerson.id, editingUpdatedAt);
+
+                // Cargar la base multi-edificio de pisos/accesos REALES de la persona
+                // y, DESPUÉS, aplicar el prefill (ticket de Alta vinculado) encima,
+                // para que los pisos/accesos solicitados prevalezcan sin perder los previos.
+                void (async () => {
+                    await refreshPersonAccess(editingPerson.id);
+
+                    if (prefill) {
+                        if (prefill.pisosPorMedio) {
+                            const pid =
+                                Number(
+                                    buildings.find(
+                                        (b) => b.name === prefill.edificio,
+                                    )?.id,
+                                ) || undefined;
+                            if (pid) {
+                                const merged = {
+                                    ...(floorsByBuilding[pid] ?? {}),
+                                };
+                                for (const fm of floorMediaTypes) {
+                                    const wanted =
+                                        !allowedCardTypes ||
+                                        allowedCardTypes.includes(fm.name);
+                                    if (wanted && prefill.pisosPorMedio[fm.key]) {
+                                        merged[fm.id] = [
+                                            ...prefill.pisosPorMedio[fm.key],
+                                        ];
+                                    }
+                                }
+                                floorsByBuilding = {
+                                    ...floorsByBuilding,
+                                    [pid]: merged,
+                                };
+                            }
+                        }
+
+                        if (
+                            prefill.specialAccesses &&
+                            prefill.specialAccesses.length > 0
+                        ) {
+                            accesosEspeciales = namesToSpecialIds(prefill.specialAccesses);
+                        } else if (prefill.specialAccesses) {
+                            accesosEspeciales = [];
+                        }
+
+                        if (prefill.edificio) edificio = prefill.edificio;
+                        if (prefill.pisoBase) pisoBase = prefill.pisoBase;
+                        if (prefill.horario) diasHorario = prefill.horario;
+                        if (prefill.horaEntrada) horaEntrada = prefill.horaEntrada;
+                        if (prefill.horaSalida) horaSalida = prefill.horaSalida;
+
+                        if (prefill.foliosPorMedio) {
+                            for (const [key, folio] of Object.entries(prefill.foliosPorMedio)) {
+                                if (!folio) continue;
+                                const mediaName =
+                                    catalogState.mediaTypes.find(
+                                        (m: any) => m.key === key,
+                                    )?.name ?? key;
+                                if (
+                                    !tarjetasAsignadas.some(
+                                        (c) =>
+                                            c.type === mediaName &&
+                                            c.folio === folio,
+                                    )
+                                ) {
+                                    tarjetasAsignadas = [
+                                        ...tarjetasAsignadas,
+                                        { type: mediaName, folio },
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                })();
             });
         } else if (
             isOpen &&
