@@ -13,14 +13,15 @@ export class SettingsState {
     coreTypesRequired = $state(2);
 
     // ─── Identidad / datos de la organización ────────────────
+    // Valores por defecto genéricos; se configuran por instalación en `app_settings`.
     /** Nombre mostrado del sistema (branding en exports). */
     orgName = $state("Nexa");
     /** Correo de contacto/soporte (hoja INSTRUCCIONES de la plantilla). */
-    orgSupportEmail = $state("Control.Accesos@nuevoleon.gob.mx");
+    orgSupportEmail = $state("soporte@example.com");
     /** Extensión del área de soporte. */
-    orgSupportExtension = $state("32199");
+    orgSupportExtension = $state("000");
     /** Monto de reposición formateado (texto legal). */
-    replacementCost = $state("$300.00 (Trescientos pesos 00/100 M.N.)");
+    replacementCost = $state("");
 
     #loaded = false;
 
@@ -116,9 +117,9 @@ export class SettingsState {
         this.responsivaWarnDays = 5;
         this.coreTypesRequired = 2;
         this.orgName = "Nexa";
-        this.orgSupportEmail = "Control.Accesos@nuevoleon.gob.mx";
-        this.orgSupportExtension = "32199";
-        this.replacementCost = "$300.00 (Trescientos pesos 00/100 M.N.)";
+        this.orgSupportEmail = "soporte@example.com";
+        this.orgSupportExtension = "000";
+        this.replacementCost = "";
         try {
             await Promise.all([
                 this.#persist("responsivaPickupDays", 7),

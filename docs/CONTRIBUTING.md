@@ -3,6 +3,13 @@
 > Todo lo que necesitas saber para contribuir al proyecto: configuración,
 > arquitectura, estándares de código, patrones de refactorización y despliegue.
 
+> **Nota sobre código generado con IA.** Este proyecto fue desarrollado en gran
+> parte con herramientas de IA generativa. Es posible encontrar código duplicado,
+> decisiones inusuales o patrones no convencionales. **Revisa los cambios con ojo
+> crítico**, y considera señalar en tus PRs cualquier código que pueda mejorarse
+> o simplificarse. No se asume responsabilidad sobre el funcionamiento, la
+> seguridad ni la integridad de los datos por el uso de este proyecto.
+
 ---
 
 ## Índice
@@ -79,6 +86,9 @@ src/
 │   ├── supabase.ts                # Cliente de Supabase
 │   ├── routes.ts                  # Definición de rutas
 │   ├── schemas.ts                 # Esquemas Zod para validación
+│   ├── modules/                   # Definiciones y módulos compilados (VITE_MODULES)
+│   │   ├── definitions.ts         # Catálogo maestro de módulos
+│   │   └── generated.ts           # (generado, no versionado)
 │   ├── components/                # Componentes Svelte
 │   │   ├── index.ts               # Barrel raíz (exporta todos)
 │   │   ├── modals/                # Modales de dominio específico
@@ -90,11 +100,11 @@ src/
 │   │   ├── Modal.svelte
 │   │   └── ...
 │   ├── views/                     # Vistas (páginas)
+│   │   ├── DashboardView.svelte
 │   │   ├── PersonnelView.svelte
 │   │   ├── CardsView.svelte
 │   │   ├── TicketsView.svelte
 │   │   ├── HistoryView.svelte
-│   │   ├── DashboardView.svelte
 │   │   ├── SettingsView.svelte
 │   │   ├── EnlacesView.svelte
 │   │   ├── RegistroSinTarjetaView.svelte
@@ -106,7 +116,9 @@ src/
 │   └── types/                     # Tipos compartidos
 ├── assets/                        # Imágenes, fuentes, etc.
 scripts/
-└── (scripts auxiliares no versionan el esquema)
+supabase/
+├── schemas/                       # DEFINICIONES del esquema (fuente de verdad)
+└── seed.sql                       # datos base de configuración
 ```
 
 ### Capas y responsabilidades
@@ -131,50 +143,86 @@ Vista ← Store.$state    ← Service retorna datos
 
 ## 3. Base de Datos (Supabase)
 
-### Esquema
+### Modelo de datos: una fuente de verdad declarativa
 
-El proyecto usa Supabase con PostgreSQL. El esquema se mantiene como archivos
-declarativos y los cambios desplegables como migraciones versionadas:
+El proyecto usa Supabase (PostgreSQL). El **esquema completo** vive como
+**definiciones declarativas** en `supabase/schemas/**` (tablas, tipos, funciones,
+vistas, políticas RLS, triggers y grants). Ese es el estado actual y la **fuente
+de verdad**: un clon limpio puede reconstruirlo sin datos.
 
-```
-supabase/schemas/
-supabase/migrations/
-```
+- `supabase/schemas/public/tables/*.sql` — tablas (DDL + RLS + policies + indexes).
+- `supabase/schemas/public/types/*.sql` — tipos del dominio (ej. `app_role`).
+- `supabase/schemas/public/functions/*.sql` — funciones y RPCs.
+- `supabase/schemas/public/views/*.sql` — vistas (ej. `personnel_with_status`).
+- `supabase/schemas/public/triggers/*.sql` — triggers (timestamps, tickets, etc.).
+- `supabase/schemas/public/default_privileges.sql` — grants por defecto.
+
+Los datos base de **configuración** (medios de acceso de ejemplo y `app_settings`
+genéricos) van en `supabase/seed.sql`. **No hay datos de negocio versionados.**
+
+El historial anterior de migraciones se conserva como referencia histórica en
+`supabase/migrations-legacy/` (no es aplicable a un clon limpio porque referencia
+objetos del modelo legacy).
 
 ### Tablas principales
 
 | Tabla | Propósito |
 |---|---|
-| `personnel` | Registro de personal operativo |
-| `cards` | Tarjetas de acceso (P2000, KONE, AccessPRO) |
-| `tickets` | Solicitudes (altas, bajas, modificaciones, reportes) |
-| `history_logs` | Auditoría de operaciones |
+| `personnel` | Registro de personal operativo (edificio/piso base, dependencia, horario) |
+| `access_media` | Medios/tarjetas de acceso (folio, estado, medios por tipo, persona) |
+| `access_media_types` | Catálogo de tipos de medio (P2000, KONE, AccessPRO) y sus requerimientos |
+| `access_media_type_buildings` | Relación tipo de medio ↔ edificio donde aplica |
+| `access_assignments` | Asignación de un medio a una persona |
+| `access_assignment_permissions` | Permisos por asignación (pisos, accesos especiales) |
+| `floors` | Catálogo de pisos por edificio |
+| `tickets` | Solicitudes (programación, firma de responsiva, altas, bajas, modificaciones) |
+| `history_logs` | Auditoría de operaciones (agrupada por `flow_id`) |
 | `profiles` | Perfiles de usuario vinculados a `auth.users` |
-| `signed_responsivas` | Responsivas digitales firmadas |
-| `cardless_registry` | Registro de personal sin tarjeta |
+| `signed_documents` | Responsivas digitales firmadas |
+| `document_templates` | Plantillas de documentos legales por tipo de medio |
+| `cardless_registry` | Registro de personal que llega sin tarjeta |
 | `enlaces` | Contactos administrativos con extensión |
 | `buildings` | Catálogo de edificios |
 | `dependencies` | Catálogo de dependencias |
-| `schedules` | Catálogo de horarios |
+| `schedules` | Catálogo de horarios/jornadas |
 | `special_accesses` | Catálogo de accesos especiales |
+| `app_settings` | Configuración por instalación (JSON por clave) |
+
+> **Nota:** el modelo antiguo (`cards`) fue migrado a `access_media`/`access_assignments`.
+> Las referencias a tablas legacy solo existen en `migrations-legacy/`.
 
 ### Roles
 
-- **admin** — acceso completo (CRUD)
-- **operator** — CRUD en datos operativos, solo lectura en catálogos
-- **viewer** — solo lectura
+El enum `app_role` (aplicado vía `profiles.role`):
+
+- **admin** — acceso completo (CRUD).
+- **operator** — CRUD en datos operativos, solo lectura en catálogos.
+- **viewer** — solo lectura.
 
 ### Cómo trabajar con el esquema
 
-1. Ejecutar `supabase start` para levantar el entorno local.
-2. Revisar o editar los archivos de `supabase/schemas/`.
-3. Generar una migración con `supabase db diff -f nombre_del_cambio`.
-4. Revisar la migración antes de aplicarla.
-5. Ejecutar `supabase migration up` localmente.
-6. Desplegar con `supabase db push` únicamente después de validar.
+1. **Entorno local:** `npm run db:setup` (usa `supabase start` + reconstruye la BD
+   desde `supabase/schemas/**` y aplica `supabase/seed.sql`).
+2. **Editar una definición:** modifica el archivo correspondiente en
+   `supabase/schemas/...`. **No edites la BD remota directamente.**
+3. **Validar en local:** `npm run db:reset` reconstruye la BD desde el esquema.
+4. **Desplegar a un proyecto remoto:** te queda `supabase link --project-ref <REF>`
+   y `supabase db push` (aplica el esquema declarativo).
+5. Tras un cambio de esquema, también puedes generar una migración de control
+   (`supabase db diff -f nombre`) si lo prefieres versionarla; el esquema
+   declarativo sigue siendo la fuente.
 
-> No se debe modificar el esquema productivo directamente desde el SQL Editor
-> sin capturar después el cambio en los archivos versionados.
+> No se debe modificar la base productiva directamente desde el SQL Editor sin
+> reflejar el cambio en `supabase/schemas/**`.
+
+### Flujo de replicación (clon fresco)
+
+1. `npm install`
+2. `cp .env.example .env` (completa URL/keys de tu instancia).
+3. Elige:
+   - **Local:** `supabase start` → `npm run db:setup`.
+   - **Remoto:** `supabase link --project-ref <REF>` → `supabase db push`.
+4. `npm run dev` y crea tu primer usuario admin.
 
 ---
 

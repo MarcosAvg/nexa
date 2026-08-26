@@ -331,7 +331,7 @@ function buildInstructionsSheet(wb: ExcelJS.Workbook) {
 
     // ─ CONTACT ─
     sectionTitle('📬  ENVÍO DE LA SOLICITUD');
-    addRow('Correo de envío', settingsState.orgSupportEmail || 'Control.Accesos@nuevoleon.gob.mx', 'note');
+    addRow('Correo de envío', settingsState.orgSupportEmail || 'soporte@example.com', 'note');
     addRow('Asunto del correo', 'Formato sugerido: [TIPO DE MOVIMIENTO] – [DEPENDENCIA]\nEjemplo: ALTA – SECRETARÍA DEL TRABAJO\nEjemplo: BAJA – SECRETARÍA DE ADMINISTRACIÓN\nEjemplo: ALTA/REPOSICIÓN – SECRETARÍA DE ADMINISTRACIÓN', 'note');
     addRow('Tiempo de respuesta', 'Las solicitudes se procesan en un plazo de 1 a 3 días hábiles.');
     addRow('Dudas o aclaraciones', `Comuníquese al área de Control de Accesos - [Ext: ${settingsState.orgSupportExtension || '0000'}] antes de enviar la solicitud\nsi tiene dudas sobre qué tipo de hoja usar.`);

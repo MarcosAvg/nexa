@@ -2,7 +2,7 @@
 
 Date: 2026-08-19
 Project: `nexa`
-Project ref: `mxvzusmmevvfnhnjgpzo`
+Project ref: `<TU_PROJECT_REF>`
 Region: `us-west-2`
 PostgreSQL: `17.6.1`
 

@@ -1,0 +1,33 @@
+name: 🐞 Reporte de bug
+description: Reporta un problema para ayudarnos a mejorar
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Gracias por reportar. Describe el problema de forma clara y reproducible."
+  - type: textarea
+    id: descripcion
+    attributes:
+      label: Descripción
+      value: "¿Qué ocurre y qué esperabas que ocurriera?"
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducir
+      placeholder: "1. Ir a ...\n2. Clic en ...\n3. Ver el error ..."
+      value: "1. ...\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: entorno
+    attributes:
+      label: Entorno
+      value: "Navegador y versión, sistema operativo, y si aplica: Supabase local o remoto."
+  - type: textarea
+    id: evidencia
+    attributes:
+      label: Evidencia
+      value: "Captura de pantalla, logs o código relevante."

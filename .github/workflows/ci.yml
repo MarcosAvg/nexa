@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  checks:
+    name: Typecheck, format y build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # Nota: `npm run format:check` se habilitará cuando el repo esté
+      # estandarizado con Prettier. Por ahora se aplica formato manualmente
+      # en los archivos nuevos (npm run format).
+
+      - name: Typecheck (svelte-check + tsc)
+        run: npm run check
+
+      - name: Build de producción
+        run: npm run build

@@ -48,7 +48,7 @@ El barrel raíz exporta **62 componentes** en total:
 | Categoría | Cantidad | Componentes |
 |---|---|---|
 | Base UI | 15 | Badge, Button, Card, CardItem, Input, Modal, Pagination, Select, SkeletonTable, EmptyState, SkeletonCard, ContentView, SearchInput, FormSection, FormField |
-| Filters | 4 | FilterGroup, FilterSelect, ToggleGroup, SectionHeader |
+| Filters | 3 | FilterSelect, ToggleGroup, SectionHeader |
 | Data Display | 5 | DataTable, ExportDropdown, TaskBanner, HistoryFilters, SignaturePad |
 | Layout | 9 | DashboardLayout, MainLayoutWrapper, Sidebar, BottomNav, GlobalOverlays, CommandPalette, FloatingActionButton, Logo, SidePanel |
 | Permissions | 1 | PermissionGuard |
@@ -161,30 +161,6 @@ Muestra el contador "Mostrando X–Y de Z", botones Anterior/Siguiente, y botone
 En móvil, los filtros se colapsan detrás de un botón de "Filtros" y las acciones se muestran en la parte inferior.
 
 **Vistas que lo usan:** Todas las vistas principales.
-
----
-
-### `FilterGroup` — Botones tipo pill
-
-**Ubicación:** `src/lib/components/FilterGroup.svelte`
-
-```svelte
-<FilterGroup
-    label="Estado"
-    options={["Todos", "Activo/a", "Parcial", "Baja"]}
-    bind:value={statusFilter}
-    onchange={onFilterChange}
-/>
-```
-
-| Prop | Tipo | Default |
-|---|---|---|
-| `label` | `string` | — |
-| `options` | `string[]` | `[]` |
-| `value` | `string` (bindable) | — |
-| `onchange` | `() => void` | — |
-
-Renderiza botones tipo pill para selección única. El seleccionado tiene fondo slate-900. Ideal para filtros de estado.
 
 ---
 

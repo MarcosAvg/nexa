@@ -1,0 +1,12 @@
+node_modules
+dist
+dev-dist
+public/build-info.json
+src/lib/modules/generated.ts
+supabase/schemas
+supabase/migrations-legacy
+supabase/seed.sql
+package-lock.json
+.editorconfig
+docs/**/*.md
+*.md
