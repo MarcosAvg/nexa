@@ -36,7 +36,7 @@ export class PersonnelState {
     });
     dashboardMetrics = $state<DashboardMetrics>({
         totalPersonnel: 0,
-        statusCounts: { activo: 0, parcial: 0, inactivo: 0, bloqueado: 0, baja: 0 },
+        statusCounts: { activo: 0, parcial: 0, en_proceso: 0, media_otro_edificio: 0, media_otro_edificio_pendiente: 0, sin_acceso: 0, bloqueado: 0, baja: 0 },
         cardCoverage: [],
         operativos: 0,
         noActivos: 0,

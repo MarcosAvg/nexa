@@ -4,6 +4,7 @@ import { accessAssignmentService } from "./accessAssignments";
 import type { Card } from "../types";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate } from "../utils";
 import { networkStore } from "../stores/network.svelte";
+import { catalogState } from "../stores/catalogs.svelte";
 
 /** Resuelve el tipo de medio (fila completa) a partir del nombre mostrado. */
 async function resolveMediaType(type: string): Promise<Record<string, any>> {
@@ -88,7 +89,8 @@ export const cardService = {
             }
 
             if (typeFilter !== "Todos") {
-                query = query.eq("access_media_types.name", typeFilter);
+                const media = catalogState.mediaTypes.find((m) => m.name === typeFilter);
+                if (media) query = query.eq("media_type_id", media.id);
             }
 
             if (statusFilter !== "Todas") {
@@ -165,7 +167,10 @@ export const cardService = {
                         q = q.ilike("identifier", st);
                     }
                 }
-                if (typeFilter !== "Todos") q = q.eq("access_media_types.name", typeFilter);
+                if (typeFilter !== "Todos") {
+                    const media = catalogState.mediaTypes.find((m) => m.name === typeFilter);
+                    if (media) q = q.eq("media_type_id", media.id);
+                }
                 if (statusFilter !== "Todas") {
                     const sm: Record<string, string> = { "Activa": "active", "Bloqueada": "blocked", "Baja": "inactive", "Disponible": "available" };
                     if (sm[statusFilter]) q = q.eq("status", sm[statusFilter]);
@@ -280,8 +285,8 @@ export const cardService = {
                             .update({
                                 status: newStatus,
                                 person_id: null,
-                                programming_status: null,
-                                responsiva_status: null,
+                                programming_status: "pending",
+                                responsiva_status: "unsigned",
                             })
                             .eq("id", oldMedia.id));
 
@@ -405,7 +410,7 @@ export const cardService = {
         return withErrorHandling(async () => {
             return HistoryService.withFlow(async () => {
             const { error } = await supabase.from("access_media")
-                .update({ person_id: null, programming_status: null, responsiva_status: null, status: "available" })
+                .update({ person_id: null, programming_status: "pending", responsiva_status: "unsigned", status: "available" })
                 .eq("id", cardId);
             if (error) throw error;
 

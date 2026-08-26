@@ -4,17 +4,22 @@
  * Cálculo centralizado del estado mostrado de una persona a partir de sus
  * medios de acceso y su estado en base de datos.
  *
- * Reglas (generalizadas por `has_floors`):
- *  - "Activo/a": al menos N tipos con pisos listos (programados + firmados),
- *    donde N es configurable en app_settings (`coreTypesRequired`),
- *    O la persona SOLO tiene tipos sin pisos (ej. AccessPRO) y tiene al menos
- *    uno asignado (activo).
- *  - "Parcial": menos de N tipos con pisos listos (al menos uno).
- *  - Los tipos sin pisos NUNCA cuentan para el umbral (son accesos
- *    secundarios), pero una persona cuyo único acceso es de ese tipo se ve Activa.
+ * Estados (máquina de 8, anclada al edificio de radicación):
+ *  - "Activo/a": tiene listos TODOS los medios requeridos de su edificio.
+ *  - "Parcial": el edificio requiere ≥2 y tiene listos algunos (no todos).
+ *  - "En proceso": tiene medio de SU edificio presente pero ninguno listo.
+ *  - "Media de otro edificio": solo tiene accesos de OTRO edificio y al menos uno listo.
+ *  - "Otro edificio en proceso": solo tiene accesos de OTRO edificio y ninguno listo.
+ *  - "Sin Acceso": no tiene ningún acceso asignado.
+ *  - "Bloqueado/a": estado BD blocked.
+ *  - "Baja": estado BD inactive/baja.
+ *
+ * Los medios requeridos de un edificio se derivan de `access_media_type_buildings`
+ * (catálogo de medios), no de un umbral global.
  */
 
 import { settingsState } from "../stores/settings.svelte";
+import { catalogState } from "../stores/catalogs.svelte";
 
 export interface StatusCardInput {
     type: string;
@@ -24,10 +29,62 @@ export interface StatusCardInput {
     has_floors?: boolean;
 }
 
+function isReady(c: StatusCardInput): boolean {
+    return (
+        c.status === "active" &&
+        c.programming_status === "done" &&
+        (c.responsiva_status === "signed" ||
+            c.responsiva_status === "legacy")
+    );
+}
+
 export function computePersonStatus(
     dbStatus: string,
     allCards: StatusCardInput[],
+    buildingId?: string | number | null,
 ): string {
+    if (dbStatus === "blocked") return "Bloqueado/a";
+    if (dbStatus !== "active") return "Baja";
+
+    if (buildingId != null && buildingId !== "") {
+        // Medio requerido por el edificio de radicación (desde el catálogo).
+        const reqNames = new Set<string>(
+            catalogState.mediaTypes
+                .filter(
+                    (m) =>
+                        (m as any).active !== false &&
+                        (m as any).access_media_type_buildings?.some(
+                            (x: { building_id?: number | string }) =>
+                                Number(x.building_id) === Number(buildingId),
+                        ),
+                )
+                .map((m) => m.name),
+        );
+
+        const hasRequiredCard = allCards.some((c) => reqNames.has(c.type));
+        const readyRequired = new Set(
+            allCards.filter((c) => reqNames.has(c.type) && isReady(c)).map((c) => c.type),
+        );
+        const hasAnyCard = allCards.length > 0;
+        const hasOtherReady = allCards.some(
+            (c) => !reqNames.has(c.type) && isReady(c),
+        );
+
+        if (reqNames.size === 0) {
+            if (!hasAnyCard) return "Sin Acceso";
+            if (hasOtherReady) return "Media de otro edificio";
+            return "Otro edificio en proceso";
+        }
+
+        if (readyRequired.size >= reqNames.size) return "Activo/a";
+        if (readyRequired.size > 0) return "Parcial";
+        if (hasRequiredCard) return "En proceso";
+        if (hasOtherReady) return "Media de otro edificio";
+        if (hasAnyCard) return "Otro edificio en proceso";
+        return "Sin Acceso";
+    }
+
+    // Respaldo (sin edificio): comportamiento anterior con el umbral global.
     const coreRequired = settingsState.coreTypesRequired || 2;
     const activeCards = allCards.filter((c) => c.status === "active");
     const readyCards = activeCards.filter(
@@ -37,7 +94,6 @@ export function computePersonStatus(
                 c.responsiva_status === "legacy"),
     );
 
-    // Solo los tipos con pisos cuentan para el umbral de tipos "core".
     const coreReadyTypes = new Set(
         readyCards.filter((c) => c.has_floors).map((c) => c.type),
     );
@@ -50,11 +106,8 @@ export function computePersonStatus(
     if (dbStatus === "active") {
         if (coreReadyTypes.size >= coreRequired) return "Activo/a";
         if (coreReadyTypes.size > 0) return "Parcial";
-        // Solo tipos sin pisos y asignados → Activa
         if (!hasCoreCards && hasActiveNonCore) return "Activo/a";
-        // Alineado con personnel_with_status: con tarjetas core pero 0 listas → Sin Acceso.
         return "Sin Acceso";
     }
-    if (dbStatus === "blocked") return "Bloqueado/a";
     return "Baja";
 }

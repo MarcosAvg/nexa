@@ -142,7 +142,10 @@ export interface DashboardMetrics {
     statusCounts: {
         activo: number;
         parcial: number;
-        inactivo: number;
+        en_proceso: number;
+        media_otro_edificio: number;
+        media_otro_edificio_pendiente: number;
+        sin_acceso: number;
         bloqueado: number;
         baja: number;
     };

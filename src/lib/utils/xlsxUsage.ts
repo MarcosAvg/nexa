@@ -351,7 +351,7 @@ export async function matchUsageToPersonnel(
                         .select(`
                             id, identifier, status, person_id, access_media_types ( name, key ),
                             personnel (
-                                id, first_name, last_name, employee_no, email, area, position, floor, status,
+                                id, first_name, last_name, employee_no, email, area, position, floor, status, building_id,
                                 buildings ( name ),
                                 dependencies ( name ),
                                 schedules ( name, default_entry, default_exit ),
@@ -400,7 +400,7 @@ export async function matchUsageToPersonnel(
                 has_floors: c.access_media_types?.has_floors,
                 key: c.access_media_types?.key ?? '',
             }));
-            const displayStatus = computePersonStatus(p.status, allCards);
+            const displayStatus = computePersonStatus(p.status, allCards, p.building_id);
             const access = deriveAccessFromAssignments(p.access_assignments);
 
             const person: ExportPersonnelData = {

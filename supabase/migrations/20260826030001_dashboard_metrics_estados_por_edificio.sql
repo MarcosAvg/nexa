@@ -1,3 +1,4 @@
+-- get_dashboard_metrics: estado por edificio (8 estados) + operativos = activo + parcial.
 -- Dashboard: contador "No Activos" + todas las dependencias + personas por piso
 -- Estado por edificio de radicación (máquina de 8): operativos = activo + parcial.
 

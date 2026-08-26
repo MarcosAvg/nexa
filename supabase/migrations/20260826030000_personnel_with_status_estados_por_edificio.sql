@@ -1,3 +1,7 @@
+-- Estado por edificio de radicación: máquina de 8 estados.
+-- Regla: conjunto de medios requeridos del edificio (access_media_type_buildings ∩ activos);
+-- listo = active + programming done + responsiva signed|legacy.
+
 create or replace view "public"."personnel_with_status" with (security_invoker=true) AS
 WITH req AS (
     SELECT mtb.building_id,

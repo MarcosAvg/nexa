@@ -9,9 +9,12 @@
 // ─── Personal Status ───────────────────────────────────────────
 
 /** Variantes de Badge para cada estado de personal */
-export function getPersonnelStatusVariant(status: string): "emerald" | "amber" | "slate" | "rose" {
+export function getPersonnelStatusVariant(status: string): "emerald" | "amber" | "slate" | "rose" | "blue" | "violet" {
     if (status === "Activo/a") return "emerald";
     if (status === "Parcial") return "amber";
+    if (status === "En proceso") return "blue";
+    if (status === "Media de otro edificio") return "violet";
+    if (status === "Otro edificio en proceso") return "violet";
     if (status === "Sin Acceso") return "slate";
     if (status === "Bloqueado/a") return "rose";
     if (status === "Baja") return "slate";

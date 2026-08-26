@@ -3,7 +3,7 @@
     import { confirm } from "../utils/confirmModal.svelte";
     import { handleError } from "../utils";
     import {
-        SectionHeader, FilterGroup, FilterSelect, Button, Card,
+        SectionHeader, FilterSelect, Button, Card,
         DataTable, Badge, PermissionGuard, FloatingActionButton,
         ContentView, SearchInput, Pagination,
         AddCardModal, ResponsivaProgramBadges,
@@ -28,16 +28,12 @@
     let dependencies = $derived(catalogState.dependencies);
     let dependencyNames = $derived(dependencies.map((d) => d.name));
 
-    // Filtros de UI que mapean nombre → ID antes de aplicar
+    // Estado local de filtros (determinista: se escribe al store justo antes de refrescar).
+    let typeFilter = $state("Todos");
+    let statusFilter = $state("Todas");
+    let searchFilter = $state("");
+    // Nombre de dependencia → ID (mapeo local)
     let depNameFilter = $state("");
-
-    // Sincronizar nombre de dependencia → ID en el store
-    $effect(() => {
-        const depId = depNameFilter
-            ? String(dependencies.find((d) => d.name === depNameFilter)?.id ?? "")
-            : "";
-        cardState.filters.dependencyId = depId;
-    });
 
     // Estado del modal
     let isModalOpen = $state(false);
@@ -53,16 +49,25 @@
 
     // No onMount necesario: el $effect debounced dispara la carga inicial automáticamente
 
-    // Debounced auto-refresh cuando cambian los filtros
+    // Debounced auto-refresh cuando cambian los filtros.
+    // Se escribe explícitamente al store y luego se refresca, de modo que la
+    // consulta siempre usa el valor seleccionado (independientemente del binding).
     let filterDebounce: ReturnType<typeof setTimeout>;
     $effect(() => {
-        cardState.filters.type;
-        cardState.filters.status;
-        cardState.filters.search;
-        cardState.filters.dependencyId;
+        typeFilter;
+        statusFilter;
+        searchFilter;
+        depNameFilter;
 
         clearTimeout(filterDebounce);
-        filterDebounce = setTimeout(() => cardState.refresh(1), 300);
+        filterDebounce = setTimeout(() => {
+            const depId = depNameFilter
+                ? String(dependencies.find((d) => d.name === depNameFilter)?.id ?? "")
+                : "";
+            cardState.setFilters(typeFilter, statusFilter, depId);
+            cardState.setSearch(searchFilter);
+            cardState.refresh(1);
+        }, 300);
     });
 
     // Manejadores
@@ -175,7 +180,7 @@
 {#snippet renderCardFolio(row: any)}
     <div class="flex items-center gap-2">
         <span class="font-medium text-slate-700">{row.folio}</span>
-        {#if row.personId}
+        {#if row.person_id}
             <ResponsivaProgramBadges responsiva_status={row.responsiva_status} programming_status={row.programming_status} />
         {/if}
     </div>
@@ -183,15 +188,16 @@
 
 <div class="space-y-6">
     <SectionHeader title="Gestión de tarjetas">
-        {#snippet filters()}                <FilterGroup
+        {#snippet filters()}
+            <FilterSelect
                 label="Tipo"
                 options={["Todos", ...mediaTypeNames]}
-                bind:value={cardState.filters.type}
+                bind:value={typeFilter}
             />
-            <FilterGroup
+            <FilterSelect
                 label="Estado"
                 options={["Todas", "Disponible", "Activa", "Bloqueada", "Baja"]}
-                bind:value={cardState.filters.status}
+                bind:value={statusFilter}
             />
             <FilterSelect
                 label="Dependencia"
@@ -199,15 +205,15 @@
                 placeholder="Todas"
                 bind:value={depNameFilter}
             />
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
-                <SearchInput
-                    placeholder="Folio..."
-                    bind:value={cardState.filters.search}
-                    oninput={() => {}}
-                    class="h-9 text-xs font-bold"
-                />
-            </div>
+<div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
+                        <SearchInput
+                            placeholder="Folio..."
+                            bind:value={searchFilter}
+                            oninput={() => {}}
+                            class="h-9 text-xs font-bold"
+                        />
+                    </div>
         {/snippet}
 
         {#snippet actions()}
@@ -219,18 +225,20 @@
                     const loadingToast = toast.loading("Preparando exportación...");
                     try {
                         const data = await cardService.fetchForExport(
-                            cardState.filters.search,
-                            cardState.filters.type,
-                            cardState.filters.status,
-                            cardState.filters.dependencyId,
+                            searchFilter,
+                            typeFilter,
+                            statusFilter,
+                            depNameFilter
+                                ? String(dependencies.find((d) => d.name === depNameFilter)?.id ?? "")
+                                : "",
                         );
                         const m = await import("../utils/xlsxExport");
                         m.exportCardsToExcel(data, {
                             filters: {
-                                type: cardState.filters.type,
-                                status: cardState.filters.status,
+                                type: typeFilter,
+                                status: statusFilter,
                                 dependency: depNameFilter,
-                                search: cardState.filters.search,
+                                search: searchFilter,
                             },
                         });
                         toast.success("Exportación completada", { id: loadingToast });
@@ -259,21 +267,20 @@
 
     <ContentView
         isLoading={isLoading}
-        data={cards}
+data={cards}
         emptyTitle="Aún no hay tarjetas registradas"
         emptyTitleFiltered="Sin resultados"
         emptyDescription="El inventario de tarjetas está vacío. Comienza registrando la primera tarjeta de acceso."
         emptyDescriptionFiltered="No encontramos tarjetas con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={CreditCard}
-        emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"                    hasFilters={!!(cardState.filters.search || cardState.filters.type !== "Todos" || cardState.filters.status !== "Todas" || cardState.filters.dependencyId)}
+        emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"                    hasFilters={!!(searchFilter || typeFilter !== "Todos" || statusFilter !== "Todas" || depNameFilter)}
                     onClearFilters={() => {
-            depNameFilter = '';
-            cardState.filters.type = 'Todos';
-            cardState.filters.status = 'Todas';
-            cardState.filters.search = '';
-            cardState.filters.dependencyId = '';
-            // El $effect se encarga de refrescar
-        }}
+                        depNameFilter = '';
+                        typeFilter = 'Todos';
+                        statusFilter = 'Todas';
+                        searchFilter = '';
+                        // El $effect se encarga de refrescar
+                    }}
         skeletonColumns={4}
         skeletonRows={5}
         cardClass="overflow-hidden"

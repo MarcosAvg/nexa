@@ -1,10 +1,7 @@
 import type * as ExcelJSTypes from 'exceljs';
 import {
     addLogoToSheet,
-    addBorder,
     calcPct,
-    addSectionTitle,
-    addKpiCard,
     addTableHeader,
     addTableRow,
     autoRowHeight,
@@ -153,17 +150,89 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
         pink: { bg: 'FFFCE7F3', fg: 'FF9D174D' },
     };
 
-    // Anchos de columna
-    ws.columns = [
-        { width: 4 },    // A espaciador
-        { width: 30 },    // B etiqueta
-        { width: 16 },    // C valor
-        { width: 14 },    // D porcentaje
-        { width: 4 },    // E espaciador
-        { width: 30 },    // F etiqueta
-        { width: 16 },    // G valor
-        { width: 14 },    // H porcentaje
+    // Rejilla en landscape: paneles contiguos de (etiqueta | valor | %) separados por columnas delgadas.
+    // PANELES[i] = [colEtiqueta, colValor, colPct]
+    const PANELS: string[][] = [
+        ['B', 'C', 'D'],
+        ['F', 'G', 'H'],
+        ['J', 'K', 'L'],
     ];
+    ws.columns = [
+        { width: 2 },    // A margen
+        { width: 22 },   // B
+        { width: 12 },   // C
+        { width: 10 },   // D
+        { width: 3 },    // E separador
+        { width: 22 },   // F
+        { width: 12 },   // G
+        { width: 10 },   // H
+        { width: 3 },    // I separador
+        { width: 22 },   // J
+        { width: 12 },   // K
+        { width: 10 },   // L
+        { width: 3 },    // M separador
+        { width: 2 },    // N margen
+    ];
+
+    // Stat de hero: etiqueta + valor + % en un panel (3 celdas, sin merge).
+    const stat = (row: number, panel: number, label: string, value: number | string, pct?: string, colors?: { bg: string; fg: string }): void => {
+        const [lc, vc, pc] = PANELS[panel];
+        const c = colors || { bg: 'FFDBEAFE', fg: 'FF1E40AF' };
+        [
+            { col: lc, value: label, size: 9, bold: false, align: 'left', indent: 1 },
+            { col: vc, value: value, size: 18, bold: true, align: 'center' },
+            { col: pc, value: pct || '', size: 9, bold: false, align: 'center' },
+        ].forEach(({ col, value: v, size, bold, align, indent }) => {
+            const cell = ws.getCell(`${col}${row}`);
+            cell.value = v;
+            cell.font = { name: 'Arial', size, bold, color: { argb: c.fg } };
+            cell.alignment = { vertical: 'middle', horizontal: align as any, indent: indent ?? 0 };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.bg } };
+            cell.border = { top: { style: 'thin', color: { argb: c.fg } }, bottom: { style: 'thin', color: { argb: c.fg } }, left: { style: 'thin', color: { argb: c.fg } }, right: { style: 'thin', color: { argb: c.fg } } };
+        });
+        ws.getRow(row).height = 46;
+    };
+
+    // Título de panel (sin merge): texto en el primer col + línea separadora en el panel.
+    const panelTitle = (row: number, panel: number, text: string, colors: { sectionHead: string; separator: string }): void => {
+        const [lc, vc, pc] = PANELS[panel];
+        const cell = ws.getCell(`${lc}${row}`);
+        cell.value = text;
+        cell.font = { name: 'Arial', bold: true, size: 11, color: { argb: colors.sectionHead } };
+        cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        [lc, vc, pc].forEach((col) => {
+            const x = ws.getCell(`${col}${row}`);
+            x.border = { top: { style: 'medium', color: { argb: colors.separator } }, left: { style: 'thin', color: { argb: colors.separator } }, right: { style: 'thin', color: { argb: colors.separator } } };
+        });
+        ws.getRow(row).height = 26;
+    };
+
+    // Cabecera de tabla en un panel (a partir de una lista de etiquetas).
+    const tableHeader = (row: number, panel: number, labels: string[], colors: { bg: string; fg: string }): void => {
+        const cols = PANELS[panel].slice(0, labels.length).map((col, i) => ({ col, label: labels[i] }));
+        addTableHeader(ws, row, cols, colors, '#FFFFFFFF');
+    };
+
+    // Fila de tabla en un panel (valores, usa los N primeros cols del panel).
+    const tableRow = (row: number, panel: number, values: (string | number)[], colors: { bg: string; fg: string }): void => {
+        const cols = PANELS[panel].slice(0, values.length).map((col, i) => ({ col, value: values[i] }));
+        addTableRow(ws, row, cols, colors, '#0F172A', '#FFFFFFFF');
+    };
+
+    // Colores por estado (máquina de 8).
+    const stateColors = (status: string): { bg: string; fg: string } => {
+        switch (status) {
+            case 'Activo/a': return { bg: 'FFD1FAE5', fg: 'FF065F46' };
+            case 'Parcial': return { bg: 'FFFEF3C7', fg: 'FF92400E' };
+            case 'En proceso': return { bg: 'FFE0F2FE', fg: 'FF075985' };
+            case 'Media de otro edificio': return { bg: 'FFEDE9FE', fg: 'FF5B21B6' };
+            case 'Otro edificio en proceso': return { bg: 'FFE0E7FF', fg: 'FF3730A3' };
+            case 'Sin Acceso': return { bg: 'FFF1F5F9', fg: 'FF334155' };
+            case 'Bloqueado/a': return { bg: 'FFFEE2E2', fg: 'FF991B1B' };
+            case 'Baja': return { bg: 'FFE2E8F0', fg: 'FF475569' };
+            default: return { bg: 'FFF1F5F9', fg: 'FF334155' };
+        }
+    };
 
     let row = 1;
 
@@ -176,6 +245,10 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     const bajas = data.filter(p => p.status === 'Baja').length;
     const activosOperativos = activos + parciales;
     const operativos = data.filter(p => p.status === 'Activo/a' || p.status === 'Parcial');
+    const enProceso = data.filter(p => p.status === 'En proceso').length;
+    const mediaOtro = data.filter(p => p.status === 'Media de otro edificio').length;
+    const otroEnProceso = data.filter(p => p.status === 'Otro edificio en proceso').length;
+    const noActivos = Math.max(0, total - activosOperativos);
     const selected = (cardTypes && cardTypes.length > 0 ? cardTypes : null);
     const mediaConfigs = buildMediaConfigs(mediaTypes).filter((m) => !selected || selected.includes(m.name));
     const conByMedia = (name: string) => operativos.filter(p => p.cards?.some(c => c.type.toUpperCase() === name.toUpperCase())).length;
@@ -219,118 +292,48 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     });
     const buildEntries = Object.entries(buildMap).sort((a, b) => b[1] - a[1]);
 
-    // Fila 1: Título
-    ws.mergeCells('A1:H1');
-    const titleCell = ws.getCell('A1');
-    titleCell.value = `       RESUMEN EJECUTIVO — DIRECTORIO DE PERSONAL${filterInfo}`;
+    // Fila 1: Título (sin merge)
+    const titleCell = ws.getCell('B1');
+    titleCell.value = `RESUMEN EJECUTIVO — DIRECTORIO DE PERSONAL${filterInfo}`;
     titleCell.font = { name: 'Arial', bold: true, size: 16, color: { argb: C.title } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     ws.getRow(1).height = 40;
 
     await addLogoToSheet(workbook, ws);
 
-    // Fila 2: Meta
-    ws.mergeCells('A2:H2');
-    const metaCell = ws.getCell('A2');
+    // Fila 2: Meta (sin merge)
+    const metaCell = ws.getCell('B2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
         year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
     metaCell.value = `Reporte generado: ${dateStr}  |  Total de registros: ${total}`;
     metaCell.font = { name: 'Arial', size: 9, color: { argb: C.meta } };
     metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    metaCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
     ws.getRow(2).height = 20;
-
     row = 4;
 
-    // Sección 1: KPIs
-    row = addSectionTitle(ws, row, '📊  INDICADORES CLAVE POR ESTADO', 'H', C);
-    ws.getRow(row).height = 32;    addKpiCard(ws, row, 'B', 'TOTAL PERSONAL', total, C.blue);
-    addKpiCard(ws, row, 'F', 'ACTIVOS OPERATIVOS', activosOperativos, C.emerald, calcPct(activosOperativos, total));
-    row++;
+    // Hero KPIs (3 stats lado a lado, sin merge)
+    stat(row, 0, 'TOTAL PERSONAL', total, calcPct(total, total), { bg: 'FFDBEAFE', fg: 'FF1E40AF' });
+    stat(row, 1, 'ACTIVOS OPERATIVOS', activosOperativos, calcPct(activosOperativos, total), { bg: 'FFD1FAE5', fg: 'FF065F46' });
+    stat(row, 2, 'NO ACTIVOS', noActivos, calcPct(noActivos, total), { bg: 'FFFEE2E2', fg: 'FF991B1B' });
+    row += 3;
 
-    ws.getRow(row).height = 28;
-    addKpiCard(ws, row, 'B', 'Activo/a', activos, C.emerald, calcPct(activos, total));
-    addKpiCard(ws, row, 'F', 'Parcial', parciales, C.amber, calcPct(parciales, total));
-    row++;
+    const stateOrder = [
+        'Activo/a', 'Parcial', 'En proceso', 'Media de otro edificio',
+        'Otro edificio en proceso', 'Sin Acceso', 'Bloqueado/a', 'Baja',
+    ];
+    const stateCounts: Record<string, number> = {
+        'Activo/a': activos,
+        'Parcial': parciales,
+        'En proceso': enProceso,
+        'Media de otro edificio': mediaOtro,
+        'Otro edificio en proceso': otroEnProceso,
+        'Sin Acceso': sinAcceso,
+        'Bloqueado/a': bloqueados,
+        'Baja': bajas,
+    };
 
-    ws.getRow(row).height = 28;
-    addKpiCard(ws, row, 'B', 'Bloqueado/a', bloqueados, C.rose, calcPct(bloqueados, total));
-    addKpiCard(ws, row, 'F', 'Sin Acceso', sinAcceso, C.slate, calcPct(sinAcceso, total));
-    row++;
-
-    ws.getRow(row).height = 28;
-    addKpiCard(ws, row, 'B', 'Baja', bajas, C.slate, calcPct(bajas, total));
-    row++; row++;
-
-    // Sección 2: Cobertura de tarjetas
-    row = addSectionTitle(ws, row, '🪪  COBERTURA DE TARJETAS DE ACCESO', 'H', C);
-    ws.mergeCells(`B${row}:H${row}`);
-    const noteCell = ws.getCell(`B${row}`);
-    const typesLabel = mediaConfigs.map((m) => m.name).join(' + ');
-    noteCell.value = `Calculado sobre personal operativo (Activo/a + Parcial): ${activosOperativos} personas  |  Tipos incluidos: ${typesLabel}`;
-    noteCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: C.meta } };
-    ws.getRow(row).height = 18;
-    row++;
-
-    const coverage = mediaConfigs.map((m) => ({
-        label: m.name,
-        con: conByMedia(m.name),
-        sin: sinByMedia(m.name),
-        colors: { bg: m.colors.fill, fg: m.colors.sub },
-    }));
-
-    coverage.forEach((k) => {
-        ws.getRow(row).height = 28;
-        addKpiCard(ws, row, 'B', `Con tarjeta ${k.label}`, k.con, k.colors, calcPct(k.con, activosOperativos));
-        addKpiCard(ws, row, 'F', `Sin tarjeta ${k.label}`, k.sin, k.sin > 0 ? C.rose : k.colors, calcPct(k.sin, activosOperativos));
-        row++;
-    });
-
-    // "Sin ninguna tarjeta" ocupa el hueco cuando la cantidad de tipos seleccionados
-    // es impar (1 o 3): mide personas sin NINGUNA tarjeta de los tipos seleccionados.
-    const conCualquiera = operativos.filter((p) =>
-        p.cards?.some((c) => mediaConfigs.some((m) => m.name.toUpperCase() === c.type.toUpperCase()))
-    ).length;
-    const sinNinguna = activosOperativos - conCualquiera;
-
-    for (let i = 0; i < coverage.length; i += 2) {
-        const a = coverage[i];
-        const b = coverage[i + 1];
-        ws.getRow(row).height = 28;
-        addKpiCard(ws, row, 'B', `% Cobertura ${a.label}`, calcPct(a.con, activosOperativos), activosOperativos > 0 && a.con / activosOperativos >= 0.9 ? C.emerald : a.colors);
-        if (b) {
-            addKpiCard(ws, row, 'F', `% Cobertura ${b.label}`, calcPct(b.con, activosOperativos), activosOperativos > 0 && b.con / activosOperativos >= 0.9 ? C.emerald : b.colors);
-        } else {
-            addKpiCard(ws, row, 'F', 'Sin ninguna tarjeta', sinNinguna, sinNinguna > 0 ? C.rose : C.emerald);
-        }
-        row++;
-    }
-    row++;
-
-    // Sección 3: Por dependencia
-    row = addSectionTitle(ws, row, '🏢  DISTRIBUCIÓN POR DEPENDENCIA', 'H', C);
-    addTableHeader(ws, row, [{ col: 'B', label: 'DEPENDENCIA' }, { col: 'C', label: 'TOTAL' }, { col: 'D', label: '% DEL TOTAL' }, { col: 'F', label: 'ACTIVOS' }, { col: 'G', label: 'INACTIVOS' }, { col: 'H', label: '% ACTIVOS' }], C.violet, C.white);
-    row++;
-    depEntries.forEach(([dep, stats]) => {
-        addTableRow(ws, row, [{ col: 'B', value: dep }, { col: 'C', value: stats.total }, { col: 'D', value: calcPct(stats.total, total) }, { col: 'F', value: stats.activos }, { col: 'G', value: stats.inactivos }, { col: 'H', value: calcPct(stats.activos, stats.total) }], C.violet, C.sectionHead, C.white);
-        row++;
-    });
-
-    // Sección 4: Por edificio
-    if (buildEntries.length > 0) {
-        row = addSectionTitle(ws, row, '🏗️  DISTRIBUCIÓN POR EDIFICIO', 'H', C);
-        addTableHeader(ws, row, [{ col: 'B', label: 'EDIFICIO' }, { col: 'C', label: 'TOTAL' }, { col: 'D', label: '% DEL TOTAL' }], C.sky, C.white);
-        row++;
-        buildEntries.forEach(([building, count]) => {
-            addTableRow(ws, row, [{ col: 'B', value: building }, { col: 'C', value: count }, { col: 'D', value: calcPct(count, total) }], C.sky, C.sectionHead, C.white);
-            row++;
-        });
-    }
-
-    // Sección 5: Calidad de datos
-    row = addSectionTitle(ws, row, '⚠️  CALIDAD DE DATOS — CAMPOS INCOMPLETOS', 'H', C);
-    addTableHeader(ws, row, [{ col: 'B', label: 'CAMPO' }, { col: 'C', label: 'SIN DATO' }, { col: 'D', label: '% INCOMPLETO' }], C.rose, C.white);
-    row++;
     const qualityRows: [string, number][] = [
         ['Correo Electrónico', sinEmail],
         ['Jornada Laboral', sinSchedule],
@@ -338,56 +341,119 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
         ['Equipo / Área', sinArea],
         ['Piso Base', sinFloor],
     ];
+
+    // ── Fila de tablas cortas lado a lado: Estado | Edificio | Calidad de datos ──
+    const bandStart = row;
+    // Panel 0: Distribución por Estado
+    let rEstado = bandStart;
+    panelTitle(rEstado, 0, '📊 DISTRIBUCIÓN POR ESTADO', C); rEstado++;
+    tableHeader(rEstado, 0, ['ESTADO', 'PERSONAS', '%'], C.violet); rEstado++;
+    stateOrder.forEach((s, i) => {
+        const colors = stateColors(s);
+        tableRow(rEstado, 0, [s, stateCounts[s], stateCounts[s] > 0 ? calcPct(stateCounts[s], total) : '0%'], colors);
+        ws.getCell(`B${rEstado}`).font = { name: 'Arial', size: 9, bold: false, color: { argb: colors.fg } };
+        rEstado++;
+    });
+    // Panel 1: Por Edificio
+    let rEdificio = bandStart;
+    panelTitle(rEdificio, 1, '🏗️ POR EDIFICIO', C); rEdificio++;
+    tableHeader(rEdificio, 1, ['EDIFICIO', 'TOTAL', '%'], C.sky); rEdificio++;
+    buildEntries.forEach(([building, count]) => { tableRow(rEdificio, 1, [building, count, calcPct(count, total)], { bg: 'FFE0F2FE', fg: 'FF075985' }); rEdificio++; });
+    // Panel 2: Calidad de datos
+    let rCalidad = bandStart;
+    panelTitle(rCalidad, 2, '⚠️ CALIDAD DE DATOS', C); rCalidad++;
+    tableHeader(rCalidad, 2, ['CAMPO', 'SIN DATO', '%'], C.rose); rCalidad++;
     qualityRows.forEach(([label, count]) => {
-        const colors = count > 0 ? C.rose : C.emerald;
-        addTableRow(ws, row, [{ col: 'B', value: label }, { col: 'C', value: count }, { col: 'D', value: calcPct(count, total) }], colors, C.sectionHead, C.white);
-        row++;
+        const colors = count > 0 ? { bg: 'FFFEE2E2', fg: 'FF991B1B' } : { bg: 'FFD1FAE5', fg: 'FF065F46' };
+        tableRow(rCalidad, 2, [label, count, calcPct(count, total)], colors); rCalidad++;
     });
     const totalMissing = qualityRows.reduce((sum, [, c]) => sum + c, 0);
     const maxPossible = total * qualityRows.length;
-    ws.getRow(row).height = 24;
-    const summCols = [
-        { col: 'B', value: 'TOTAL CAMPOS VACÍOS' },
-        { col: 'C', value: `${totalMissing} / ${maxPossible}` },
-        { col: 'D', value: calcPct(totalMissing, maxPossible) },
-    ];
-    summCols.forEach(({ col, value }, i) => {
-        const cell = ws.getCell(`${col}${row}`);
-        cell.value = value;
-        cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: C.sectionHead } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.slate.bg } };
-        cell.alignment = { vertical: 'middle', horizontal: i === 0 ? 'left' : 'center', indent: i === 0 ? 1 : 0 };
-        addBorder(cell);
+    tableRow(rCalidad, 2, ['TOTAL VACÍOS', `${totalMissing} / ${maxPossible}`, calcPct(totalMissing, maxPossible)], { bg: 'FFF1F5F9', fg: 'FF334155' }); rCalidad++;
+    row = Math.max(rEstado, rEdificio, rCalidad) + 3;
+
+    // ── Fila de tablas medianas lado a lado: Cobertura | Jornada | Accesos especiales ──
+    const band2 = row;
+    // Panel 0: Cobertura de tarjetas
+    let rCob = band2;
+    panelTitle(rCob, 0, '🪪 COBERTURA DE TARJETAS', C); rCob++;
+    tableHeader(rCob, 0, ['MEDIO', 'CON', '%'], C.sky); rCob++;
+    mediaConfigs.forEach((m) => {
+        const con = conByMedia(m.name);
+        tableRow(rCob, 0, [`Tienen ${m.name}`, con, calcPct(con, activosOperativos)], { bg: m.colors.fill, fg: m.colors.sub }); rCob++;
     });
-    row++; row++;
+    const conCualquiera = operativos.filter((p) =>
+        p.cards?.some((c) => mediaConfigs.some((m) => m.name.toUpperCase() === c.type.toUpperCase()))
+    ).length;
+    const sinNinguna = activosOperativos - conCualquiera;
+    tableRow(rCob, 0, ['Sin ninguna tarjeta', sinNinguna, calcPct(sinNinguna, activosOperativos)], { bg: 'FFF1F5F9', fg: 'FF334155' }); rCob++;
+    // Panel 1: Jornada laboral
+    let rJor = band2;
+    panelTitle(rJor, 1, '🕐 JORNADA LABORAL', C); rJor++;
+    tableHeader(rJor, 1, ['JORNADA', 'PERSONAS', '%'], C.emerald); rJor++;
+    schedEntries.forEach(([sched, count]) => { tableRow(rJor, 1, [sched, count, calcPct(count, total)], { bg: 'FFD1FAE5', fg: 'FF065F46' }); rJor++; });
+    if (schedEntries.length === 0) { tableRow(rJor, 1, ['—', 0, '0%'], { bg: 'FFF1F5F9', fg: 'FF334155' }); rJor++; }
+    // Panel 2: Accesos especiales
+    let rAcc = band2;
+    panelTitle(rAcc, 2, '🔐 ACCESOS ESPECIALES', C); rAcc++;
+    tableHeader(rAcc, 2, ['TIPO', 'PERSONAS', '%'], C.pink); rAcc++;
+    accessEntries.forEach(([access, count]) => { tableRow(rAcc, 2, [access, count, calcPct(count, total)], { bg: 'FFFCE7F3', fg: 'FF9D174D' }); rAcc++; });
+    if (accessEntries.length === 0) { tableRow(rAcc, 2, ['—', 0, '0%'], { bg: 'FFF1F5F9', fg: 'FF334155' }); rAcc++; }
+    row = Math.max(rCob, rJor, rAcc) + 2;
 
-    // Sección 6: Accesos especiales
-    if (accessEntries.length > 0) {
-        row = addSectionTitle(ws, row, '🔐  ACCESOS ESPECIALES', 'H', C);
-        ws.getRow(row).height = 28;
-        addKpiCard(ws, row, 'B', 'Personas con acceso especial', conAccesoEspecial, C.pink, calcPct(conAccesoEspecial, total));
+    // ── Banda ancha al fondo: Por dependencia (B..H, con E como separador interno; sin merge) ──
+    const depTitle = ws.getCell(`B${row}`);
+    depTitle.value = '🏢 DISTRIBUCIÓN POR DEPENDENCIA';
+    depTitle.font = { name: 'Arial', bold: true, size: 11, color: { argb: C.sectionHead } };
+    depTitle.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    ['B', 'C', 'D', 'F', 'G', 'H'].forEach((col) => {
+        const x = ws.getCell(`${col}${row}`);
+        x.border = { top: { style: 'medium', color: { argb: C.separator } }, left: { style: 'thin', color: { argb: C.separator } }, right: { style: 'thin', color: { argb: C.separator } } };
+    });
+    ws.getRow(row).height = 26;
+    row++;
+    addTableHeader(ws, row, [{ col: 'B', label: 'DEPENDENCIA' }, { col: 'C', label: 'TOTAL' }, { col: 'D', label: '% DEL TOTAL' }, { col: 'F', label: 'ACTIVOS' }, { col: 'G', label: 'INACTIVOS' }, { col: 'H', label: '% ACTIVOS' }], C.violet, C.white);
+    row++;
+    depEntries.forEach(([dep, stats]) => {
+        addTableRow(ws, row, [{ col: 'B', value: dep }, { col: 'C', value: stats.total }, { col: 'D', value: calcPct(stats.total, total) }, { col: 'F', value: stats.activos }, { col: 'G', value: stats.inactivos }, { col: 'H', value: calcPct(stats.activos, stats.total) }], C.violet, C.sectionHead, C.white);
         row++;
-        addTableHeader(ws, row, [{ col: 'B', label: 'TIPO DE ACCESO' }, { col: 'C', label: 'PERSONAS' }, { col: 'D', label: '% DEL TOTAL' }], C.pink, C.white);
-        row++;
-        accessEntries.forEach(([access, count]) => {
-            addTableRow(ws, row, [{ col: 'B', value: access }, { col: 'C', value: count }, { col: 'D', value: calcPct(count, total) }], C.pink, C.sectionHead, C.white);
-            row++;
-        });
-    }
+    });
+    row++;
 
-    // Sección 7: Horario
-    if (schedEntries.length > 0) {
-        row = addSectionTitle(ws, row, '🕐  DISTRIBUCIÓN DE JORNADA LABORAL', 'H', C);
-        addTableHeader(ws, row, [{ col: 'B', label: 'JORNADA' }, { col: 'C', label: 'PERSONAS' }, { col: 'D', label: '% DEL TOTAL' }], C.emerald, C.white);
+    // ── Banda amplia: Personas por Piso (Edificio | Piso | Personas | %) ──
+    const floorMap = new Map<string, { building: string; floor: string; count: number }>();
+    data.forEach((p) => {
+        const b = p.building || 'Sin Edificio';
+        const f = p.floor || 'Sin Piso';
+        const key = `${b}|${f}`;
+        const cur = floorMap.get(key);
+        if (cur) cur.count++;
+        else floorMap.set(key, { building: b, floor: f, count: 1 });
+    });
+    const floorEntries = [...floorMap.values()].sort((a, b) =>
+        a.building.localeCompare(b.building)
+        || a.floor.localeCompare(b.floor, undefined, { numeric: true, sensitivity: 'base' }),
+    );
+
+    const floorTitle = ws.getCell(`B${row}`);
+    floorTitle.value = '🏢 PERSONAS POR PISO';
+    floorTitle.font = { name: 'Arial', bold: true, size: 11, color: { argb: C.sectionHead } };
+    floorTitle.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    ['B', 'C', 'D', 'F', 'G', 'H'].forEach((col) => {
+        const x = ws.getCell(`${col}${row}`);
+        x.border = { top: { style: 'medium', color: { argb: C.separator } }, left: { style: 'thin', color: { argb: C.separator } }, right: { style: 'thin', color: { argb: C.separator } } };
+    });
+    ws.getRow(row).height = 26;
+    row++;
+    addTableHeader(ws, row, [{ col: 'B', label: 'EDIFICIO' }, { col: 'C', label: 'PISO' }, { col: 'D', label: 'PERSONAS' }, { col: 'F', label: '% DEL TOTAL' }], C.sky, C.white);
+    row++;
+    floorEntries.forEach(({ building, floor, count }) => {
+        addTableRow(ws, row, [{ col: 'B', value: building }, { col: 'C', value: floor }, { col: 'D', value: count }, { col: 'F', value: calcPct(count, total) }], { bg: 'FFE0F2FE', fg: 'FF075985' }, C.sectionHead, C.white);
         row++;
-        schedEntries.forEach(([sched, count]) => {
-            addTableRow(ws, row, [{ col: 'B', value: sched }, { col: 'C', value: count }, { col: 'D', value: calcPct(count, total) }], C.emerald, C.sectionHead, C.white);
-            row++;
-        });
-    }
+    });
 
     ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 3 }];
-    ws.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1 };
+    ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1 };
 }
 
 export async function exportPersonnelToExcel(data: ExportPersonnelData[], options?: ExportOptions, returnBuffer?: false): Promise<void>;

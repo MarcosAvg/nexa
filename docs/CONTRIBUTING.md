@@ -1185,8 +1185,8 @@ await cardService.save({
     type: "P2000",
     person_id: "uuid",          // null = disponible en inventario
     status: "active",           // "active" | "available" | "blocked" | "inactive"
-    programming_status: null,    // Se auto-asigna "pending" en nueva asignación
-    responsiva_status: null,
+    programming_status: "done",  // "pending" | "done" (NOT NULL en access_media)
+    responsiva_status: "unsigned", // "unsigned" | "signed" | "legacy" (NOT NULL en access_media)
 }, { oldCardStatus: "blocked" });  // Opciones de reemplazo (reposición)
 
 // Actualizar estado de programación

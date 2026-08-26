@@ -157,6 +157,14 @@
     const overscan = 10;
     const clientHeight = 600; // estimated max height of the scroll container
 
+    // Reinicia la posición de scroll cuando cambia el conjunto de datos
+    // (filtros/paginación). Sin esto, al filtrar estando scroll hacia abajo,
+    // startIndex queda más allá del nuevo tamaño y la tabla queda vacía.
+    $effect(() => {
+        data.length;
+        scrollTop = 0;
+    });
+
     let startIndex = $derived(
         Math.max(0, Math.floor(scrollTop / rowHeight) - overscan),
     );

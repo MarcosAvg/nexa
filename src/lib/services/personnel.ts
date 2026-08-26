@@ -62,7 +62,7 @@ const mapPersonRecord = (p: PersonnelRow): Person => {
     const access = deriveAccessFromAssignments((p as any).access_assignments);
 
     const displayStatus = p.computed_status
-        || computePersonStatus(p.status, allCards);
+        || computePersonStatus(p.status, allCards, p.building_id);
 
     return {
         id: p.id,
@@ -114,7 +114,8 @@ export const personnelService = {
                     query = query.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
                 }
             }
-            if (statusFilter !== "Todos") query = query.eq("computed_status", statusFilter);
+            if (statusFilter === "No Activos") query = query.neq("computed_status", "Activo/a");
+            else if (statusFilter !== "Todos") query = query.eq("computed_status", statusFilter);
             if (dependencyId) query = query.eq("dependency_id", dependencyId);
             if (buildingId === "__none__") query = query.is("building_id", null);
             else if (buildingId) query = query.eq("building_id", buildingId);
@@ -138,6 +139,7 @@ export const personnelService = {
     // Helper para lógica de fallback
     async _fetchAllFallback(page: number, limit: number, search: string, statusFilter: string, dependencyId: string, buildingId: string) {
         const isComputedStatus = ["Activo/a", "Parcial", "Sin Acceso"].includes(statusFilter);
+        const isNoActivos = statusFilter === "No Activos";
         const dbStatusMap: Record<string, string> = {
             "Bloqueado/a": "blocked",
             "Baja": "inactive"
@@ -163,7 +165,7 @@ export const personnelService = {
                 }
             }
 
-            if (statusFilter !== "Todos") {
+            if (statusFilter !== "Todos" && !isNoActivos) {
                 if (dbStatusMap[statusFilter]) {
                     q = q.eq("status", dbStatusMap[statusFilter]);
                 } else if (isComputedStatus) {
@@ -178,7 +180,7 @@ export const personnelService = {
             return q;
         };
 
-        if (isComputedStatus) {
+        if (isComputedStatus || isNoActivos) {
             const allData = await batchPaginate<any>(async (from, to) => {
                 return buildBaseQuery()
                     .order("first_name", { ascending: true })
@@ -186,7 +188,9 @@ export const personnelService = {
             });
 
             const allMapped = allData.map(p => mapPersonRecord(p));
-            const filtered = allMapped.filter(p => p.status === statusFilter);
+            const filtered = allMapped.filter(p =>
+                isNoActivos ? p.status !== "Activo/a" : p.status === statusFilter,
+            );
             const from = (page - 1) * limit;
             return { data: filtered.slice(from, from + limit), count: filtered.length };
         } else {
@@ -543,7 +547,7 @@ export const personnelService = {
             return data as DashboardMetrics;
         }, "Fetch Dashboard Metrics (RPC)", {
             totalPersonnel: 0,
-            statusCounts: { activo: 0, parcial: 0, inactivo: 0, bloqueado: 0, baja: 0 },
+            statusCounts: { activo: 0, parcial: 0, en_proceso: 0, media_otro_edificio: 0, media_otro_edificio_pendiente: 0, sin_acceso: 0, bloqueado: 0, baja: 0 },
             cardCoverage: [],
             operativos: 0,
             noActivos: 0,

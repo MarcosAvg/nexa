@@ -1,6 +1,7 @@
 import { supabase } from "../supabase";
 import { withErrorHandlingSafe } from "../utils";
 import type { AccessMedia, AccessMediaType } from "../types";
+import { catalogState } from "../stores/catalogs.svelte";
 
 export const accessMediaService = {
     async fetchTypes(throwOnError: boolean = false): Promise<AccessMediaType[]> {
@@ -52,7 +53,8 @@ export const accessMediaService = {
             }
 
             if (typeName !== "Todos") {
-                query = query.eq("access_media_types.name", typeName);
+                const media = catalogState.mediaTypes.find((m) => m.name === typeName);
+                if (media) query = query.eq("media_type_id", media.id);
             }
 
             if (statusFilter !== "Todas") {

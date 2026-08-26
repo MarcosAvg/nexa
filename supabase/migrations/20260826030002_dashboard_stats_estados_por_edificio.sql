@@ -1,3 +1,4 @@
+-- get_dashboard_stats: activePersonnel = activo + parcial (estado por edificio).
 create or replace function public.get_dashboard_stats()
   returns json
   language sql

@@ -7,7 +7,7 @@
         moduleState,
     } from "../stores";
     import {
-        SectionHeader, FilterGroup, FilterSelect, Button, DataTable,
+        SectionHeader, FilterSelect, Button, DataTable,
         Badge, PermissionGuard, FloatingActionButton, Pagination,
         ContentView, SearchInput, ExportDropdown, ExportMenuItem,
         UsoTarjetasImportModal,
@@ -269,12 +269,16 @@
 <div class="space-y-6">
     <SectionHeader title="Directorio de Personal">
         {#snippet filters()}
-            <FilterGroup
+            <FilterSelect
                 label="Estado"
                 options={[
                     "Todos",
                     "Activo/a",
+                    "No Activos",
                     "Parcial",
+                    "En proceso",
+                    "Media de otro edificio",
+                    "Otro edificio en proceso",
                     "Sin Acceso",
                     "Bloqueado/a",
                     "Baja",

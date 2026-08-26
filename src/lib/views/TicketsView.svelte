@@ -5,7 +5,7 @@
         catalogState,
     } from "../stores";
     import {
-        SectionHeader, TaskBanner, Button, FilterGroup, FilterSelect,
+        SectionHeader, TaskBanner, Button, FilterSelect,
         Input, PermissionGuard, ContentView,
         Pagination, ExportDropdown, ExportMenuItem, Tabs,
         ModificationCompareModal,
@@ -406,7 +406,7 @@
                 <!-- Urgency (solo Responsivas) -->
                 {#if currentSection === "Responsivas"}
                     <div class="w-full xl:w-auto">
-                        <FilterGroup
+                        <FilterSelect
                             label="Estado"
                             options={["Todas", "Pendiente", "Por vencer", "Baja de Registro"]}
                             bind:value={responsivaFilter}

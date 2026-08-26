@@ -550,8 +550,15 @@ export async function exportUsageToExcel(
             // Columna de estado (14) — badge
             if (colNumber === 14) {
                 let stColors = COLORS.slate;
-                if (entry.person.status === 'Activo/a') stColors = COLORS.emerald;
-                else if (entry.person.status === 'Bloqueado/a') stColors = COLORS.rose;
+                switch (entry.person.status) {
+                    case 'Activo/a': stColors = COLORS.emerald; break;
+                    case 'Parcial': stColors = COLORS.amber; break;
+                    case 'En proceso': stColors = COLORS.sky; break;
+                    case 'Media de otro edificio': case 'Otro edificio en proceso': stColors = COLORS.violet; break;
+                    case 'Sin Acceso': case 'Baja': stColors = COLORS.slate; break;
+                    case 'Bloqueado/a': stColors = COLORS.rose; break;
+                    default: stColors = COLORS.slate;
+                }
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: stColors.head } };
                 cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: stColors.sub } };
                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -754,8 +761,15 @@ export async function exportUsageToExcel(
 
             if (colNumber === 14) {
                 let stColors = COLORS.slate;
-                if (entry.person.status === 'Activo/a') stColors = COLORS.emerald;
-                else if (entry.person.status === 'Bloqueado/a') stColors = COLORS.rose;
+                switch (entry.person.status) {
+                    case 'Activo/a': stColors = COLORS.emerald; break;
+                    case 'Parcial': stColors = COLORS.amber; break;
+                    case 'En proceso': stColors = COLORS.sky; break;
+                    case 'Media de otro edificio': case 'Otro edificio en proceso': stColors = COLORS.violet; break;
+                    case 'Sin Acceso': case 'Baja': stColors = COLORS.slate; break;
+                    case 'Bloqueado/a': stColors = COLORS.rose; break;
+                    default: stColors = COLORS.slate;
+                }
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: stColors.head } };
                 cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: stColors.sub } };
                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -879,8 +893,15 @@ export async function exportUsageToExcel(
                 }
                 if (colNumber === 10) {
                     let stColors = COLORS.slate;
-                    if (entry.person.status === 'Activo/a') stColors = COLORS.emerald;
-                    else if (entry.person.status === 'Bloqueado/a') stColors = COLORS.rose;
+                    switch (entry.person.status) {
+                        case 'Activo/a': stColors = COLORS.emerald; break;
+                        case 'Parcial': stColors = COLORS.amber; break;
+                        case 'En proceso': stColors = COLORS.sky; break;
+                        case 'Media de otro edificio': case 'Otro edificio en proceso': stColors = COLORS.violet; break;
+                        case 'Sin Acceso': case 'Baja': stColors = COLORS.slate; break;
+                        case 'Bloqueado/a': stColors = COLORS.rose; break;
+                        default: stColors = COLORS.slate;
+                    }
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: stColors.head } };
                     cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: stColors.sub } };
                 }

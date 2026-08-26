@@ -21,6 +21,7 @@
         BarChart3,
     } from "lucide-svelte";
     import { onMount } from "svelte";
+    import { push } from "svelte-spa-router";
     import {
         mediaTypeVariant,
         mediaTypeBarClasses,
@@ -36,6 +37,19 @@
     // Las métricas se actualizan automáticamente vía Realtime:
     // PersonnelState.initRealtime() refresca dashboardStats y dashboardMetrics
     // en cada cambio detectado en la tabla personnel.
+
+    // Navegación desde los contadores: pre-aplican el filtro en el store de destino.
+    function goPersonnel(status: string) {
+        personnelState.filters.status = status;
+        personnelState.filters.search = "";
+        push("/personal");
+    }
+    function goTickets(section: "General" | "Responsivas", type: string = "Todos") {
+        ticketState.filters.section = section;
+        ticketState.filters.type = type;
+        ticketState.filters.search = "";
+        push("/tickets");
+    }
 
     let pendingItems = $derived(ticketState.pendingItems);
     let currentUser = $derived(userState.currentUser);
@@ -100,7 +114,10 @@
     const statusConfig = [
         { key: "activo", label: "Activo/a", color: "bg-emerald-500", hex: "#10b981", textColor: "text-emerald-700", bgLight: "bg-emerald-50" },
         { key: "parcial", label: "Parcial", color: "bg-amber-500", hex: "#f59e0b", textColor: "text-amber-700", bgLight: "bg-amber-50" },
-        { key: "inactivo", label: "Sin Acceso", color: "bg-slate-400", hex: "#94a3b8", textColor: "text-slate-600", bgLight: "bg-slate-50" },
+        { key: "en_proceso", label: "En proceso", color: "bg-sky-500", hex: "#0ea5e9", textColor: "text-sky-700", bgLight: "bg-sky-50" },
+        { key: "media_otro_edificio", label: "Media de otro edificio", color: "bg-violet-500", hex: "#8b5cf6", textColor: "text-violet-700", bgLight: "bg-violet-50" },
+        { key: "media_otro_edificio_pendiente", label: "Otro edificio en proceso", color: "bg-violet-300", hex: "#c4b5fd", textColor: "text-violet-600", bgLight: "bg-violet-50/60" },
+        { key: "sin_acceso", label: "Sin Acceso", color: "bg-slate-400", hex: "#94a3b8", textColor: "text-slate-600", bgLight: "bg-slate-50" },
         { key: "bloqueado", label: "Bloqueado/a", color: "bg-rose-500", hex: "#f43f5e", textColor: "text-rose-700", bgLight: "bg-rose-50" },
         { key: "baja", label: "Baja", color: "bg-slate-300", hex: "#cbd5e1", textColor: "text-slate-500", bgLight: "bg-slate-50/50" },
     ];
@@ -244,7 +261,7 @@
 
     <!-- ── KPIs ── -->
     <section class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300">
+        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300 cursor-pointer" onclick={() => goPersonnel("Activo/a")}>
             <div class="flex items-center gap-3.5">
                 <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
                     <Users size={22} strokeWidth={2} />
@@ -257,7 +274,7 @@
             <div class="absolute -right-4 -bottom-4 text-emerald-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><Users size={96} /></div>
         </Card>
 
-        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300">
+        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300 cursor-pointer" onclick={() => goPersonnel("No Activos")}>
             <div class="flex items-center gap-3.5">
                 <div class="p-3 bg-rose-50 text-rose-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
                     <Shield size={22} strokeWidth={2} />
@@ -267,11 +284,11 @@
                     <div class="text-2xl font-black text-slate-900 tabular-nums">{metrics.noActivos}</div>
                 </div>
             </div>
-            <div class="mt-2 text-[10px] font-medium text-slate-400">Sin acceso listo (sin tarjeta, bloqueada o baja)</div>
+            <div class="mt-2 text-[10px] font-medium text-slate-400">Sin acceso utilizable (en proceso, media de otro edificio, sin acceso, bloqueado o baja)</div>
             <div class="absolute -right-4 -bottom-4 text-rose-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><Shield size={96} /></div>
         </Card>
 
-        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300">
+        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300 cursor-pointer" onclick={() => goTickets("General")}>
             <div class="flex items-center gap-3.5">
                 <div class="p-3 bg-amber-50 text-amber-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
                     <FileText size={22} strokeWidth={2} />
@@ -289,7 +306,7 @@
             <div class="absolute -right-4 -bottom-4 text-amber-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><FileText size={96} /></div>
         </Card>
 
-        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300">
+        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300 cursor-pointer" onclick={() => goTickets("Responsivas")}>
             <div class="flex items-center gap-3.5">
                 <div class="p-3 bg-violet-50 text-violet-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
                     <FileSignature size={22} strokeWidth={2} />
@@ -302,7 +319,7 @@
             <div class="absolute -right-4 -bottom-4 text-violet-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><FileSignature size={96} /></div>
         </Card>
 
-        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300">
+        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300 cursor-pointer" onclick={() => goTickets("General", "Programación")}>
             <div class="flex items-center gap-3.5">
                 <div class="p-3 bg-cyan-50 text-cyan-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
                     <Cpu size={22} strokeWidth={2} />

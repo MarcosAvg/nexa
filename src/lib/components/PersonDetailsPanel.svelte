@@ -19,6 +19,7 @@
         Eye,
     } from "lucide-svelte";
     import { generateResponsivaPdf, generateCardPdf, handleError } from "../utils";
+    import { getPersonnelStatusVariant } from "../constants/status";
     import ResponsivaTemplate from "./ResponsivaTemplate.svelte";
     import ResponsivaPreviewModal from "./ResponsivaPreviewModal.svelte";
     import { toast } from "svelte-sonner";
@@ -535,15 +536,7 @@ async function loadFloors() {
                 <div class="pt-3 border-t border-slate-200">
                     <div class="flex justify-between items-center">
                         <span class="text-xs text-slate-500">Estado</span>
-                        <Badge
-                            variant={person.status === "Activo/a"
-                                ? "emerald"
-                                : person.status === "Parcial"
-                                  ? "amber"
-                                  : person.status === "Bloqueado/a"
-                                    ? "rose"
-                                    : "slate"}
-                        >
+                        <Badge variant={getPersonnelStatusVariant(person.status)}>
                             {person.status}
                         </Badge>
                     </div>
