@@ -23,3 +23,13 @@ export const GENERAL_TICKET_TYPES = [
 ];
 
 export const RESPONSIVA_TICKET_TYPES = [TICKET_TYPES.firmaResponsiva];
+
+/**
+ * Tipos que no cuentan como tiquet operativo en el dashboard.
+ * Se muestran por separado (Firmas y Programación) y no inflan
+ * el conteo de tiquets pendientes.
+ */
+export const DASHBOARD_EXCLUDED_TICKET_TYPES = [
+    TICKET_TYPES.firmaResponsiva,
+    TICKET_TYPES.programacion,
+];

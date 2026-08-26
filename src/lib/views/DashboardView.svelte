@@ -27,6 +27,7 @@
         mediaTypeStockClasses,
     } from "../utils/mediaTypeAppearance";
     import { timeAgo, fullName } from "../utils/format";
+    import { DASHBOARD_EXCLUDED_TICKET_TYPES } from "../constants/tickets";
 
     onMount(() => {
         personnelState.refreshDashboardStats();
@@ -38,6 +39,11 @@
 
     let pendingItems = $derived(ticketState.pendingItems);
     let currentUser = $derived(userState.currentUser);
+
+    // Tiquets operativos: excluye Firmas Responsiva y Programaciones del conteo principal.
+    let operationalTickets = $derived(
+        pendingItems.filter((t) => !DASHBOARD_EXCLUDED_TICKET_TYPES.includes(t.type as any)),
+    );
 
     // Tarjetas KPI
     let activePersonnelCount = $derived(personnelState.dashboardStats.activePersonnel);
@@ -53,10 +59,10 @@
     let metrics = $derived(personnelState.dashboardMetrics);
     let metricsLoading = $derived(personnelState.metricsLoading);
 
-    // Tickets: desglose por prioridad + urgentes
+    // Tickets: desglose por prioridad + urgentes (solo operativos)
     let ticketsByPriority = $derived.by(() => {
         const map = { Alta: 0, Media: 0, Baja: 0 };
-        for (const t of pendingItems) {
+        for (const t of operationalTickets) {
             const p = String(t.priority || "").toLowerCase();
             if (p === "alta") map.Alta++;
             else if (p === "media") map.Media++;
@@ -70,7 +76,7 @@
         { label: "Baja", count: ticketsByPriority.Baja },
     ]);
     let urgentTickets = $derived(
-        pendingItems
+        operationalTickets
             .filter((t) => String(t.priority || "").toLowerCase() === "alta")
             .slice(0, 6),
     );
@@ -230,8 +236,8 @@
             {:else}
                 <Badge variant="slate" class="text-[10px] font-extrabold px-2.5 py-1 uppercase tracking-wider">Consulta</Badge>
             {/if}
-            <Badge variant={pendingItems.length > 0 ? "amber" : "emerald"} class="text-[10px] font-extrabold px-2.5 py-1 uppercase tracking-wider">
-                {pendingItems.length} pendientes
+            <Badge variant={operationalTickets.length > 0 ? "amber" : "emerald"} class="text-[10px] font-extrabold px-2.5 py-1 uppercase tracking-wider">
+                {operationalTickets.length} pendientes
             </Badge>
         </div>
     </section>
@@ -271,7 +277,7 @@
                 </div>
                 <div>
                     <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">Tickets Pendientes</div>
-                    <div class="text-2xl font-black text-slate-900 tabular-nums">{pendingItems.length}</div>
+                    <div class="text-2xl font-black text-slate-900 tabular-nums">{operationalTickets.length}</div>
                 </div>
             </div>
             <div class="mt-2 flex items-center gap-1.5">
@@ -573,7 +579,7 @@
                         <div class="p-8 text-center text-slate-400 italic text-sm">Sin tickets prioritarios.</div>
                     {/each}
                 </div>
-                {#if pendingItems.length > 0}
+                {#if operationalTickets.length > 0}
                     <a href="/tickets" class="flex items-center justify-center gap-1 py-3 text-[11px] font-bold text-sky-600 hover:text-sky-800 transition-colors border-t border-slate-100/60">
                         Ver todos los tickets <ChevronRight size={13} />
                     </a>
