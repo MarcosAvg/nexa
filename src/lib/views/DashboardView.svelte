@@ -259,15 +259,16 @@
 
         <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300">
             <div class="flex items-center gap-3.5">
-                <div class="p-3 bg-sky-50 text-sky-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                <div class="p-3 bg-rose-50 text-rose-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
                     <Shield size={22} strokeWidth={2} />
                 </div>
                 <div>
-                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">Operativos</div>
-                    <div class="text-2xl font-black text-slate-900 tabular-nums">{metrics.operativos}</div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">No Activos</div>
+                    <div class="text-2xl font-black text-slate-900 tabular-nums">{metrics.noActivos}</div>
                 </div>
             </div>
-            <div class="absolute -right-4 -bottom-4 text-sky-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><Shield size={96} /></div>
+            <div class="mt-2 text-[10px] font-medium text-slate-400">Sin acceso listo (sin tarjeta, bloqueada o baja)</div>
+            <div class="absolute -right-4 -bottom-4 text-rose-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><Shield size={96} /></div>
         </Card>
 
         <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300">
@@ -449,7 +450,7 @@
 
         <!-- ── FILA B: Dependencias + Edificios ── -->
         <section class="grid lg:grid-cols-3 gap-6">
-            <Card class="lg:col-span-2 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
+            <Card class="lg:col-span-1 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-violet-50 text-violet-600 rounded-xl"><Building2 size={18} strokeWidth={2.5} /></div>
@@ -467,7 +468,7 @@
                             <div class="absolute inset-y-0 left-0 bg-violet-50/40 transition-all duration-700" style="width: {barWidth}%"></div>
                             <div class="relative flex items-center justify-between">
                                 <div class="flex items-center gap-2.5 min-w-0">
-                                    <span class="text-[10px] font-black text-violet-400 tabular-nums w-5">#{i + 1}</span>
+                                    <span class="text-[10px] font-black text-violet-400 tabular-nums w-5">{i + 1}</span>
                                     <span class="text-[12px] font-bold text-slate-800 truncate">{dep.name}</span>
                                 </div>
                                 <div class="flex items-center gap-2 shrink-0">
@@ -482,30 +483,40 @@
                 </div>
             </Card>
 
-            <Card class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
+            <Card class="lg:col-span-2 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-cyan-50 text-cyan-600 rounded-xl"><Building2 size={18} strokeWidth={2.5} /></div>
                         <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">Edificios</h2>
-                            <p class="text-[11px] text-slate-400 font-medium">{metrics.topBuildings.length} registrados</p>
+                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">Personas por Piso</h2>
+                            <p class="text-[11px] text-slate-400 font-medium">Radicación: edificio + piso base</p>
                         </div>
                     </div>
                 </div>
                 <div class="divide-y divide-slate-100/60 max-h-[420px] overflow-y-auto">
-                    {#each metrics.topBuildings as bldg, i}
-                        {@const barWidth = pct(bldg.total, metrics.totalPersonnel)}
-                        <div class="px-6 py-3 hover:bg-cyan-50/30 transition-all duration-200 relative">
-                            <div class="absolute inset-y-0 left-0 bg-cyan-50/40 transition-all duration-700" style="width: {barWidth}%"></div>
-                            <div class="relative flex items-center justify-between">
-                                <div class="flex items-center gap-2.5 min-w-0">
-                                    <span class="text-[10px] font-black text-cyan-400 tabular-nums w-5">#{i + 1}</span>
-                                    <span class="text-[12px] font-bold text-slate-800 truncate">{bldg.name}</span>
-                                </div>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    <Badge variant="slate" class="text-[9px] font-extrabold px-1.5 py-0.5">{bldg.total}</Badge>
-                                    <span class="text-[10px] font-bold text-cyan-600 bg-cyan-50 px-1.5 py-0.5 rounded">{barWidth}%</span>
-                                </div>
+                    {#each metrics.buildingFloors as bldg}
+                        {@const bldgTotal = bldg.floors.reduce((s, f) => s + f.people, 0)}
+                        <div class="px-6 py-4 relative">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[12px] font-extrabold text-slate-800 flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
+                                    {bldg.name}
+                                </span>
+                                <Badge variant="slate" class="text-[10px] font-extrabold px-2 py-0.5">{bldgTotal} personas</Badge>
+                            </div>
+                            <div class="space-y-1.5">
+                                {#each bldg.floors as floor}
+                                    {@const pisoBarWidth = bldgTotal > 0 ? pct(floor.people, bldgTotal) : 0}
+                                    {@const pisoPct = bldgTotal > 0 ? pct(floor.people, bldgTotal) : 0}
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-[11px] font-bold text-slate-600 w-24 shrink-0 truncate">{floor.label}</span>
+                                        <div class="flex-1 min-w-0 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div class="bg-cyan-500 h-full rounded-full transition-all duration-700" style="width: {pisoBarWidth}%"></div>
+                                        </div>
+                                        <span class="text-[10px] font-black text-slate-700 tabular-nums w-8 shrink-0 text-right">{floor.people}</span>
+                                        <span class="text-[9px] font-bold text-cyan-600 tabular-nums w-10 shrink-0 text-right">{pisoPct}%</span>
+                                    </div>
+                                {/each}
                             </div>
                         </div>
                     {:else}

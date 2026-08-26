@@ -1,6 +1,9 @@
 import { HistoryService } from "../services/history";
+import type { HistoryStory } from "../services/history";
 import type { HistoryLog } from "../types";
 import { PaginatedListState } from "./paginatedList.svelte";
+
+export type { HistoryStory };
 
 export type HistoryFilters = {
     person: string;
@@ -12,7 +15,10 @@ export type HistoryFilters = {
 };
 
 export class HistoryState {
+    /** Paginación por fila (vista "Individual"). */
     pagination = new PaginatedListState<HistoryLog>();
+    /** Paginación por flujo (vista "Por flujo") — historias completas. */
+    storiesPagination = new PaginatedListState<HistoryStory>();
 
     filters: HistoryFilters = $state({
         person: "",
@@ -26,6 +32,7 @@ export class HistoryState {
     /** Carga la primera página con los filtros actuales. */
     async init() {
         await this.refresh(1);
+        await this.refreshFlows(1);
     }
 
     /** Libera recursos. */
@@ -36,6 +43,13 @@ export class HistoryState {
     async refresh(page: number = 1) {
         await this.pagination.fetchPage(
             (p, s) => HistoryService.fetchAll(p, s, this.filters),
+            page,
+        );
+    }
+
+    async refreshFlows(page: number = 1) {
+        await this.storiesPagination.fetchPage(
+            (p, s) => HistoryService.fetchFlows(p, s, this.filters),
             page,
         );
     }
@@ -53,6 +67,7 @@ export class HistoryState {
         }
         if (changed) {
             this.pagination.currentPage = 1;
+            this.storiesPagination.currentPage = 1;
         }
     }
 
@@ -69,6 +84,7 @@ export class HistoryState {
             endDate: "",
         };
         this.pagination.currentPage = 1;
+        this.storiesPagination.currentPage = 1;
     }
 
     async nextPage() {
@@ -86,6 +102,24 @@ export class HistoryState {
     async goToPage(page: number) {
         if (this.pagination.goToPage(page)) {
             await this.refresh(this.pagination.currentPage);
+        }
+    }
+
+    async nextFlowPage() {
+        if (this.storiesPagination.nextPage()) {
+            await this.refreshFlows(this.storiesPagination.currentPage);
+        }
+    }
+
+    async prevFlowPage() {
+        if (this.storiesPagination.prevPage()) {
+            await this.refreshFlows(this.storiesPagination.currentPage);
+        }
+    }
+
+    async goToFlowPage(page: number) {
+        if (this.storiesPagination.goToPage(page)) {
+            await this.refreshFlows(this.storiesPagination.currentPage);
         }
     }
 }

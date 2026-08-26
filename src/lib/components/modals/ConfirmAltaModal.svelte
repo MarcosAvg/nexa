@@ -9,9 +9,8 @@
     import ConfirmationModal from "./ConfirmationModal.svelte";
     import { ticketService } from "../../services/tickets";
     import { personnelService } from "../../services/personnel";
-    import { HistoryService } from "../../services/history";
     import { toast } from "svelte-sonner";
-    import { handleError, parseFloors, fullName } from "../../utils";
+    import { handleError, parseFloors } from "../../utils";
     import { wantsCard } from "../../utils/matchAnalysis";
     import { activeMediaTypes } from "../../utils/mediaContract";
     import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
@@ -140,12 +139,7 @@
         if (!ticket) return;
         isRejecting = true;
         try {
-            await ticketService.delete(ticket.id, "Alta rechazada");
-            const altaName = fullName(p.nombres, p.apellidos) || 'Desconocido';
-            await HistoryService.log("PERSONNEL", "", "REJECT_ALTA", {
-                message: `Solicitud de alta rechazada: ${p.apellidos}, ${p.nombres}`,
-                entityName: altaName,
-            });
+            await ticketService.reject(ticket.id, "Alta de Persona");
             toast.info("Solicitud rechazada.");
             isRejectOpen = false;
             isOpen = false;

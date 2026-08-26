@@ -14,7 +14,6 @@
     import { personnelService } from "../../services/personnel";
     import { ticketService } from "../../services/tickets";
     import { floorsForKey } from "../../services/accessAssignments";
-    import { HistoryService } from "../../services/history";
     import { catalogState, personnelState } from "../../stores";
     import { activeMediaTypes } from "../../utils/mediaContract";
     import InfoCard from "../InfoCard.svelte";
@@ -603,18 +602,7 @@
         if (!ticket) return;
         isSubmitting = true;
         try {
-            await ticketService.delete(ticket.id, "Ticket rechazado");
-            await HistoryService.log(
-                "PERSONNEL",
-                selectedPerson?.id ?? "",
-                "REJECT_TICKET",
-                {
-                    message: `Ticket de ${ticketType} rechazado`,
-                    entityName: selectedPerson
-                        ? `${selectedPerson.last_name}, ${selectedPerson.first_name}`
-                        : `Ticket rechazado (${ticketType})`,
-                },
-            );
+            await ticketService.reject(ticket.id, ticketType || "Ticket");
             toast.info("Ticket rechazado.");
             isRejectOpen = false;
             isOpen = false;

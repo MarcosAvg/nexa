@@ -318,22 +318,7 @@
         isSubmitting = true;
 
         try {
-            await ticketService.delete(
-                ticket.id,
-                `Modificación rechazada: ${ticket.description}`,
-            );
-
-            // Registrar el rechazo
-            const rejectName = currentPerson?.name || 'Desconocido';
-            await HistoryService.log(
-                "PERSONNEL",
-                ticket.person_id || "",
-                "REJECT_MODIFICATION",
-                {
-                    message: `Modificación de datos rechazada para ${rejectName}`,
-                    entityName: rejectName,
-                },
-            );
+            await ticketService.reject(ticket.id, "Modificación");
             toast.info("Ticket rechazado", {
                 description: "Los cambios no se aplicaron.",
             });

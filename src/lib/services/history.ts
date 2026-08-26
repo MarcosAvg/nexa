@@ -1,8 +1,12 @@
 import { supabase } from "../supabase";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, batchPaginate } from "../utils";
+import type { HistoryLog } from "../types";
 
 // Caché de userId a nivel de módulo — evita llamar a getSession() en cada registro
 let _cachedUserId: string | undefined;
+
+// Flujo activo de módulo: los log() dentro de HistoryService.withFlow() lo heredan.
+let _activeFlowId: string | undefined;
 
 /** Filtros comunes aceptados por fetchAll y fetchForExport. */
 export type HistoryFilters = {
@@ -12,6 +16,15 @@ export type HistoryFilters = {
     action?: string;
     startDate?: string;
     endDate?: string;
+};
+
+/** Un flujo del historial: los pasos conectados de una misma operación. */
+export type HistoryStory = {
+    flowId: string;
+    /** Pasos del flujo ordenados cronológicamente (ascendente). */
+    steps: HistoryLog[];
+    /** Paso más reciente (para ordenar y mostrar la cabecera). */
+    latest: HistoryLog;
 };
 
 /**
@@ -57,8 +70,9 @@ export const HistoryService = {
      * @param action - Short action name e.g. 'CREATE', 'UPDATE', 'BLOCK'
      * @param details - Object or string with details. If details.entityName is set, it's used as the entity_name.
      * @param performedBy - Optional user UUID (cached after first call)
+     * @param flowId - Optional flow id to group this log with others of the same operation.
      */
-    async log(entityType: string, entityId: string | number | undefined, action: string, details: Record<string, unknown> | string, performedBy?: string) {
+    async log(entityType: string, entityId: string | number | undefined, action: string, details: Record<string, unknown> | string, performedBy?: string, flowId?: string) {
         if (!entityId) {
             console.warn("HistoryService: No entityId provided for log", { entityType, action });
         }
@@ -92,6 +106,7 @@ export const HistoryService = {
                 action,
                 details: detailsObj,
                 performed_by: userId,
+                flow_id: flowId ?? _activeFlowId ?? null,
             }]);
 
         if (error) {
@@ -102,6 +117,26 @@ export const HistoryService = {
     /** Reset cached userId (call on logout) */
     clearCache() {
         _cachedUserId = undefined;
+    },
+
+    /** Genera un id de flujo (uuid) para agrupar logs de una misma operación. */
+    startFlow(): string {
+        return crypto.randomUUID();
+    },
+
+    /**
+     * Ejecuta `fn` con un flujo activo: todos los HistoryService.log() invocados
+     * dentro heredan el mismo flow_id, conectando las acciones de un mismo
+     * flujo en el historial. Anida llamadas reutilizando el flujo externo.
+     */
+    async withFlow<T>(fn: () => Promise<T>, flowId?: string): Promise<T> {
+        const previous = _activeFlowId;
+        _activeFlowId = flowId ?? _activeFlowId ?? crypto.randomUUID();
+        try {
+            return await fn();
+        } finally {
+            _activeFlowId = previous;
+        }
     },
 
     /**
@@ -140,7 +175,7 @@ export const HistoryService = {
             const from = (page - 1) * limit;
             let query = supabase
                 .from("history_logs")
-                .select("id, timestamp, entity_type, entity_id, entity_name, action, details, performed_by", { count: "exact" });
+                .select("id, timestamp, entity_type, entity_id, entity_name, action, details, performed_by, flow_id", { count: "exact" });
 
             query = applyFilters(query, filters);
 
@@ -165,6 +200,91 @@ export const HistoryService = {
             });
             return await this._attachUserNames(rows);
         }, "Fetch History for Export", []);
+    },
+
+    /**
+     * Agrupa filas ya enriquecidas en "historias" por flow_id.
+     * Las filas sin flow_id se convierten en historias de un solo paso.
+     */
+    _groupStories(rows: any[]): HistoryStory[] {
+        const map = new Map<string, HistoryLog[]>();
+        for (const r of rows) {
+            const key = r.flow_id ?? `row-${r.id}`;
+            const arr = map.get(key);
+            if (arr) arr.push(r);
+            else map.set(key, [r]);
+        }
+        const stories: HistoryStory[] = [];
+        for (const [flowId, raw] of map.entries()) {
+            const steps = [...raw].sort(
+                (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+            );
+            stories.push({ flowId, steps, latest: steps[steps.length - 1] });
+        }
+        return stories.sort(
+            (a, b) => new Date(b.latest.timestamp).getTime() - new Date(a.latest.timestamp).getTime(),
+        );
+    },
+
+    /**
+     * Página las historias del historial (un flujo = una "historia").
+     * A diferencia de fetchAll (que pagina por fila), aquí se pagina por flujo,
+     * evitando que un flujo se corte entre páginas. Devuelve historias completas.
+     */
+    async fetchFlows(
+        page: number = 1,
+        limit: number = 50,
+        filters: HistoryFilters = {}
+    ): Promise<{ data: HistoryStory[]; count: number }> {
+        return withErrorHandlingSafe(async () => {
+            // 1) Claves de flujo (flow_id) + su timestamp más reciente, y filas sin flow_id como singletons.
+            let flowQ = supabase.from("history_logs").select("flow_id, timestamp");
+            flowQ = applyFilters(flowQ, filters);
+            const { data: flowRows } = await flowQ
+                .not("flow_id", "is", null)
+                .order("timestamp", { ascending: false });
+
+            let nullQ = supabase.from("history_logs").select("id, timestamp");
+            nullQ = applyFilters(nullQ, filters);
+            const { data: nullRows } = await nullQ
+                .is("flow_id", null)
+                .order("timestamp", { ascending: false });
+
+            const flowLatest = new Map<string, string>();
+            for (const r of flowRows || []) {
+                if (!flowLatest.has(r.flow_id)) flowLatest.set(r.flow_id, r.timestamp);
+            }
+
+            const keys: { key: string; last: string; single?: boolean }[] = [];
+            for (const [key, last] of flowLatest) keys.push({ key, last });
+            for (const r of nullRows || []) keys.push({ key: `row-${r.id}`, last: r.timestamp, single: true });
+
+            keys.sort((a, b) => (b.last).localeCompare(a.last));
+
+            const total = keys.length;
+            const from = (page - 1) * limit;
+            const pageKeys = keys.slice(from, from + limit);
+
+            const flowIds = pageKeys.filter((k) => !k.single).map((k) => k.key);
+            const singleIds = pageKeys.filter((k) => k.single).map((k) => Number(k.key.replace("row-", "")));
+
+            const rows: any[] = [];
+            if (flowIds.length > 0) {
+                let q = supabase.from("history_logs").select("*");
+                q = applyFilters(q, filters);
+                const { data } = await q.in("flow_id", flowIds);
+                rows.push(...(data || []));
+            }
+            if (singleIds.length > 0) {
+                let q = supabase.from("history_logs").select("*");
+                q = applyFilters(q, filters);
+                const { data } = await q.in("id", singleIds);
+                rows.push(...(data || []));
+            }
+
+            const enriched = await this._attachUserNames(rows);
+            return { data: this._groupStories(enriched), count: total };
+        }, "Fetch History Flows", { data: [], count: 0 });
     },
 
 

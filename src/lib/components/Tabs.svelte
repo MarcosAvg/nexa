@@ -1,6 +1,6 @@
 <script lang="ts" generics="T extends string">
     type Props = {
-        tabs: { id: T; label: string }[];
+        tabs: { id: T; label: string; icon?: any }[];
         active: T;
         onSelect: (id: T) => void;
         variant?: "underline" | "pill";
@@ -21,7 +21,7 @@
 >
     {#each tabs as tab}
         <button
-            class="whitespace-nowrap text-sm font-bold transition-colors {variant === 'underline'
+            class="inline-flex items-center gap-2 whitespace-nowrap text-sm font-bold transition-colors {variant === 'underline'
                 ? 'px-6 py-3 border-b-2 -mb-px '
                 : 'px-5 py-2.5 rounded-2xl text-[13px] font-extrabold active:scale-95 '}{variant === 'underline'
                 ? active === tab.id
@@ -32,6 +32,10 @@
                   : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800'}"
             onclick={() => onSelect(tab.id)}
         >
+            {#if tab.icon}
+                {@const Icon = tab.icon}
+                <Icon size={16} strokeWidth={2.5} />
+            {/if}
             {tab.label}
         </button>
     {/each}

@@ -149,8 +149,22 @@ export interface DashboardMetrics {
     /** Cobertura por tipo de medio activo. */
     cardCoverage: CoverageEntry[];
     operativos: number;
-    topDependencies: { name: string; total: number; activos: number }[];
-    topBuildings: { name: string; total: number }[];
+    /** Personal que no está operando (complemento de operativos). */
+    noActivos: number;
+    topDependencies: { name: string; sort_order?: number | null; total: number; activos: number }[];
+    topBuildings: { name: string; sort_order?: number | null; total: number }[];
+    /** Personas por piso y edificio (según radicación: edificio + piso base). */
+    buildingFloors: {
+        buildingId: number;
+        name: string;
+        sort_order?: number | null;
+        floors: {
+            id: number;
+            label: string;
+            sort_order: number | null;
+            people: number;
+        }[];
+    }[];
     dataQuality: {
         sinEmail: number;
         sinSchedule: number;
@@ -170,6 +184,8 @@ export interface HistoryLog {
     action: string;
     details: Record<string, unknown>;
     performed_by: string | null;
+    /** Id de flujo: agrupa los registros de una misma operación. */
+    flow_id?: string | null;
     /** Nombre del usuario que ejecutó la acción (resuelto desde profiles). */
     performed_by_name?: string;
 }

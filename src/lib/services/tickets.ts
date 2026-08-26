@@ -392,12 +392,16 @@ export const ticketService = {
 
             created = newTickets?.length ?? 0;
 
-            // Único registro de historial para toda la importación
+            // Una historia por cada tiquet importado (cada uno en su propio flujo).
             if (created > 0) {
-                await HistoryService.log('TICKET', newTickets![0].id, 'CREATE', {
-                    message: `Importación masiva: ${created} ticket(s) creados desde plantilla Excel`,
-                    entityName: `Importación Excel (${new Date().toLocaleDateString()})`
-                });
+                for (const t of newTickets || []) {
+                    await HistoryService.withFlow(async () => {
+                        await HistoryService.log('TICKET', t.id, 'CREATE', {
+                            message: `Ticket creado: ${t.title}`,
+                            entityName: `Ticket #${t.id}: ${t.title}`,
+                        });
+                    });
+                }
             }
 
             // Actualizar store
@@ -412,23 +416,42 @@ export const ticketService = {
     },
 
 
-    async delete(id: number, reason?: string) {
+    async delete(
+        id: number,
+        reason?: string,
+        action: "COMPLETE" | "CANCEL" | "REJECT" = "COMPLETE",
+        ticketType?: string,
+    ) {
         return withErrorHandling(async () => {
-            const { data: ticket } = await supabase.from("tickets").select("title").eq("id", id).single();
+            return HistoryService.withFlow(async () => {
+            const { data: ticket } = await supabase.from("tickets").select("title, type").eq("id", id).single();
 
-            await HistoryService.log("TICKET", id, "COMPLETE", {
-                message: reason || `Ticket completado/atendido`,
+            const typeLabel = ticketType
+                || ticket?.type
+                || (ticket?.title || "").replace(/^Firma:\s*/, "");
+            await HistoryService.log("TICKET", id, action, {
+                message: action === "REJECT"
+                    ? `Ticket de ${typeLabel} rechazado`
+                    : (reason || `Ticket completado/atendido`),
+                ticketType: action === "REJECT" ? typeLabel : undefined,
                 entityName: ticket ? `Ticket #${id}: ${ticket.title}` : `Ticket #${id}`
             });
 
             const { error } = await supabase.from("tickets").delete().eq("id", id);
             if (error) throw error;
             ticketState.removeTicket(id);
+            });
         }, "Delete Ticket");
+    },
+
+    /** Rechaza un tiquet registrando una sola fila TICKET REJECT con su tipo. */
+    async reject(id: number, ticketType?: string) {
+        return this.delete(id, undefined, "REJECT", ticketType);
     },
 
     async deleteByCard(cardId: string, types?: string[], reason?: string) {
         return withErrorHandling(async () => {
+            return HistoryService.withFlow(async () => {
             let fetchQuery = supabase.from("tickets")
                 .select("id, title")
                 .eq("access_media_id", cardId);
@@ -452,11 +475,13 @@ export const ticketService = {
             const { error } = await query;
             if (error) throw error;
             ticketState.removeByCard(cardId, types);
+            });
         }, "Delete Tickets by Card");
     },
 
     async deleteByPerson(personId: string, reason?: string, types?: string[]) {
         return withErrorHandling(async () => {
+            return HistoryService.withFlow(async () => {
             let fetchQuery = supabase.from("tickets")
                 .select("id, title")
                 .eq("person_id", personId);
@@ -479,6 +504,7 @@ export const ticketService = {
             const { error } = await query;
             if (error) throw error;
             ticketState.removeByPerson(personId);
+            });
         }, "Delete Tickets by Person");
     },
 

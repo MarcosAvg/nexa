@@ -141,7 +141,7 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
                 if (['CREATE', 'ACTIVATE', 'APPLY_MODIFICATION'].includes(action)) {
                     bgColor = COLORS.emerald.head;
                     textColor = COLORS.emerald.sub;
-                } else if (['DELETE', 'BLOCK', 'DEACTIVATE', 'UNASSIGN', 'UNASSIGN_CARD', 'DELETE_RESPONSIVA', 'REPLACE_OLD', 'DELETE_TICKET_CASCADE', 'REJECT_MODIFICATION'].includes(action)) {
+                } else if (['DELETE', 'BLOCK', 'DEACTIVATE', 'UNASSIGN', 'UNASSIGN_CARD', 'DELETE_RESPONSIVA', 'REPLACE_OLD', 'DELETE_TICKET_CASCADE', 'REJECT_MODIFICATION', 'REJECT', 'REJECT_ALTA', 'REJECT_TICKET', 'CANCEL'].includes(action)) {
                     bgColor = COLORS.rose.head;
                     textColor = COLORS.rose.sub;
                 } else if (['ASSIGN_CARD', 'REPLACE_CARD', 'SIGN_RESPONSIVA', 'COMPLETE_TICKET', 'TICKET', 'CREATE_TICKET'].includes(action)) {

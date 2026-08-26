@@ -242,6 +242,7 @@ export const cardService = {
         [key: string]: unknown;
     }, replacementOptions?: { oldCardStatus: string, skipTicket?: boolean }) {
         return withErrorHandling(async () => {
+            return HistoryService.withFlow(async () => {
             const mediaType = await resolveMediaType(data.type);
             const mediaTypeId = mediaType.id as string;
             // Los medios que no requieren programación nacen listos.
@@ -363,6 +364,7 @@ export const cardService = {
                     });
                 }
             }
+            });
         }, "Save Card");
     },
 
@@ -401,6 +403,7 @@ export const cardService = {
 
     async unassign(cardId: string) {
         return withErrorHandling(async () => {
+            return HistoryService.withFlow(async () => {
             const { error } = await supabase.from("access_media")
                 .update({ person_id: null, programming_status: null, responsiva_status: null, status: "available" })
                 .eq("id", cardId);
@@ -418,11 +421,13 @@ export const cardService = {
                 message: `Tarjeta desvinculada de la persona`,
                 entityName: media ? `${mediaTypeName(media)} (Folio: ${media.identifier})` : `Tarjeta (${cardId})`
             });
+            });
         }, "Unassign Card");
     },
 
     async delete(id: string) {
         return withErrorHandling(async () => {
+            return HistoryService.withFlow(async () => {
             const { data: media } = await supabase.from("access_media")
                 .select("identifier, access_media_types(name)")
                 .eq("id", id).single();
@@ -440,6 +445,7 @@ export const cardService = {
 
             const { error } = await supabase.from("access_media").delete().eq("id", id);
             if (error) throw error;
+            });
         }, "Delete Card");
     },
 

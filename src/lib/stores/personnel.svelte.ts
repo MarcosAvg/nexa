@@ -39,8 +39,10 @@ export class PersonnelState {
         statusCounts: { activo: 0, parcial: 0, inactivo: 0, bloqueado: 0, baja: 0 },
         cardCoverage: [],
         operativos: 0,
+        noActivos: 0,
         topDependencies: [],
         topBuildings: [],
+        buildingFloors: [],
         dataQuality: { sinEmail: 0, sinSchedule: 0, sinPosition: 0, sinArea: 0, total: 0 },
     });
     metricsLoading = $state(false);

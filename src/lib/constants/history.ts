@@ -28,8 +28,10 @@ export const ACTION_NAMES: Record<string, string> = {
     DELETE_CATALOG: "Catálogo Eliminado",
     CANCEL: "Cancelación",
     COMPLETE: "Completado",
+    REJECT: "Rechazo de tiquet",
     // Agregados que se usan pero faltaban:
     REJECT_ALTA: "Alta Rechazada",
+    REJECT_TICKET: "Rechazo de tiquet",
 };
 
 /**
@@ -54,6 +56,7 @@ export const FILTERED_ACTIONS: [string, string][] = [
     ["REJECT_MODIFICATION", "Modificación Rechazada"],
     ["COMPLETE", "Completado"],
     ["CANCEL", "Cancelación"],
+    ["REJECT", "Rechazo de tiquet"],
     ["UPDATE_ROLE", "Cambio de Rol"],
     ["REJECT_ALTA", "Alta Rechazada"],
 ];
@@ -88,7 +91,9 @@ export const ACTION_COLORS: Record<string, string> = {
     DELETE_CATALOG: "rose",
     CANCEL: "rose",
     COMPLETE: "emerald",
+    REJECT: "rose",
     REJECT_ALTA: "rose",
+    REJECT_TICKET: "rose",
 };
 
 export function translateDetails(text: string) {

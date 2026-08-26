@@ -7,6 +7,8 @@
         title: string;
         filters?: Snippet;
         actions?: Snippet;
+        /** Contenido opcional renderizado junto al título (desktop). */
+        titleExtra?: Snippet;
         onSearch?: () => void;
     };
 
@@ -17,6 +19,8 @@
         filters,
         /** Snippet de botones de acción. */
         actions,
+        /** Contenido opcional junto al título (desktop). */
+        titleExtra,
         /** Handler de búsqueda (deprecado, usa filters en su lugar). */
         onSearch,
     }: Props = $props();
@@ -33,11 +37,18 @@
             class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
         >
             <div class="flex items-center justify-between gap-4 min-w-0 flex-1">
-                <h2
-                    class="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight truncate"
-                >
-                    {title}
-                </h2>
+                <div class="flex items-center gap-3 min-w-0">
+                    <h2
+                        class="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight truncate"
+                    >
+                        {title}
+                    </h2>
+                    {#if titleExtra}
+                        <div class="hidden md:block shrink-0">
+                            {@render titleExtra()}
+                        </div>
+                    {/if}
+                </div>
 
                 <div class="flex items-center gap-2">
                     <!-- Alternar acciones en móvil -->

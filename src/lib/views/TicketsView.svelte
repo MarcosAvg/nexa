@@ -16,6 +16,7 @@
         Download,
         FolderArchive,
         ClipboardList,
+        FileSignature,
     } from "lucide-svelte";
     import { ticketService } from "../services/tickets";
     import { cardService } from "../services/cards";
@@ -358,21 +359,22 @@
 </script>
 
 <div class="space-y-6">
-    <!-- Section Tabs -->
-    <Tabs
-        tabs={[
-            { id: "General", label: "Tickets Generales" },
-            { id: "Responsivas", label: "Firmas de Responsiva" },
-        ]}
-        active={currentSection}
-        onSelect={(id) => switchSection(id as "General" | "Responsivas")}
-    />
-
     <SectionHeader
         title={currentSection === "General"
             ? "Tickets de trabajo"
             : "Firmas de Responsiva"}
     >
+        {#snippet titleExtra()}
+            <Tabs
+                variant="pill"
+                tabs={[
+                    { id: "General", label: "Tickets Generales", icon: ClipboardList },
+                    { id: "Responsivas", label: "Firmas de Responsiva", icon: FileSignature },
+                ]}
+                active={currentSection}
+                onSelect={(id) => switchSection(id as "General" | "Responsivas")}
+            />
+        {/snippet}
         {#snippet filters()}
             <div
                 class="flex flex-col xl:flex-row flex-wrap gap-4 items-center w-full"

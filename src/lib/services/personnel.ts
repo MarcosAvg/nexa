@@ -421,6 +421,7 @@ export const personnelService = {
         [key: string]: unknown;
     }) {
         return withErrorHandling(async () => {
+            return HistoryService.withFlow(async () => {
             if (!data.id) {
                 const results = await this.searchByName(
                     data.apellidos || data.last_name || "",
@@ -488,6 +489,7 @@ export const personnelService = {
                 floorsByBuilding,
                 specialAccesses,
             );
+            });
         }, "Save Personnel");
     },
 
@@ -503,6 +505,7 @@ export const personnelService = {
 
     async delete(id: string, cardActionMap?: Record<string, "delete" | "keep">) {
         return withErrorHandling(async () => {
+            return HistoryService.withFlow(async () => {
             const { data: person } = await supabase.from("personnel").select("first_name, last_name").eq("id", id).single();
             const personName = person ? `${person.first_name} ${person.last_name}` : `Personal (${id})`;
 
@@ -520,6 +523,7 @@ export const personnelService = {
 
             const { error } = await supabase.from("personnel").delete().eq("id", id);
             if (error) throw error;
+            });
         }, "Delete Personnel");
     },
 
@@ -542,8 +546,10 @@ export const personnelService = {
             statusCounts: { activo: 0, parcial: 0, inactivo: 0, bloqueado: 0, baja: 0 },
             cardCoverage: [],
             operativos: 0,
+            noActivos: 0,
             topDependencies: [],
             topBuildings: [],
+            buildingFloors: [],
             dataQuality: { sinEmail: 0, sinSchedule: 0, sinPosition: 0, sinArea: 0, total: 0 },
         });
     },

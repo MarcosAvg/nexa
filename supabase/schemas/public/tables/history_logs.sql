@@ -7,6 +7,7 @@ create table "public"."history_logs" (
   "details"      jsonb,
   "performed_by" uuid,
   "timestamp"    timestamp with time zone default now(),
+  "flow_id"      uuid,
   constraint "history_logs_performed_by_fkey" foreign key (performed_by) references auth.users(id),
   constraint "history_logs_pkey" primary key (id)
 );
@@ -23,6 +24,8 @@ create index idx_history_entity on public.history_logs using btree (entity_type,
 create index idx_history_logs_performed_by on public.history_logs using btree (performed_by);
 
 create index idx_history_timestamp on public.history_logs using btree ("timestamp" desc);
+
+create index idx_history_flow_id on public.history_logs using btree (flow_id);
 
 create policy "Admins/Operators insert history" on "public"."history_logs"
   for insert
