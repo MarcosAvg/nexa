@@ -24,7 +24,7 @@
     import { personnelService } from "../services/personnel";
     import { cardService } from "../services/cards";
     import { exportPersonnelToExcel, exportPersonnelAllDependenciesAsZip, handleError, createSimpleDebounce } from "../utils";
-    import { mediaTypeVariant } from "../utils/mediaTypeAppearance";
+    import { mediaTypeVariant, mediaTypeDotClass } from "../utils/mediaTypeAppearance";
     import { toast } from "svelte-sonner";
     import { networkStore } from "../stores/network.svelte";
     import { getPersonnelStatusVariant } from "../constants/status";
@@ -48,15 +48,6 @@
             exportCardTypes = [...mediaTypeNames];
         }
     });
-
-    const TYPE_DOT_CLASSES = [
-        "bg-amber-400",
-        "bg-sky-400",
-        "bg-emerald-400",
-        "bg-violet-400",
-        "bg-rose-400",
-        "bg-indigo-400",
-    ];
 
     function toggleExportCardType(type: string) {
         if (exportCardTypes.includes(type) && exportCardTypes.length === 1) {
@@ -357,7 +348,7 @@
                             Tipos de tarjeta
                         </p>
                         <div class="flex flex-col gap-0.5">
-                            {#each mediaTypeNames as t, i}
+                            {#each mediaTypeNames as t}
                                 <button
                                     type="button"
                                     class="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-[12px] font-bold transition-colors {exportCardTypes.includes(t)
@@ -372,7 +363,7 @@
                                     >
                                         <Check size={11} strokeWidth={3.5} />
                                     </span>
-                                    <span class="w-2 h-2 rounded-full {TYPE_DOT_CLASSES[i % TYPE_DOT_CLASSES.length]}"></span>
+                                    <span class="w-2 h-2 rounded-full {mediaTypeDotClass(t)}"></span>
                                     {t}
                                 </button>
                             {/each}

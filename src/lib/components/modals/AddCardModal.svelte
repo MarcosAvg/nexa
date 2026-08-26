@@ -3,6 +3,7 @@
     import Button from "../Button.svelte";
     import Badge from "../Badge.svelte";
     import { personnelState, catalogState } from "../../stores";
+    import { mediaTypeActiveClass, mediaTypeDotClass } from "../../utils/mediaTypeAppearance";
 
     /** Mensaje cuando otro usuario modificó la tarjeta mientras se editaba. */
     const CONFLICT_MSG =
@@ -71,28 +72,16 @@
             .filter((m) => (m as any).active !== false)
             .sort((a, b) => ((a as any).sort_order ?? 0) - ((b as any).sort_order ?? 0)),
     );
+    // Id (FK) del medio seleccionado, para aislar el folio por medio.
+    let selectedMediaTypeId = $derived(
+        mediaTypes.find((m) => m.name === cardType)?.id ?? null,
+    );
     // Clases estáticas (Tailwind JIT requiere literales completos).
-    const TYPE_ACTIVE_CLASSES = [
-        "border-amber-500 bg-amber-50 text-amber-900 shadow-sm",
-        "border-sky-500 bg-sky-50 text-sky-900 shadow-sm",
-        "border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm",
-        "border-violet-500 bg-violet-50 text-violet-900 shadow-sm",
-        "border-rose-500 bg-rose-50 text-rose-900 shadow-sm",
-        "border-indigo-500 bg-indigo-50 text-indigo-900 shadow-sm",
-    ];
-    const TYPE_DOT_CLASSES = [
-        "bg-amber-500",
-        "bg-sky-500",
-        "bg-emerald-500",
-        "bg-violet-500",
-        "bg-rose-500",
-        "bg-indigo-500",
-    ];
-    function typeActiveClass(i: number): string {
-        return TYPE_ACTIVE_CLASSES[i % TYPE_ACTIVE_CLASSES.length];
+    function typeActiveClass(m: any): string {
+        return mediaTypeActiveClass(m.name);
     }
-    function typeDotClass(i: number): string {
-        return TYPE_DOT_CLASSES[i % TYPE_DOT_CLASSES.length];
+    function typeDotClass(m: any): string {
+        return mediaTypeDotClass(m.name);
     }
     let searchQuery = $state("");
     let isSubmitting = $state(false);
@@ -144,6 +133,7 @@
     $effect(() => {
         const query = searchQuery.trim();
         const type = cardType;
+        const mediaTypeId = selectedMediaTypeId;
 
         clearTimeout(searchDebounce);
 
@@ -178,7 +168,9 @@
         isSearching = true;
         searchDebounce = setTimeout(async () => {
             try {
-                const result = await cardService.findByFolio(query, type);
+                const result = mediaTypeId
+                    ? await cardService.findByFolio(query, mediaTypeId)
+                    : null;
 
                 // Guard: la consulta pudo haber cambiado durante la obtención
                 if (searchQuery.trim() !== query || cardType !== type) return;
@@ -376,13 +368,13 @@
                 >Tipo de Acceso</span
             >
             <div class="grid grid-cols-3 gap-2">
-                {#each mediaTypes as m, i}
+                {#each mediaTypes as m}
                     <button
                         type="button"
                         disabled={!!replacingCard}
                         class="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all {cardType ===
                         m.name
-                            ? typeActiveClass(i)
+                            ? typeActiveClass(m)
                             : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'} {replacingCard &&
                         cardType !== m.name
                             ? 'opacity-50 cursor-not-allowed'
@@ -395,7 +387,7 @@
                         <span class="text-[10px] opacity-70">{m.key}</span>
                         {#if cardType === m.name}
                             <div
-                                class="absolute -top-2 -right-2 {typeDotClass(i)} text-white rounded-full p-0.5"
+                                class="absolute -top-2 -right-2 {typeDotClass(m)} text-white rounded-full p-0.5"
                             >
                                 <CheckCircle2 size={14} />
                             </div>

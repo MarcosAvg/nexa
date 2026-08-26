@@ -192,8 +192,8 @@ export const cardService = {
         }, "Fetch Extra Cards", throwOnError, []);
     },
 
-    /** Look up a card by exact folio + type, including owner info */
-    async findByFolio(folio: string, type: string): Promise<{
+    /** Look up a card by exact folio + media type id, including owner info */
+    async findByFolio(folio: string, mediaTypeId: string): Promise<{
         card: Card;
         ownerName: string | null;
     } | null> {
@@ -201,7 +201,7 @@ export const cardService = {
             .from("access_media")
             .select("*, access_media_types(*), personnel(first_name, last_name)")
             .eq("identifier", folio)
-            .eq("access_media_types.name", type)
+            .eq("media_type_id", mediaTypeId)
             .maybeSingle();
 
         if (error || !data) return null;
