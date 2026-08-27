@@ -10,6 +10,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+      },
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'maskable-icon.svg'],
       // Habilitar SW en modo dev para que el prompt de instalación funcione en localhost
       devOptions: {

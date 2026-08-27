@@ -102,11 +102,6 @@ export function resolveFloorList(
     return { resolved, unresolved };
 }
 
-/** Indica si un conjunto de pisos textuales puede resolverse por completo en un edificio. */
-export function allFloorsResolve(rawFloors: string[], canonicalLabels: string[]): boolean {
-    return resolveFloorList(rawFloors, canonicalLabels).unresolved.length === 0;
-}
-
 /**
  * Construye un resolvedor de pisos por edificio a partir del arreglo crudo de
  * la tabla `floors` (idi, label, building_id). Devuelve un mapa

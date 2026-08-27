@@ -1793,60 +1793,110 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                             getRequestedCards(
                                                                 row.fields,
                                                             )}
-                                                        <div
-                                                            class="rounded-lg bg-emerald-50 border border-emerald-200 p-4 space-y-3"
-                                                        >
+                                                        {@const rowProblems =
+                                                            validationErrors.get(
+                                                                rowKey,
+                                                            ) ?? []}
+                                                        {#if rowProblems.length > 0}
                                                             <div
-                                                                class="flex items-center gap-2"
+                                                                class="rounded-lg bg-rose-50 border border-rose-200 p-4 space-y-3"
                                                             >
                                                                 <div
-                                                                    class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0"
+                                                                    class="flex items-center gap-2"
                                                                 >
-                                                                    <CheckCircle2
-                                                                        size={18}
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <p
-                                                                        class="text-sm font-bold text-emerald-800"
+                                                                    <div
+                                                                        class="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0"
                                                                     >
-                                                                        Persona
-                                                                        nueva
-                                                                    </p>
-                                                                    <p
-                                                                        class="text-[10px] text-emerald-600"
-                                                                    >
-                                                                        No se
-                                                                        encontró
-                                                                        en el
-                                                                        sistema —
-                                                                        el alta
-                                                                        puede
-                                                                        continuar
-                                                                        sin
-                                                                        conflictos.
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                            {#if requestedCards.length > 0}
-                                                                <div
-                                                                    class="flex flex-wrap items-center gap-2"
-                                                                >
-                                                                    <span
-                                                                        class="text-[10px] font-bold text-emerald-700 uppercase tracking-widest"
-                                                                        >Solicita:</span
-                                                                    >
-                                                                    {#each requestedCards as type}
-                                                                        <span
-                                                                            class="text-[10px] font-bold px-2 py-0.5 rounded border {cardTypeClasses(
-                                                                                type
-                                                                            )}"
-                                                                            >{type}</span
+                                                                        <AlertCircle
+                                                                            size={18}
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <p
+                                                                            class="text-sm font-bold text-rose-800"
                                                                         >
-                                                                    {/each}
+                                                                            Datos no
+                                                                            reconocidos
+                                                                            en el
+                                                                            catálogo
+                                                                        </p>
+                                                                        <p
+                                                                            class="text-[10px] text-rose-600"
+                                                                        >
+                                                                            El alta
+                                                                            no puede
+                                                                            continuar
+                                                                            hasta
+                                                                            corregir
+                                                                            estos
+                                                                            valores.
+                                                                        </p>
+                                                                    </div>
                                                                 </div>
+                                                                <ul
+                                                                    class="list-disc list-inside text-xs text-rose-700 space-y-0.5"
+                                                                >
+                                                                    {#each rowProblems as err}
+                                                                        <li>{err}</li>
+                                                                    {/each}
+                                                                </ul>
+                                                            </div>
+                                                        {:else}
+                                                            <div
+                                                                class="rounded-lg bg-emerald-50 border border-emerald-200 p-4 space-y-3"
+                                                            >
+                                                                <div
+                                                                    class="flex items-center gap-2"
+                                                                >
+                                                                    <div
+                                                                        class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0"
+                                                                    >
+                                                                        <CheckCircle2
+                                                                            size={18}
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <p
+                                                                            class="text-sm font-bold text-emerald-800"
+                                                                        >
+                                                                            Persona
+                                                                            nueva
+                                                                        </p>
+                                                                        <p
+                                                                            class="text-[10px] text-emerald-600"
+                                                                        >
+                                                                            No se
+                                                                            encontró
+                                                                            en el
+                                                                            sistema —
+                                                                            el alta
+                                                                            puede
+                                                                            continuar
+                                                                            sin
+                                                                            conflictos.
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                {#if requestedCards.length > 0}
+                                                                    <div
+                                                                        class="flex flex-wrap items-center gap-2"
+                                                                    >
+                                                                        <span
+                                                                            class="text-[10px] font-bold text-emerald-700 uppercase tracking-widest"
+                                                                            >Solicita:</span
+                                                                        >
+                                                                        {#each requestedCards as type}
+                                                                            <span
+                                                                                class="text-[10px] font-bold px-2 py-0.5 rounded border {cardTypeClasses(
+                                                                                    type
+                                                                                )}"
+                                                                                >{type}</span
+                                                                            >
+                                                                        {/each}
+                                                                    </div>
+                                                                {/if}
+                                                            </div>
                                                         {/if}
-                                                        </div>
 
                                                         <!-- ── TYPE: MODIFICACIONES (OLD) ── -->
                                                     {:else if reviewSheetTab === "modificaciones"}
