@@ -369,7 +369,10 @@ export const personnelService = {
             // Construir p_permissions (plan con assignment_index).
             const floorsByBuilding = (data as any).floorsByBuilding || {};
             const specialAccessIds = (data.specialAccesses as number[]) || [];
-            const plan = await buildPermissionPlan(mediaTypeIds, floorsByBuilding, specialAccessIds);
+            const plan = await buildPermissionPlan(mediaTypeIds, floorsByBuilding, specialAccessIds, {
+                buildingId: Number((data as any).building_id) || null,
+                floor: (data as any).floor || null,
+            });
 
             const p_person = {
                 first_name: first,
@@ -495,6 +498,10 @@ export const personnelService = {
                 String(personId),
                 floorsByBuilding,
                 specialAccesses,
+                {
+                    buildingId: Number((data as any).building_id) || null,
+                    floor: (data as any).floor || null,
+                },
             );
             });
         }, "Save Personnel");

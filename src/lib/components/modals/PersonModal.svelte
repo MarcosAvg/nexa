@@ -209,12 +209,8 @@
         };
     }
 
-    // El edificio base (radicación) siempre está incluido en el acceso.
-    $effect(() => {
-        if (baseBuildingId && !selectedBuildings.includes(baseBuildingId)) {
-            selectedBuildings = [...selectedBuildings, baseBuildingId];
-        }
-    });
+    // El edificio base (radicación) es independiente de los accesos asignados:
+    // solo se agrega a selectedBuildings si el usuario lo solicita, igual que los demás.
 
     // Accesos especiales filtrados a los edificios seleccionados.
     let availableSpecialAccesses = $derived.by(() => {
@@ -349,7 +345,6 @@
             selectedBuildings = [
                 ...new Set([
                     ...selectedBuildings,
-                    ...(bid ? [bid] : []),
                     ...Object.keys(access.floorsByBuilding).map(Number),
                 ]),
             ];
@@ -1019,12 +1014,11 @@
                                     {@const isBase = bid === baseBuildingId}
                                     <button
                                         type="button"
-                                        disabled={isBase}
                                         class="px-3 py-1.5 rounded-xl text-[11px] font-bold border-2 transition-all active:scale-95 {selectedBuildings.includes(bid)
                                             ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                                            : 'border-slate-200 text-slate-500 hover:border-blue-300'} {isBase ? 'opacity-90 cursor-default' : ''}"
+                                            : 'border-slate-200 text-slate-500 hover:border-blue-300'}"
                                         onclick={() => toggleBuilding(bid)}
-                                        title={isBase ? "Edificio de radicación (siempre incluido)" : undefined}
+                                        title={isBase ? "Edificio de radicación (independiente del acceso; márcalo solo si solicita acceso aquí)" : undefined}
                                     >
                                         {b.name}{isBase ? " ★" : ""}
                                     </button>

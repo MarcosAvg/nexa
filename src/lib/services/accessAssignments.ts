@@ -61,6 +61,48 @@ export function floorGroupsToIdMap(groups: FloorGroup[] | null | undefined): Flo
     return out;
 }
 
+/** Datos de radicación usados para inyectar el piso base en los accesos de pisos. */
+export interface BaseFloorInput {
+    buildingId: number | null;
+    floor?: string | null;
+}
+
+/**
+ * Si la persona radica en un edificio que se está solicitando (presente en
+ * floorsByBuilding) y ese edificio gestiona medios CON pisos, inyecta el piso
+ * base en los pisos de cada medio con pisos que aplica a ese edificio.
+ */
+async function applyBaseFloor(
+    floorsByBuilding: Record<number, FloorGroups>,
+    base: BaseFloorInput | undefined,
+    mediaApplies: (mediaTypeId: string, bid: number) => boolean,
+): Promise<Record<number, FloorGroups>> {
+    if (!base || !base.buildingId || !base.floor) return floorsByBuilding;
+    const bid = base.buildingId;
+    // Si no se está solicitando acceso en el edificio de radicación, no se inyecta.
+    if (!floorsByBuilding[bid]) return floorsByBuilding;
+
+    const { data: types } = await supabase
+        .from("access_media_types")
+        .select("id, has_floors");
+    const hasFloors = new Set<string>(
+        (types || []).filter((m: any) => m.has_floors).map((m: any) => m.id),
+    );
+    const floorLabel = base.floor;
+    const next = { ...floorsByBuilding };
+    const floorsForBid = { ...next[bid] };
+    for (const mediaTypeId of Object.keys(floorsForBid)) {
+        if (!hasFloors.has(mediaTypeId)) continue;
+        if (!mediaApplies(mediaTypeId, bid)) continue;
+        const list = floorsForBid[mediaTypeId] || [];
+        if (!list.includes(floorLabel)) {
+            floorsForBid[mediaTypeId] = [...list, floorLabel];
+        }
+    }
+    next[bid] = floorsForBid;
+    return next;
+}
+
 export const accessAssignmentService = {
     async fetchForPerson(personId: string): Promise<AccessAssignment[]> {
         return withErrorHandlingSafe(async () => {
@@ -155,6 +197,7 @@ export const accessAssignmentService = {
         personId: string,
         floorsByBuilding: Record<number, FloorGroups>,
         specialAccessIds: number[],
+        base?: BaseFloorInput,
     ): Promise<void> {
         return withErrorHandling(async () => {
             // Resolver referencias estables por edificio.
@@ -185,6 +228,9 @@ export const accessAssignmentService = {
             );
             const mediaApplies = (mediaTypeId: string, bid: number) =>
                 mediaBuildingsSet.has(`${mediaTypeId}:${bid}`);
+
+            // Regla de negocio: inyectar el piso base a los pisos del edificio de radicación.
+            floorsByBuilding = await applyBaseFloor(floorsByBuilding, base, mediaApplies);
 
             const assignments = await this.fetchForPerson(personId);
             const allRows: {
@@ -308,7 +354,17 @@ export const accessAssignmentService = {
         const specialIds = access.specialAccesses
             .map((n) => idByName.get(n))
             .filter((id): id is number => id !== undefined);
-        await this.savePersonAccess(personId, idKeyed, specialIds);
+        // Base de radicación de la persona (para inyectar el piso base si aplica).
+        const { data: person } = await supabase
+            .from("personnel")
+            .select("building_id, floor")
+            .eq("id", personId)
+            .maybeSingle();
+        const base: BaseFloorInput = {
+            buildingId: person?.building_id ?? null,
+            floor: person?.floor || null,
+        };
+        await this.savePersonAccess(personId, idKeyed, specialIds, base);
     },
 };
 
@@ -323,6 +379,7 @@ export async function buildPermissionPlan(
     mediaTypeIds: string[],
     floorsByBuilding: Record<number, FloorGroups>,
     specialAccessIds: number[],
+    base?: BaseFloorInput,
 ): Promise<{
     assignment_index: number;
     resource_type: string;
@@ -356,6 +413,9 @@ export async function buildPermissionPlan(
     );
     const mediaApplies = (mediaTypeId: string, bid: number) =>
         mediaBuildingsSet.has(`${mediaTypeId}:${bid}`);
+
+    // Regla de negocio: inyectar el piso base a los pisos del edificio de radicación.
+    floorsByBuilding = await applyBaseFloor(floorsByBuilding, base, mediaApplies);
 
     const rows: {
         assignment_index: number;
