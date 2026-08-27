@@ -224,9 +224,16 @@
             return;
         }
 
-        if (ticket.type === "Modificación de datos") {
-            compareTicket = ticket;
-            isCompareOpen = true;
+        if (isModificacionType(ticket.type)) {
+            // Con payload normalizado (original/modified) → panel de comparación.
+            // Sin modificada (columnas crudas de plantilla) → modal que lo construye.
+            if (ticket.payload?.modified) {
+                compareTicket = ticket;
+                isCompareOpen = true;
+            } else {
+                importedTicket = ticket;
+                isImportedOpen = true;
+            }
             return;
         }
 
@@ -241,7 +248,11 @@
         onStartCompletion(ticket);
     }
 
-    function onStartCompletion(ticket: any) {
+    function isModificacionType(type: string): boolean {
+    return type === "Modificación" || type === "Modificación de datos";
+}
+
+function onStartCompletion(ticket: any) {
         if (
             ticket.type === "Firma Responsiva" ||
             ticket.type === "Programación"
@@ -255,15 +266,14 @@
             return;
         }
 
-        if (ticket.type === "Modificación de datos") {
-            compareTicket = ticket;
-            isCompareOpen = true;
-            return;
-        }
-
-        if (ticket.type === "Modificación") {
-            importedTicket = ticket;
-            isImportedOpen = true;
+        if (isModificacionType(ticket.type)) {
+            if (ticket.payload?.modified) {
+                compareTicket = ticket;
+                isCompareOpen = true;
+            } else {
+                importedTicket = ticket;
+                isImportedOpen = true;
+            }
             return;
         }
 

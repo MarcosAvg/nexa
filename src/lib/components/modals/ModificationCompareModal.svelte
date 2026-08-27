@@ -149,6 +149,27 @@
         return { added, removed, kept };
     }
 
+    /**
+     * Normaliza un listado de accesos especiales a sus NOMBRES para comparar.
+     * El ticket manual los guarda como ids (number[]), el importado como nombres
+     * (string[]); el resultado siempre es una lista de nombres legibles.
+     */
+    function resolveSpecialAccessNames(list: unknown[]): string[] {
+        if (!Array.isArray(list)) return [];
+        const out: string[] = [];
+        for (const item of list) {
+            if (item === null || item === undefined || item === "") continue;
+            const found = catalogState.specialAccesses.find(
+                (s) =>
+                    String(s.id) === String(item) ||
+                    s.name === String(item),
+            );
+            const name = found?.name ?? String(item);
+            if (!out.includes(name)) out.push(name);
+        }
+        return out;
+    }
+
     function getCurrentFloors(key: string): string[] {
         if (!currentPerson) return [];
         // Leer desde el modelo nuevo (floorGroup por clave de medio).
@@ -156,13 +177,37 @@
         return group ? group.floors : [];
     }
 
-    function getModifiedFloors(key: string, fallbackKey?: string): string[] {
+    function getModifiedFloors(
+        mediaKey: string,
+        modifiedKey?: string,
+        fallbackKey?: string,
+    ): string[] {
         if (!modifiedData) return [];
-        return (
-            modifiedData[key] ||
-            (fallbackKey ? modifiedData[fallbackKey] : []) ||
-            []
-        );
+        // Plantilla importada: pisos<Cap> / floors_<key>.
+        const direct =
+            modifiedData[modifiedKey ?? mediaKey] ??
+            (fallbackKey ? modifiedData[fallbackKey] : []);
+        if (Array.isArray(direct)) return direct;
+        // Ticket manual: pisosPorMedio indexado por mediaKey.
+        const viaPisosPorMedio = (
+            modifiedData.pisosPorMedio as Record<string, string[]>
+        )?.[mediaKey];
+        if (Array.isArray(viaPisosPorMedio)) return viaPisosPorMedio;
+        // Último recurso: agregar desde floorsByBuilding por mediaTypeId.
+        const mediaType = catalogState.mediaTypes.find((m) => m.key === mediaKey);
+        const fbb = modifiedData.floorsByBuilding as Record<
+            number,
+            Record<string, string[]>
+        >;
+        if (mediaType && fbb && typeof fbb === "object") {
+            const floors: string[] = [];
+            for (const typeMap of Object.values(fbb)) {
+                const list = typeMap?.[String(mediaType.id)] || [];
+                for (const f of list) if (!floors.includes(f)) floors.push(f);
+            }
+            return floors;
+        }
+        return [];
     }
 
     // Medios con pisos del catálogo: deriva los campos de comparación de pisos.
@@ -207,7 +252,9 @@
 
     // Estado de comparación de accesos especiales
     let currentAccesses = $derived(currentPerson?.specialAccesses || []);
-    let modifiedAccesses = $derived(modifiedData?.specialAccesses || []);
+    let modifiedAccesses = $derived(resolveSpecialAccessNames(
+        modifiedData?.specialAccesses || modifiedData?.special_accesses || [],
+    ));
     let accessChanges = $derived(
         getFloorChanges(currentAccesses, modifiedAccesses),
     );
@@ -237,11 +284,16 @@
                 (modifiedData as any).specialAccesses ??
                 (modifiedData as any).special_accesses ??
                 [];
-            // Convertir nombres de accesos especiales a ids del catálogo.
+            // Convertir accesos especiales (nombres o ids del ticket) a ids del catálogo.
             const specialAccessIds: number[] = [];
             for (const n of specialAccesses as string[]) {
-                const id = catalogState.specialAccesses.find((s) => s.name === n)?.id;
-                if (id !== undefined) specialAccessIds.push(Number(id));
+                const cat = catalogState.specialAccesses.find(
+                    (s) => s.name === n || String(s.id) === String(n),
+                );
+                if (cat?.id !== undefined) {
+                    const id = Number(cat.id);
+                    if (!specialAccessIds.includes(id)) specialAccessIds.push(id);
+                }
             }
             const typeMap: Record<string, string[]> = {};
             for (const m of catalogState.mediaTypes) {
@@ -250,8 +302,12 @@
             }
             // La modificación aplica a TODOS los edificios con pisos del payload
             // (floorsByBuilding ya viene con claves mediaTypeId); si no viene, solo
-            // el edificio de radicación.
-            const baseBid = Number(currentPerson.building_id) || 1;
+            // el edificio de radicación (priorizando el edificio propuesto en el ticket).
+            const baseBid =
+                Number((modifiedData as any).building_id) ||
+                Number((modifiedData as any).buildingId) ||
+                Number(currentPerson.building_id) ||
+                1;
             const floorsByBuilding =
                 (modifiedData as any).floorsByBuilding ??
                 ({ [baseBid]: typeMap } as Record<number, Record<string, string[]>>);
@@ -689,6 +745,7 @@
             {#each floorMediaFields as field}
                 {@const currentFloors = getCurrentFloors(field.key)}
                 {@const modifiedFloors = getModifiedFloors(
+                    field.key,
                     field.modifiedKey,
                     field.fallbackKey,
                 )}

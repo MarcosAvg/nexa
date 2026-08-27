@@ -20,6 +20,7 @@
     import CardCheckItem from "../CardCheckItem.svelte";
     import { toast } from "svelte-sonner";
     import { handleError, parseFloors, capitalize } from "../../utils";
+    import { applyFloorAction } from "../../utils/floorActions";
     import {
         AlertCircle,
         CheckCircle2,
@@ -74,6 +75,11 @@
 
     let p = $derived(ticket?.payload ?? {});
     let ticketType = $derived(ticket?.type ?? "");
+
+    /** El ticket de modificación puede venir como "Modificación" o "Modificación de datos". */
+    let isModificacion = $derived(
+        ticketType === "Modificación" || ticketType === "Modificación de datos",
+    );
 
     // ── Auto-search when modal opens ──────────────────────
     $effect(() => {
@@ -206,40 +212,7 @@
 
     // La lógica de tarjetas y accesos maneja strings: "Añadir", "Reemplazar", "Quitar"
     // Como ModificationCompareModal compara arrays de pisos, necesitamos aplicar la acción
-    // para generar el estado final "propuesto" de pisos/accesos.            // Helper para matching robusto de acciones
-        const isAction = (
-            act: string,
-            type: "replace" | "add" | "remove" | "clear",
-        ) => {
-            const a = (act ?? "").toLowerCase();
-            if (type === "clear")
-                return (
-                    a.includes("todo") ||
-                    a.includes("vaciar") ||
-                    a.includes("limpiar")
-                );
-            if (type === "replace")
-                return (
-                    a.includes("reemplazar") ||
-                    a.includes("remplazar") ||
-                    a.includes("sustituir")
-                );
-            if (type === "add")
-                return (
-                    a.includes("añadir") ||
-                    a.includes("anadir") ||
-                    a.includes("sumar") ||
-                    a.includes("agregar")
-                );
-            if (type === "remove")
-                return (
-                    a.includes("quitar") ||
-                    a.includes("eliminar") ||
-                    a.includes("borrar") ||
-                    a.includes("remover")
-                );
-            return false;
-        };
+    // para generar el estado final "propuesto" de pisos/accesos.
 
         // Pisos por clave de medio (derivados del catálogo con has_floors).
         const floorMediaKeys = Array.from(new Set(
@@ -249,20 +222,12 @@
         ));
         for (const key of floorMediaKeys) {
             const cap = capitalize(key);
-            const proposed = [...floorsForKey(selectedPerson.floors, key)];
+            const current = [...floorsForKey(selectedPerson.floors, key)];
             const action = (p as any)[`accion_${key}`];
             const pisos = (p as any)[`pisos_${key}`];
-            if (action) {
-                const parsedFloors = parseFloors(pisos);
-                if (isAction(action, "clear")) proposed.length = 0;
-                else if (isAction(action, "replace")) proposed.splice(0, proposed.length, ...parsedFloors);
-                else if (isAction(action, "add"))
-                    proposed.splice(0, proposed.length,
-                        ...Array.from(new Set([...proposed, ...parsedFloors])));
-                else if (isAction(action, "remove"))
-                    proposed.splice(0, proposed.length,
-                        ...proposed.filter((f) => !parsedFloors.includes(f)));
-            }
+            const proposed = action
+                ? applyFloorAction(action, current, parseFloors(pisos))
+                : current;
             // Forzar al modal de comparación a mostrar diferencias pasando los arrays generados
             modifiedPayload[`floors_${key}`] = proposed;
             modifiedPayload[`pisos${cap}`] = proposed;
@@ -270,21 +235,10 @@
 
         let proposedAccesses = [...(selectedPerson.specialAccesses || [])];
         if (p.accion_acc) {
-            const action = p.accion_acc;
             const accesses = [p.acceso1, p.acceso2, p.acceso3]
                 .map((s) => s?.trim())
                 .filter(Boolean);
-
-            if (isAction(action, "clear")) proposedAccesses = [];
-            else if (isAction(action, "replace")) proposedAccesses = accesses;
-            else if (isAction(action, "add"))
-                proposedAccesses = [
-                    ...new Set([...proposedAccesses, ...accesses]),
-                ];
-            else if (isAction(action, "remove"))
-                proposedAccesses = proposedAccesses.filter(
-                    (a) => !accesses.includes(a),
-                );
+            proposedAccesses = applyFloorAction(p.accion_acc, proposedAccesses, accesses);
         }
         modifiedPayload.specialAccesses = proposedAccesses;
 
@@ -818,7 +772,7 @@
             </div>
 
         <!-- ── MODIFICACIÓN: summary + open compare button ── -->
-        {#if ticketType === "Modificación" && selectedPerson}
+        {#if isModificacion && selectedPerson}
             <InfoCard
                 variant="amber"
                 icon={ArrowRight}
@@ -1254,7 +1208,7 @@
 
             <div class="flex items-center gap-2">
                 <!-- MODIFICACIÓN: open compare modal -->
-                {#if ticketType === "Modificación"}
+                {#if isModificacion}
                     <Button
                         variant="primary"
                         disabled={!selectedPerson}

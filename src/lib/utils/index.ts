@@ -50,6 +50,9 @@ export {
 } from './xlsxImporter';
 export type { SheetKey, ParsedRow, ParsedSheet, ImportParseResult } from './xlsxImporter';
 
+export { applyFloorAction, isAction } from './floorActions';
+export type { FloorAction } from './floorActions';
+
 export {
     parseUsageFile,
     findDuplicateFolios,

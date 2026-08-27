@@ -12,6 +12,8 @@
 import type { Person } from "../types";
 import { floorsForKey } from "../services/accessAssignments";
 import { activeMediaTypes, type MediaInfo } from "./mediaContract";
+import { parseFloors } from "./xlsxImporter";
+import { applyFloorAction } from "./floorActions";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -86,15 +88,6 @@ export function wantsCard(fields: Record<string, string>, media: MediaInfo): boo
     if (YES_VALUES.includes((fields[`${media.key}_req`] ?? "").toLowerCase())) return true;
     if (!media.has_floors && (fields[`${media.key}_folio`] ?? "").trim().length > 0) return true;
     return false;
-}
-
-function parseFloors(floorsStr: string | null | undefined): string[] {
-    if (!floorsStr) return [];
-    return String(floorsStr)
-        .replace(/\by\b/gi, ",")
-        .split(/[,;|.]/)
-        .map((s) => s.trim())
-        .filter(Boolean);
 }
 
 // ─── Alta Analysis ──────────────────────────────────────────
@@ -230,8 +223,15 @@ export function analyzeModificacionConflicts(
 
     const medias = activeMediaTypes(mediaTypes).filter((m) => m.has_floors);
     for (const media of medias) {
-        if (fields[`accion_${media.key}`]) {
-            addFloorChange(media.key, floorsForKey(person.floors, media.key), parseFloors(fields[`pisos_${media.key}`]));
+        const action = fields[`accion_${media.key}`];
+        if (action) {
+            const current = floorsForKey(person.floors, media.key);
+            const final = applyFloorAction(
+                action,
+                current,
+                parseFloors(fields[`pisos_${media.key}`]),
+            );
+            addFloorChange(media.key, current, final);
         }
     }
 
@@ -240,7 +240,8 @@ export function analyzeModificacionConflicts(
         const requestedAccesses = [fields.acceso1, fields.acceso2, fields.acceso3]
             .map((s) => s?.trim())
             .filter(Boolean);
-        addFloorChange("accesses", currentAccesses, requestedAccesses);
+        const final = applyFloorAction(fields.accion_acc, currentAccesses, requestedAccesses);
+        addFloorChange("accesses", currentAccesses, final);
     }
 
     const anyFloorChange = Object.values(floorChanges).some(
