@@ -88,32 +88,30 @@
 
     /**
      * Da de baja a una persona gestionando sus tarjetas (eliminar vs dejar
-     * disponible). Los datos de la persona se conservan; solo se revoca el
-     * acceso. El sidepanel permanece abierto para poder eliminar después.
+     * disponible). La operación es transaccional vía RPC: las decisiones por
+     * tarjeta y el cambio de estado se aplican en un solo paso atómico. Los
+     * datos de la persona se conservan; solo se revoca el acceso. El sidepanel
+     * permanece abierto para poder eliminar después.
      */
     async function handleDeactivateWithCards(
         person: any,
         cardActionMap: Record<string, "delete" | "keep">,
     ) {
         try {
-            if (cardActionMap) {
-                for (const [cardId, action] of Object.entries(cardActionMap)) {
-                    if (action === "delete") {
-                        await supabase.from("access_media").delete().eq("id", cardId);
-                    } else if (action === "keep") {
-                        await supabase
-                            .from("access_media")
-                            .update({
-                                person_id: null,
-                                status: "available",
-                                responsiva_status: "unsigned",
-                                programming_status: "pending",
-                            })
-                            .eq("id", cardId);
-                    }
-                }
-            }
-            await personnelActions.handleDeactivatePerson(person, refreshData);
+            const { error } = await supabase.rpc("deactivate_person_with_cards", {
+                p_person_id: person.id,
+                p_card_actions: cardActionMap ?? null,
+            });
+            if (error) throw error;
+
+            // Actualización optimista de la lista (el RPC ya registró el estado).
+            const localPerson = personnelState.pagination.items.find(
+                (p) => p.id === person.id,
+            );
+            if (localPerson) localPerson.status_raw = "inactive";
+
+            toast.success("Persona dada de baja");
+            await refreshData();
         } catch (e) {
             handleError(e, "Error al dar de baja");
         }
