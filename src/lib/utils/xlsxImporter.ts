@@ -281,6 +281,38 @@ function cellText(cell: ExcelJS.Cell): string {
     return String(v).trim();
 }
 
+/**
+ * Normaliza un correo que pudo llegar como texto, enlace o hipervínculo
+ * ("mailto:user@dom.com", "<mailto:...>", "mailto:?subject=...", etc.) a solo
+ * la dirección de correo en texto plano.
+ */
+export function normalizeEmailText(raw: string | null | undefined): string {
+    if (!raw) return '';
+    let v = String(raw).trim();
+
+    if (v.toLowerCase().startsWith('mailto:')) {
+        v = v.slice('mailto:'.length);
+        // Recorta cualquier query/param que acompañe al mailto (ej. ?subject=...).
+        const q = v.search(/[?#]/);
+        if (q !== -1) v = v.slice(0, q);
+    }
+
+    // Quita comillas/ángulos comunes en enlaces o celdas con formato.
+    v = v.replace(/[<>"']/g, '').trim();
+
+    // Aísla la dirección si quedó envuelta en un URI o texto extra.
+    const at = v.lastIndexOf('@');
+    if (at !== -1) {
+        let start = at;
+        while (start > 0 && /[A-Za-z0-9._%+-]/.test(v[start - 1])) start--;
+        let end = at + 1;
+        while (end < v.length && /[A-Za-z0-9.-]/.test(v[end])) end++;
+        v = v.slice(start, end);
+    }
+
+    return v;
+}
+
 /** Normaliza el texto de un encabezado: quita el asterisco de obligatorio y recorta. */
 function normalizeHeader(text: string): string {
     return text.replace(/\s*\*\s*$/, '').trim().toLowerCase();
@@ -354,8 +386,8 @@ function parseSheet(ws: ExcelJS.Worksheet, key: SheetKey, cols: ColDef[]): Parse
 
         for (const [colIdx, c] of colToDef) {
             let val = cellText(row.getCell(colIdx));
-            if (c.field === 'correo' && val.toLowerCase().startsWith('mailto:')) {
-                val = val.replace(/^mailto:\s*/i, '').trim();
+            if (c.field === 'correo') {
+                val = normalizeEmailText(val);
             }
             fields[c.field] = val;
             if (val) hasData = true;

@@ -47,6 +47,7 @@ export {
     parseTemplateFile,
     SHEET_TO_TICKET_TYPE,
     FIELD_LABELS,
+    normalizeEmailText,
 } from './xlsxImporter';
 export type { SheetKey, ParsedRow, ParsedSheet, ImportParseResult } from './xlsxImporter';
 
@@ -57,7 +58,6 @@ export {
     normalizeFloorLabel,
     resolveFloorLabel,
     resolveFloorList,
-    allFloorsResolve,
     buildFloorResolver,
 } from './floorMatch';
 

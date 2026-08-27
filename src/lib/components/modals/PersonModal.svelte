@@ -19,7 +19,7 @@
     import { personnelState, catalogState, userState } from "../../stores";
     import PermissionGuard from "../PermissionGuard.svelte";
     import { toast } from "svelte-sonner";
-    import { handleError, mediaTypeVariant } from "../../utils";
+    import { handleError, mediaTypeVariant, normalizeEmailText } from "../../utils";
     import { updateWithLock, fetchCurrentVersion } from "../../utils/optimisticLock";
     import { resolveFloorList } from "../../utils/floorMatch";
     import type { Person } from "../../types";
@@ -495,7 +495,7 @@
                 diasHorario = schedObj ? prefill.horario! : "";
                 horaEntrada = prefill.horaEntrada ?? "08:00";
                 horaSalida = prefill.horaSalida ?? "17:00";
-                email = prefill.correo ?? "";
+                email = normalizeEmailText(prefill.correo);
                 const prefillBid =
                     Number(
                         buildings.find((b) => b.name === prefill.edificio)?.id,
@@ -552,20 +552,24 @@
     }
 
     /**
-     * Valida que cada piso de cada edificio seleccionado exista en ese edificio.
-     * Devuelve los pisos no reconocidos para impedir el guardado. Solo aplica en
-     * altas y ediciones con accesos; si no hay edificios/medios, no hay error.
+     * Valida que cada piso de cada edificio seleccionado exista en ese edificio,
+     * y que el edificio base de radicación esté en el catálogo. Devuelve los
+     * problemas para impedir el guardado.
      */
     function validateFloors(): { ok: boolean; unresolved: string[] } {
         const unresolved: string[] = [];
         for (const [bidStr, typeMap] of Object.entries(floorsByBuilding)) {
             const bid = Number(bidStr);
             const b = buildings.find((x) => Number(x.id) === bid);
-            const canonical = b?.floors || [];
+            if (!b) {
+                unresolved.push(`Edificio no reconocido (id ${bid})`);
+                continue;
+            }
+            const canonical = b.floors || [];
             for (const list of Object.values(typeMap || {})) {
                 const { unresolved: bad } = resolveFloorList(list, canonical);
                 if (bad.length) {
-                    unresolved.push(...bad.map((x) => `${x} (${b?.name ?? bid})`));
+                    unresolved.push(...bad.map((x) => `${x} (${b.name})`));
                 }
             }
         }
@@ -646,7 +650,7 @@
                 first_name: nombres,
                 last_name: apellidos,
                 employee_no: noEmpleado,
-                email: email?.replace(/^mailto:\s*/i, "").trim(),
+                email: normalizeEmailText(email),
                 floor: pisoBase,
                 floorsByBuilding,
                 schedule_id: schedules.find((s) => s.name === diasHorario)?.id,
@@ -710,7 +714,7 @@
                         schedule_id: schedules.find((s) => s.name === diasHorario)?.id ?? null,
                         entry_time: horaEntrada || null,
                         exit_time: horaSalida || null,
-                        email: email?.replace(/^mailto:\s*/i, "").trim() || null,
+                        email: normalizeEmailText(email) || null,
                         status: editingPerson?.status_raw || "active",
                     };
                     const lock = await updateWithLock(

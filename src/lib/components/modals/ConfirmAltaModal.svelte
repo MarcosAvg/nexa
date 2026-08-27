@@ -10,7 +10,7 @@
     import { ticketService } from "../../services/tickets";
     import { personnelService } from "../../services/personnel";
     import { toast } from "svelte-sonner";
-    import { handleError, parseFloors } from "../../utils";
+    import { handleError, parseFloors, normalizeEmailText } from "../../utils";
     import { resolveFloorList } from "../../utils/floorMatch";
     import { wantsCard } from "../../utils/matchAnalysis";
     import { activeMediaTypes } from "../../utils/mediaContract";
@@ -69,7 +69,7 @@
             horario: p.horario,
             horaEntrada: p.hora_entrada,
             horaSalida: p.hora_salida,
-            correo: p.correo?.replace(/^mailto:\s*/i, "").trim(),
+            correo: normalizeEmailText(p.correo),
             pisosPorMedio,
             foliosPorMedio,
             specialAccesses: [p.acceso1, p.acceso2, p.acceso3]

@@ -26,11 +26,13 @@
         parseTemplateFile,
         SHEET_TO_TICKET_TYPE,
         FIELD_LABELS,
+        parseFloors,
         type SheetKey,
         type ImportParseResult,
         type ParsedSheet,
         type ParsedRow,
     } from "../../utils";
+    import { resolveFloorList } from "../../utils/floorMatch";
     import type { Person } from "../../types";
     import { catalogState } from "../../stores";
     import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
@@ -95,12 +97,19 @@
     /** Conflict analyses for MODIFICACIONES rows */
     let modAnalyses = $state<Map<string, ModificacionConflictAnalysis>>(new Map());
 
+    /** Errores de validación contra catálogo por fila (clave 'sheetKey-rowNumber'). */
+    let validationErrors = $state<Map<string, string[]>>(new Map());
+
     // ── Review tab state ────────────────────────────────
     let reviewTab = $state<'conflict' | 'ok'>('conflict');
     let reviewSheetTab = $state<string>('altas');
 
     function rowMatchesTab(sheetKey: string, row: ParsedRow, tab: string): boolean {
         const rk = `${sheetKey}-${row.rowNumber}`;
+        // Error de validación contra catálogo → siempre aparece como conflicto.
+        if (validationErrors.has(rk) && validationErrors.get(rk)!.length > 0) {
+            return tab === 'conflict';
+        }
         if (sheetKey === 'altas') {
             const ana = altaAnalyses.get(rk);
             const hasConflict = ana ? ana.hasConflicts : false;
@@ -119,6 +128,90 @@
         return tab === 'conflict' ? !hasMatch : hasMatch;
     }
 
+    // ── Validación contra catálogo (bloqueante) ─────────
+
+    /** Resuelve un valor libre contra un catálogo por nombre (insensible a mayúsculas/acentos). */
+    function catalogHasName(
+        catalog: { name?: string }[],
+        value: string | null | undefined,
+    ): boolean {
+        if (!value) return false;
+        const norm = (s: string) =>
+            s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return catalog.some((c) => norm(c.name ?? '') === norm(value));
+    }
+
+    /** Devuelve las claves inválidas de la fila FIELDS (campos de catálogo + pisos). */
+    function validateRowAgainstCatalog(
+        sheetKey: string,
+        row: ParsedRow,
+    ): string[] {
+        const f = row.fields;
+        const problems: string[] = [];
+        const cat = catalogState;
+
+        if (sheetKey === 'altas') {
+            if (f.dependencia && !catalogHasName(cat.dependencies, f.dependencia)) {
+                problems.push(`Dependencia "${f.dependencia}"` );
+            }
+            if (f.edificio && !catalogHasName(cat.buildings, f.edificio)) {
+                problems.push(`Edificio "${f.edificio}"`);
+            }
+            if (f.horario && !catalogHasName(cat.schedules, f.horario)) {
+                problems.push(`Horario "${f.horario}"`);
+            }
+            // Pisos vs. catálogo del edificio (solo si el edificio es válido).
+            if (f.edificio && catalogHasName(cat.buildings, f.edificio)) {
+                const b = cat.buildings.find((x) => x.name === f.edificio);
+                const canonical = (b?.floors || []) as string[];
+                for (const m of activeMediaTypes(cat.mediaTypes)) {
+                    if (!m.has_floors) continue;
+                    const raw = parseFloors(f[`pisos_${m.key}`]);
+                    if (raw.length === 0) continue;
+                    const { unresolved } = resolveFloorList(raw, canonical);
+                    if (unresolved.length) {
+                        problems.push(
+                            `Pisos ${m.name}: ${unresolved.join(', ')}`,
+                        );
+                    }
+                }
+            }
+        } else if (sheetKey === 'modificaciones') {
+            if (f.nueva_dep && !catalogHasName(cat.dependencies, f.nueva_dep)) {
+                problems.push(`Nueva dependencia "${f.nueva_dep}"`);
+            }
+            if (f.nuevo_edificio && !catalogHasName(cat.buildings, f.nuevo_edificio)) {
+                problems.push(`Nuevo edificio "${f.nuevo_edificio}"`);
+            }
+            // Pisos vs. catálogo del edificio destino.
+            const targetBuilding = f.nuevo_edificio;
+            if (targetBuilding) {
+                const b = cat.buildings.find((x) => x.name === targetBuilding);
+                const canonical = (b?.floors || []) as string[];
+                for (const m of activeMediaTypes(cat.mediaTypes)) {
+                    if (!m.has_floors) continue;
+                    const action = f[`accion_${m.key}`];
+                    if (!action) continue;
+                    const raw = parseFloors(f[`pisos_${m.key}`]);
+                    const { unresolved } = resolveFloorList(raw, canonical);
+                    if (unresolved.length) {
+                        problems.push(
+                            `Pisos ${m.name}: ${unresolved.join(', ')}`,
+                        );
+                    }
+                }
+            }
+        }
+
+        return problems;
+    }
+
+    /** Indica si una fila está seleccionada Y es importable (sin errores de validación). */
+    function splitRowKey(rowKey: string): [string, string] {
+        const idx = rowKey.indexOf('-');
+        return [rowKey.slice(0, idx), rowKey.slice(idx + 1)];
+    }
+
     // ── Helpers ────────────────────────────────────────
 
     function reset() {
@@ -130,6 +223,7 @@
         expandedReviewRows = new Set();
         altaAnalyses = new Map();
         modAnalyses = new Map();
+        validationErrors = new Map();
     }
 
     function closeModal() {
@@ -259,6 +353,19 @@
 
         altaAnalyses = newAltaAnalyses;
         modAnalyses = newModAnalyses;
+
+        // ── Validación contra catálogo (pisos, edificio, dependencia, horario) ──
+        const newValidationErrors = new Map<string, string[]>();
+        for (const sheet of parseResult.sheets) {
+            for (const row of sheet.rows) {
+                if (!row.isValid) continue;
+                const rk = `${sheet.key}-${row.rowNumber}`;
+                if (!selectedRows.has(rk)) continue;
+                const problems = validateRowAgainstCatalog(sheet.key, row);
+                if (problems.length) newValidationErrors.set(rk, problems);
+            }
+        }
+        validationErrors = newValidationErrors;
 
         // Expandir todas las filas automáticamente
         expandedReviewRows = new Set(newMatches.keys());
@@ -529,6 +636,27 @@
     async function handleImport() {
         if (!parseResult) return;
 
+        // Bloqueo por validación contra catálogo: no importar si alguna fila
+        // seleccionada tiene pisos/campos no reconocidos.
+        const blockedRows = [...validationErrors.entries()].filter(
+            ([rk]) => selectedRows.has(rk),
+        );
+        if (blockedRows.length > 0) {
+            const first = blockedRows[0];
+            const [sheetKey] = splitRowKey(first[0]);
+            const sheetLabel =
+                sheetKey === "altas"
+                    ? "Altas"
+                    : sheetKey === "modificaciones"
+                      ? "Modificaciones"
+                      : sheetKey;
+            toast.error("No se pueden importar las filas seleccionadas", {
+                description: `${blockedRows.length} fila(s) tienen pisos o campos que no coinciden con el catálogo (${sheetLabel}). Revisa las advertencias en cada fila y corrígelas antes de importar.`,
+            });
+            step = "review";
+            return;
+        }
+
         isImporting = true;
         step = "importing";
 
@@ -540,6 +668,7 @@
                 if (!row.isValid) continue;
                 const rowKey = `${sheet.key}-${row.rowNumber}`;
                 if (!selectedRows.has(rowKey)) continue;
+                if (validationErrors.has(rowKey)) continue;
 
                 if (
                     sheet.key === "altas" &&
@@ -1028,7 +1157,15 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                 <div
                                                     class="flex items-center gap-3 min-w-0"
                                                 >
-                                                    {#if matches.length > 0}
+                                                    {#if validationErrors.has(rowKey) && validationErrors.get(rowKey)!.length > 0}
+                                                        <div
+                                                            class="w-6 h-6 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0"
+                                                        >
+                                                            <AlertCircle
+                                                                size={13}
+                                                            />
+                                                        </div>
+                                                    {:else if matches.length > 0}
                                                         <div
                                                             class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0"
                                                         >
@@ -1255,6 +1392,29 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                     {/if}
                                                                 {/if}
                                                             {/each}
+
+                                                            <!-- Validación contra catálogo (bloqueante) -->
+                                                            {#if validationErrors.has(rowKey) && validationErrors.get(rowKey)!.length > 0}
+                                                                <div
+                                                                    class="rounded-lg border border-rose-200 bg-rose-50/80 p-3 space-y-2"
+                                                                >
+                                                                    <div
+                                                                        class="flex items-center gap-2 text-xs font-bold text-rose-800"
+                                                                    >
+                                                                        <AlertCircle
+                                                                            size={14}
+                                                                        />
+                                                                        No reconocido en el catálogo
+                                                                    </div>
+                                                                    <ul
+                                                                        class="list-disc list-inside text-xs text-rose-700 space-y-0.5"
+                                                                    >
+                                                                        {#each validationErrors.get(rowKey)! as err}
+                                                                            <li>{err}</li>
+                                                                        {/each}
+                                                                    </ul>
+                                                                </div>
+                                                            {/if}
 
                                                             <!-- Acciones por conflicto -->
                                                             {#if analysis.hasConflicts}
@@ -1730,6 +1890,29 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                                 detectados en
                                                                 los campos.
                                                             </p>
+                                                        {/if}
+
+                                                        <!-- Validación contra catálogo (bloqueante) -->
+                                                        {#if validationErrors.has(rowKey) && validationErrors.get(rowKey)!.length > 0}
+                                                            <div
+                                                                class="rounded-lg border border-rose-200 bg-rose-50/80 p-3 space-y-2"
+                                                            >
+                                                                <div
+                                                                    class="flex items-center gap-2 text-xs font-bold text-rose-800"
+                                                                >
+                                                                    <AlertCircle
+                                                                        size={14}
+                                                                    />
+                                                                    No reconocido en el catálogo
+                                                                </div>
+                                                                <ul
+                                                                    class="list-disc list-inside text-xs text-rose-700 space-y-0.5"
+                                                                >
+                                                                    {#each validationErrors.get(rowKey)! as err}
+                                                                        <li>{err}</li>
+                                                                    {/each}
+                                                                </ul>
+                                                            </div>
                                                         {/if}
 
                                                         <!-- ── TYPE: BAJA ── -->
