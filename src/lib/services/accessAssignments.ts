@@ -1,5 +1,6 @@
 import { supabase } from "../supabase";
 import { withErrorHandlingSafe, withErrorHandling } from "../utils";
+import { buildFloorResolver } from "../utils/floorMatch";
 import type { AccessAssignment, AccessAssignmentPermission, FloorGroup } from "../types";
 
 /** Mapa de pisos por id de tipo de medio (entrada de savePersonAccess). */
@@ -204,13 +205,9 @@ export const accessAssignmentService = {
             const { data: allFloors } = await supabase
                 .from("floors")
                 .select("id, label, building_id");
-            const floorIdByBuilding = new Map<number, Map<string, number>>();
-            for (const f of allFloors || []) {
-                if (!floorIdByBuilding.has(f.building_id)) {
-                    floorIdByBuilding.set(f.building_id, new Map());
-                }
-                floorIdByBuilding.get(f.building_id)!.set(f.label, f.id);
-            }
+            const resolveFloorId = buildFloorResolver(
+                (allFloors || []) as { id: number; label: string; building_id: number }[],
+            );
 
             const { data: specials } = await supabase
                 .from("special_accesses")
@@ -253,17 +250,18 @@ export const accessAssignmentService = {
                     const list = typeMap[assignment.media_type_id] || [];
                     if (list.length === 0) continue;
                     if (!mediaApplies(assignment.media_type_id, bid)) continue;
-                    const labelMap = floorIdByBuilding.get(bid);
                     for (const f of list) {
                         const key = f.trim();
                         const dedupeKey = `${bid}:${key.toLowerCase()}`;
                         if (!key || seenFloors.has(dedupeKey)) continue;
                         seenFloors.add(dedupeKey);
+                        const floorId = resolveFloorId(bid, key);
+                        if (floorId == null) continue; // piso no válido en el edificio: omitir
                         allRows.push({
                             assignment_id: assignment.id,
                             resource_type: "floor",
                             building_id: bid,
-                            floor_id: labelMap?.get(key) ?? null,
+                            floor_id: floorId,
                         });
                     }
                 }
@@ -390,13 +388,9 @@ export async function buildPermissionPlan(
     const { data: allFloors } = await supabase
         .from("floors")
         .select("id, label, building_id");
-    const floorIdByBuilding = new Map<number, Map<string, number>>();
-    for (const f of allFloors || []) {
-        if (!floorIdByBuilding.has(f.building_id)) {
-            floorIdByBuilding.set(f.building_id, new Map());
-        }
-        floorIdByBuilding.get(f.building_id)!.set(f.label, f.id);
-    }
+    const resolveFloorId = buildFloorResolver(
+        (allFloors || []) as { id: number; label: string; building_id: number }[],
+    );
 
     const { data: specials } = await supabase
         .from("special_accesses")
@@ -435,17 +429,18 @@ export async function buildPermissionPlan(
             const list = typeMap[mediaTypeId] || [];
             if (list.length === 0) continue;
             if (!mediaApplies(mediaTypeId, bid)) continue;
-            const labelMap = floorIdByBuilding.get(bid);
             for (const f of list) {
                 const key = f.trim();
                 const dedupeKey = `${bid}:${key.toLowerCase()}`;
                 if (!key || seenFloors.has(dedupeKey)) continue;
                 seenFloors.add(dedupeKey);
+                const floorId = resolveFloorId(bid, key);
+                if (floorId == null) continue; // piso no válido en el edificio: omitir
                 rows.push({
                     assignment_index: index,
                     resource_type: "floor",
                     building_id: bid,
-                    floor_id: labelMap?.get(key) ?? null,
+                    floor_id: floorId,
                 });
             }
         }

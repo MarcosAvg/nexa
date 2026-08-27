@@ -54,6 +54,14 @@ export { applyFloorAction, isAction } from './floorActions';
 export type { FloorAction } from './floorActions';
 
 export {
+    normalizeFloorLabel,
+    resolveFloorLabel,
+    resolveFloorList,
+    allFloorsResolve,
+    buildFloorResolver,
+} from './floorMatch';
+
+export {
     parseUsageFile,
     findDuplicateFolios,
     getDuplicateFoliosSummary,

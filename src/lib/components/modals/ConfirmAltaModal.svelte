@@ -11,6 +11,7 @@
     import { personnelService } from "../../services/personnel";
     import { toast } from "svelte-sonner";
     import { handleError, parseFloors } from "../../utils";
+    import { resolveFloorList } from "../../utils/floorMatch";
     import { wantsCard } from "../../utils/matchAnalysis";
     import { activeMediaTypes } from "../../utils/mediaContract";
     import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
@@ -38,7 +39,6 @@
         ticket: any;
         onComplete?: () => void;
     } = $props();
-
     let isRejectOpen = $state(false);
     let isRejecting = $state(false);
     let selectedCandidate = $state<any>(null);
@@ -85,6 +85,19 @@
             if (wantsCard(p, media)) types.push(media.name);
         }
         return types.length > 0 ? types : null; // null = allow all
+    });
+
+    /** Pisos de la plantilla que no existen en el edificio indicado. */
+    let unresolvedFloors = $derived.by((): string[] => {
+        if (!prefill?.edificio || !prefill.pisosPorMedio) return [];
+        const b = catalogState.buildings.find((x) => x.name === prefill.edificio);
+        const canonical = (b?.floors || []) as string[];
+        const bad: string[] = [];
+        for (const list of Object.values(prefill.pisosPorMedio)) {
+            const { unresolved } = resolveFloorList(list, canonical);
+            bad.push(...unresolved);
+        }
+        return [...new Set(bad)];
     });
 
     async function handlePersonSaved() {
@@ -188,6 +201,29 @@
                 <div class="flex items-center gap-2 text-sm text-slate-500">
                     <Loader2 size={14} class="animate-spin" />
                     Validando si <strong>{p.apellidos}, {p.nombres}</strong> ya existe...
+                </div>
+            </div>
+        {:else if unresolvedFloors.length > 0}
+            <div
+                class="rounded-xl border border-rose-200 bg-rose-50 p-4 mb-4 space-y-2"
+            >
+                <div class="flex items-start gap-2 text-rose-800 text-sm">
+                    <AlertTriangle size={16} class="mt-0.5 shrink-0" />
+                    <div>
+                        <p class="font-bold">Pisos no reconocidos</p>
+                        <p class="text-xs text-rose-700 mt-1">
+                            Los siguientes pisos de la plantilla no coinciden con
+                            los del edificio seleccionado. Corrígelos en la propia
+                            plantilla o ajústalos en el formulario antes de
+                            guardar, de lo contrario no se podrá completar el
+                            alta.
+                        </p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                    {#each unresolvedFloors as f}
+                        <Badge variant="rose">{f}</Badge>
+                    {/each}
                 </div>
             </div>
         {:else if candidates.length > 0}

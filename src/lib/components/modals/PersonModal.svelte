@@ -21,6 +21,7 @@
     import { toast } from "svelte-sonner";
     import { handleError, mediaTypeVariant } from "../../utils";
     import { updateWithLock, fetchCurrentVersion } from "../../utils/optimisticLock";
+    import { resolveFloorList } from "../../utils/floorMatch";
     import type { Person } from "../../types";
     import { personnelSchema } from "../../schemas";
 
@@ -509,6 +510,10 @@
                           ),
                       }
                     : {};
+                // El edificio de radicación (base) se considera seleccionado aunque
+                // el usuario no marcara edificios: si trae pisos/accesos, debe
+                // mostrarse activo en el listado.
+                selectedBuildings = prefillBid ? [prefillBid] : [];
                 accesosEspeciales = namesToSpecialIds(prefill.specialAccesses ?? []);
                 tarjetasAsignadas = [];
                 if (prefill.foliosPorMedio) {
@@ -546,9 +551,46 @@
         tarjetasAsignadas = tarjetasAsignadas.filter((_, i) => i !== index);
     }
 
+    /**
+     * Valida que cada piso de cada edificio seleccionado exista en ese edificio.
+     * Devuelve los pisos no reconocidos para impedir el guardado. Solo aplica en
+     * altas y ediciones con accesos; si no hay edificios/medios, no hay error.
+     */
+    function validateFloors(): { ok: boolean; unresolved: string[] } {
+        const unresolved: string[] = [];
+        for (const [bidStr, typeMap] of Object.entries(floorsByBuilding)) {
+            const bid = Number(bidStr);
+            const b = buildings.find((x) => Number(x.id) === bid);
+            const canonical = b?.floors || [];
+            for (const list of Object.values(typeMap || {})) {
+                const { unresolved: bad } = resolveFloorList(list, canonical);
+                if (bad.length) {
+                    unresolved.push(...bad.map((x) => `${x} (${b?.name ?? bid})`));
+                }
+            }
+        }
+        if (unresolved.length === 0) return { ok: true, unresolved: [] };
+        return { ok: false, unresolved };
+    }
+
     async function handleSave() {
         if (isSubmitting) return;
         errors = {};
+
+        // Validar que los pisos seleccionados existan en su edificio. Si alguno
+        // no se reconoce, se bloquea el guardado para evitar pisos "null".
+        const floorCheck = validateFloors();
+        if (!floorCheck.ok) {
+            const details = floorCheck.unresolved
+                .slice(0, 6)
+                .map((f) => `"${f}"`)
+                .join(", ");
+            errors.floor = "Hay pisos que no existen en el edificio seleccionado.";
+            toast.error("Pisos no reconocidos", {
+                description: `No se guardó la persona. Pisos inválidos: ${details}. Ajusta los pisos en el selector antes de continuar.`,
+            });
+            return;
+        }
 
         const dataToValidate = {
             first_name: nombres,
