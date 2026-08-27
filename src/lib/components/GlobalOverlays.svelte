@@ -10,6 +10,9 @@
     import { personnelActions } from "../utils";
     import { uiState } from "../stores/ui.svelte";
     import { confirm } from "../utils/confirmModal.svelte";
+    import { toast } from "svelte-sonner";
+    import { handleError } from "../utils/error";
+    import { supabase } from "../supabase";
 
     // Estado calculado desde el store global
     let isDetailsOpen = $derived(personnelState.isDetailsOpen);
@@ -56,9 +59,11 @@
     let deleteModal = $state<{
         isOpen: boolean;
         person: any;
+        mode: "baja" | "eliminar";
     }>({
         isOpen: false,
         person: null,
+        mode: "eliminar",
     });
 
     // Auxiliar de actualización de datos
@@ -81,6 +86,39 @@
         }
     }
 
+    /**
+     * Da de baja a una persona gestionando sus tarjetas (eliminar vs dejar
+     * disponible). Los datos de la persona se conservan; solo se revoca el
+     * acceso. El sidepanel permanece abierto para poder eliminar después.
+     */
+    async function handleDeactivateWithCards(
+        person: any,
+        cardActionMap: Record<string, "delete" | "keep">,
+    ) {
+        try {
+            if (cardActionMap) {
+                for (const [cardId, action] of Object.entries(cardActionMap)) {
+                    if (action === "delete") {
+                        await supabase.from("access_media").delete().eq("id", cardId);
+                    } else if (action === "keep") {
+                        await supabase
+                            .from("access_media")
+                            .update({
+                                person_id: null,
+                                status: "available",
+                                responsiva_status: "unsigned",
+                                programming_status: "pending",
+                            })
+                            .eq("id", cardId);
+                    }
+                }
+            }
+            await personnelActions.handleDeactivatePerson(person, refreshData);
+        } catch (e) {
+            handleError(e, "Error al dar de baja");
+        }
+    }
+
     // Envoltorios de acción que inyectan refreshData
     const onBlock = (p: any) => {
         confirm.open({
@@ -95,13 +133,13 @@
     };
 
     const onDeactivate = (p: any) => {
-        confirm.open({
-            title: "¿DAR DE BAJA?",
-            description: "Esta persona dejará de tener acceso, pero sus datos se conservarán en el sistema. Sus tarjetas quedarán disponibles en el inventario.",
-            variant: "danger",
-            confirmText: "Dar de Baja",
-            onConfirm: () => personnelActions.handleDeactivatePerson(p, refreshData),
-        });
+        // La baja permite gestionar las tarjetas (eliminar vs dejar disponible)
+        // antes de procesarla; los datos de la persona se conservan.
+        deleteModal = {
+            isOpen: true,
+            person: p,
+            mode: "baja",
+        };
     };
 
     const onReactivate = (p: any) =>
@@ -111,6 +149,7 @@
         deleteModal = {
             isOpen: true,
             person: p,
+            mode: "eliminar",
         };
     };
 
@@ -219,8 +258,15 @@
 <DeletePersonnelModal
     bind:isOpen={deleteModal.isOpen}
     person={deleteModal.person}
-    onConfirm={async (cardActionMap) => {
-        await personnelActions.handleDeletePersonPermanent(
+    mode={deleteModal.mode}
+    onConfirm={(cardActionMap) => {
+        if (deleteModal.mode === "baja") {
+            return handleDeactivateWithCards(
+                deleteModal.person,
+                cardActionMap,
+            );
+        }
+        return personnelActions.handleDeletePersonPermanent(
             deleteModal.person,
             cardActionMap,
             async () => {

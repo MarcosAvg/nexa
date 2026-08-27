@@ -10,6 +10,8 @@
         isOpen = $bindable(false),
         /** Persona a eliminar. */
         person,
+        /** Contexto de la operación: "baja" conserva datos, "eliminar" es irreversible. */
+        mode = "eliminar",
         /** Callback de confirmación con mapa de decisiones por tarjeta. */
         onConfirm,
         /** Callback al cancelar. */
@@ -17,11 +19,14 @@
     } = $props<{
         isOpen: boolean;
         person: Person;
+        mode?: "baja" | "eliminar";
         onConfirm: (
             cardActionMap: Record<string, "delete" | "keep">,
         ) => Promise<void>;
         onCancel?: () => void;
     }>();
+
+    let esBaja = $derived(mode === "baja");
 
     let isSubmitting = $state(false);
     let cardActionMap = $state<Record<string, "delete" | "keep">>({});        // Inicializar mapa cuando cambia la persona o se abre el modal
@@ -58,7 +63,7 @@
 
 <Modal
     bind:isOpen
-    title="¿ELIMINAR PERMANENTEMENTE?"
+    title={esBaja ? "DAR DE BAJA" : "¿ELIMINAR PERMANENTEMENTE?"}
     size="md"
     zIndex="z-[100]"
     onclose={handleCancel}
@@ -72,14 +77,25 @@
             </div>
             <div class="space-y-1">
                 <h3 class="font-bold text-rose-900 uppercase text-sm">
-                    Atención: Acción Irreversible
+                    {esBaja
+                        ? "Atención: Se dará de baja"
+                        : "Atención: Acción Irreversible"}
                 </h3>
-                <p class="text-sm text-rose-700 leading-relaxed">
-                    Vas a eliminar a <strong
-                        >{person?.first_name} {person?.last_name}</strong
-                    >. Esta acción borrará todo su historial y registros
-                    personales.
-                </p>
+                {#if esBaja}
+                    <p class="text-sm text-rose-700 leading-relaxed">
+                        Vas a dar de baja a <strong
+                            >{person?.first_name} {person?.last_name}</strong
+                        >. La persona dejará de tener acceso, pero sus datos se
+                        conservarán en el sistema.
+                    </p>
+                {:else}
+                    <p class="text-sm text-rose-700 leading-relaxed">
+                        Vas a eliminar a <strong
+                            >{person?.first_name} {person?.last_name}</strong
+                        >. Esta acción borrará todo su historial y registros
+                        personales.
+                    </p>
+                {/if}
             </div>
         </div>
 
@@ -155,7 +171,7 @@
                 loading={isSubmitting}
                 class="min-w-[180px]"
             >
-                Confirmar Eliminación
+                {esBaja ? "Confirmar Baja" : "Confirmar Eliminación"}
             </Button>
         </div>
     {/snippet}
