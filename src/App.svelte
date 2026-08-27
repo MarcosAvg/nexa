@@ -154,7 +154,7 @@ import { fade } from "svelte/transition";
   }
 </script>
 
-<Toaster />
+<Toaster richColors closeButton position="top-right" />
 
 {#if loadingAuth}
   <div class="min-h-screen bg-slate-50 flex items-center justify-center">
