@@ -164,6 +164,11 @@
             if (f.edificio && catalogHasName(cat.buildings, f.edificio)) {
                 const b = cat.buildings.find((x) => x.name === f.edificio);
                 const canonical = (b?.floors || []) as string[];
+                // Piso base
+                if (f.piso_base) {
+                    const { unresolved: badBase } = resolveFloorList([f.piso_base], canonical);
+                    if (badBase.length) problems.push(`Piso base "${f.piso_base}" no existe en ${f.edificio}`);
+                }
                 for (const m of activeMediaTypes(cat.mediaTypes)) {
                     if (!m.has_floors) continue;
                     const raw = parseFloors(f[`pisos_${m.key}`]);
@@ -188,6 +193,10 @@
             if (targetBuilding) {
                 const b = cat.buildings.find((x) => x.name === targetBuilding);
                 const canonical = (b?.floors || []) as string[];
+                if (f.nuevo_piso) {
+                    const { unresolved: badBase } = resolveFloorList([f.nuevo_piso], canonical);
+                    if (badBase.length) problems.push(`Nuevo piso base "${f.nuevo_piso}" no existe en ${targetBuilding}`);
+                }
                 for (const m of activeMediaTypes(cat.mediaTypes)) {
                     if (!m.has_floors) continue;
                     const action = f[`accion_${m.key}`];
@@ -1050,6 +1059,7 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                 {@const totalConflicts = [...altaAnalyses.values()].filter(
                     (a) => a.hasConflicts,
                 ).length}
+                {@const totalValidationErrors = validationErrors.size}
                 <div class="flex items-center gap-3 text-xs flex-wrap">
                     <div
                         class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium"
@@ -1069,6 +1079,14 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                         >
                             <AlertCircle size={12} />
                             {totalConflicts} con conflicto
+                        </div>
+                    {/if}
+                    {#if totalValidationErrors > 0}
+                        <div
+                            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-800 font-bold animate-pulse"
+                        >
+                            <AlertCircle size={12} />
+                            {totalValidationErrors} con datos no reconocidos (bloqueante)
                         </div>
                     {/if}
                     <div
