@@ -114,7 +114,7 @@
     let horaSalida = $state("17:00");
     let email = $state("");
     let accesosEspeciales = $state<number[]>([]);
-    let tarjetasAsignadas = $state<{ type: string; folio: string }[]>([]);
+    let tarjetasAsignadas = $state<{ type: string; folio: string; id?: string; status?: string }[]>([]);
 
     // Estado del modal anidado
     let isCardModalOpen = $state(false);
@@ -543,7 +543,7 @@
         }
     });
 
-    function addCard(card: { type: string; folio: string }) {
+    function addCard(card: { type: string; folio: string; id?: string; status?: string }) {
         tarjetasAsignadas = [...tarjetasAsignadas, card];
     }
 

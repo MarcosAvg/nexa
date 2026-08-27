@@ -354,9 +354,12 @@ export const personnelService = {
                 if (!media) continue;
                 const requiresProgramming = media.requires_programming !== false;
                 p_media.push({
+                    // Si la tarjeta ya existe en inventario, el RPC la asigna;
+                    // si no, la crea (el RPC valida folio único por medio al crear).
+                    id: (card as any).id || undefined,
                     media_type_id: media.id,
                     identifier: card.folio || "",
-                    status: "active",
+                    status: (card as any).status || "active",
                     programming_status: requiresProgramming ? "pending" : "done",
                     responsiva_status: "unsigned",
                 });
