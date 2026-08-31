@@ -142,7 +142,7 @@ export const catalogService = {
         }, "Fetch Schedules", throwOnError, []);
     },
     async fetchMediaTypes(throwOnError: boolean = false) {
-        const cached = catalogCache.get<any[]>('access_media_types_v2');
+        const cached = catalogCache.get<any[]>('access_media_types_v3');
         if (cached) return cached;
         return withErrorHandlingConditional(async () => {
             const { data, error } = await supabase
@@ -152,7 +152,7 @@ export const catalogService = {
                 .order("name", { ascending: true });
             if (error) throw error;
             const result = data || [];
-            catalogCache.set('access_media_types_v2', result, CATALOG_CACHE_TTL_MS);
+            catalogCache.set('access_media_types_v3', result, CATALOG_CACHE_TTL_MS);
             return result;
         }, "Fetch Media Types", throwOnError, []);
     },
@@ -180,6 +180,10 @@ export const catalogService = {
                 message: `Orden del catálogo de ${table} actualizado`,
             });
             catalogCache.invalidate(table);
+            if (table === "access_media_types") {
+                catalogCache.invalidate("access_media_types_v2");
+                catalogCache.invalidate("access_media_types_v3");
+            }
         }, "Reorder Catalog");
     },
 
@@ -319,7 +323,10 @@ export const catalogService = {
                     .insert(buildingIds.map((buildingId) => ({ media_type_id: mediaTypeId, building_id: buildingId })));
                 if (jError) throw jError;
             }
+            catalogCache.invalidate('access_media_types_v3');
+            // Limpiar caché legacy
             catalogCache.invalidate('access_media_types_v2');
+            catalogCache.invalidate('access_media_types');
         }, "Save Media Type");
     },
 
@@ -330,6 +337,10 @@ export const catalogService = {
             if (error) throw error;
             await HistoryService.log("SYSTEM", String(id), "DELETE_CATALOG", { message: `Eliminado de ${table}: ${itemName}`, entityName: `${table}: ${itemName}` });
             catalogCache.invalidate(table);
+            if (table === "access_media_types") {
+                catalogCache.invalidate("access_media_types_v2");
+                catalogCache.invalidate("access_media_types_v3");
+            }
         }, "Delete Catalog Item");
     }
 };
