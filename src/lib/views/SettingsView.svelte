@@ -3,7 +3,7 @@
     import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard, FileText, Puzzle } from "lucide-svelte";
     import { userState, catalogState, settingsState, moduleState } from "../stores";
     import { networkStore } from "../stores/network.svelte";
-    import { generateMediaTemplate, generateUsageTemplate, handleError, capitalize } from "../utils";
+    import { generateMediaTemplate, generateMediosTemplate, generateUsageTemplate, handleError, capitalize } from "../utils";
     import { toast } from "svelte-sonner";
     import GeneralSettingsView from "./GeneralSettingsView.svelte";
 
@@ -55,6 +55,7 @@
 
     let isGeneratingTemplate = $state(false);
     let isGeneratingKoneTemplate = $state(false);
+    let isGeneratingMediosTemplate = $state(false);
 
     // Medios activos seleccionados para incluir en la plantilla (por defecto: todos)
     let selectedMediaKeys = $state<string[]>([]);
@@ -97,6 +98,26 @@
             handleError(e, "Generar Plantilla de Conteo");
         } finally {
             isGeneratingKoneTemplate = false;
+        }
+    }
+
+    async function handleGenerateMediosTemplate() {
+        isGeneratingMediosTemplate = true;
+        const loadingToast = toast.loading("Generando plantilla de medios...");
+        try {
+            await generateMediosTemplate({
+                buildings: buildings as any[],
+                dependencies: dependencies as any[],
+                specialAccesses: specialAccesses as any[],
+                schedules: schedules as any[],
+                mediaTypes: mediaTypes as any[],
+            });
+            toast.success("Plantilla generada correctamente", { id: loadingToast });
+        } catch (e) {
+            toast.dismiss(loadingToast);
+            handleError(e, "Generar Plantilla Medios");
+        } finally {
+            isGeneratingMediosTemplate = false;
         }
     }
 
@@ -201,6 +222,14 @@
                         </div>
                     {/snippet}
                 </ExportDropdown>
+                <button
+                    class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-violet-50 hover:text-violet-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                    onclick={handleGenerateMediosTemplate}
+                    disabled={isGeneratingMediosTemplate || !networkStore.isOnline}
+                >
+                    <CreditCard size={18} strokeWidth={2.5} class="text-violet-500" />
+                    {isGeneratingMediosTemplate ? "Generando..." : "Plantilla de Medios"}
+                </button>
                 {#if moduleState.isEnabled("conteo_uso")}
                     <button
                         class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"

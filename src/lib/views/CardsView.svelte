@@ -17,7 +17,6 @@
         Plus,
         FileSpreadsheet,
         CreditCard,
-        Download,
         Upload,
     } from "lucide-svelte";
 
@@ -27,7 +26,6 @@
     import { getCardStatusVariant, getCardStatusLabel } from "../constants/status";
     import { mediaTypeVariant } from "../utils/mediaTypeAppearance";
     import MediosImportModal from "../components/modals/MediosImportModal.svelte";
-    import { generateMediosTemplate } from "../utils/xlsxTemplate";
 
     let dependencies = $derived(catalogState.dependencies);
     let dependencyNames = $derived(dependencies.map((d) => d.name));
@@ -222,26 +220,6 @@
         {/snippet}
 
         {#snippet actions()}
-            <Button
-                variant="ghost"
-                class="flex items-center gap-2 h-9 px-4 text-xs"
-                disabled={!networkStore.isOnline}
-                onclick={async () => {
-                    const t = toast.loading("Generando plantilla...");
-                    try {
-                        await generateMediosTemplate({
-                            buildings: catalogState.buildings as any[],
-                            dependencies: catalogState.dependencies as any[],
-                            specialAccesses: catalogState.specialAccesses as any[],
-                            schedules: catalogState.schedules as any[],
-                            mediaTypes: catalogState.mediaTypes as any[],
-                        });
-                        toast.success("Plantilla generada", { id: t });
-                    } catch(e){ toast.dismiss(t); handleError(e, "Generar Plantilla Medios"); }
-                }}
-            >
-                <Download size={14} /> Plantilla Medios
-            </Button>
             <Button
                 variant="soft-blue"
                 class="flex items-center gap-2 h-9 px-4 text-xs"
