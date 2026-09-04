@@ -114,7 +114,7 @@ export const personnelService = {
                     query = query.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`);
                 }
             }
-            if (statusFilter === "No Activos") query = query.neq("computed_status", "Activo/a");
+            if (statusFilter === "No Activos") query = query.not("computed_status", "in", '("Activo/a","Parcial","Media de otro edificio")');
             else if (statusFilter !== "Todos") query = query.eq("computed_status", statusFilter);
             if (dependencyId) query = query.eq("dependency_id", dependencyId);
             if (buildingId === "__none__") query = query.is("building_id", null);
@@ -189,7 +189,7 @@ export const personnelService = {
 
             const allMapped = allData.map(p => mapPersonRecord(p));
             const filtered = allMapped.filter(p =>
-                isNoActivos ? p.status !== "Activo/a" : p.status === statusFilter,
+                isNoActivos ? !["Activo/a", "Parcial", "Media de otro edificio"].includes(p.status) : p.status === statusFilter,
             );
             const from = (page - 1) * limit;
             return { data: filtered.slice(from, from + limit), count: filtered.length };

@@ -271,6 +271,7 @@
                     <div class="text-2xl font-black text-slate-900 tabular-nums">{activePersonnelCount}</div>
                 </div>
             </div>
+            <div class="mt-2 text-[10px] font-medium text-slate-400">Incluye: Activo/a, Parcial y Media de otro edificio</div>
             <div class="absolute -right-4 -bottom-4 text-emerald-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><Users size={96} /></div>
         </Card>
 
@@ -284,7 +285,7 @@
                     <div class="text-2xl font-black text-slate-900 tabular-nums">{metrics.noActivos}</div>
                 </div>
             </div>
-            <div class="mt-2 text-[10px] font-medium text-slate-400">Sin acceso utilizable (en proceso, media de otro edificio, sin acceso, bloqueado o baja)</div>
+            <div class="mt-2 text-[10px] font-medium text-slate-400">Sin acceso utilizable (en proceso, otro edificio en proceso, sin acceso, bloqueado o baja)</div>
             <div class="absolute -right-4 -bottom-4 text-rose-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><Shield size={96} /></div>
         </Card>
 

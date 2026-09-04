@@ -55,7 +55,7 @@ create or replace function public.get_dashboard_stats()
                     END AS final_status
                 FROM pm
             )
-            SELECT COUNT(*) FROM cs WHERE final_status IN ('activo', 'parcial')
+            SELECT COUNT(*) FROM cs WHERE final_status IN ('activo', 'parcial', 'media_otro_edificio')
         ),
         'stock', (
             SELECT COALESCE(json_agg(x ORDER BY x."sortOrder"), '[]'::json)

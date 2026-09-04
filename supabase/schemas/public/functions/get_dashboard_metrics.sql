@@ -1,5 +1,5 @@
 -- Dashboard: contador "No Activos" + todas las dependencias + personas por piso
--- Estado por edificio de radicación (máquina de 8): operativos = activo + parcial.
+-- Estado por edificio de radicación (máquina de 8): operativos = activo + parcial + media_otro_edificio.
 
 create or replace function public.get_dashboard_metrics()
   returns json
@@ -70,7 +70,7 @@ BEGIN
 
     SELECT COUNT(*) INTO operativos_count
     FROM tmp_person_status
-    WHERE final_status IN ('activo', 'parcial');
+    WHERE final_status IN ('activo', 'parcial', 'media_otro_edificio');
 
     SELECT json_build_object(
         'activo', COUNT(*) FILTER (WHERE final_status = 'activo'),
