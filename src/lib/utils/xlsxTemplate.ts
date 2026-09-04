@@ -213,6 +213,7 @@ function prepareCatalogData(catalogs: TemplateCatalogs) {
         .map((m) => m.name || m.key);
     const cardTypeList = [...mediaNames, 'Ambas'];
 
+    const mediosTipoList = [...mediaNames];
     const refs = {
         depsRef: () => `CATALOGOS!$A$1:$A$${depsNames.length}`,
         buildingsRef: () => `CATALOGOS!$B$1:$B$${buildingNames.length}`,
@@ -225,8 +226,9 @@ function prepareCatalogData(catalogs: TemplateCatalogs) {
         tipoBajaRef: () => `CATALOGOS!$I$1:$I$2`,
         motivoReposRef: () => `CATALOGOS!$J$1:$J$4`,
         urgenciaRef: () => `CATALOGOS!$K$2:$K$4`,
+        mediosTipoRef: () => `CATALOGOS!$L$1:$L$${mediosTipoList.length}`,
     };
-    return { refs, lists: { depsNames, buildingNames, accessNames, scheduleNames, floorList, cardTypeList } };
+    return { refs, lists: { depsNames, buildingNames, accessNames, scheduleNames, floorList, cardTypeList, mediosTipoList } };
 }
 
 function writeCatalogSheet(wb: ExcelJS.Workbook, lists: ReturnType<typeof prepareCatalogData>['lists']) {
@@ -245,6 +247,7 @@ function writeCatalogSheet(wb: ExcelJS.Workbook, lists: ReturnType<typeof prepar
     write(9, ['Definitiva', 'Temporal']);
     write(10, ['Extravío', 'Daño', 'Robo', 'Otro']);
     write(11, ['Alta (Alta/Media/Baja)', 'Alta', 'Media', 'Baja']);
+    write(12, lists.mediosTipoList);
 }
 
 // Tipo alias para que las hojas sigan referenciando la misma forma
@@ -747,6 +750,43 @@ function buildReporteFallaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 // Punto de entrada principal
 // ─────────────────────────────────────────
 
+// ─────────────────────────────────────────
+// Hoja: MEDIOS (inventario - plantilla separada)
+// ─────────────────────────────────────────
+
+function buildMediosSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
+    const ws = wb.addWorksheet('📇 MEDIOS');
+    ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 4, showGridLines: true }];
+
+    ws.columns = [
+        { key: 'tipo', width: 26 },
+        { key: 'folio', width: 26 },
+    ];
+
+    addSheetTitle(ws, 'REGISTRO DE MEDIOS — INVENTARIO', 2);
+
+    ws.mergeCells('A2:B2');
+    const banner = ws.getCell('A2');
+    banner.value = 'Use esta hoja para registrar medios en inventario. Cada fila es un medio (folio) con su tipo. Los medios quedarán disponibles para asignar.';
+    styleCell(banner, { size: 9, fontColor: 'FF065F46', fillColor: 'FFD1FAE5', align: 'center', wrap: true });
+    ws.getRow(2).height = 24;
+
+    addGroupHeaders(ws, 3, [
+        { label: 'MEDIO', cols: 2, color: C.groupSky },
+    ]);
+    addColumnHeaders(ws, 4, [
+        { label: 'Tipo', mandatory: true },
+        { label: 'Folio', mandatory: false },
+    ]);
+
+    const ROWS = 500;
+    paintDataRows(ws, 5, 5 + ROWS, 2, [1], [2]);
+
+    addDropdown(ws, 'A', 5, 5 + ROWS, refs.mediosTipoRef());
+
+    ws.autoFilter = 'A4:B4';
+}
+
 export async function generateMediaTemplate(catalogs: TemplateCatalogs) {
     const wb = new ExcelJS.Workbook();
     wb.created = new Date();
@@ -769,6 +809,20 @@ export async function generateMediaTemplate(catalogs: TemplateCatalogs) {
 
     const buffer = await wb.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), 'Plantilla_Solicitudes_Acceso.xlsx');
+}
+
+export async function generateMediosTemplate(catalogs: TemplateCatalogs) {
+    const wb = new ExcelJS.Workbook();
+    wb.created = new Date();
+
+    const { refs, lists } = prepareCatalogData(catalogs);
+
+    // Solo hoja de medios + catálogos ocultos
+    buildMediosSheet(wb, refs);
+    writeCatalogSheet(wb, lists);
+
+    const buffer = await wb.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), 'Plantilla_Medios_Inventario.xlsx');
 }
 
 export async function generateUsageTemplate(mediaLabel: string = "Uso de tarjetas") {

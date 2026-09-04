@@ -17,6 +17,8 @@
         Plus,
         FileSpreadsheet,
         CreditCard,
+        Download,
+        Upload,
     } from "lucide-svelte";
 
     import { cardService } from "../services/cards";
@@ -24,6 +26,8 @@
     import { networkStore } from "../stores/network.svelte";
     import { getCardStatusVariant, getCardStatusLabel } from "../constants/status";
     import { mediaTypeVariant } from "../utils/mediaTypeAppearance";
+    import MediosImportModal from "../components/modals/MediosImportModal.svelte";
+    import { generateMediosTemplate } from "../utils/xlsxTemplate";
 
     let dependencies = $derived(catalogState.dependencies);
     let dependencyNames = $derived(dependencies.map((d) => d.name));
@@ -39,6 +43,7 @@
     let isModalOpen = $state(false);
     let editingCard = $state<any>(null);
     let replacingCard = $state<any>(null);
+    let isMediosImportOpen = $state(false);
     // Estado derivado del store
     let cards = $derived(cardState.pagination.items);
     let currentPage = $derived(cardState.pagination.currentPage);
@@ -217,6 +222,34 @@
         {/snippet}
 
         {#snippet actions()}
+            <Button
+                variant="ghost"
+                class="flex items-center gap-2 h-9 px-4 text-xs"
+                disabled={!networkStore.isOnline}
+                onclick={async () => {
+                    const t = toast.loading("Generando plantilla...");
+                    try {
+                        await generateMediosTemplate({
+                            buildings: catalogState.buildings as any[],
+                            dependencies: catalogState.dependencies as any[],
+                            specialAccesses: catalogState.specialAccesses as any[],
+                            schedules: catalogState.schedules as any[],
+                            mediaTypes: catalogState.mediaTypes as any[],
+                        });
+                        toast.success("Plantilla generada", { id: t });
+                    } catch(e){ toast.dismiss(t); handleError(e, "Generar Plantilla Medios"); }
+                }}
+            >
+                <Download size={14} /> Plantilla Medios
+            </Button>
+            <Button
+                variant="soft-blue"
+                class="flex items-center gap-2 h-9 px-4 text-xs"
+                disabled={!networkStore.isOnline}
+                onclick={() => isMediosImportOpen = true}
+            >
+                <Upload size={14} /> Importar Medios
+            </Button>
             <Button
                 variant="soft-emerald"
                 class="flex items-center gap-2.5 h-10 px-6"
@@ -411,6 +444,8 @@ data={cards}
         isModalOpen = false;
     }}
 />
+
+<MediosImportModal bind:isOpen={isMediosImportOpen} onComplete={() => cardState.refresh()} />
 
 <PermissionGuard requireEdit>
     {#if networkStore.isOnline}

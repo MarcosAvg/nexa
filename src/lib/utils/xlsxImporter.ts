@@ -17,7 +17,8 @@ export type SheetKey =
     | 'modificaciones'
     | 'baja_persona'
     | 'reposicion'
-    | 'reporte_falla';
+    | 'reporte_falla'
+    | 'medios';
 
 export interface ParsedRow {
     rowNumber: number;
@@ -54,6 +55,7 @@ export const SHEET_TO_TICKET_TYPE: Record<SheetKey, string> = {
     baja_persona: 'Baja de Persona',
     reposicion: 'Reposición',
     reporte_falla: 'Reporte de Falla',
+    medios: 'Alta de Medio',
 };
 
 export const FIELD_LABELS: Record<string, string> = {
@@ -91,6 +93,7 @@ export const FIELD_LABELS: Record<string, string> = {
     descripcion: 'Descripción del Problema',
     desde_cuando: '¿Desde cuándo ocurre?',
     urgencia: 'Urgencia',
+    tipo: 'Tipo',
 };
 
 // ─────────────────────────────────────────
@@ -219,6 +222,18 @@ const SHEET_DEFS: Record<SheetKey, BaseSheetCols> = {
             { field: 'desde_cuando', label: '¿Desde cuándo ocurre?' },
             { field: 'urgencia', label: 'Urgencia', required: true },
             { field: 'observaciones', label: 'Observaciones adicionales' },
+        ],
+        trailing: [],
+    },
+    medios: {
+        name: '📇 MEDIOS',
+        label: 'Medios',
+        dataStartRow: 5,
+        mediaInsertAfter: 0,
+        mediaKind: 'none',
+        base: [
+            { field: 'tipo', label: 'Tipo', required: true },
+            { field: 'folio', label: 'Folio', required: true },
         ],
         trailing: [],
     },

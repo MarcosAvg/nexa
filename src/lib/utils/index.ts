@@ -69,7 +69,7 @@ export {
 } from './xlsxUsage';
 export type { UsageEntry, UsageMatchedEntry, UsageMatchResult, DuplicateFolioInfo } from './xlsxUsage';
 
-export { generateMediaTemplate, generateUsageTemplate } from './xlsxTemplate';
+export { generateMediaTemplate, generateMediosTemplate, generateUsageTemplate } from './xlsxTemplate';
 
 export { capitalize, fullName, personDisplayName, formatDate, formatDateTime, timeAgo } from './format';
 
