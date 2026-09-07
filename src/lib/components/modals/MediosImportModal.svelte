@@ -7,7 +7,7 @@
     import { supabase } from "../../supabase";
     import { catalogState } from "../../stores";
     import { HistoryService } from "../../services/history";
-    import { FileSpreadsheet, Upload, AlertCircle, CheckCircle2, XCircle, Download } from "lucide-svelte";
+        import { FileSpreadsheet, Upload, AlertCircle, CheckCircle2, XCircle, Download, Trash2, Search, Filter, RotateCcw } from "lucide-svelte";
     import type { ParsedRow } from "../../utils/xlsxImporter";
 
     let { isOpen = $bindable(false), onComplete }: { isOpen: boolean; onComplete?: () => void } = $props();
@@ -16,22 +16,40 @@
     let parseResult = $state<any>(null);
     let mediosRows = $state<ParsedRow[]>([]);
     let validation = $state<{ rowNumber: number; folio: string; tipo: string; status: "ok" | "duplicate_file" | "exists_db" | "invalid_tipo" | "missing_folio"; message: string }[]>([]);
+    let originalValidation = $state<typeof validation>([]);
     let isParsing = $state(false);
     let isImporting = $state(false);
     let importResult = $state<{ created: number; errors: string[] } | null>(null);
     let fileInput = $state<HTMLInputElement | undefined>(undefined);
+    let searchQuery = $state("");
+    let statusFilter = $state<"todos" | "ok" | "conflicto">("todos");
 
     function reset() {
         step = "idle";
         parseResult = null;
         mediosRows = [];
         validation = [];
+        originalValidation = [];
         importResult = null;
         isParsing = false;
         isImporting = false;
+        searchQuery = "";
+        statusFilter = "todos";
         if (fileInput) fileInput.value = "";
     }
     function closeModal() { reset(); isOpen = false; }
+
+    function removeRow(rowNumber: number) {
+        validation = validation.filter(v => v.rowNumber !== rowNumber);
+    }
+    function removeConflicts() {
+        validation = validation.filter(v => v.status === "ok");
+        toast.info("Filas con conflicto eliminadas de la lista");
+    }
+    function restoreList() {
+        validation = [...originalValidation];
+        toast.info("Lista restaurada");
+    }
 
     async function handleFileChange(e: Event) {
         const input = e.target as HTMLInputElement;
@@ -133,12 +151,24 @@
         }
 
         validation = prelim;
+        originalValidation = [...prelim];
         step = "review";
     }
 
     let totalOk = $derived(validation.filter(v => v.status === "ok").length);
     let totalConflict = $derived(validation.filter(v => v.status !== "ok").length);
     let totalInvalid = $derived(parseResult ? mediosRows.filter((r: ParsedRow) => !r.isValid).length : 0);
+    let filteredValidation = $derived.by(() => {
+        let list = validation;
+        if (statusFilter !== "todos") {
+            list = list.filter(v => statusFilter === "ok" ? v.status === "ok" : v.status !== "ok");
+        }
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            list = list.filter(v => v.tipo.toLowerCase().includes(q) || v.folio.toLowerCase().includes(q));
+        }
+        return list;
+    });
 
     async function handleImport() {
         const toImport = validation.filter(v => v.status === "ok");
@@ -222,50 +252,114 @@
         </div>
     {:else if step === "parsed" || step === "review"}
         <div class="space-y-4">
-            <div class="flex items-center gap-3 text-xs flex-wrap">
-                <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium">
-                    <CheckCircle2 size={12} /> {totalOk} listos
+            <!-- KPIs profesionales -->
+            <div class="grid grid-cols-3 gap-3">
+                <div class="rounded-xl border border-slate-200 bg-white p-3 text-center">
+                    <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total filas</div>
+                    <div class="text-xl font-black text-slate-800">{mediosRows.length}</div>
+                    <div class="text-[10px] text-slate-400">Excel (desde fila 5)</div>
                 </div>
-                {#if totalConflict > 0}
-                    <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-medium">
-                        <XCircle size={12} /> {totalConflict} con conflicto
-                    </div>
-                {/if}
-                {#if totalInvalid > 0}
-                    <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 font-medium">
-                        <AlertCircle size={12} /> {totalInvalid} inválidas
-                    </div>
-                {/if}
-                <div class="ml-auto text-[11px] text-slate-400">{mediosRows.length} filas totales</div>
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center">
+                    <div class="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Listos</div>
+                    <div class="text-xl font-black text-emerald-700">{totalOk}</div>
+                    <div class="text-[10px] text-emerald-600">Se importarán</div>
+                </div>
+                <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-center">
+                    <div class="text-[10px] font-bold uppercase tracking-widest text-rose-600">Conflictos</div>
+                    <div class="text-xl font-black text-rose-700">{totalConflict}</div>
+                    <div class="text-[10px] text-rose-500">No se importarán</div>
+                </div>
             </div>
 
-            <div class="rounded-xl border border-slate-200 overflow-hidden">
-                <div class="grid grid-cols-[50px_1fr_1fr_140px] gap-px bg-slate-200 text-[10px] font-bold uppercase tracking-wider">
-                    <div class="bg-slate-50 px-3 py-2 text-center">#</div>
-                    <div class="bg-slate-50 px-3 py-2">Tipo</div>
-                    <div class="bg-slate-50 px-3 py-2">Folio</div>
-                    <div class="bg-slate-50 px-3 py-2 text-center">Estado</div>
-                </div>
-                {#each validation as v}
-                    <div class="grid grid-cols-[50px_1fr_1fr_140px] gap-px bg-slate-200 text-xs">
-                        <div class="bg-white px-3 py-2 text-center text-slate-500">{v.rowNumber}</div>
-                        <div class="bg-white px-3 py-2 font-medium {v.status !== 'ok' ? 'text-rose-600' : ''}">{v.tipo || "—"}</div>
-                        <div class="bg-white px-3 py-2 font-mono text-[11px]">{v.folio || "—"}</div>
-                        <div class="bg-white px-3 py-1.5 text-center">
-                            {#if v.status === "ok"}
-                                <Badge variant="emerald" class="text-[10px]">OK</Badge>
-                            {:else}
-                                <Badge variant="rose" class="text-[10px]">{v.message}</Badge>
-                            {/if}
-                        </div>
+            <!-- Toolbar gestión lista -->
+            <div class="flex flex-col sm:flex-row gap-2 sm:items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                <div class="flex items-center gap-1.5">
+                    <div class="relative">
+                        <Search size={14} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Filtrar por tipo o folio..."
+                            bind:value={searchQuery}
+                            class="pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs w-56 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300"
+                        />
                     </div>
-                {/each}
+                    <select bind:value={statusFilter} class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium">
+                        <option value="todos">Todos ({validation.length})</option>
+                        <option value="ok">Solo listos ({totalOk})</option>
+                        <option value="conflicto">Solo conflictos ({totalConflict})</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    {#if totalConflict > 0}
+                        <Button variant="ghost" size="sm" class="h-7 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700" onclick={removeConflicts}>
+                            <Trash2 size={12} class="mr-1" /> Quitar conflictos ({totalConflict})
+                        </Button>
+                    {/if}
+                    {#if validation.length !== originalValidation.length}
+                        <Button variant="ghost" size="sm" class="h-7 text-xs" onclick={restoreList}>
+                            <RotateCcw size={12} class="mr-1" /> Restaurar
+                        </Button>
+                    {/if}
+                </div>
+            </div>
+
+            <!-- Tabla profesional -->
+            <div class="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                <div class="grid grid-cols-[44px_1fr_1fr_160px_44px] gap-px bg-slate-200 text-[10px] font-bold uppercase tracking-wider">
+                    <div class="bg-slate-50 px-2 py-2.5 text-center">#</div>
+                    <div class="bg-slate-50 px-3 py-2.5">Tipo <span class="normal-case font-normal text-slate-400">(desplegable)</span></div>
+                    <div class="bg-slate-50 px-3 py-2.5">Folio</div>
+                    <div class="bg-slate-50 px-3 py-2.5 text-center">Estado</div>
+                    <div class="bg-slate-50 px-2 py-2.5 text-center"></div>
+                </div>
+                <div class="max-h-[320px] overflow-auto divide-y divide-slate-100">
+                    {#each filteredValidation as v, idx}
+                        <div class="grid grid-cols-[44px_1fr_1fr_160px_44px] gap-px bg-slate-100 text-xs items-center {v.status !== 'ok' ? 'bg-rose-50/30' : 'bg-white'}">
+                            <div class="bg-white px-2 py-2.5 text-center">
+                                <span class="font-bold text-slate-700" title="Fila Excel {v.rowNumber}">{idx + 1}</span>
+                                <span class="block text-[9px] text-slate-400">F{v.rowNumber}</span>
+                            </div>
+                            <div class="bg-white px-3 py-2.5">
+                                <span class="font-semibold {v.status === 'invalid_tipo' ? 'text-rose-600' : 'text-slate-700'}">{v.tipo || "—"}</span>
+                            </div>
+                            <div class="bg-white px-3 py-2.5 font-mono text-[11px] font-medium text-slate-700">{v.folio || "—"}</div>
+                            <div class="bg-white px-2 py-2 text-center">
+                                {#if v.status === "ok"}
+                                    <Badge variant="emerald" class="text-[10px] px-2">Listo</Badge>
+                                {:else if v.status === "exists_db"}
+                                    <Badge variant="rose" class="text-[10px]">Existe en BD</Badge>
+                                {:else if v.status === "duplicate_file"}
+                                    <Badge variant="amber" class="text-[10px]">Duplicado archivo</Badge>
+                                {:else}
+                                    <Badge variant="rose" class="text-[10px]">{v.message}</Badge>
+                                {/if}
+                            </div>
+                            <div class="bg-white px-1 py-2 text-center">
+                                <button type="button" class="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors" onclick={() => removeRow(v.rowNumber)} title="Quitar de la lista">
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    {:else}
+                        <div class="p-8 text-center text-sm text-slate-400 bg-white">
+                            <Filter size={24} class="mx-auto mb-2 text-slate-300" />
+                            Sin resultados para el filtro actual.
+                        </div>
+                    {/each}
+                </div>
+                <div class="bg-slate-50 px-3 py-2 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-200">
+                    <span>Mostrando {filteredValidation.length} de {validation.length} filas</span>
+                    <span class="hidden sm:inline">Tip: usa el desplegable “Tipo” de la plantilla para evitar errores de escritura.</span>
+                </div>
             </div>
 
             {#if totalConflict > 0}
-                <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 flex gap-2">
-                    <AlertCircle size={14} class="text-amber-600 mt-0.5" />
-                    <p class="text-xs text-amber-800">Las filas con conflicto no se importarán. Corrige el archivo o desmarca duplicados/tipos inválidos.</p>
+                <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 flex gap-2.5">
+                    <AlertCircle size={16} class="text-amber-600 mt-0.5 shrink-0" />
+                    <div class="text-xs text-amber-800">
+                        <p class="font-bold">Gestión de lista</p>
+                        <p>Las filas con conflicto no se importarán. Puedes quitarlas con “Quitar conflictos” o eliminar individualmente con <Trash2 size={10} class="inline" />. Corrige el Excel y vuelve a subirlo si necesitas conservarlas.</p>
+                    </div>
                 </div>
             {/if}
         </div>
