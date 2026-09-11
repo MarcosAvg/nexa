@@ -353,12 +353,38 @@ export const personnelService = {
                 );
                 if (!media) continue;
                 const requiresProgramming = media.requires_programming !== false;
+                let cardId: string | undefined = (card as any).id || undefined;
+                const folio = (card.folio || "").trim();
+                // Resolver folio existente disponible -> inyectar id para que el RPC asigne
+                if (!cardId && folio) {
+                    const { data: existing } = await supabase
+                        .from("access_media")
+                        .select("id, status, media_type_id")
+                        .eq("media_type_id", media.id)
+                        .eq("identifier", folio)
+                        .maybeSingle();
+                    if (existing) {
+                        if (existing.status === "available") {
+                            cardId = existing.id;
+                        } else {
+                            // Bloqueo si el tipo no coincide o no está disponible: el RPC también bloqueará
+                            const { data: other } = await supabase
+                                .from("access_media")
+                                .select("id, media_type_id")
+                                .eq("identifier", folio)
+                                .neq("media_type_id", media.id)
+                                .limit(1)
+                                .maybeSingle();
+                            if (other) {
+                                throw new Error(`El folio "${folio}" ya existe para otro tipo de medio y no coincide con "${media.name}"`);
+                            }
+                        }
+                    }
+                }
                 p_media.push({
-                    // Si la tarjeta ya existe en inventario, el RPC la asigna;
-                    // si no, la crea (el RPC valida folio único por medio al crear).
-                    id: (card as any).id || undefined,
+                    id: cardId,
                     media_type_id: media.id,
-                    identifier: card.folio || "",
+                    identifier: folio,
                     status: (card as any).status || "active",
                     programming_status: requiresProgramming ? "pending" : "done",
                     responsiva_status: "unsigned",

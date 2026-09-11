@@ -1,7 +1,4 @@
--- Alta atómica de persona + medios (crear o asignar existentes) + permisos.
--- Por cada elemento de p_media:
---   - si trae "id"  → ASIGNA la tarjeta existente del inventario (status 'available').
---   - si NO trae id → CREA la tarjeta nueva (valida folio único por medio).
+-- Alta: si el folio ya existe como disponible, asignarlo; bloqueo si tipo no coincide.
 create or replace function "public"."create_person_with_access"(p_person jsonb, p_media jsonb, p_permissions jsonb)
  returns uuid
  language plpgsql
@@ -38,7 +35,6 @@ begin
         raise exception 'Ya existe una persona con ese nombre';
     end if;
 
-    -- Pre-validación de número de empleado (único en personnel.employee_no).
     v_eno := nullif(btrim(coalesce(p_person->>'employee_no', '')), '');
     if v_eno is not null then
         select exists(select 1 from personnel where employee_no = v_eno) into v_dupe;
@@ -89,7 +85,6 @@ begin
             select name into v_type_name from access_media_types where id = v_media_type;
 
             if v_id is not null then
-                -- Tarjeta existente: asignarla a la persona (solo si está libre/disponible).
                 select status into v_existing_status from access_media where id = v_id::uuid and media_type_id = v_media_type;
                 if v_existing_status is null then
                     raise exception 'La tarjeta del folio % no existe para ese medio', v_identifier;
@@ -105,16 +100,12 @@ begin
                 elsif v_existing_status = 'active' and exists (
                     select 1 from access_media where id = v_id::uuid and person_id = v_person_id
                 ) then
-                    -- Ya está asignada a esta persona (idempotente).
                     v_media_id := v_id::uuid;
                 else
                     raise exception 'La tarjeta con folio % no está disponible para asignar', v_identifier;
                 end if;
             else
-                -- Si el folio ya existe como disponible, asignarlo; si no, crear.
-                -- Bloqueo si el tipo no coincide o no está disponible.
                 if v_identifier <> '' then
-                    -- ¿Existe el mismo folio para ESTE medio y está disponible?
                     select id, status into v_media_id, v_existing_status
                       from access_media
                      where media_type_id = v_media_type
@@ -128,12 +119,10 @@ begin
                                    programming_status = v_prog,
                                    responsiva_status = v_resp
                              where id = v_media_id;
-                            -- v_media_id ya queda asignado, saltar al insert de assignment
                         else
                             raise exception 'El folio "%" ya está registrado para % y no está disponible (estado: %)', v_identifier, v_type_name, v_existing_status;
                         end if;
                     else
-                        -- ¿Existe el mismo folio para OTRO medio? Bloqueo por tipo no coincide.
                         select am.id, t.name into v_media_id, v_type_name
                           from access_media am
                           join access_media_types t on t.id = am.media_type_id
