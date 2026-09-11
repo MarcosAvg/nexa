@@ -99,8 +99,8 @@
 
         const dpr = window.devicePixelRatio || 1;
         const rect = canvasEl.getBoundingClientRect();
-        const width = rect.width || 600;
-        const height = rect.height || 200;
+        const width = rect.width || 800;
+        const height = rect.height || 380;
 
         canvasEl.width = width * dpr;
         canvasEl.height = height * dpr;
@@ -412,14 +412,14 @@
     }
 </script>
 
-<div class="space-y-4 w-full">
-    <div class="text-center">
-        <p class="text-sm font-medium text-slate-600 mb-2">
+<div class="flex flex-col gap-3 w-full flex-1 min-h-0">
+    <div class="flex-1 min-h-[300px] flex flex-col">
+        <p class="text-sm font-medium text-slate-600 mb-2 text-center shrink-0">
             Firma aquí (usa tu mouse, dedo o stylus)
         </p>
         <canvas
             bind:this={canvasEl}
-            class="w-full h-64 sm:h-48 border-2 border-dashed rounded-xl bg-slate-50 cursor-crosshair touch-none shadow-inner transition-all duration-300 {tabletMode
+            class="w-full flex-1 min-h-[280px] h-[42vh] sm:min-h-[320px] sm:h-[38vh] lg:min-h-[380px] lg:h-[420px] max-h-[52vh] border-2 border-dashed rounded-xl bg-white cursor-crosshair touch-none shadow-inner transition-all duration-300 {tabletMode
                 ? 'border-blue-400 ring-4 ring-blue-400/30 shadow-blue-500/20'
                 : 'border-slate-300'}"
             onpointerdown={onPointerDown}
@@ -430,13 +430,13 @@
         ></canvas>
 
         {#if tabletMode}
-            <p class="mt-2 text-xs text-blue-500 font-medium animate-pulse">
+            <p class="mt-2 text-xs text-blue-500 font-medium animate-pulse text-center shrink-0">
                 Modo tableta activo — dibuja en cualquier parte de la pantalla
             </p>
         {/if}
     </div>
 
-    <div class="flex flex-col-reverse sm:flex-row justify-between gap-3">
+    <div class="flex flex-col-reverse sm:flex-row justify-between gap-3 shrink-0 pt-1">
         <div class="flex gap-2 w-full sm:w-auto">
             <Button variant="ghost" onclick={onCancel} class="w-full sm:w-auto"
                 >Cancelar</Button
