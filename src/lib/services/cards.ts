@@ -325,17 +325,76 @@ export const cardService = {
                 const { error } = await withTimeout(supabase.from("access_media").update(payload).eq("id", cardId));
                 if (error) throw error;
             } else {
-                const { data: newMedia, error } = await withTimeout(supabase
-                    .from("access_media")
-                    .insert([payload])
-                    .select()
-                    .single());
-                if (error) throw error;
-                cardId = newMedia.id;
-                await HistoryService.log("CARD", cardId, "CREATE", {
-                    message: `Tarjeta ${payload.identifier} creada`,
-                    entityName: `${data.type} (Folio: ${payload.identifier})`
-                });
+                // Si el folio ya existe como disponible, asignarlo automáticamente
+                // en lugar de intentar crear un duplicado (409 / 23505).
+                if (payload.identifier) {
+                    const { data: existingAvailable } = await supabase
+                        .from("access_media")
+                        .select("id, status, person_id")
+                        .eq("media_type_id", mediaTypeId)
+                        .eq("identifier", payload.identifier)
+                        .maybeSingle();
+                    if (existingAvailable && existingAvailable.person_id === null && existingAvailable.status === "available") {
+                        const { error: updErr } = await withTimeout(supabase.from("access_media").update(payload).eq("id", existingAvailable.id));
+                        if (updErr) throw updErr;
+                        cardId = existingAvailable.id;
+                        await HistoryService.log("CARD", cardId, "ASSIGN", {
+                            message: `Tarjeta ${payload.identifier} asignada (folio existente disponible)`,
+                            entityName: `${data.type} (Folio: ${payload.identifier})`
+                        });
+                    } else if (existingAvailable) {
+                        // Existe pero no está disponible (asignada/bloqueada) -> error claro
+                        throw new Error(`El folio "${payload.identifier}" ya está registrado para ${data.type} y no está disponible`);
+                    } else {
+                        const { data: newMedia, error } = await withTimeout(supabase
+                            .from("access_media")
+                            .insert([payload])
+                            .select()
+                            .single());
+                        if (error) {
+                            // Carrera: otro proceso creó el mismo folio justo ahora -> reintentar asignación
+                            if ((error as any).code === "23505") {
+                                const { data: race } = await supabase
+                                    .from("access_media")
+                                    .select("id, status, person_id")
+                                    .eq("media_type_id", mediaTypeId)
+                                    .eq("identifier", payload.identifier)
+                                    .maybeSingle();
+                                if (race && race.person_id === null && race.status === "available") {
+                                    const { error: upd2 } = await withTimeout(supabase.from("access_media").update(payload).eq("id", race.id));
+                                    if (upd2) throw upd2;
+                                    cardId = race.id;
+                                    await HistoryService.log("CARD", cardId, "ASSIGN", {
+                                        message: `Tarjeta ${payload.identifier} asignada (folio existente disponible)`,
+                                        entityName: `${data.type} (Folio: ${payload.identifier})`
+                                    });
+                                } else {
+                                    throw new Error(`El folio "${payload.identifier}" ya está registrado para ${data.type}`);
+                                }
+                            } else {
+                                throw error;
+                            }
+                        } else {
+                            cardId = newMedia.id;
+                            await HistoryService.log("CARD", cardId, "CREATE", {
+                                message: `Tarjeta ${payload.identifier} creada`,
+                                entityName: `${data.type} (Folio: ${payload.identifier})`
+                            });
+                        }
+                    }
+                } else {
+                    const { data: newMedia, error } = await withTimeout(supabase
+                        .from("access_media")
+                        .insert([payload])
+                        .select()
+                        .single());
+                    if (error) throw error;
+                    cardId = newMedia.id;
+                    await HistoryService.log("CARD", cardId, "CREATE", {
+                        message: `Tarjeta ${payload.identifier} creada`,
+                        entityName: `${data.type} (Folio: ${payload.identifier})`
+                    });
+                }
             }
 
             // Mantener la asignación del modelo nuevo (antes lo hacía el trigger).
