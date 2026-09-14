@@ -1,4 +1,4 @@
-import type { Person, Card, DashboardMetrics, DashboardStats } from "../types";
+import type { Person, Card, DashboardMetrics, DashboardStats, DashboardGrowth } from "../types";
 import { handleError } from "../utils";
 import { PaginatedListState } from "./paginatedList.svelte";
 
@@ -47,6 +47,22 @@ export class PersonnelState {
     });
     metricsLoading = $state(false);
 
+    // Crecimiento de personal (rango de fechas)
+    growth = $state<DashboardGrowth>({
+        startDate: null,
+        endDate: null,
+        minCreatedAt: null,
+        totals: { initial: 0, final: 0, increment: 0, percent: null },
+        byDependency: [],
+        byBuilding: [],
+        byFloor: [],
+    });
+    growthLoading = $state(false);
+    /** Fecha de inicio (YYYY-MM-DD). Vacío = "desde creación". */
+    growthStartDate = $state("");
+    /** Fecha de fin (YYYY-MM-DD). Vacío = hoy. */
+    growthEndDate = $state("");
+
     setPersonnelOptions(data: { id: string, name: string, employee_no: string }[]) {
         this.personnelOptions = data;
     }
@@ -81,6 +97,20 @@ export class PersonnelState {
             // Manejar error de actualización de métricas silenciosamente - reintentará
         } finally {
             this.metricsLoading = false;
+        }
+    }
+
+    async refreshDashboardGrowth() {
+        this.growthLoading = true;
+        try {
+            const { personnelService } = await import("../services/personnel");
+            const startDate = this.growthStartDate || null;
+            const endDate = this.growthEndDate || null;
+            this.growth = await personnelService.fetchDashboardGrowth(startDate, endDate);
+        } catch (error) {
+            // Manejar error de actualización de crecimiento silenciosamente
+        } finally {
+            this.growthLoading = false;
         }
     }
 

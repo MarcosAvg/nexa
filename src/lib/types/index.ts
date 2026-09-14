@@ -177,6 +177,46 @@ export interface DashboardMetrics {
     };
 }
 
+/** Delta de crecimiento de plantilla en un rango de fechas. */
+export interface GrowthDelta {
+    /** Plantilla al inicio del rango. */
+    initial: number;
+    /** Plantilla al final del rango. */
+    final: number;
+    /** Diferencia (final - initial). */
+    increment: number;
+    /** Porcentaje de incremento (null si initial = 0). */
+    percent: number | null;
+}
+
+/** Crecimiento por categoría (dependencia o edificio). */
+export interface GrowthCategory extends GrowthDelta {
+    id: number;
+    name: string;
+    sort_order?: number | null;
+}
+
+/** Crecimiento por piso, agrupado bajo su edificio. */
+export interface GrowthFloor extends GrowthDelta {
+    buildingId: number;
+    buildingName: string;
+    buildingSort?: number | null;
+    floorId: number;
+    label: string;
+    floorSort?: number | null;
+}
+
+/** Crecimiento de personal devuelto por get_dashboard_growth. */
+export interface DashboardGrowth {
+    startDate: string | null;
+    endDate: string | null;
+    minCreatedAt: string | null;
+    totals: GrowthDelta;
+    byDependency: GrowthCategory[];
+    byBuilding: GrowthCategory[];
+    byFloor: GrowthFloor[];
+}
+
 /** A single log entry from the history_logs table */
 export interface HistoryLog {
     id: number;

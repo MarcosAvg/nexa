@@ -4,7 +4,7 @@ import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional,
 import { computePersonStatus } from "../utils/personStatus";
 import { deriveAccessFromAssignments, buildPermissionPlan } from "./accessAssignments";
 import { catalogState } from "../stores/catalogs.svelte";
-import type { Person, Card, DashboardMetrics, DashboardStats } from "../types";
+import type { Person, Card, DashboardMetrics, DashboardStats, DashboardGrowth } from "../types";
 import { networkStore } from "../stores/network.svelte";
 
 /** Row shape from personnel_with_status view or personnel table with joins */
@@ -591,6 +591,25 @@ export const personnelService = {
             topBuildings: [],
             buildingFloors: [],
             dataQuality: { sinEmail: 0, sinSchedule: 0, sinPosition: 0, sinArea: 0, total: 0 },
+        });
+    },
+
+    async fetchDashboardGrowth(startDate: string | null, endDate: string | null): Promise<DashboardGrowth> {
+        return withErrorHandlingSafe(async () => {
+            const { data, error } = await supabase.rpc('get_dashboard_growth', {
+                p_start_date: startDate,
+                p_end_date: endDate,
+            });
+            if (error) throw error;
+            return data as DashboardGrowth;
+        }, "Fetch Dashboard Growth (RPC)", {
+            startDate: null,
+            endDate: null,
+            minCreatedAt: null,
+            totals: { initial: 0, final: 0, increment: 0, percent: null },
+            byDependency: [],
+            byBuilding: [],
+            byFloor: [],
         });
     },
 

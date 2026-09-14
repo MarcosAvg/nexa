@@ -5,7 +5,7 @@
         userState,
         historyState,
     } from "../stores";
-    import { Card, Badge, Button } from "../components";
+    import { Card, Badge, Button, Input } from "../components";
     import {
         CreditCard,
         FileSignature,
@@ -19,6 +19,8 @@
         ChevronRight,
         Cpu,
         BarChart3,
+        TrendingUp,
+        Calendar,
     } from "lucide-svelte";
     import { onMount } from "svelte";
     import { push } from "svelte-spa-router";
@@ -33,6 +35,7 @@
     onMount(() => {
         personnelState.refreshDashboardStats();
         personnelState.refreshDashboardMetrics();
+        personnelState.refreshDashboardGrowth();
     });
     // Las métricas se actualizan automáticamente vía Realtime:
     // PersonnelState.initRealtime() refresca dashboardStats y dashboardMetrics
@@ -72,6 +75,35 @@
     // Métricas
     let metrics = $derived(personnelState.dashboardMetrics);
     let metricsLoading = $derived(personnelState.metricsLoading);
+
+    // Crecimiento de personal
+    let growth = $derived(personnelState.growth);
+    let growthLoading = $derived(personnelState.growthLoading);
+
+    function growthSign(p: number | null): string {
+        if (p == null || p === 0) return "0";
+        return p > 0 ? `+${p}` : `${p}`;
+    }
+    function growthPct(p: number | null): string {
+        if (p == null) return "—";
+        return `${p.toFixed(1)}%`;
+    }
+    function growthVariant(p: number | null): "slate" | "blue" | "violet" | "amber" | "orange" | "emerald" | "rose" {
+        if (p == null || p === 0) return "slate";
+        if (p < 0) return "rose";
+        if (p < 5) return "blue";
+        if (p < 15) return "violet";
+        if (p < 35) return "amber";
+        if (p < 75) return "orange";
+        return "emerald";
+    }
+    function applyGrowthRange() {
+        personnelState.refreshDashboardGrowth();
+    }
+    function resetGrowthToCreation() {
+        personnelState.growthStartDate = "";
+        personnelState.refreshDashboardGrowth();
+    }
 
     // Tickets: desglose por prioridad + urgentes (solo operativos)
     let ticketsByPriority = $derived.by(() => {
@@ -540,6 +572,128 @@
                     {:else}
                         <div class="p-8 text-center text-slate-400 italic text-sm">Sin datos.</div>
                     {/each}
+                </div>
+            </Card>
+        </section>
+
+        <!-- ── FILA CRECIMIENTO: Crecimiento de Personal ── -->
+        <section class="transition-opacity duration-300" class:opacity-60={growthLoading}>
+            <Card class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
+                <div class="px-6 pt-5 pb-4 border-b border-slate-100/60 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><TrendingUp size={18} strokeWidth={2.5} /></div>
+                        <div>
+                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">Crecimiento de Personal</h2>
+                            <p class="text-[11px] text-slate-400 font-medium">Incremento de plantilla por rango de fechas</p>
+                        </div>
+                    </div>
+                    <div class="flex items-end gap-2 flex-wrap">
+                        <div class="w-40">
+                            <label for="growth-start" class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1 ml-1"><Calendar size={12} /> Desde</label>
+                            <Input
+                                id="growth-start"
+                                type="date"
+                                bind:value={personnelState.growthStartDate}
+                                min={growth.minCreatedAt ?? undefined}
+                                onchange={applyGrowthRange}
+                                class="h-9"
+                            />
+                        </div>
+                        <div class="w-40">
+                            <label for="growth-end" class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1 ml-1"><Calendar size={12} /> Hasta</label>
+                            <Input
+                                id="growth-end"
+                                type="date"
+                                bind:value={personnelState.growthEndDate}
+                                min={personnelState.growthStartDate || undefined}
+                                onchange={applyGrowthRange}
+                                class="h-9"
+                            />
+                        </div>
+                        <Button variant="soft-slate" size="sm" onclick={resetGrowthToCreation}>Desde creación</Button>
+                    </div>
+                </div>
+
+                <!-- Totales -->
+                <div class="px-6 py-4 flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-slate-100/60">
+                    <div>
+                        <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">Total de personal</div>
+                        <div class="text-3xl font-black text-slate-900 tabular-nums">
+                            {growth.totals.final}
+                            <span class="text-sm font-bold text-slate-400">de {growth.totals.initial} inicial</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <Badge variant={growthVariant(growth.totals.percent)} class="text-[11px] font-extrabold px-2.5 py-1">
+                            {growthSign(growth.totals.increment)} nuevos
+                        </Badge>
+                        <Badge variant={growthVariant(growth.totals.percent)} class="text-[11px] font-extrabold px-2.5 py-1">
+                            {growthPct(growth.totals.percent)}
+                        </Badge>
+                    </div>
+                    {#if growth.minCreatedAt}
+                        <div class="text-[11px] font-medium text-slate-400">Desde creación: {growth.minCreatedAt}</div>
+                    {/if}
+                </div>
+
+                <!-- Desglose: dependencias / edificios / pisos -->
+                <div class="grid lg:grid-cols-3 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-slate-100/60">
+                    <div>
+                        <div class="px-6 pt-4 pb-2 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Por Edificio</div>
+                        <div class="divide-y divide-slate-100/60 max-h-[360px] overflow-y-auto">
+                            {#each growth.byBuilding as bldg}
+                                <div class="px-6 py-2.5 flex items-center justify-between gap-3">
+                                    <span class="text-[12px] font-bold text-slate-700 truncate">{bldg.name}</span>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <span class="text-[10px] font-bold text-slate-400 tabular-nums">{bldg.initial} → {bldg.final}</span>
+                                        <Badge variant={growthVariant(bldg.percent)} class="text-[9px] font-extrabold px-1.5 py-0.5">{growthSign(bldg.increment)} · {growthPct(bldg.percent)}</Badge>
+                                    </div>
+                                </div>
+                            {:else}
+                                <div class="p-6 text-center text-slate-400 italic text-sm">Sin datos.</div>
+                            {/each}
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="px-6 pt-4 pb-2 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Por Dependencia</div>
+                        <div class="divide-y divide-slate-100/60 max-h-[360px] overflow-y-auto">
+                            {#each growth.byDependency as dep}
+                                <div class="px-6 py-2.5 flex items-center justify-between gap-3">
+                                    <span class="text-[12px] font-bold text-slate-700 truncate">{dep.name}</span>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <span class="text-[10px] font-bold text-slate-400 tabular-nums">{dep.initial} → {dep.final}</span>
+                                        <Badge variant={growthVariant(dep.percent)} class="text-[9px] font-extrabold px-1.5 py-0.5">{growthSign(dep.increment)} · {growthPct(dep.percent)}</Badge>
+                                    </div>
+                                </div>
+                            {:else}
+                                <div class="p-6 text-center text-slate-400 italic text-sm">Sin datos.</div>
+                            {/each}
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="px-6 pt-4 pb-2 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Por Piso</div>
+                        <div class="divide-y divide-slate-100/60 max-h-[360px] overflow-y-auto">
+                            {#each growth.byFloor as floor, i}
+                                {#if i === 0 || growth.byFloor[i - 1].buildingId !== floor.buildingId}
+                                    <div class="px-6 pt-3 pb-1 flex items-center gap-2">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
+                                        <span class="text-[11px] font-extrabold text-slate-600">{floor.buildingName}</span>
+                                    </div>
+                                {/if}
+                                <div class="px-6 py-2.5 flex items-center justify-between gap-3">
+                                    <span class="text-[12px] font-bold text-slate-600 truncate pl-4">{floor.label}</span>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <span class="text-[10px] font-bold text-slate-400 tabular-nums">{floor.initial} → {floor.final}</span>
+                                        <Badge variant={growthVariant(floor.percent)} class="text-[9px] font-extrabold px-1.5 py-0.5">{growthSign(floor.increment)} · {growthPct(floor.percent)}</Badge>
+                                    </div>
+                                </div>
+                            {:else}
+                                <div class="p-6 text-center text-slate-400 italic text-sm">Sin datos.</div>
+                            {/each}
+                        </div>
+                    </div>
                 </div>
             </Card>
         </section>

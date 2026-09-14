@@ -12,6 +12,7 @@
     "_cluster/publications.sql",
     "auth/tables/users.sql",
     "public/default_privileges.sql",
+    "public/functions/get_dashboard_growth.sql",
     "public/functions/get_dashboard_metrics.sql",
     "public/functions/get_dashboard_stats.sql",
     "public/functions/handle_new_user.sql",
