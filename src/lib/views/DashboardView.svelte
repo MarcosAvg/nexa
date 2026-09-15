@@ -5,7 +5,7 @@
         userState,
         historyState,
     } from "../stores";
-    import { Card, Badge, Button, Input } from "../components";
+    import { Card, Badge, Button, Input, Tabs } from "../components";
     import {
         CreditCard,
         FileSignature,
@@ -79,6 +79,7 @@
     // Crecimiento de personal
     let growth = $derived(personnelState.growth);
     let growthLoading = $derived(personnelState.growthLoading);
+    let growthTab = $state<"edificio" | "dependencia" | "piso">("edificio");
 
     function growthSign(p: number | null): string {
         if (p == null || p === 0) return "0";
@@ -623,77 +624,68 @@
                             <span class="text-sm font-bold text-slate-400">de {growth.totals.initial} inicial</span>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <Badge variant={growthVariant(growth.totals.percent)} class="text-[11px] font-extrabold px-2.5 py-1">
-                            {growthSign(growth.totals.increment)} nuevos
-                        </Badge>
-                        <Badge variant={growthVariant(growth.totals.percent)} class="text-[11px] font-extrabold px-2.5 py-1">
-                            {growthPct(growth.totals.percent)}
-                        </Badge>
-                    </div>
-                    {#if growth.minCreatedAt}
-                        <div class="text-[11px] font-medium text-slate-400">Desde creación: {growth.minCreatedAt}</div>
-                    {/if}
+                    <Badge variant={growthVariant(growth.totals.percent)} class="text-[11px] font-extrabold px-2.5 py-1">
+                        {growthSign(growth.totals.increment)} · {growthPct(growth.totals.percent)}
+                    </Badge>
                 </div>
 
-                <!-- Desglose: dependencias / edificios / pisos -->
-                <div class="grid lg:grid-cols-3 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-slate-100/60">
-                    <div>
-                        <div class="px-6 pt-4 pb-2 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Por Edificio</div>
-                        <div class="divide-y divide-slate-100/60 max-h-[360px] overflow-y-auto">
-                            {#each growth.byBuilding as bldg}
-                                <div class="px-6 py-2.5 flex items-center justify-between gap-3">
-                                    <span class="text-[12px] font-bold text-slate-700 truncate">{bldg.name}</span>
-                                    <div class="flex items-center gap-1.5 shrink-0">
-                                        <span class="text-[10px] font-bold text-slate-400 tabular-nums">{bldg.initial} → {bldg.final}</span>
-                                        <Badge variant={growthVariant(bldg.percent)} class="text-[9px] font-extrabold px-1.5 py-0.5">{growthSign(bldg.increment)} · {growthPct(bldg.percent)}</Badge>
-                                    </div>
+                <!-- Desglose: edificios / dependencias / pisos -->
+                <div class="px-6 pt-4">
+                    <Tabs
+                        variant="pill"
+                        tabs={[
+                            { id: "edificio", label: "Edificio" },
+                            { id: "dependencia", label: "Dependencia" },
+                            { id: "piso", label: "Piso" },
+                        ]}
+                        active={growthTab}
+                        onSelect={(id) => (growthTab = id)}
+                    />
+                </div>
+                <div class="divide-y divide-slate-100/60 max-h-[400px] overflow-y-auto">
+                    {#if growthTab === "edificio"}
+                        {#each growth.byBuilding as bldg}
+                            <div class="px-6 py-3 flex items-center justify-between gap-3">
+                                <span class="text-[12px] font-bold text-slate-700 truncate">{bldg.name}</span>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span class="text-[10px] font-bold text-slate-400 tabular-nums">{bldg.initial} → {bldg.final}</span>
+                                    <Badge variant={growthVariant(bldg.percent)} class="text-[9px] font-extrabold px-1.5 py-0.5">{growthSign(bldg.increment)} · {growthPct(bldg.percent)}</Badge>
                                 </div>
-                            {:else}
-                                <div class="p-6 text-center text-slate-400 italic text-sm">Sin datos.</div>
-                            {/each}
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="px-6 pt-4 pb-2 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Por Dependencia</div>
-                        <div class="divide-y divide-slate-100/60 max-h-[360px] overflow-y-auto">
-                            {#each growth.byDependency as dep}
-                                <div class="px-6 py-2.5 flex items-center justify-between gap-3">
-                                    <span class="text-[12px] font-bold text-slate-700 truncate">{dep.name}</span>
-                                    <div class="flex items-center gap-1.5 shrink-0">
-                                        <span class="text-[10px] font-bold text-slate-400 tabular-nums">{dep.initial} → {dep.final}</span>
-                                        <Badge variant={growthVariant(dep.percent)} class="text-[9px] font-extrabold px-1.5 py-0.5">{growthSign(dep.increment)} · {growthPct(dep.percent)}</Badge>
-                                    </div>
+                            </div>
+                        {:else}
+                            <div class="p-6 text-center text-slate-400 italic text-sm">Sin datos.</div>
+                        {/each}
+                    {:else if growthTab === "dependencia"}
+                        {#each growth.byDependency as dep}
+                            <div class="px-6 py-3 flex items-center justify-between gap-3">
+                                <span class="text-[12px] font-bold text-slate-700 truncate">{dep.name}</span>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span class="text-[10px] font-bold text-slate-400 tabular-nums">{dep.initial} → {dep.final}</span>
+                                    <Badge variant={growthVariant(dep.percent)} class="text-[9px] font-extrabold px-1.5 py-0.5">{growthSign(dep.increment)} · {growthPct(dep.percent)}</Badge>
                                 </div>
-                            {:else}
-                                <div class="p-6 text-center text-slate-400 italic text-sm">Sin datos.</div>
-                            {/each}
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="px-6 pt-4 pb-2 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Por Piso</div>
-                        <div class="divide-y divide-slate-100/60 max-h-[360px] overflow-y-auto">
-                            {#each growth.byFloor as floor, i}
-                                {#if i === 0 || growth.byFloor[i - 1].buildingId !== floor.buildingId}
-                                    <div class="px-6 pt-3 pb-1 flex items-center gap-2">
-                                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
-                                        <span class="text-[11px] font-extrabold text-slate-600">{floor.buildingName}</span>
-                                    </div>
-                                {/if}
-                                <div class="px-6 py-2.5 flex items-center justify-between gap-3">
-                                    <span class="text-[12px] font-bold text-slate-600 truncate pl-4">{floor.label}</span>
-                                    <div class="flex items-center gap-1.5 shrink-0">
-                                        <span class="text-[10px] font-bold text-slate-400 tabular-nums">{floor.initial} → {floor.final}</span>
-                                        <Badge variant={growthVariant(floor.percent)} class="text-[9px] font-extrabold px-1.5 py-0.5">{growthSign(floor.increment)} · {growthPct(floor.percent)}</Badge>
-                                    </div>
+                            </div>
+                        {:else}
+                            <div class="p-6 text-center text-slate-400 italic text-sm">Sin datos.</div>
+                        {/each}
+                    {:else}
+                        {#each growth.byFloor as floor, i}
+                            {#if i === 0 || growth.byFloor[i - 1].buildingId !== floor.buildingId}
+                                <div class="px-6 pt-3 pb-1 flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
+                                    <span class="text-[11px] font-extrabold text-slate-600">{floor.buildingName}</span>
                                 </div>
-                            {:else}
-                                <div class="p-6 text-center text-slate-400 italic text-sm">Sin datos.</div>
-                            {/each}
-                        </div>
-                    </div>
+                            {/if}
+                            <div class="px-6 py-3 flex items-center justify-between gap-3">
+                                <span class="text-[12px] font-bold text-slate-600 truncate pl-4">{floor.label}</span>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span class="text-[10px] font-bold text-slate-400 tabular-nums">{floor.initial} → {floor.final}</span>
+                                    <Badge variant={growthVariant(floor.percent)} class="text-[9px] font-extrabold px-1.5 py-0.5">{growthSign(floor.increment)} · {growthPct(floor.percent)}</Badge>
+                                </div>
+                            </div>
+                        {:else}
+                            <div class="p-6 text-center text-slate-400 italic text-sm">Sin datos.</div>
+                        {/each}
+                    {/if}
                 </div>
             </Card>
         </section>
