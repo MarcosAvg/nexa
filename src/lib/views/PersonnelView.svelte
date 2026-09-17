@@ -10,7 +10,7 @@
         SectionHeader, FilterSelect, Button, DataTable,
         Badge, PermissionGuard, FloatingActionButton, Pagination,
         ContentView, SearchInput, ExportDropdown, ExportMenuItem,
-        UsoTarjetasImportModal,
+        UsoTarjetasImportModal, RegistrosImportModal,
     } from "../components";
     import {
         FileSpreadsheet,
@@ -113,6 +113,7 @@
     }
 
     let showKoneUsageModal = $state(false);
+    let showRegistrosImport = $state(false);
     let isZipExporting = $state(false);
 
     async function handleExportExcel(splitByDependency: boolean = false) {
@@ -327,6 +328,18 @@
                 </PermissionGuard>
             {/if}
 
+            <PermissionGuard requireEdit>
+                <Button
+                    variant="soft-emerald"
+                    onclick={() => (showRegistrosImport = true)}
+                    class="flex items-center gap-2.5 h-10 px-5"
+                    disabled={!networkStore.isOnline}
+                >
+                    <Upload size={18} strokeWidth={2.5} class="text-emerald-600/80" />
+                    Importar Registros
+                </Button>
+            </PermissionGuard>
+
             <ExportDropdown
                 icon={FileSpreadsheet}
                 label="Exportar Excel"
@@ -480,3 +493,5 @@
 </PermissionGuard>
 
 <UsoTarjetasImportModal bind:isOpen={showKoneUsageModal} />
+
+<RegistrosImportModal bind:isOpen={showRegistrosImport} onComplete={() => personnelState.refresh(1)} />

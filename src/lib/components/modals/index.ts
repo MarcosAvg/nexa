@@ -6,6 +6,7 @@ export { default as ConfirmationModal } from './ConfirmationModal.svelte';
 export { default as DeletePersonnelModal } from './DeletePersonnelModal.svelte';
 export { default as EditEnlaceModal } from './EditEnlaceModal.svelte';
 export { default as ImportPreviewModal } from './ImportPreviewModal.svelte';
+export { default as RegistrosImportModal } from './RegistrosImportModal.svelte';
 export { default as UsoTarjetasImportModal } from './UsoTarjetasImportModal.svelte';
 export { default as ModificationCompareModal } from './ModificationCompareModal.svelte';
 export { default as PersonModal } from './PersonModal.svelte';

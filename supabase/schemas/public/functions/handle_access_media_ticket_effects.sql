@@ -51,7 +51,7 @@ begin
 
     if new.person_id is not null
        and new.programming_status = 'done'
-       and coalesce(new.responsiva_status, 'unsigned') <> 'signed'
+       and coalesce(new.responsiva_status, 'unsigned') not in ('signed', 'legacy')
        and (tg_op = 'INSERT' or old.programming_status is distinct from 'done')
     then
         if not exists (
@@ -75,7 +75,7 @@ begin
         end if;
     end if;
 
-    if new.responsiva_status = 'signed' then
+    if new.responsiva_status in ('signed', 'legacy') then
         delete from tickets
          where access_media_id = new.id
            and type = 'Firma Responsiva'

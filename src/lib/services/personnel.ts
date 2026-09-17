@@ -4,6 +4,8 @@ import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional,
 import { computePersonStatus } from "../utils/personStatus";
 import { deriveAccessFromAssignments, buildPermissionPlan } from "./accessAssignments";
 import { catalogState } from "../stores/catalogs.svelte";
+import { wantsCard } from "../utils/matchAnalysis";
+import { parseFloors } from "../utils/xlsxImporter";
 import type { Person, Card, DashboardMetrics, DashboardStats, DashboardGrowth } from "../types";
 import { networkStore } from "../stores/network.svelte";
 
@@ -334,12 +336,16 @@ export const personnelService = {
         cards?: any[];
         specialAccesses?: number[];
         floorsByBuilding?: Record<number, Record<string, string[]>>;
+        /** Si es true, los medios se crean como legacy (sin firma ni programación pendiente). */
+        legacy?: boolean;
         [key: string]: unknown;
     }): Promise<string> {
         return withErrorHandling(async () => {
             const first = data.first_name || data.nombres || "";
             const last = data.last_name || data.apellidos || "";
             if (!first || !last) throw new Error("Nombre y apellidos son requeridos");
+
+            const legacy = data.legacy === true;
 
             // Resolver media_type_id por cada tarjeta y construir p_media.
             const medias = catalogState.mediaTypes as any[];
@@ -386,8 +392,8 @@ export const personnelService = {
                     media_type_id: media.id,
                     identifier: folio,
                     status: (card as any).status || "active",
-                    programming_status: requiresProgramming ? "pending" : "done",
-                    responsiva_status: "unsigned",
+                    programming_status: legacy ? "done" : (requiresProgramming ? "pending" : "done"),
+                    responsiva_status: legacy ? "legacy" : "unsigned",
                 });
                 mediaTypeIds.push(media.id);
             }
@@ -424,6 +430,105 @@ export const personnelService = {
             if (error) throw error;
             return personId as string;
         }, "Create Person With Access");
+    },
+
+    /**
+     * Alta directa de un registro importado (hoja ALTAS) en modo legacy:
+     * crea la persona y asigna/crea los medios con folio como
+     * `programming_status='done'` y `responsiva_status='legacy'` (sin tickets).
+     * Resuelve los nombres del catálogo (dependencia, edificio, horario, medios,
+     * accesos especiales) a sus ids.
+     */
+    async importDirectLegacy(fields: Record<string, string>): Promise<string> {
+        return withErrorHandling(async () => {
+            const cats = catalogState;
+            const norm = (s: string) => s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const findByName = (list: any[], name: string | undefined) => {
+                if (!name || !list) return undefined;
+                const n = norm(name);
+                return list.find((x) => norm(x?.name ?? "") === n);
+            };
+
+            const dependency = findByName(cats.dependencies, fields.dependencia);
+            const building = findByName(cats.buildings, fields.edificio);
+            const schedule = findByName(cats.schedules, fields.horario);
+
+            if (fields.dependencia && !dependency) throw new Error(`Dependencia no encontrada: "${fields.dependencia}"`);
+            if (fields.edificio && !building) throw new Error(`Edificio no encontrado: "${fields.edificio}"`);
+            if (fields.horario && !schedule) throw new Error(`Horario no encontrado: "${fields.horario}"`);
+
+            const medias = (catalogState.mediaTypes || []) as any[];
+            const cards: { type: string; folio: string }[] = [];
+            const specialAccessIds: number[] = [];
+            const floorsByBuilding: Record<number, Record<string, string[]>> = {};
+            const buildingId = building ? Number(building.id) : null;
+
+            for (const m of medias) {
+                if (m.active === false) continue;
+                const mediaInfo = { key: m.key, name: m.name, has_floors: m.has_floors === true };
+                if (!wantsCard(fields, mediaInfo as any)) continue;
+
+                const folio = (fields[`${m.key}_folio`] || "").trim();
+                if (folio) cards.push({ type: m.name, folio });
+
+                if (m.has_floors && buildingId) {
+                    const floors = parseFloors(fields[`pisos_${m.key}`]);
+                    if (floors.length > 0) {
+                        if (!floorsByBuilding[buildingId]) floorsByBuilding[buildingId] = {};
+                        floorsByBuilding[buildingId][m.id] = floors;
+                    }
+                }
+            }
+
+            for (const name of [fields.acceso1, fields.acceso2, fields.acceso3]) {
+                const acc = findByName(cats.specialAccesses, name);
+                if (acc) specialAccessIds.push(Number(acc.id));
+            }
+
+            return await this.createWithAccess({
+                first_name: fields.nombres,
+                last_name: fields.apellidos,
+                employee_no: fields.no_empleado,
+                dependency_id: dependency ? String(dependency.id) : "",
+                building_id: building ? String(building.id) : "",
+                floor: fields.piso_base,
+                area: fields.area,
+                position: fields.puesto,
+                schedule_id: schedule ? String(schedule.id) : "",
+                entry_time: fields.hora_entrada || null,
+                exit_time: fields.hora_salida || null,
+                email: fields.correo || null,
+                status: "active",
+                cards,
+                specialAccesses: specialAccessIds,
+                floorsByBuilding,
+                legacy: true,
+            });
+        }, "Import Registro Directo (Legacy)");
+    },
+
+    /**
+     * Alta directa en lote (legacy). Crea cada registro individualmente y
+     * devuelve el conteo de creados y los errores por fila.
+     */
+    async importRegistros(
+        rows: { fields: Record<string, string>; rowNumber: number }[],
+    ): Promise<{ creados: number; errores: { index: number; rowNumber: number; message: string }[] }> {
+        const errores: { index: number; rowNumber: number; message: string }[] = [];
+        let creados = 0;
+        for (let i = 0; i < rows.length; i++) {
+            try {
+                await this.importDirectLegacy(rows[i].fields);
+                creados++;
+            } catch (e) {
+                errores.push({
+                    index: i,
+                    rowNumber: rows[i].rowNumber,
+                    message: e instanceof Error ? e.message : "Error desconocido",
+                });
+            }
+        }
+        return { creados, errores };
     },
 
     /** Input shape for creating/updating a personnel record */
