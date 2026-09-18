@@ -340,6 +340,35 @@ export interface LinkLegacyResult {
     assignedFolios: { type: string; folio: string }[];
 }
 
+/** Solicitud de folio detectada en una fila importada. */
+export interface ImportedFolioRequest {
+    rowKey: string;
+    rowNumber: number;
+    mediaTypeId: string;
+    mediaKey: string;
+    mediaName: string;
+    folio: string;
+}
+
+/** Estado conocido de un folio solicitado durante la importación. */
+export type ImportedFolioStatus = "nuevo" | "disponible" | "ya_asignado" | "ocupado" | "duplicado_interno";
+
+/** Propiedad actual de un folio solicitado. */
+export interface ImportedFolioOwnership {
+    mediaTypeId: string;
+    mediaKey: string;
+    mediaName: string;
+    identifier: string;
+    status: string | null;
+    mediaId: string | null;
+    ownerId: string | null;
+    ownerName: string | null;
+    ownerEmployee: string | null;
+}
+
+/** Resolución elegida para un folio ocupado por otra persona. */
+export type ImportedFolioResolution = "omitir" | "ticket";
+
 export interface Floor {
     id: number;
     label: string;

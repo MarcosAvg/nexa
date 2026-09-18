@@ -6,10 +6,13 @@
     import {
         personnelService,
         LINKABLE_PERSONNEL_FIELD_DEFS,
+        classifyImportedFolio,
         currentLinkFieldValue,
         linkFieldDiffers,
         proposedLinkFieldValue,
+        resolveImportedFolioRequests,
     } from "../../services/personnel";
+    import { cardService, importedFolioLookupKey } from "../../services/cards";
     import { ticketService } from "../../services/tickets";
     import { catalogState } from "../../stores";
     import { toast } from "svelte-sonner";
@@ -25,7 +28,22 @@
     import { activeMediaTypes, type MediaInfo } from "../../utils/mediaContract";
     import { wantsCard, analyzeAltaConflicts } from "../../utils/matchAnalysis";
     import { resolveFloorList } from "../../utils/floorMatch";
-    import type { LinkablePersonnelField, LinkPersonalUpdates, Person } from "../../types";
+    import type {
+        ImportedFolioOwnership,
+        ImportedFolioRequest,
+        ImportedFolioResolution,
+        ImportedFolioStatus,
+        LinkablePersonnelField,
+        LinkPersonalUpdates,
+        Person,
+    } from "../../types";
+    type FolioCheck = {
+        request: ImportedFolioRequest;
+        targetPersonId: string | null;
+        status: ImportedFolioStatus;
+        ownership?: ImportedFolioOwnership;
+        resolutionKey: string;
+    };
     import {
         FileSpreadsheet,
         Upload,
@@ -74,6 +92,9 @@
     let selectedLinkedPersons = $state<Map<string, string>>(new Map());
     let expandedLinkedCandidates = $state<Set<string>>(new Set());
     let linkFieldSelections = $state<Map<string, Partial<Record<LinkablePersonnelField, boolean>>>>(new Map());
+    let folioOwnership = $state<Map<string, ImportedFolioOwnership>>(new Map());
+    let folioOwnershipLoaded = $state(false);
+    let folioActions = $state<Map<string, ImportedFolioResolution>>(new Map());
 
     let importResult = $state<{
         directos: number;
@@ -103,6 +124,119 @@
         return requestedMedia(fields)
             .filter((m) => (fields[`${m.key}_folio`] ?? "").trim().length > 0)
             .map((m) => ({ type: m.name, folio: (fields[`${m.key}_folio`] ?? "").trim() }));
+    }
+
+    function folioRequestsForRow(rowKey: string, row: ParsedRow): ImportedFolioRequest[] {
+        return resolveImportedFolioRequests(row.fields).map((request) => ({
+            ...request,
+            rowKey,
+            rowNumber: row.rowNumber,
+        }));
+    }
+
+    function folioTargetForRow(rowKey: string, row: ParsedRow): string | null {
+        if (!isDirect(row.fields)) return null;
+        if (getRowAction(rowKey, row.fields) !== "link") return null;
+        return getSelectedLinkedPerson(rowKey, matchResults.get(rowKey) ?? [])?.id ?? null;
+    }
+
+    function folioResolutionKey(rowKey: string, targetPersonId: string | null, request: ImportedFolioRequest): string {
+        return `${rowKey}|${targetPersonId ?? "new"}|${request.mediaTypeId}|${request.folio.trim()}`;
+    }
+
+    function folioStatusForRequest(
+        request: ImportedFolioRequest,
+        targetPersonId: string | null,
+    ): { status: ImportedFolioStatus; ownership?: ImportedFolioOwnership } {
+        const ownership = folioOwnership.get(importedFolioLookupKey(request.mediaTypeId, request.folio));
+        return { status: classifyImportedFolio(ownership, targetPersonId), ownership };
+    }
+
+    function folioChecksForRow(rowKey: string, row: ParsedRow): (FolioCheck & { targetPersonId: string | null })[] {
+        const targetPersonId = folioTargetForRow(rowKey, row);
+        return folioRequestsForRow(rowKey, row).map((request) => {
+            const { status, ownership } = folioStatusForRequest(request, targetPersonId);
+            return {
+                request,
+                targetPersonId,
+                status,
+                ownership,
+                resolutionKey: folioResolutionKey(rowKey, targetPersonId, request),
+            };
+        });
+    }
+
+    function getFolioAction(resolutionKey: string): ImportedFolioResolution | null {
+        return folioActions.get(resolutionKey) ?? null;
+    }
+
+    function setFolioAction(resolutionKey: string, action: ImportedFolioResolution) {
+        const next = new Map(folioActions);
+        next.set(resolutionKey, action);
+        folioActions = next;
+    }
+
+    function setAllUnresolvedFolioActions(action: ImportedFolioResolution) {
+        if (!altasSheet) return;
+        const next = new Map(folioActions);
+        for (const row of altasSheet.rows) {
+            if (!row.isValid) continue;
+            const rowKey = `altas-${row.rowNumber}`;
+            if (!selectedRows.has(rowKey)) continue;
+            if (validationErrors.has(rowKey)) continue;
+            if (!isDirect(row.fields)) continue;
+            if (getRowAction(rowKey, row.fields) === "skip") continue;
+            for (const check of folioPlanForRow(rowKey, row)) {
+                if (check.status !== "ocupado") continue;
+                if (getFolioAction(check.resolutionKey)) continue;
+                next.set(check.resolutionKey, action);
+            }
+        }
+        folioActions = next;
+    }
+
+    function folioDecision(check: FolioCheck & { targetPersonId: string | null }): "assign" | "omitir" | "ticket" | "pending" {
+        if (check.status === "nuevo" || check.status === "disponible" || check.status === "ya_asignado") {
+            return "assign";
+        }
+        return getFolioAction(check.resolutionKey) ?? "pending";
+    }
+
+    function folioPlanForRow(rowKey: string, row: ParsedRow) {
+        return folioChecksForRow(rowKey, row).map((check) => ({
+            ...check,
+            decision: folioDecision(check),
+        }));
+    }
+
+    function effectiveAssignedFolioKeys(): Map<string, string[]> {
+        const assigned = new Map<string, string[]>();
+        if (!altasSheet) return assigned;
+        for (const row of altasSheet.rows) {
+            if (!row.isValid) continue;
+            const rowKey = `altas-${row.rowNumber}`;
+            if (!selectedRows.has(rowKey)) continue;
+            if (validationErrors.has(rowKey)) continue;
+            if (!isDirect(row.fields)) continue;
+            if (getRowAction(rowKey, row.fields) === "skip") continue;
+            for (const check of folioPlanForRow(rowKey, row)) {
+                if (folioDecision(check) !== "assign") continue;
+                if (check.status === "ya_asignado") continue;
+                const lookupKey = importedFolioLookupKey(check.request.mediaTypeId, check.request.folio);
+                const rows = assigned.get(lookupKey) ?? [];
+                if (!rows.includes(rowKey)) rows.push(rowKey);
+                assigned.set(lookupKey, rows);
+            }
+        }
+        return assigned;
+    }
+
+    function internalFolioDuplicateKeys(): Set<string> {
+        const duplicates = new Set<string>();
+        for (const [lookupKey, rowKeys] of effectiveAssignedFolioKeys()) {
+            if (rowKeys.length > 1) duplicates.add(lookupKey);
+        }
+        return duplicates;
     }
 
     // ── Acciones por fila y por tarjeta ────────────────────
@@ -242,6 +376,9 @@
         selectedLinkedPersons = new Map();
         expandedLinkedCandidates = new Set();
         linkFieldSelections = new Map();
+        folioOwnership = new Map();
+        folioOwnershipLoaded = false;
+        folioActions = new Map();
     }
 
     function closeModal() {
@@ -384,6 +521,24 @@
         }
         validationErrors = newErrors;
 
+        try {
+            const folioRequests: ImportedFolioRequest[] = [];
+            for (const row of altasSheet.rows) {
+                if (!row.isValid) continue;
+                const rowKey = `altas-${row.rowNumber}`;
+                if (!selectedRows.has(rowKey)) continue;
+                if (!isDirect(row.fields)) continue;
+                folioRequests.push(...folioRequestsForRow(rowKey, row));
+            }
+            folioOwnership = await cardService.checkImportedFolioOwnership(folioRequests);
+            folioOwnershipLoaded = true;
+        } catch (err) {
+            handleError(err, "Verificar folios");
+            step = "parsed";
+            isReviewing = false;
+            return;
+        }
+
         isReviewing = false;
     }
 
@@ -401,6 +556,42 @@
             .join("\n");
     }
 
+    /**
+     * Copia una fila para un ticket de alta derivado de folios ocupados.
+     * Conserva únicamente los medios elegidos como `ticket`, deja la solicitud
+     * activa y elimina el identificador ocupado.
+     */
+    function ticketFieldsForFolioConflicts(row: ParsedRow, plan: ReturnType<typeof folioPlanForRow>): Record<string, string> | null {
+        const ticketRequests = plan.filter((check) => check.status === "ocupado" && check.decision === "ticket");
+        if (ticketRequests.length === 0) return null;
+
+        const ticketFields = { ...row.fields };
+        for (const request of resolveImportedFolioRequests(row.fields)) {
+            const check = plan.find(
+                (item) =>
+                    item.request.mediaTypeId === request.mediaTypeId &&
+                    item.request.folio.trim() === request.folio.trim(),
+            );
+            if (check && check.status === "ocupado" && check.decision === "ticket") {
+                ticketFields[`${request.mediaKey}_req`] = "sí";
+                ticketFields[`${request.mediaKey}_folio`] = "";
+            } else {
+                ticketFields[`${request.mediaKey}_req`] = "";
+                ticketFields[`${request.mediaKey}_folio`] = "";
+                ticketFields[`pisos_${request.mediaKey}`] = "";
+            }
+        }
+
+        const occupiedDetails = ticketRequests
+            .map((check) => {
+                const owner = check.ownership?.ownerName ? ` (propietario actual: ${check.ownership.ownerName})` : "";
+                return `${check.request.mediaName} ${check.request.folio}${owner}`;
+            })
+            .join("; ");
+        ticketFields.origen = `Importación de registros: folio ocupado, alta sin medio asignado (${occupiedDetails})`;
+        return ticketFields;
+    }
+
     // ── Importar ──────────────────────────────────────────
     async function handleImport() {
         if (!altasSheet) return;
@@ -409,6 +600,18 @@
         if (blockedRows.length > 0) {
             toast.error("No se pueden importar las filas seleccionadas", {
                 description: `${blockedRows.length} fila(s) tienen datos que no coinciden con el catálogo. Corrígelas y vuelve a intentarlo.`,
+            });
+            return;
+        }
+
+        const folioBlockingRows = new Set(
+            [...folioReview.pendingRows, ...folioReview.duplicateRows].filter((rowKey) =>
+                selectedRows.has(rowKey),
+            ),
+        );
+        if (folioBlockingRows.size > 0) {
+            toast.error("Hay folios por resolver antes de importar", {
+                description: `${folioBlockingRows.size} fila(s) tienen folios ocupados sin decisión o duplicados en el archivo. Elige omitir folio o ticket sin medio.`,
             });
             return;
         }
@@ -443,9 +646,46 @@
             const action = getRowAction(rowKey, row.fields);
             if (action === "skip") continue;
 
+            const folioPlan = folioPlanForRow(rowKey, row);
+            const unavailableTicketChecks = folioPlan.filter(
+                (check) => check.status === "ocupado" && check.decision === "ticket",
+            );
+            const assignableFolioChecks = folioPlan.filter(
+                (check) =>
+                    (check.status === "nuevo" || check.status === "disponible") && check.decision === "assign",
+            );
+            const folioExclusions = new Set<string>();
+            for (const check of folioPlan) {
+                if (check.status === "ya_asignado") {
+                    folioExclusions.add(check.request.mediaKey);
+                    continue;
+                }
+                if (check.status === "ocupado" && check.decision !== "pending") {
+                    folioExclusions.add(check.request.mediaKey);
+                }
+            }
+
             try {
                 if (action === "create") {
-                    await personnelService.importDirectLegacy(row.fields);
+                    if (unavailableTicketChecks.length > 0) {
+                        const ticketFields = ticketFieldsForFolioConflicts(row, folioPlan);
+                        if (ticketFields) {
+                            ticketDefs.push({
+                                type: "Alta de Persona",
+                                title: `${buildTicketTitle(row)} (sin folio disponible)`,
+                                description: buildTicketDescription({ ...row, fields: ticketFields }),
+                                priority: "media",
+                                payload: ticketFields,
+                                person_id: null,
+                            });
+                        }
+                    }
+                    if (folioPlan.length > 0 && assignableFolioChecks.length === 0 && unavailableTicketChecks.length > 0) {
+                        continue;
+                    }
+                    await personnelService.importDirectLegacy(row.fields, {
+                        excludeMediaKeys: [...folioExclusions],
+                    });
                     directos++;
                     continue;
                 }
@@ -455,8 +695,25 @@
                 const person = getSelectedLinkedPerson(rowKey, dups);
                 if (!person?.id) throw new Error("No se encontró la persona para vincular");
 
+                if (unavailableTicketChecks.length > 0) {
+                    const ticketFields = ticketFieldsForFolioConflicts(row, folioPlan);
+                    if (ticketFields) {
+                        ticketDefs.push({
+                            type: "Alta de Persona",
+                            title: `${buildTicketTitle(row)} (sin folio disponible)`,
+                            description: buildTicketDescription({ ...row, fields: ticketFields }),
+                            priority: "media",
+                            payload: ticketFields,
+                            person_id: person.id,
+                        });
+                    }
+                }
+
                 const conflicts = selectedConflicts(rowKey, row, person);
-                const excludeKeys = new Set(conflicts.map((c) => c.mediaKey));
+                const excludeKeys = new Set([
+                    ...conflicts.map((c) => c.mediaKey),
+                    ...folioExclusions,
+                ]);
                 const personalUpdates = selectedLinkPersonalUpdates(rowKey, row, person);
 
                 // Asignar folios no conflictivos a la persona existente y aplicar
@@ -523,7 +780,48 @@
         if (!altasSheet) return 0;
         return altasSheet.rows.filter((r) => r.isValid && selectedRows.has(`altas-${r.rowNumber}`) && !isDirect(r.fields)).length;
     });
-</script>
+    let folioReview = $derived.by(() => {
+        const pendingRows = new Set<string>();
+        const duplicateRows = new Set<string>();
+        const assigned = new Map<string, string[]>();
+        let occupied = 0;
+
+        if (altasSheet && folioOwnershipLoaded) {
+            for (const row of altasSheet.rows) {
+                if (!row.isValid) continue;
+                const rowKey = `altas-${row.rowNumber}`;
+                if (!selectedRows.has(rowKey)) continue;
+                if (validationErrors.has(rowKey)) continue;
+                if (!isDirect(row.fields)) continue;
+                if (getRowAction(rowKey, row.fields) === "skip") continue;
+
+                for (const check of folioPlanForRow(rowKey, row)) {
+                    if (check.status === "ocupado") {
+                        occupied += 1;
+                        if (!getFolioAction(check.resolutionKey)) pendingRows.add(rowKey);
+                    }
+                    if (
+                        check.status === "nuevo" ||
+                        check.status === "disponible" ||
+                        (check.status === "ya_asignado" && check.targetPersonId)
+                    ) {
+                        const lookupKey = importedFolioLookupKey(check.request.mediaTypeId, check.request.folio);
+                        const rows = assigned.get(lookupKey) ?? [];
+                        if (!rows.includes(rowKey)) rows.push(rowKey);
+                        assigned.set(lookupKey, rows);
+                    }
+                }
+            }
+
+            for (const rowKeys of assigned.values()) {
+                if (rowKeys.length > 1) {
+                    for (const rowKey of rowKeys) duplicateRows.add(rowKey);
+                }
+            }
+        }
+
+        return { occupied, pendingRows, duplicateRows };
+    });</script>
 
 <Modal
     bind:isOpen
@@ -634,12 +932,36 @@
                             <AlertTriangle size={12} /> {totalDuplicates} posible(s) duplicado(s)
                         </div>
                     {/if}
+                    {#if folioReview.occupied > 0}
+                        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-50 border border-orange-200 text-orange-700 font-medium">
+                            <AlertTriangle size={12} /> {folioReview.occupied} folio(s) ocupado(s)
+                        </div>
+                    {/if}
                     {#if validationErrors.size > 0}
                         <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-800 font-bold">
                             <AlertCircle size={12} /> {validationErrors.size} con datos no reconocidos (bloqueante)
                         </div>
                     {/if}
                 </div>
+
+                {#if folioReview.pendingRows.size > 0}
+                    <div class="flex items-center gap-2">
+                        <button
+                            type="button"
+                            class="rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50"
+                            onclick={() => setAllUnresolvedFolioActions("omitir")}
+                        >
+                            Omitir folios pendientes
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50"
+                            onclick={() => setAllUnresolvedFolioActions("ticket")}
+                        >
+                            Enviar folios pendientes a ticket
+                        </button>
+                    </div>
+                {/if}
 
                 <div class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
                     {#each altasSheet.rows as row (row.rowNumber)}
@@ -665,6 +987,69 @@
                                         {/if}
                                     </div>
                                 </div>
+
+                                {#if direct}
+                                    {@const folioPlan = folioPlanForRow(rowKey, row)}
+                                    {@const hasDuplicateFolio = folioReview.duplicateRows.has(rowKey)}
+                                    {#if folioPlan.length > 0}
+                                        <div class="mt-2 rounded-lg border border-slate-200 bg-white p-2">
+                                            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Folios verificados</p>
+                                            <div class="mt-1.5 space-y-1.5">
+                                                {#each folioPlan as check (check.resolutionKey)}
+                                                    {@const folioDecision = check.decision}
+                                                    <div class="flex items-start justify-between gap-2 rounded-md bg-slate-50/70 p-1.5">
+                                                        <div class="min-w-0">
+                                                            <p class="truncate text-[10px] font-bold text-slate-700">
+                                                                {check.request.mediaName}: {check.request.folio}
+                                                            </p>
+                                                            <p class="text-[10px] text-slate-500">
+                                                                {#if check.status === "nuevo"}Nuevo; se creará el medio.
+                                                                {:else if check.status === "disponible"}Disponible en inventario.
+                                                                {:else if check.status === "ya_asignado"}Ya asignado a la persona vinculada.
+                                                                {:else}Ocupado{#if check.ownership?.ownerName} por {check.ownership.ownerName}{/if}{#if check.ownership?.ownerEmployee} (#{check.ownership.ownerEmployee}){/if}.
+                                                                {/if}
+                                                            </p>
+                                                        </div>
+                                                        <div class="flex shrink-0 items-center gap-1">
+                                                            {#if check.status === "nuevo"}
+                                                                <Badge variant="emerald" class="px-1.5 py-0.5 text-[9px] font-extrabold">Nuevo</Badge>
+                                                            {:else if check.status === "disponible"}
+                                                                <Badge variant="blue" class="px-1.5 py-0.5 text-[9px] font-extrabold">Disponible</Badge>
+                                                            {:else if check.status === "ya_asignado"}
+                                                                <Badge variant="slate" class="px-1.5 py-0.5 text-[9px] font-extrabold">Verificado</Badge>
+                                                            {:else}
+                                                                <Badge variant="rose" class="px-1.5 py-0.5 text-[9px] font-extrabold">Ocupado</Badge>
+                                                            {/if}
+                                                        </div>
+                                                    </div>
+                                                    {#if check.status === "ocupado"}
+                                                        <div class="flex items-center gap-1">
+                                                            <button
+                                                                type="button"
+                                                                class="rounded border px-1.5 py-0.5 text-[9px] font-bold {folioDecision === 'omitir' ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-200 bg-white text-slate-600'}"
+                                                                onclick={() => setFolioAction(check.resolutionKey, "omitir")}
+                                                            >
+                                                                Omitir folio
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                class="rounded border px-1.5 py-0.5 text-[9px] font-bold {folioDecision === 'ticket' ? 'bg-amber-600 text-white border-amber-600' : 'border-slate-200 bg-white text-slate-600'}"
+                                                                onclick={() => setFolioAction(check.resolutionKey, "ticket")}
+                                                            >
+                                                                Ticket sin medio
+                                                            </button>
+                                                        </div>
+                                                    {/if}
+                                                {/each}
+                                            </div>
+                                            {#if hasDuplicateFolio}
+                                                <p class="mt-1.5 flex items-center gap-1 text-[10px] font-bold text-rose-600">
+                                                    <AlertCircle size={11} /> Folio duplicado en el archivo: deja solo una fila con asignación directa.
+                                                </p>
+                                            {/if}
+                                        </div>
+                                    {/if}
+                                {/if}
 
                                 {#if direct && dups.length > 0}
                                     {@const selectedPerson = getSelectedLinkedPerson(rowKey, dups)}
@@ -758,7 +1143,7 @@
                                             {/if}
                                         {/if}
                                     </div>
-                                {:else if direct}
+                                {:else if direct && dups.length === 0}
                                     {@const folios = foliosOf(row.fields)}
                                     {#if folios.length > 0}
                                         <div class="mt-1.5 flex flex-wrap gap-1.5">

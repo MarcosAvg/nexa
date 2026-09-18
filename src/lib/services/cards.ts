@@ -1,7 +1,7 @@
 import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import { accessAssignmentService } from "./accessAssignments";
-import type { Card } from "../types";
+import type { Card, ImportedFolioOwnership, ImportedFolioRequest } from "../types";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate } from "../utils";
 import { networkStore } from "../stores/network.svelte";
 import { catalogState } from "../stores/catalogs.svelte";
@@ -48,6 +48,13 @@ function mediaTypeName(m: any): string {
     const t = m?.access_media_types;
     if (Array.isArray(t)) return (t[0]?.name ?? "") as string;
     return (t?.name ?? "") as string;
+}
+
+const FOLIO_OWNERSHIP_CHUNK_SIZE = 200;
+
+/** Clave estable para indexar un folio por su par exacto `(media_type_id, identifier)`. */
+export function importedFolioLookupKey(mediaTypeId: string, folio: string): string {
+    return JSON.stringify([mediaTypeId, folio.trim()]);
 }
 
 export const cardService = {
@@ -234,6 +241,68 @@ export const cardService = {
             if (error) throw error;
             return (data || []).map(toCard);
         }, "Search Cards by Folio", []);
+    },
+
+    /**
+     * Busca la propiedad actual de varios folios agrupados por tipo de medio.
+     * Devuelve un mapa indexado por la clave exacta `(media_type_id, identifier)`.
+     */
+    async checkImportedFolioOwnership(
+        requests: ImportedFolioRequest[],
+    ): Promise<Map<string, ImportedFolioOwnership>> {
+        return withErrorHandling(async () => {
+            const ownership = new Map<string, ImportedFolioOwnership>();
+            const identifiersByType = new Map<string, Set<string>>();
+            const requestByLookupKey = new Map<string, ImportedFolioRequest>();
+
+            for (const request of requests) {
+                const identifier = request.folio.trim();
+                if (!request.mediaTypeId || !identifier) continue;
+                const lookupKey = importedFolioLookupKey(request.mediaTypeId, identifier);
+                if (!requestByLookupKey.has(lookupKey)) {
+                    requestByLookupKey.set(lookupKey, request);
+                }
+                if (!identifiersByType.has(request.mediaTypeId)) {
+                    identifiersByType.set(request.mediaTypeId, new Set());
+                }
+                identifiersByType.get(request.mediaTypeId)!.add(identifier);
+            }
+
+            for (const [mediaTypeId, identifiers] of identifiersByType) {
+                const list = [...identifiers];
+                for (let start = 0; start < list.length; start += FOLIO_OWNERSHIP_CHUNK_SIZE) {
+                    const chunk = list.slice(start, start + FOLIO_OWNERSHIP_CHUNK_SIZE);
+                    const { data, error } = await supabase
+                        .from("access_media")
+                        .select("id, media_type_id, identifier, status, person_id, personnel(first_name, last_name, employee_no)")
+                        .eq("media_type_id", mediaTypeId)
+                        .in("identifier", chunk);
+                    if (error) throw error;
+
+                    for (const media of (data || []) as any[]) {
+                        const owner = Array.isArray(media.personnel) ? media.personnel[0] : media.personnel;
+                        const ownerName = owner
+                            ? `${owner.first_name || ""} ${owner.last_name || ""}`.trim()
+                            : null;
+                        const lookupKey = importedFolioLookupKey(mediaTypeId, media.identifier ?? "");
+                        const request = requestByLookupKey.get(lookupKey);
+                        ownership.set(lookupKey, {
+                            mediaTypeId,
+                            mediaKey: request?.mediaKey ?? "",
+                            mediaName: request?.mediaName ?? "",
+                            identifier: media.identifier ?? "",
+                            status: media.status ?? null,
+                            mediaId: media.id ?? null,
+                            ownerId: media.person_id ?? null,
+                            ownerName: ownerName || null,
+                            ownerEmployee: owner?.employee_no ?? null,
+                        });
+                    }
+                }
+            }
+
+            return ownership;
+        }, "Check Folio Ownership");
     },
 
     async save(data: {

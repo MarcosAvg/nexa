@@ -3,6 +3,7 @@ import { HistoryService } from "./history";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate } from "../utils";
 import { computePersonStatus } from "../utils/personStatus";
 import { deriveAccessFromAssignments, buildPermissionPlan, accessAssignmentService } from "./accessAssignments";
+import { importedFolioLookupKey } from "./cards";
 import { catalogState } from "../stores/catalogs.svelte";
 import { wantsCard } from "../utils/matchAnalysis";
 import { parseFloors } from "../utils/xlsxImporter";
@@ -12,6 +13,9 @@ import type {
     DashboardMetrics,
     DashboardStats,
     DashboardGrowth,
+    ImportedFolioOwnership,
+    ImportedFolioRequest,
+    ImportedFolioStatus,
     LinkablePersonnelField,
     LinkLegacyResult,
     LinkPersonalUpdates,
@@ -165,6 +169,68 @@ function resolveImportCatalog(fields: Record<string, string>): ImportCatalogReso
     }
 
     return { dependency, building, schedule, cards, specialAccessIds, floorsByBuilding, mediaKeyByTypeId };
+}
+
+/** Solicitudes de folio con folio no vacío detectadas en una fila importada. */
+export function resolveImportedFolioRequests(fields: Record<string, string>): ImportedFolioRequest[] {
+    const medias = (catalogState.mediaTypes || []) as any[];
+    const requests: ImportedFolioRequest[] = [];
+
+    for (const m of medias) {
+        if (m.active === false) continue;
+        const mediaInfo = { key: m.key, name: m.name, has_floors: m.has_floors === true };
+        if (!wantsCard(fields, mediaInfo as any)) continue;
+        const folio = (fields[`${m.key}_folio`] || "").trim();
+        if (!folio) continue;
+        requests.push({
+            rowKey: "",
+            rowNumber: 0,
+            mediaTypeId: m.id,
+            mediaKey: m.key,
+            mediaName: m.name,
+            folio,
+        });
+    }
+
+    return requests;
+}
+
+/**
+ * Clasifica un folio solicitado contra su propiedad actual.
+ * Todo medio con `person_id` cuenta como ocupado, sin importar su estado.
+ */
+export function classifyImportedFolio(
+    ownership: ImportedFolioOwnership | undefined,
+    targetPersonId: string | null,
+): ImportedFolioStatus {
+    if (!ownership) return "nuevo";
+    if (ownership.ownerId && targetPersonId && ownership.ownerId === targetPersonId) return "ya_asignado";
+    if (!ownership.ownerId && ownership.status === "available") return "disponible";
+    return "ocupado";
+}
+
+/**
+ * Verifica la disponibilidad exacta de los folios que realmente se asignarán.
+ * Se ejecuta justo antes de mutar datos para reducir el riesgo de revisiones obsoletas.
+ */
+export async function assertImportedFolios(
+    fields: Record<string, string>,
+    options: { targetPersonId?: string | null; excludeMediaKeys?: string[] } = {},
+): Promise<void> {
+    const exclude = new Set(options.excludeMediaKeys ?? []);
+    const requests = resolveImportedFolioRequests(fields).filter((request) => !exclude.has(request.mediaKey));
+    if (requests.length === 0) return;
+
+    const { cardService } = await import("./cards");
+    const ownership = await cardService.checkImportedFolioOwnership(requests);
+
+    for (const request of requests) {
+        const record = ownership.get(importedFolioLookupKey(request.mediaTypeId, request.folio));
+        const status = classifyImportedFolio(record, options.targetPersonId ?? null);
+        if (status === "nuevo" || status === "disponible" || status === "ya_asignado") continue;
+        const owner = record?.ownerName ? ` Está asignado a ${record.ownerName}.` : "";
+        throw new Error(`El folio "${request.folio}" de ${request.mediaName} ya está asignado a otra persona.${owner}`);
+    }
 }
 
 export const LINKABLE_PERSONNEL_FIELD_DEFS: { field: LinkablePersonnelField; label: string }[] = [
@@ -572,9 +638,25 @@ export const personnelService = {
      * Resuelve los nombres del catálogo (dependencia, edificio, horario, medios,
      * accesos especiales) a sus ids.
      */
-    async importDirectLegacy(fields: Record<string, string>): Promise<string> {
+    async importDirectLegacy(
+        fields: Record<string, string>,
+        options: { excludeMediaKeys?: string[] } = {},
+    ): Promise<string> {
         return withErrorHandling(async () => {
             const resolved = resolveImportCatalog(fields);
+            const exclude = new Set(options.excludeMediaKeys ?? []);
+            await assertImportedFolios(fields, { targetPersonId: null, excludeMediaKeys: [...exclude] });
+            const cards = resolved.cards.filter((card) => !exclude.has(card.key));
+            const floorsByBuilding: Record<number, Record<string, string[]>> = {};
+            for (const [buildingId, mediaFloors] of Object.entries(resolved.floorsByBuilding)) {
+                const building = Number(buildingId);
+                for (const [mediaTypeId, floors] of Object.entries(mediaFloors)) {
+                    const mediaKey = resolved.mediaKeyByTypeId[mediaTypeId];
+                    if (mediaKey && exclude.has(mediaKey)) continue;
+                    if (!floorsByBuilding[building]) floorsByBuilding[building] = {};
+                    floorsByBuilding[building][mediaTypeId] = floors;
+                }
+            }
             return await this.createWithAccess({
                 first_name: fields.nombres,
                 last_name: fields.apellidos,
@@ -589,9 +671,9 @@ export const personnelService = {
                 exit_time: fields.hora_salida || null,
                 email: fields.correo || null,
                 status: "active",
-                cards: resolved.cards,
+                cards,
                 specialAccesses: resolved.specialAccessIds,
-                floorsByBuilding: resolved.floorsByBuilding,
+                floorsByBuilding,
                 legacy: true,
             });
         }, "Import Registro Directo (Legacy)");
@@ -621,11 +703,12 @@ export const personnelService = {
                 const resolved = resolveImportCatalog(fields);
                 const fresh = await this.fetchById(personId);
                 if (!fresh) throw new Error("La persona vinculada ya no existe");
+                const exclude = new Set(excludeMediaKeys);
+                await assertImportedFolios(fields, { targetPersonId: personId, excludeMediaKeys: [...exclude] });
 
                 const payload: Record<string, string | number | null> = {};
                 const updatedFields: LinkablePersonnelField[] = [];
                 const fieldChanges: Record<string, { from: string; to: string }> = {};
-                const exclude = new Set(excludeMediaKeys);
 
                 for (const definition of LINKABLE_PERSONNEL_FIELD_DEFS) {
                     const requested = personalUpdates[definition.field];
