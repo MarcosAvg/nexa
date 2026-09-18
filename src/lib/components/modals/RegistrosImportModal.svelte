@@ -2,6 +2,7 @@
     import Modal from "../Modal.svelte";
     import Button from "../Button.svelte";
     import Badge from "../Badge.svelte";
+    import LinkedPersonSummary from "../LinkedPersonSummary.svelte";
     import { personnelService } from "../../services/personnel";
     import { ticketService } from "../../services/tickets";
     import { catalogState } from "../../stores";
@@ -16,7 +17,7 @@
         type ParsedRow,
     } from "../../utils";
     import { activeMediaTypes, type MediaInfo } from "../../utils/mediaContract";
-    import { wantsCard, analyzeAltaConflicts, type AltaConflictAnalysis } from "../../utils/matchAnalysis";
+    import { wantsCard, analyzeAltaConflicts } from "../../utils/matchAnalysis";
     import { resolveFloorList } from "../../utils/floorMatch";
     import type { Person } from "../../types";
     import {
@@ -62,9 +63,10 @@
     let isImporting = $state(false);
     let matchResults = $state<Map<string, Person[]>>(new Map());
     let validationErrors = $state<Map<string, string[]>>(new Map());
-    let altaAnalyses = $state<Map<string, AltaConflictAnalysis>>(new Map());
     let rowActions = $state<Map<string, "link" | "create" | "skip">>(new Map());
     let cardActions = $state<Map<string, "omitir" | "reponer">>(new Map());
+    let selectedLinkedPersons = $state<Map<string, string>>(new Map());
+    let expandedLinkedCandidates = $state<Set<string>>(new Set());
 
     let importResult = $state<{
         directos: number;
@@ -122,6 +124,38 @@
         cardActions = next;
     }
 
+    function getSelectedLinkedPerson(rowKey: string, candidates: Person[]): Person | null {
+        if (candidates.length === 0) return null;
+        const selectedId = selectedLinkedPersons.get(rowKey);
+        return candidates.find((candidate) => candidate.id === selectedId) ?? candidates[0];
+    }
+
+    function setSelectedLinkedPerson(rowKey: string, personId: string) {
+        const nextSelected = new Map(selectedLinkedPersons);
+        nextSelected.set(rowKey, personId);
+        selectedLinkedPersons = nextSelected;
+
+        const nextCardActions = new Map(cardActions);
+        for (const key of nextCardActions.keys()) {
+            if (key.startsWith(`${rowKey}:`)) nextCardActions.delete(key);
+        }
+        cardActions = nextCardActions;
+    }
+
+    function toggleLinkedCandidate(candidateKey: string) {
+        const next = new Set(expandedLinkedCandidates);
+        if (next.has(candidateKey)) next.delete(candidateKey);
+        else next.add(candidateKey);
+        expandedLinkedCandidates = next;
+    }
+
+    function selectedConflicts(rowKey: string, row: ParsedRow, person: Person | null) {
+        if (!person) return [];
+        return analyzeAltaConflicts(rowKey, person, row.fields, mediaTypes).conflicts.filter(
+            (conflict) => conflict.requested && conflict.hasCard,
+        );
+    }
+
     // ── Reset / cierre ────────────────────────────────────
     function reset() {
         step = "idle";
@@ -131,9 +165,10 @@
         expandedSheets = new Set();
         matchResults = new Map();
         validationErrors = new Map();
-        altaAnalyses = new Map();
         rowActions = new Map();
         cardActions = new Map();
+        selectedLinkedPersons = new Map();
+        expandedLinkedCandidates = new Set();
     }
 
     function closeModal() {
@@ -266,18 +301,6 @@
         }
         matchResults = newMatches;
 
-        const newAnalyses = new Map<string, AltaConflictAnalysis>();
-        for (const row of altasSheet.rows) {
-            const rowKey = `altas-${row.rowNumber}`;
-            const matches = newMatches.get(rowKey) ?? [];
-            if (matches.length === 0) continue;
-            newAnalyses.set(
-                rowKey,
-                analyzeAltaConflicts(rowKey, matches[0], row.fields, mediaTypes),
-            );
-        }
-        altaAnalyses = newAnalyses;
-
         const newErrors = new Map<string, string[]>();
         for (const row of altasSheet.rows) {
             if (!row.isValid) continue;
@@ -353,13 +376,12 @@
                     continue;
                 }
 
-                // Vincular a persona existente.
+                // Vincular a la candidata seleccionada.
                 const dups = matchResults.get(rowKey) ?? [];
-                const person = dups[0];
+                const person = getSelectedLinkedPerson(rowKey, dups);
                 if (!person?.id) throw new Error("No se encontró la persona para vincular");
 
-                const analysis = altaAnalyses.get(rowKey);
-                const conflicts = (analysis?.conflicts ?? []).filter((c) => c.requested && c.hasCard);
+                const conflicts = selectedConflicts(rowKey, row, person);
                 const excludeKeys = new Set(conflicts.map((c) => c.mediaKey));
 
                 // Asignar folios no conflictivos a la persona existente.
@@ -545,8 +567,6 @@
                             {@const errs = validationErrors.get(rowKey) ?? []}
                             {@const dups = matchResults.get(rowKey) ?? []}
                             {@const action = direct ? getRowAction(rowKey, row.fields) : "create"}
-                            {@const analysis = altaAnalyses.get(rowKey)}
-                            {@const conflicts = (analysis?.conflicts ?? []).filter((c) => c.requested && c.hasCard)}
                             <div class="rounded-lg border {errs.length ? 'border-rose-200 bg-rose-50/50' : 'border-slate-200'} p-3">
                                 <div class="flex items-center justify-between gap-3">
                                     <div class="min-w-0">
@@ -565,20 +585,34 @@
                                 </div>
 
                                 {#if direct && dups.length > 0}
+                                    {@const selectedPerson = getSelectedLinkedPerson(rowKey, dups)}
+                                    {@const conflicts = selectedConflicts(rowKey, row, selectedPerson)}
                                     <div class="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
                                         <p class="text-[10px] text-amber-700 font-bold flex items-center gap-1">
-                                            <AlertTriangle size={11} /> Posible duplicado: {dups[0].name}
+                                            <AlertTriangle size={11} /> {dups.length === 1 ? "Posible duplicado" : `${dups.length} posibles duplicados`}
                                         </p>
+                                        <div class="mt-2 space-y-1.5">
+                                            {#each dups as candidate (candidate.id)}
+                                                {@const candidateKey = `${rowKey}:${candidate.id}`}
+                                                <LinkedPersonSummary
+                                                    person={candidate}
+                                                    selected={selectedPerson?.id === candidate.id}
+                                                    expanded={expandedLinkedCandidates.has(candidateKey)}
+                                                    onSelect={(id) => setSelectedLinkedPerson(rowKey, id)}
+                                                    onToggle={(id) => toggleLinkedCandidate(`${rowKey}:${id}`)}
+                                                />
+                                            {/each}
+                                        </div>
                                         <div class="mt-1.5 flex items-center gap-1 flex-wrap">
                                             <button class="px-2 py-1 rounded text-[10px] font-bold {action === 'link' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}" onclick={() => setRowAction(rowKey, "link")}>Vincular</button>
                                             <button class="px-2 py-1 rounded text-[10px] font-bold {action === 'create' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}" onclick={() => setRowAction(rowKey, "create")}>Crear nuevo</button>
                                             <button class="px-2 py-1 rounded text-[10px] font-bold {action === 'skip' ? 'bg-rose-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}" onclick={() => setRowAction(rowKey, "skip")}>Omitir</button>
                                         </div>
 
-                                        {#if action === "link"}
+                                        {#if action === "link" && selectedPerson}
                                             {#if conflicts.length > 0}
                                                 <div class="mt-2 space-y-1.5">
-                                                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ya tiene:</p>
+                                                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{selectedPerson.name} ya tiene:</p>
                                                     {#each conflicts as c (c.mediaKey)}
                                                         {@const cardKey = `${rowKey}:${c.mediaKey}`}
                                                         {@const cardAction = getCardAction(cardKey)}
@@ -592,7 +626,7 @@
                                                     {/each}
                                                 </div>
                                             {:else}
-                                                <p class="mt-1.5 text-[10px] text-emerald-700 font-medium">Se asignarán los folios a esta persona.</p>
+                                                <p class="mt-1.5 text-[10px] text-emerald-700 font-medium">Se asignarán los folios a {selectedPerson.name}.</p>
                                             {/if}
                                         {/if}
                                     </div>
