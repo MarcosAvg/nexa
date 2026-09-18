@@ -116,6 +116,7 @@ export interface ExportOptions {
         dependency?: string;
         building?: string;
         floor?: string;
+        mediaType?: string;
         search?: string;
     },
     splitByDependency?: boolean;
@@ -697,7 +698,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
     let fileNameParts: string[] = ['Directorio'];
 
     if (options?.filters) {
-        const { status, dependency, building, floor, search } = options.filters;
+        const { status, dependency, building, floor, mediaType, search } = options.filters;
         const activeFilters: string[] = [];
         if (status && status !== 'Todos') {
             activeFilters.push(`Estado: ${status}`);
@@ -714,6 +715,10 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         if (floor) {
             activeFilters.push(`Piso: ${floor}`);
             fileNameParts.push(`Piso_${floor.replace(/\s+/g, "_")}`);
+        }
+        if (mediaType) {
+            activeFilters.push(`Tarjeta: ${mediaType}`);
+            fileNameParts.push(`Tarjeta_${mediaType.replace(/\s+/g, "_")}`);
         }
         if (search) {
             activeFilters.push(`Búsqueda: "${search}"`);

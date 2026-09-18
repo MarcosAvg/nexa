@@ -8,6 +8,7 @@ export type PersonnelFilters = {
     dependencyId: string;
     buildingId: string;
     floor: string;
+    mediaTypeId: string;
 };
 
 export class PersonnelState {
@@ -30,6 +31,7 @@ export class PersonnelState {
         dependencyId: "",
         buildingId: "",
         floor: "",
+        mediaTypeId: "",
     });
 
     dashboardStats = $state<DashboardStats>({
@@ -129,7 +131,7 @@ export class PersonnelState {
     async refresh(page?: number) {
         const { personnelService } = await import("../services/personnel");
         await this.pagination.fetchPage(
-            (p, s) => personnelService.fetchAll(p, s, this.filters.search, this.filters.status, this.filters.dependencyId, this.filters.buildingId, this.filters.floor),
+            (p, s) => personnelService.fetchAll(p, s, this.filters.search, this.filters.status, this.filters.dependencyId, this.filters.buildingId, this.filters.floor, this.filters.mediaTypeId),
             page,
         );
     }

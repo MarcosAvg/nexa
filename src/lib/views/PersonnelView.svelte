@@ -33,11 +33,30 @@
     let dependencies = $derived(catalogState.dependencies);
     let buildings = $derived(catalogState.buildings);
 
+    let mediaFilter = $state("");
     let dependencyNames = $derived(dependencies.map((d) => d.name));
     let buildingNames = $derived([
         ...buildings.map((b) => b.name),
         "Sin Edificio",
     ]);
+    let mediaTypeOptions = $derived.by(() => {
+        const options: { value: string; label: string }[] = [];
+        const seen = new Set<string>();
+        for (const media of catalogState.mediaTypes) {
+            if ((media as any).active === false) continue;
+            const id = String(media.id ?? "");
+            const label = media.name ?? "";
+            if (!id || !label || seen.has(id)) continue;
+            seen.add(id);
+            options.push({ value: id, label });
+        }
+        return [...options, { value: "__none__", label: "Sin tarjeta" }];
+    });
+    let mediaTypeName = $derived(
+        mediaFilter === "__none__"
+            ? "Sin tarjeta"
+            : catalogState.mediaTypes.find((media) => String(media.id) === mediaFilter)?.name ?? "",
+    );
 
     // Tipos de acceso (medios) para las columnas/KPIs de la exportación Excel.
     let exportCardTypes = $state<string[]>([]);
@@ -101,6 +120,13 @@
         personnelState.filters.floor = floorFilter;
     });
     $effect(() => {
+        const media = catalogState.mediaTypes.find((item) => String(item.id) === mediaFilter);
+        if (mediaFilter && mediaFilter !== "__none__" && !media) {
+            mediaFilter = "";
+        }
+        personnelState.filters.mediaTypeId = mediaFilter;
+    });
+    $effect(() => {
         const depId = dependencies.find((d) => d.name === dependencyFilter)?.id || "";
         personnelState.filters.dependencyId = depId;
     });
@@ -120,6 +146,7 @@
         personnelState.filters.dependencyId;
         personnelState.filters.buildingId;
         personnelState.filters.floor;
+        personnelState.filters.mediaTypeId;
 
         clearTimeout(filterDebounce);
         filterDebounce = setTimeout(() => personnelState.refresh(1), FILTER_DEBOUNCE_MS);
@@ -163,6 +190,7 @@
                 depId,
                 bldgId,
                 floorFilter,
+                personnelState.filters.mediaTypeId,
             );
 
             exportPersonnelToExcel(data as any[], {
@@ -171,6 +199,7 @@
                     dependency: dependencyFilter,
                     building: buildingFilter,
                     floor: floorFilterLabel,
+                    mediaType: mediaTypeName,
                     search: personnelState.filters.search,
                 },
                 splitByDependency,
@@ -205,6 +234,8 @@
                     buildingName: buildingFilter,
                     floor: floorFilter,
                     floorName: floorFilterLabel,
+                    mediaTypeId: personnelState.filters.mediaTypeId,
+                    mediaTypeName,
                 },
                 (_current, _total, label) => {
                     toast.loading(`Procesando: ${label}`, { id: loadingToast });
@@ -340,6 +371,12 @@
                 placeholder={floorPlaceholder}
                 bind:value={floorFilter}
                 disabled={!isFloorFilterEnabled}
+            />
+            <FilterSelect
+                label="Tipo de tarjeta"
+                options={mediaTypeOptions}
+                placeholder="Todos los tipos"
+                bind:value={mediaFilter}
             />
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
