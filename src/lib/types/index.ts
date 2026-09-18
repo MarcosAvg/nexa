@@ -316,6 +316,30 @@ export interface AccessAssignmentPermission {
     special_access_id?: number | null;
 }
 
+/** Campos personales que pueden actualizarse explícitamente al vincular un registro. */
+export type LinkablePersonnelField =
+    | "first_name"
+    | "last_name"
+    | "employee_no"
+    | "dependency_id"
+    | "building_id"
+    | "floor"
+    | "area"
+    | "position"
+    | "schedule_id"
+    | "entry_time"
+    | "exit_time"
+    | "email";
+
+/** Valores del Excel para los campos personales seleccionados en un vínculo. */
+export type LinkPersonalUpdates = Partial<Record<LinkablePersonnelField, string>>;
+
+/** Resultado de vincular un registro importado a una persona existente. */
+export interface LinkLegacyResult {
+    updatedFields: LinkablePersonnelField[];
+    assignedFolios: { type: string; folio: string }[];
+}
+
 export interface Floor {
     id: number;
     label: string;

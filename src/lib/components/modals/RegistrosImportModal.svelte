@@ -3,7 +3,13 @@
     import Button from "../Button.svelte";
     import Badge from "../Badge.svelte";
     import LinkedPersonSummary from "../LinkedPersonSummary.svelte";
-    import { personnelService } from "../../services/personnel";
+    import {
+        personnelService,
+        LINKABLE_PERSONNEL_FIELD_DEFS,
+        currentLinkFieldValue,
+        linkFieldDiffers,
+        proposedLinkFieldValue,
+    } from "../../services/personnel";
     import { ticketService } from "../../services/tickets";
     import { catalogState } from "../../stores";
     import { toast } from "svelte-sonner";
@@ -19,7 +25,7 @@
     import { activeMediaTypes, type MediaInfo } from "../../utils/mediaContract";
     import { wantsCard, analyzeAltaConflicts } from "../../utils/matchAnalysis";
     import { resolveFloorList } from "../../utils/floorMatch";
-    import type { Person } from "../../types";
+    import type { LinkablePersonnelField, LinkPersonalUpdates, Person } from "../../types";
     import {
         FileSpreadsheet,
         Upload,
@@ -67,10 +73,12 @@
     let cardActions = $state<Map<string, "omitir" | "reponer">>(new Map());
     let selectedLinkedPersons = $state<Map<string, string>>(new Map());
     let expandedLinkedCandidates = $state<Set<string>>(new Set());
+    let linkFieldSelections = $state<Map<string, Partial<Record<LinkablePersonnelField, boolean>>>>(new Map());
 
     let importResult = $state<{
         directos: number;
         tickets: number;
+        camposActualizados: number;
         errores: { rowNumber: number; message: string }[];
     } | null>(null);
 
@@ -124,6 +132,64 @@
         cardActions = next;
     }
 
+    function linkSelectionKey(rowKey: string, personId: string): string {
+        return `${rowKey}:${personId}`;
+    }
+
+    function linkFieldComparisons(person: Person, row: ParsedRow) {
+        return LINKABLE_PERSONNEL_FIELD_DEFS.map((definition) => {
+            const proposed = proposedLinkFieldValue(definition.field, row.fields).trim();
+            return {
+                field: definition.field,
+                label: definition.label,
+                current: currentLinkFieldValue(definition.field, person),
+                proposed,
+                selectable: proposed.length > 0 && linkFieldDiffers(definition.field, person, row.fields),
+            };
+        });
+    }
+
+    function getLinkFieldSelections(rowKey: string, personId: string): Partial<Record<LinkablePersonnelField, boolean>> {
+        return linkFieldSelections.get(linkSelectionKey(rowKey, personId)) ?? {};
+    }
+
+    function setLinkFieldSelected(rowKey: string, personId: string, field: LinkablePersonnelField, selected: boolean) {
+        const key = linkSelectionKey(rowKey, personId);
+        const next = new Map(linkFieldSelections);
+        const current = { ...(next.get(key) ?? {}) };
+        if (selected) current[field] = true;
+        else delete current[field];
+        if (Object.keys(current).length > 0) next.set(key, current);
+        else next.delete(key);
+        linkFieldSelections = next;
+    }
+
+    function setAllLinkFields(rowKey: string, row: ParsedRow, person: Person, selected: boolean) {
+        const key = linkSelectionKey(rowKey, person.id);
+        const next = new Map(linkFieldSelections);
+        if (selected) {
+            const current: Partial<Record<LinkablePersonnelField, boolean>> = {};
+            for (const comparison of linkFieldComparisons(person, row)) {
+                if (comparison.selectable) current[comparison.field] = true;
+            }
+            if (Object.keys(current).length > 0) next.set(key, current);
+            else next.delete(key);
+        } else {
+            next.delete(key);
+        }
+        linkFieldSelections = next;
+    }
+
+    function selectedLinkPersonalUpdates(rowKey: string, row: ParsedRow, person: Person): LinkPersonalUpdates {
+        const selections = getLinkFieldSelections(rowKey, person.id);
+        const updates: LinkPersonalUpdates = {};
+        for (const definition of LINKABLE_PERSONNEL_FIELD_DEFS) {
+            if (!selections[definition.field]) continue;
+            updates[definition.field] = proposedLinkFieldValue(definition.field, row.fields).trim();
+        }
+        return updates;
+    }
+
     function getSelectedLinkedPerson(rowKey: string, candidates: Person[]): Person | null {
         if (candidates.length === 0) return null;
         const selectedId = selectedLinkedPersons.get(rowKey);
@@ -140,6 +206,12 @@
             if (key.startsWith(`${rowKey}:`)) nextCardActions.delete(key);
         }
         cardActions = nextCardActions;
+
+        const nextFieldSelections = new Map(linkFieldSelections);
+        for (const key of nextFieldSelections.keys()) {
+            if (key.startsWith(`${rowKey}:`)) nextFieldSelections.delete(key);
+        }
+        linkFieldSelections = nextFieldSelections;
     }
 
     function toggleLinkedCandidate(candidateKey: string) {
@@ -169,6 +241,7 @@
         cardActions = new Map();
         selectedLinkedPersons = new Map();
         expandedLinkedCandidates = new Set();
+        linkFieldSelections = new Map();
     }
 
     function closeModal() {
@@ -347,6 +420,7 @@
         const ticketDefs: { type: string; title: string; description: string; priority: string; payload: Record<string, string>; person_id: string | null }[] = [];
         let directos = 0;
         let tickets = 0;
+        let camposActualizados = 0;
 
         for (const row of altasSheet.rows) {
             if (!row.isValid) continue;
@@ -383,9 +457,17 @@
 
                 const conflicts = selectedConflicts(rowKey, row, person);
                 const excludeKeys = new Set(conflicts.map((c) => c.mediaKey));
+                const personalUpdates = selectedLinkPersonalUpdates(rowKey, row, person);
 
-                // Asignar folios no conflictivos a la persona existente.
-                await personnelService.linkLegacyToExisting(person.id, row.fields, [...excludeKeys]);
+                // Asignar folios no conflictivos a la persona existente y aplicar
+                // únicamente los campos personales seleccionados.
+                const linkResult = await personnelService.linkLegacyToExisting(
+                    person.id,
+                    row.fields,
+                    [...excludeKeys],
+                    { personalUpdates },
+                );
+                camposActualizados += linkResult.updatedFields.length;
 
                 // Conflictos marcados "reponer" → ticket de Reposición.
                 for (const c of conflicts) {
@@ -418,12 +500,12 @@
             res.errors.forEach((e) => errores.push({ rowNumber: 0, message: `Ticket ${e.index + 1}: ${e.message}` }));
         }
 
-        importResult = { directos, tickets, errores };
+        importResult = { directos, tickets, camposActualizados, errores };
         isImporting = false;
         step = "done";
 
         if (directos + tickets > 0) {
-            toast.success(`${directos} registro(s) directo(s) y ${tickets} ticket(s) creados.`);
+            toast.success(`${directos} registro(s) directo(s), ${camposActualizados} campo(s) actualizados y ${tickets} ticket(s) creados.`);
         }
         if (errores.length > 0) {
             toast.error(`${errores.length} fila(s) no pudieron importarse.`);
@@ -610,6 +692,52 @@
                                         </div>
 
                                         {#if action === "link" && selectedPerson}
+                                            {@const comparisons = linkFieldComparisons(selectedPerson, row)}
+                                            {@const selections = getLinkFieldSelections(rowKey, selectedPerson.id)}
+                                            {@const selectableComparisons = comparisons.filter((comparison) => comparison.selectable)}
+                                            <div class="mt-2 rounded-lg border border-slate-200 bg-white p-2">
+                                                <div class="flex items-center justify-between gap-2">
+                                                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Datos a actualizar</p>
+                                                    <div class="flex items-center gap-1">
+                                                        <button
+                                                            type="button"
+                                                            class="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 hover:bg-slate-100"
+                                                            onclick={() => setAllLinkFields(rowKey, row, selectedPerson, true)}
+                                                        >
+                                                            Marcar nuevos
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            class="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-500 hover:bg-slate-50"
+                                                            onclick={() => setAllLinkFields(rowKey, row, selectedPerson, false)}
+                                                        >
+                                                            Limpiar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                {#if selectableComparisons.length > 0}
+                                                    <ul class="mt-1.5 divide-y divide-slate-100">
+                                                        {#each selectableComparisons as comparison (comparison.field)}
+                                                            <li class="flex items-start justify-between gap-2 py-1">
+                                                                <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-1.5">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        class="mt-0.5 h-3 w-3 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                                                        checked={selections[comparison.field] === true}
+                                                                        onchange={(event) => setLinkFieldSelected(rowKey, selectedPerson.id, comparison.field, event.currentTarget.checked)}
+                                                                    />
+                                                                    <span class="min-w-0">
+                                                                        <span class="block text-[10px] font-bold text-slate-700">{comparison.label}</span>
+                                                                        <span class="block truncate text-[10px] text-slate-500">{comparison.current || "—"} → {comparison.proposed}</span>
+                                                                    </span>
+                                                                </label>
+                                                            </li>
+                                                        {/each}
+                                                    </ul>
+                                                {:else}
+                                                    <p class="mt-1.5 text-[10px] italic text-slate-400">No hay datos nuevos en esta fila.</p>
+                                                {/if}
+                                            </div>
                                             {#if conflicts.length > 0}
                                                 <div class="mt-2 space-y-1.5">
                                                     <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{selectedPerson.name} ya tiene:</p>
@@ -669,10 +797,14 @@
                 <div class="flex items-center gap-2 text-sm font-bold text-emerald-700">
                     <CheckCircle2 size={18} /> Importación completada
                 </div>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-3 gap-3">
                     <div class="rounded-lg p-3 bg-emerald-50 border border-emerald-200 text-center">
                         <p class="text-2xl font-bold text-emerald-700">{importResult.directos}</p>
                         <p class="text-xs text-emerald-600">Registros directos (legacy)</p>
+                    </div>
+                    <div class="rounded-lg p-3 bg-teal-50 border border-teal-200 text-center">
+                        <p class="text-2xl font-bold text-teal-700">{importResult.camposActualizados}</p>
+                        <p class="text-xs text-teal-600">Campos actualizados</p>
                     </div>
                     <div class="rounded-lg p-3 bg-blue-50 border border-blue-200 text-center">
                         <p class="text-2xl font-bold text-blue-700">{importResult.tickets}</p>

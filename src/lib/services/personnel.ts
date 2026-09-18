@@ -6,7 +6,16 @@ import { deriveAccessFromAssignments, buildPermissionPlan, accessAssignmentServi
 import { catalogState } from "../stores/catalogs.svelte";
 import { wantsCard } from "../utils/matchAnalysis";
 import { parseFloors } from "../utils/xlsxImporter";
-import type { Person, Card, DashboardMetrics, DashboardStats, DashboardGrowth } from "../types";
+import type {
+    Person,
+    Card,
+    DashboardMetrics,
+    DashboardStats,
+    DashboardGrowth,
+    LinkablePersonnelField,
+    LinkLegacyResult,
+    LinkPersonalUpdates,
+} from "../types";
 import { networkStore } from "../stores/network.svelte";
 
 /** Row shape from personnel_with_status view or personnel table with joins */
@@ -104,6 +113,7 @@ interface ImportCatalogResolution {
     cards: { type: string; folio: string; key: string }[];
     specialAccessIds: number[];
     floorsByBuilding: Record<number, Record<string, string[]>>;
+    mediaKeyByTypeId: Record<string, string>;
 }
 
 /** Resuelve dependencia/edificio/horario/medios/accesos especiales por nombre. */
@@ -128,10 +138,12 @@ function resolveImportCatalog(fields: Record<string, string>): ImportCatalogReso
     const cards: { type: string; folio: string; key: string }[] = [];
     const specialAccessIds: number[] = [];
     const floorsByBuilding: Record<number, Record<string, string[]>> = {};
+    const mediaKeyByTypeId: Record<string, string> = {};
     const buildingId = building ? Number(building.id) : null;
 
     for (const m of medias) {
         if (m.active === false) continue;
+        mediaKeyByTypeId[m.id] = m.key;
         const mediaInfo = { key: m.key, name: m.name, has_floors: m.has_floors === true };
         if (!wantsCard(fields, mediaInfo as any)) continue;
 
@@ -152,7 +164,63 @@ function resolveImportCatalog(fields: Record<string, string>): ImportCatalogReso
         if (acc) specialAccessIds.push(Number(acc.id));
     }
 
-    return { dependency, building, schedule, cards, specialAccessIds, floorsByBuilding };
+    return { dependency, building, schedule, cards, specialAccessIds, floorsByBuilding, mediaKeyByTypeId };
+}
+
+export const LINKABLE_PERSONNEL_FIELD_DEFS: { field: LinkablePersonnelField; label: string }[] = [
+    { field: "first_name", label: "Nombres" },
+    { field: "last_name", label: "Apellidos" },
+    { field: "employee_no", label: "No. empleado" },
+    { field: "dependency_id", label: "Dependencia" },
+    { field: "building_id", label: "Edificio" },
+    { field: "floor", label: "Piso base" },
+    { field: "area", label: "Área / equipo" },
+    { field: "position", label: "Puesto / función" },
+    { field: "schedule_id", label: "Horario" },
+    { field: "entry_time", label: "Hora entrada" },
+    { field: "exit_time", label: "Hora salida" },
+    { field: "email", label: "Correo electrónico" },
+];
+
+export function proposedLinkFieldValue(field: LinkablePersonnelField, fields: Record<string, string>): string {
+    switch (field) {
+        case "first_name": return fields.nombres ?? "";
+        case "last_name": return fields.apellidos ?? "";
+        case "employee_no": return fields.no_empleado ?? "";
+        case "dependency_id": return fields.dependencia ?? "";
+        case "building_id": return fields.edificio ?? "";
+        case "floor": return fields.piso_base ?? "";
+        case "area": return fields.area ?? "";
+        case "position": return fields.puesto ?? "";
+        case "schedule_id": return fields.horario ?? "";
+        case "entry_time": return fields.hora_entrada ?? "";
+        case "exit_time": return fields.hora_salida ?? "";
+        case "email": return fields.correo ?? "";
+    }
+}
+
+export function currentLinkFieldValue(field: LinkablePersonnelField, person: Person): string {
+    switch (field) {
+        case "first_name": return person.first_name ?? "";
+        case "last_name": return person.last_name ?? "";
+        case "employee_no": return person.employee_no ?? "";
+        case "dependency_id": return person.dependency ?? "";
+        case "building_id": return person.building ?? "";
+        case "floor": return person.floor ?? "";
+        case "area": return person.area ?? "";
+        case "position": return person.position ?? "";
+        case "schedule_id": return person.schedule?.days ?? "";
+        case "entry_time": return person.schedule?.entry ?? "";
+        case "exit_time": return person.schedule?.exit ?? "";
+        case "email": return person.email ?? "";
+    }
+}
+
+export function linkFieldDiffers(field: LinkablePersonnelField, person: Person, fields: Record<string, string>): boolean {
+    const proposed = proposedLinkFieldValue(field, fields).trim();
+    if (!proposed) return false;
+    const normalize = (value: string) => value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return normalize(currentLinkFieldValue(field, person)) !== normalize(proposed);
 }
 
 export const personnelService = {
@@ -524,71 +592,165 @@ export const personnelService = {
     },
 
     /**
-     * Vincula un registro importado a una persona existente: asigna los folios
-     * (excepto los excluidos) como legacy y fusiona los pisos/accesos especiales
-     * de la fila con el acceso actual (sin tocar los datos personales).
+     * Vincula un registro importado a una persona existente: aplica únicamente
+     * los campos personales seleccionados, asigna los folios no excluidos como
+     * legacy y suma los pisos/accesos especiales importados a los actuales.
      */
-    async linkLegacyToExisting(personId: string, fields: Record<string, string>, excludeMediaKeys: string[] = []): Promise<void> {
+    async linkLegacyToExisting(
+        personId: string,
+        fields: Record<string, string>,
+        excludeMediaKeys: string[] = [],
+        options: { personalUpdates?: LinkPersonalUpdates } = {},
+    ): Promise<LinkLegacyResult> {
         return withErrorHandling(async () => {
-            const resolved = resolveImportCatalog(fields);
-            const exclude = new Set(excludeMediaKeys);
-            const { cardService } = await import("./cards");
+            return HistoryService.withFlow(async () => {
+                const personalUpdates = options.personalUpdates ?? {};
+                const unknownFields = Object.keys(personalUpdates).filter(
+                    (field) => !LINKABLE_PERSONNEL_FIELD_DEFS.some((definition) => definition.field === field),
+                );
+                if (unknownFields.length > 0) {
+                    throw new Error(`Campos no permitidos para vinculación: ${unknownFields.join(", ")}`);
+                }
 
-            for (const card of resolved.cards) {
-                if (exclude.has(card.key)) continue;
-                await cardService.save({
-                    type: card.type,
-                    folio: card.folio,
-                    person_id: personId,
-                    programming_status: "done",
-                    responsiva_status: "legacy",
-                });
-            }
+                const resolved = resolveImportCatalog(fields);
+                const fresh = await this.fetchById(personId);
+                if (!fresh) throw new Error("La persona vinculada ya no existe");
 
-            const current = await accessAssignmentService.fetchPersonAccess(personId);
-            const merged: Record<number, Record<string, string[]>> = {};
+                const payload: Record<string, string | number | null> = {};
+                const updatedFields: LinkablePersonnelField[] = [];
+                const fieldChanges: Record<string, { from: string; to: string }> = {};
+                const exclude = new Set(excludeMediaKeys);
 
-            for (const [bidStr, groups] of Object.entries(current.floorsByBuilding)) {
-                const bid = Number(bidStr);
-                if (!Number.isFinite(bid)) continue;
-                if (!merged[bid]) merged[bid] = {};
-                for (const g of groups) {
-                    if (!merged[bid][g.mediaTypeId]) merged[bid][g.mediaTypeId] = [];
-                    for (const f of g.floors) {
-                        if (!merged[bid][g.mediaTypeId].includes(f)) merged[bid][g.mediaTypeId].push(f);
+                for (const definition of LINKABLE_PERSONNEL_FIELD_DEFS) {
+                    const requested = personalUpdates[definition.field];
+                    if (requested === undefined) continue;
+                    const proposed = requested.trim();
+                    if (!proposed) {
+                        throw new Error(`Seleccionaste "${definition.label}", pero la fila no tiene valor.`);
+                    }
+                    if (!linkFieldDiffers(definition.field, fresh, fields)) continue;
+
+                    switch (definition.field) {
+                        case "dependency_id": {
+                            if (!resolved.dependency) throw new Error(`Dependencia no encontrada: "${fields.dependencia}"`);
+                            payload.dependency_id = Number(resolved.dependency.id);
+                            fieldChanges.dependency_id = { from: fresh.dependency, to: fields.dependencia.trim() };
+                            updatedFields.push(definition.field);
+                            break;
+                        }
+                        case "building_id": {
+                            if (!resolved.building) throw new Error(`Edificio no encontrado: "${fields.edificio}"`);
+                            payload.building_id = Number(resolved.building.id);
+                            fieldChanges.building_id = { from: fresh.building, to: fields.edificio.trim() };
+                            updatedFields.push(definition.field);
+                            break;
+                        }
+                        case "schedule_id": {
+                            if (!resolved.schedule) throw new Error(`Horario no encontrado: "${fields.horario}"`);
+                            payload.schedule_id = Number(resolved.schedule.id);
+                            fieldChanges.schedule_id = { from: fresh.schedule?.days ?? "", to: fields.horario.trim() };
+                            updatedFields.push(definition.field);
+                            break;
+                        }
+                        default: {
+                            payload[definition.field] = proposed;
+                            fieldChanges[definition.field] = { from: currentLinkFieldValue(definition.field, fresh), to: proposed };
+                            updatedFields.push(definition.field);
+                        }
                     }
                 }
-            }
-            for (const [bid, typeMap] of Object.entries(resolved.floorsByBuilding)) {
-                const b = Number(bid);
-                if (!Number.isFinite(b)) continue;
-                if (!merged[b]) merged[b] = {};
-                for (const [typeId, floors] of Object.entries(typeMap)) {
-                    if (!merged[b][typeId]) merged[b][typeId] = [];
-                    for (const f of floors) {
-                        if (!merged[b][typeId].includes(f)) merged[b][typeId].push(f);
+
+                if (payload.employee_no) {
+                    const { data: duplicate, error: duplicateError } = await supabase
+                        .from("personnel")
+                        .select("id")
+                        .eq("employee_no", payload.employee_no)
+                        .neq("id", personId)
+                        .maybeSingle();
+                    if (duplicateError) throw duplicateError;
+                    if (duplicate) {
+                        throw new Error(`El número de empleado "${payload.employee_no}" ya está asignado a otra persona.`);
                     }
                 }
-            }
 
-            const { data: specials } = await supabase.from("special_accesses").select("id, name");
-            const idByName = new Map<string, number>((specials || []).map((s: any) => [s.name, s.id]));
-            const currentSpecialIds = current.specialAccesses
-                .map((n) => idByName.get(n))
-                .filter((id): id is number => id !== undefined);
-            const mergedSpecialIds = [...new Set([...currentSpecialIds, ...resolved.specialAccessIds])];
+                if (Object.keys(payload).length > 0) {
+                    const { error: updateError } = await withTimeout(
+                        supabase.from("personnel").update(payload).eq("id", personId),
+                    );
+                    if (updateError) throw updateError;
+                    await HistoryService.log("PERSONNEL", personId, "UPDATE", {
+                        message: `Vinculación desde importación de registros: ${updatedFields.join(", ")}`,
+                        fields: fieldChanges,
+                        linked: true,
+                        origin: "Importación de registros",
+                        entityName: `${fresh.first_name} ${fresh.last_name}`,
+                    });
+                }
 
-            const { data: person } = await supabase
-                .from("personnel")
-                .select("building_id, floor")
-                .eq("id", personId)
-                .maybeSingle();
-            const base = {
-                buildingId: person?.building_id ?? null,
-                floor: person?.floor || null,
-            };
+                const { cardService } = await import("./cards");
+                const assignedFolios: { type: string; folio: string }[] = [];
 
-            await accessAssignmentService.savePersonAccess(personId, merged, mergedSpecialIds, base);
+                for (const card of resolved.cards) {
+                    if (exclude.has(card.key)) continue;
+                    await cardService.save({
+                        type: card.type,
+                        folio: card.folio,
+                        person_id: personId,
+                        programming_status: "done",
+                        responsiva_status: "legacy",
+                    });
+                    assignedFolios.push({ type: card.type, folio: card.folio });
+                }
+
+                const current = await accessAssignmentService.fetchPersonAccess(personId);
+                const merged: Record<number, Record<string, string[]>> = {};
+
+                for (const [bidStr, groups] of Object.entries(current.floorsByBuilding)) {
+                    const bid = Number(bidStr);
+                    if (!Number.isFinite(bid)) continue;
+                    if (!merged[bid]) merged[bid] = {};
+                    for (const g of groups) {
+                        if (!merged[bid][g.mediaTypeId]) merged[bid][g.mediaTypeId] = [];
+                        for (const f of g.floors) {
+                            if (!merged[bid][g.mediaTypeId].includes(f)) merged[bid][g.mediaTypeId].push(f);
+                        }
+                    }
+                }
+                for (const [bid, typeMap] of Object.entries(resolved.floorsByBuilding)) {
+                    const b = Number(bid);
+                    if (!Number.isFinite(b)) continue;
+                    if (!merged[b]) merged[b] = {};
+                    for (const [typeId, floors] of Object.entries(typeMap)) {
+                        const mediaKey = resolved.mediaKeyByTypeId[typeId];
+                        if (mediaKey && exclude.has(mediaKey)) continue;
+                        if (!merged[b][typeId]) merged[b][typeId] = [];
+                        for (const f of floors) {
+                            if (!merged[b][typeId].includes(f)) merged[b][typeId].push(f);
+                        }
+                    }
+                }
+
+                const { data: specials } = await supabase.from("special_accesses").select("id, name");
+                const idByName = new Map<string, number>((specials || []).map((s: any) => [s.name, s.id]));
+                const currentSpecialIds = current.specialAccesses
+                    .map((n) => idByName.get(n))
+                    .filter((id): id is number => id !== undefined);
+                const mergedSpecialIds = [...new Set([...currentSpecialIds, ...resolved.specialAccessIds])];
+
+                const updatedBuildingId = payload.building_id !== undefined
+                    ? Number(payload.building_id)
+                    : fresh.building_id ?? null;
+                const updatedFloor = payload.floor !== undefined
+                    ? String(payload.floor)
+                    : fresh.floor ?? null;
+                const base = {
+                    buildingId: updatedBuildingId,
+                    floor: updatedFloor,
+                };
+
+                await accessAssignmentService.savePersonAccess(personId, merged, mergedSpecialIds, base);
+                return { updatedFields, assignedFolios };
+            });
         }, "Link Registro Legacy a Existente");
     },
 
