@@ -2,7 +2,7 @@ import { supabase } from "../supabase";
 import { HistoryService } from "./history";
 import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, withTimeout, dbCache, batchPaginate } from "../utils";
 import { computePersonStatus } from "../utils/personStatus";
-import { deriveAccessFromAssignments, buildPermissionPlan } from "./accessAssignments";
+import { deriveAccessFromAssignments, buildPermissionPlan, accessAssignmentService } from "./accessAssignments";
 import { catalogState } from "../stores/catalogs.svelte";
 import { wantsCard } from "../utils/matchAnalysis";
 import { parseFloors } from "../utils/xlsxImporter";
@@ -95,6 +95,65 @@ const mapPersonRecord = (p: PersonnelRow): Person => {
         specialAccesses: access.specialAccesses
     } as Person;
 };
+
+/** Resultado de resolver una fila importada contra el catálogo. */
+interface ImportCatalogResolution {
+    dependency?: any;
+    building?: any;
+    schedule?: any;
+    cards: { type: string; folio: string; key: string }[];
+    specialAccessIds: number[];
+    floorsByBuilding: Record<number, Record<string, string[]>>;
+}
+
+/** Resuelve dependencia/edificio/horario/medios/accesos especiales por nombre. */
+function resolveImportCatalog(fields: Record<string, string>): ImportCatalogResolution {
+    const cats = catalogState;
+    const norm = (s: string) => s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const findByName = (list: any[], name: string | undefined) => {
+        if (!name || !list) return undefined;
+        const n = norm(name);
+        return list.find((x) => norm(x?.name ?? "") === n);
+    };
+
+    const dependency = findByName(cats.dependencies, fields.dependencia);
+    const building = findByName(cats.buildings, fields.edificio);
+    const schedule = findByName(cats.schedules, fields.horario);
+
+    if (fields.dependencia && !dependency) throw new Error(`Dependencia no encontrada: "${fields.dependencia}"`);
+    if (fields.edificio && !building) throw new Error(`Edificio no encontrado: "${fields.edificio}"`);
+    if (fields.horario && !schedule) throw new Error(`Horario no encontrado: "${fields.horario}"`);
+
+    const medias = (catalogState.mediaTypes || []) as any[];
+    const cards: { type: string; folio: string; key: string }[] = [];
+    const specialAccessIds: number[] = [];
+    const floorsByBuilding: Record<number, Record<string, string[]>> = {};
+    const buildingId = building ? Number(building.id) : null;
+
+    for (const m of medias) {
+        if (m.active === false) continue;
+        const mediaInfo = { key: m.key, name: m.name, has_floors: m.has_floors === true };
+        if (!wantsCard(fields, mediaInfo as any)) continue;
+
+        const folio = (fields[`${m.key}_folio`] || "").trim();
+        if (folio) cards.push({ type: m.name, folio, key: m.key });
+
+        if (m.has_floors && buildingId) {
+            const floors = parseFloors(fields[`pisos_${m.key}`]);
+            if (floors.length > 0) {
+                if (!floorsByBuilding[buildingId]) floorsByBuilding[buildingId] = {};
+                floorsByBuilding[buildingId][m.id] = floors;
+            }
+        }
+    }
+
+    for (const name of [fields.acceso1, fields.acceso2, fields.acceso3]) {
+        const acc = findByName(cats.specialAccesses, name);
+        if (acc) specialAccessIds.push(Number(acc.id));
+    }
+
+    return { dependency, building, schedule, cards, specialAccessIds, floorsByBuilding };
+}
 
 export const personnelService = {
     async fetchAll(page: number = 1, limit: number = 50, search: string = "", statusFilter: string = "Todos", dependencyId: string = "", buildingId: string = ""): Promise<{ data: Person[], count: number }> {
@@ -441,70 +500,96 @@ export const personnelService = {
      */
     async importDirectLegacy(fields: Record<string, string>): Promise<string> {
         return withErrorHandling(async () => {
-            const cats = catalogState;
-            const norm = (s: string) => s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            const findByName = (list: any[], name: string | undefined) => {
-                if (!name || !list) return undefined;
-                const n = norm(name);
-                return list.find((x) => norm(x?.name ?? "") === n);
-            };
-
-            const dependency = findByName(cats.dependencies, fields.dependencia);
-            const building = findByName(cats.buildings, fields.edificio);
-            const schedule = findByName(cats.schedules, fields.horario);
-
-            if (fields.dependencia && !dependency) throw new Error(`Dependencia no encontrada: "${fields.dependencia}"`);
-            if (fields.edificio && !building) throw new Error(`Edificio no encontrado: "${fields.edificio}"`);
-            if (fields.horario && !schedule) throw new Error(`Horario no encontrado: "${fields.horario}"`);
-
-            const medias = (catalogState.mediaTypes || []) as any[];
-            const cards: { type: string; folio: string }[] = [];
-            const specialAccessIds: number[] = [];
-            const floorsByBuilding: Record<number, Record<string, string[]>> = {};
-            const buildingId = building ? Number(building.id) : null;
-
-            for (const m of medias) {
-                if (m.active === false) continue;
-                const mediaInfo = { key: m.key, name: m.name, has_floors: m.has_floors === true };
-                if (!wantsCard(fields, mediaInfo as any)) continue;
-
-                const folio = (fields[`${m.key}_folio`] || "").trim();
-                if (folio) cards.push({ type: m.name, folio });
-
-                if (m.has_floors && buildingId) {
-                    const floors = parseFloors(fields[`pisos_${m.key}`]);
-                    if (floors.length > 0) {
-                        if (!floorsByBuilding[buildingId]) floorsByBuilding[buildingId] = {};
-                        floorsByBuilding[buildingId][m.id] = floors;
-                    }
-                }
-            }
-
-            for (const name of [fields.acceso1, fields.acceso2, fields.acceso3]) {
-                const acc = findByName(cats.specialAccesses, name);
-                if (acc) specialAccessIds.push(Number(acc.id));
-            }
-
+            const resolved = resolveImportCatalog(fields);
             return await this.createWithAccess({
                 first_name: fields.nombres,
                 last_name: fields.apellidos,
                 employee_no: fields.no_empleado,
-                dependency_id: dependency ? String(dependency.id) : "",
-                building_id: building ? String(building.id) : "",
+                dependency_id: resolved.dependency ? String(resolved.dependency.id) : "",
+                building_id: resolved.building ? String(resolved.building.id) : "",
                 floor: fields.piso_base,
                 area: fields.area,
                 position: fields.puesto,
-                schedule_id: schedule ? String(schedule.id) : "",
+                schedule_id: resolved.schedule ? String(resolved.schedule.id) : "",
                 entry_time: fields.hora_entrada || null,
                 exit_time: fields.hora_salida || null,
                 email: fields.correo || null,
                 status: "active",
-                cards,
-                specialAccesses: specialAccessIds,
-                floorsByBuilding,
+                cards: resolved.cards,
+                specialAccesses: resolved.specialAccessIds,
+                floorsByBuilding: resolved.floorsByBuilding,
                 legacy: true,
             });
         }, "Import Registro Directo (Legacy)");
+    },
+
+    /**
+     * Vincula un registro importado a una persona existente: asigna los folios
+     * (excepto los excluidos) como legacy y fusiona los pisos/accesos especiales
+     * de la fila con el acceso actual (sin tocar los datos personales).
+     */
+    async linkLegacyToExisting(personId: string, fields: Record<string, string>, excludeMediaKeys: string[] = []): Promise<void> {
+        return withErrorHandling(async () => {
+            const resolved = resolveImportCatalog(fields);
+            const exclude = new Set(excludeMediaKeys);
+            const { cardService } = await import("./cards");
+
+            for (const card of resolved.cards) {
+                if (exclude.has(card.key)) continue;
+                await cardService.save({
+                    type: card.type,
+                    folio: card.folio,
+                    person_id: personId,
+                    programming_status: "done",
+                    responsiva_status: "legacy",
+                });
+            }
+
+            const current = await accessAssignmentService.fetchPersonAccess(personId);
+            const merged: Record<number, Record<string, string[]>> = {};
+
+            for (const [bidStr, groups] of Object.entries(current.floorsByBuilding)) {
+                const bid = Number(bidStr);
+                if (!Number.isFinite(bid)) continue;
+                if (!merged[bid]) merged[bid] = {};
+                for (const g of groups) {
+                    if (!merged[bid][g.mediaTypeId]) merged[bid][g.mediaTypeId] = [];
+                    for (const f of g.floors) {
+                        if (!merged[bid][g.mediaTypeId].includes(f)) merged[bid][g.mediaTypeId].push(f);
+                    }
+                }
+            }
+            for (const [bid, typeMap] of Object.entries(resolved.floorsByBuilding)) {
+                const b = Number(bid);
+                if (!Number.isFinite(b)) continue;
+                if (!merged[b]) merged[b] = {};
+                for (const [typeId, floors] of Object.entries(typeMap)) {
+                    if (!merged[b][typeId]) merged[b][typeId] = [];
+                    for (const f of floors) {
+                        if (!merged[b][typeId].includes(f)) merged[b][typeId].push(f);
+                    }
+                }
+            }
+
+            const { data: specials } = await supabase.from("special_accesses").select("id, name");
+            const idByName = new Map<string, number>((specials || []).map((s: any) => [s.name, s.id]));
+            const currentSpecialIds = current.specialAccesses
+                .map((n) => idByName.get(n))
+                .filter((id): id is number => id !== undefined);
+            const mergedSpecialIds = [...new Set([...currentSpecialIds, ...resolved.specialAccessIds])];
+
+            const { data: person } = await supabase
+                .from("personnel")
+                .select("building_id, floor")
+                .eq("id", personId)
+                .maybeSingle();
+            const base = {
+                buildingId: person?.building_id ?? null,
+                floor: person?.floor || null,
+            };
+
+            await accessAssignmentService.savePersonAccess(personId, merged, mergedSpecialIds, base);
+        }, "Link Registro Legacy a Existente");
     },
 
     /**

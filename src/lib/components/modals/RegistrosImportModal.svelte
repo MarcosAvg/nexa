@@ -16,7 +16,7 @@
         type ParsedRow,
     } from "../../utils";
     import { activeMediaTypes, type MediaInfo } from "../../utils/mediaContract";
-    import { wantsCard } from "../../utils/matchAnalysis";
+    import { wantsCard, analyzeAltaConflicts, type AltaConflictAnalysis } from "../../utils/matchAnalysis";
     import { resolveFloorList } from "../../utils/floorMatch";
     import type { Person } from "../../types";
     import {
@@ -62,6 +62,9 @@
     let isImporting = $state(false);
     let matchResults = $state<Map<string, Person[]>>(new Map());
     let validationErrors = $state<Map<string, string[]>>(new Map());
+    let altaAnalyses = $state<Map<string, AltaConflictAnalysis>>(new Map());
+    let rowActions = $state<Map<string, "link" | "create" | "skip">>(new Map());
+    let cardActions = $state<Map<string, "omitir" | "reponer">>(new Map());
 
     let importResult = $state<{
         directos: number;
@@ -92,6 +95,33 @@
             .map((m) => ({ type: m.name, folio: (fields[`${m.key}_folio`] ?? "").trim() }));
     }
 
+    // ── Acciones por fila y por tarjeta ────────────────────
+    function defaultAction(rowKey: string, fields: Record<string, string>): "link" | "create" | "skip" {
+        const dups = matchResults.get(rowKey) ?? [];
+        if (dups.length === 0) return "create";
+        return hasFolio(fields) ? "link" : "skip";
+    }
+
+    function getRowAction(rowKey: string, fields: Record<string, string>): "link" | "create" | "skip" {
+        return rowActions.get(rowKey) ?? defaultAction(rowKey, fields);
+    }
+
+    function setRowAction(rowKey: string, action: "link" | "create" | "skip") {
+        const next = new Map(rowActions);
+        next.set(rowKey, action);
+        rowActions = next;
+    }
+
+    function getCardAction(key: string): "omitir" | "reponer" {
+        return cardActions.get(key) ?? "omitir";
+    }
+
+    function setCardAction(key: string, action: "omitir" | "reponer") {
+        const next = new Map(cardActions);
+        next.set(key, action);
+        cardActions = next;
+    }
+
     // ── Reset / cierre ────────────────────────────────────
     function reset() {
         step = "idle";
@@ -101,6 +131,9 @@
         expandedSheets = new Set();
         matchResults = new Map();
         validationErrors = new Map();
+        altaAnalyses = new Map();
+        rowActions = new Map();
+        cardActions = new Map();
     }
 
     function closeModal() {
@@ -233,6 +266,18 @@
         }
         matchResults = newMatches;
 
+        const newAnalyses = new Map<string, AltaConflictAnalysis>();
+        for (const row of altasSheet.rows) {
+            const rowKey = `altas-${row.rowNumber}`;
+            const matches = newMatches.get(rowKey) ?? [];
+            if (matches.length === 0) continue;
+            newAnalyses.set(
+                rowKey,
+                analyzeAltaConflicts(rowKey, matches[0], row.fields, mediaTypes),
+            );
+        }
+        altaAnalyses = newAnalyses;
+
         const newErrors = new Map<string, string[]>();
         for (const row of altasSheet.rows) {
             if (!row.isValid) continue;
@@ -272,8 +317,13 @@
             return;
         }
 
-        const directRows: { fields: Record<string, string>; rowNumber: number }[] = [];
-        const ticketDefs: { type: string; title: string; description: string; priority: string; payload: Record<string, string>; person_id: null }[] = [];
+        isImporting = true;
+        step = "importing";
+
+        const errores: { rowNumber: number; message: string }[] = [];
+        const ticketDefs: { type: string; title: string; description: string; priority: string; payload: Record<string, string>; person_id: string | null }[] = [];
+        let directos = 0;
+        let tickets = 0;
 
         for (const row of altasSheet.rows) {
             if (!row.isValid) continue;
@@ -281,9 +331,7 @@
             if (!selectedRows.has(rowKey)) continue;
             if (validationErrors.has(rowKey)) continue;
 
-            if (isDirect(row.fields)) {
-                directRows.push({ fields: row.fields, rowNumber: row.rowNumber });
-            } else {
+            if (!isDirect(row.fields)) {
                 ticketDefs.push({
                     type: "Alta de Persona",
                     title: buildTicketTitle(row),
@@ -292,20 +340,54 @@
                     payload: row.fields,
                     person_id: null,
                 });
+                continue;
             }
-        }
 
-        isImporting = true;
-        step = "importing";
+            const action = getRowAction(rowKey, row.fields);
+            if (action === "skip") continue;
 
-        const errores: { rowNumber: number; message: string }[] = [];
-        let directos = 0;
-        let tickets = 0;
+            try {
+                if (action === "create") {
+                    await personnelService.importDirectLegacy(row.fields);
+                    directos++;
+                    continue;
+                }
 
-        if (directRows.length > 0) {
-            const res = await personnelService.importRegistros(directRows);
-            directos = res.creados;
-            errores.push(...res.errores.map((e) => ({ rowNumber: e.rowNumber, message: e.message })));
+                // Vincular a persona existente.
+                const dups = matchResults.get(rowKey) ?? [];
+                const person = dups[0];
+                if (!person?.id) throw new Error("No se encontró la persona para vincular");
+
+                const analysis = altaAnalyses.get(rowKey);
+                const conflicts = (analysis?.conflicts ?? []).filter((c) => c.requested && c.hasCard);
+                const excludeKeys = new Set(conflicts.map((c) => c.mediaKey));
+
+                // Asignar folios no conflictivos a la persona existente.
+                await personnelService.linkLegacyToExisting(person.id, row.fields, [...excludeKeys]);
+
+                // Conflictos marcados "reponer" → ticket de Reposición.
+                for (const c of conflicts) {
+                    if (getCardAction(`${rowKey}:${c.mediaKey}`) === "reponer") {
+                        ticketDefs.push({
+                            type: "Reposición",
+                            title: `Reposición ${c.mediaName} — ${row.fields.apellidos}, ${row.fields.nombres}`,
+                            description: `Reposición automática desde importación de registros (${c.mediaName} existente: ${c.existingFolio || "N/A"})`,
+                            priority: "media",
+                            payload: {
+                                ...row.fields,
+                                [`reponer_${c.mediaKey}`]: "sí",
+                                [`folio_${c.mediaKey}`]: c.existingFolio || "",
+                                origen: "Importación de registros",
+                            },
+                            person_id: person.id,
+                        });
+                    }
+                }
+
+                directos++;
+            } catch (e) {
+                errores.push({ rowNumber: row.rowNumber, message: e instanceof Error ? e.message : "Error desconocido" });
+            }
         }
 
         if (ticketDefs.length > 0) {
@@ -462,6 +544,9 @@
                             {@const direct = isDirect(row.fields)}
                             {@const errs = validationErrors.get(rowKey) ?? []}
                             {@const dups = matchResults.get(rowKey) ?? []}
+                            {@const action = direct ? getRowAction(rowKey, row.fields) : "create"}
+                            {@const analysis = altaAnalyses.get(rowKey)}
+                            {@const conflicts = (analysis?.conflicts ?? []).filter((c) => c.requested && c.hasCard)}
                             <div class="rounded-lg border {errs.length ? 'border-rose-200 bg-rose-50/50' : 'border-slate-200'} p-3">
                                 <div class="flex items-center justify-between gap-3">
                                     <div class="min-w-0">
@@ -479,7 +564,39 @@
                                     </div>
                                 </div>
 
-                                {#if direct}
+                                {#if direct && dups.length > 0}
+                                    <div class="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
+                                        <p class="text-[10px] text-amber-700 font-bold flex items-center gap-1">
+                                            <AlertTriangle size={11} /> Posible duplicado: {dups[0].name}
+                                        </p>
+                                        <div class="mt-1.5 flex items-center gap-1 flex-wrap">
+                                            <button class="px-2 py-1 rounded text-[10px] font-bold {action === 'link' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}" onclick={() => setRowAction(rowKey, "link")}>Vincular</button>
+                                            <button class="px-2 py-1 rounded text-[10px] font-bold {action === 'create' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}" onclick={() => setRowAction(rowKey, "create")}>Crear nuevo</button>
+                                            <button class="px-2 py-1 rounded text-[10px] font-bold {action === 'skip' ? 'bg-rose-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}" onclick={() => setRowAction(rowKey, "skip")}>Omitir</button>
+                                        </div>
+
+                                        {#if action === "link"}
+                                            {#if conflicts.length > 0}
+                                                <div class="mt-2 space-y-1.5">
+                                                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ya tiene:</p>
+                                                    {#each conflicts as c (c.mediaKey)}
+                                                        {@const cardKey = `${rowKey}:${c.mediaKey}`}
+                                                        {@const cardAction = getCardAction(cardKey)}
+                                                        <div class="flex items-center justify-between gap-2">
+                                                            <span class="text-[10px] font-bold text-slate-700">{c.mediaName} ({c.existingFolio || "activa"})</span>
+                                                            <div class="flex items-center gap-1 shrink-0">
+                                                                <button class="px-2 py-0.5 rounded text-[9px] font-bold {cardAction === 'omitir' ? 'bg-slate-700 text-white' : 'bg-white text-slate-500 border border-slate-200'}" onclick={() => setCardAction(cardKey, "omitir")}>Omitir</button>
+                                                                <button class="px-2 py-0.5 rounded text-[9px] font-bold {cardAction === 'reponer' ? 'bg-amber-600 text-white' : 'bg-white text-slate-500 border border-slate-200'}" onclick={() => setCardAction(cardKey, "reponer")}>Reponer</button>
+                                                            </div>
+                                                        </div>
+                                                    {/each}
+                                                </div>
+                                            {:else}
+                                                <p class="mt-1.5 text-[10px] text-emerald-700 font-medium">Se asignarán los folios a esta persona.</p>
+                                            {/if}
+                                        {/if}
+                                    </div>
+                                {:else if direct}
                                     {@const folios = foliosOf(row.fields)}
                                     {#if folios.length > 0}
                                         <div class="mt-1.5 flex flex-wrap gap-1.5">
@@ -492,11 +609,6 @@
                                     {/if}
                                 {/if}
 
-                                {#if dups.length > 0}
-                                    <p class="mt-1.5 text-[10px] text-amber-600 flex items-center gap-1">
-                                        <AlertTriangle size={11} /> Posible duplicado: {dups[0].name}
-                                    </p>
-                                {/if}
                                 {#if errs.length > 0}
                                     <p class="mt-1.5 text-[10px] text-rose-600 flex items-center gap-1">
                                         <AlertCircle size={11} /> {errs.join(" · ")}
