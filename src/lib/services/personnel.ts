@@ -224,9 +224,9 @@ export function linkFieldDiffers(field: LinkablePersonnelField, person: Person, 
 }
 
 export const personnelService = {
-    async fetchAll(page: number = 1, limit: number = 50, search: string = "", statusFilter: string = "Todos", dependencyId: string = "", buildingId: string = ""): Promise<{ data: Person[], count: number }> {
+    async fetchAll(page: number = 1, limit: number = 50, search: string = "", statusFilter: string = "Todos", dependencyId: string = "", buildingId: string = "", floor: string = ""): Promise<{ data: Person[], count: number }> {
         return withErrorHandlingSafe(async () => {
-            const cacheKey = `personnel_page_${page}_${statusFilter}_${dependencyId}_${buildingId}_${search}`;
+            const cacheKey = `personnel_page_${page}_${statusFilter}_${dependencyId}_${buildingId}_${floor}_${search}`;
             if (!networkStore.isOnline) {
                 const cachedData = await dbCache.load<{ data: Person[], count: number }>(cacheKey);
                 if (cachedData) return cachedData;
@@ -248,6 +248,8 @@ export const personnelService = {
             if (dependencyId) query = query.eq("dependency_id", dependencyId);
             if (buildingId === "__none__") query = query.is("building_id", null);
             else if (buildingId) query = query.eq("building_id", buildingId);
+            if (floor === "__none__") query = query.or("floor.is.null,floor.eq.");
+            else if (floor) query = query.eq("floor", floor);
 
             const from = (page - 1) * limit;
             const { data, count, error } = await query
@@ -256,7 +258,7 @@ export const personnelService = {
 
             if (error) {
                 console.warn("Falling back from personnel_with_status view:", error.message);
-                return this._fetchAllFallback(page, limit, search, statusFilter, dependencyId, buildingId);
+                return this._fetchAllFallback(page, limit, search, statusFilter, dependencyId, buildingId, floor);
             }
 
             const result = { data: (data || []).map(p => mapPersonRecord(p)), count: count || 0 };
@@ -266,7 +268,7 @@ export const personnelService = {
     },
 
     // Helper para lógica de fallback
-    async _fetchAllFallback(page: number, limit: number, search: string, statusFilter: string, dependencyId: string, buildingId: string) {
+    async _fetchAllFallback(page: number, limit: number, search: string, statusFilter: string, dependencyId: string, buildingId: string, floor: string = "") {
         const isComputedStatus = ["Activo/a", "Parcial", "Sin Acceso"].includes(statusFilter);
         const isNoActivos = statusFilter === "No Activos";
         const dbStatusMap: Record<string, string> = {
@@ -305,6 +307,8 @@ export const personnelService = {
             if (dependencyId) q = q.eq("dependency_id", dependencyId);
             if (buildingId === "__none__") q = q.is("building_id", null);
             else if (buildingId) q = q.eq("building_id", buildingId);
+            if (floor === "__none__") q = q.or("floor.is.null,floor.eq.");
+            else if (floor) q = q.eq("floor", floor);
 
             return q;
         };
@@ -348,7 +352,7 @@ export const personnelService = {
         }, "Fetch Personnel Options", throwOnError, []);
     },
 
-    async fetchForExport(search: string = "", statusFilter: string = "Todos", dependencyId: string = "", buildingId: string = ""): Promise<Person[]> {
+    async fetchForExport(search: string = "", statusFilter: string = "Todos", dependencyId: string = "", buildingId: string = "", floor: string = ""): Promise<Person[]> {
         return withErrorHandlingSafe(async () => {
             const isComputedStatus = ["Activo/a", "Parcial", "Sin Acceso"].includes(statusFilter);
             const dbStatusMap: Record<string, string> = { "Bloqueado/a": "blocked", "Baja": "inactive" };
@@ -363,6 +367,8 @@ export const personnelService = {
                 if (dependencyId) q = q.eq("dependency_id", dependencyId);
                 if (buildingId === "__none__") q = q.is("building_id", null);
                 else if (buildingId) q = q.eq("building_id", buildingId);
+                if (floor === "__none__") q = q.or("floor.is.null,floor.eq.");
+                else if (floor) q = q.eq("floor", floor);
                 return q.order("first_name", { ascending: true }).range(from, to);
             });
 

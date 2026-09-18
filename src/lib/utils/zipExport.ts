@@ -50,7 +50,7 @@ async function buildZip(
  */
 export async function exportPersonnelAllDependenciesAsZip(
     dependencies: { id: string; name: string }[],
-    globalFilters: { status?: string; search?: string; buildingId?: string; buildingName?: string } = {},
+    globalFilters: { status?: string; search?: string; buildingId?: string; buildingName?: string; floor?: string; floorName?: string } = {},
     onProgress?: ZipProgressCallback,
     cardTypes?: CardType[],
     mediaTypes?: any[]
@@ -68,6 +68,7 @@ export async function exportPersonnelAllDependenciesAsZip(
             globalFilters.status ?? 'Todos',
             dep.id,
             globalFilters.buildingId ?? '',
+            globalFilters.floor ?? '',
         );
 
         if (data.length === 0) continue;
@@ -77,6 +78,7 @@ export async function exportPersonnelAllDependenciesAsZip(
                 status: globalFilters.status,
                 dependency: dep.name,
                 ...(globalFilters.buildingName ? { building: globalFilters.buildingName } : {}),
+                ...(globalFilters.floorName ? { floor: globalFilters.floorName } : {}),
                 search: globalFilters.search,
             },
             splitByDependency: false,

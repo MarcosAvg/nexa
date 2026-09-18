@@ -11,11 +11,13 @@
         /** Label del filtro. */
         label: string;
         /** Opciones del select. */
-        options: string[];
+        options: (string | { value: string | number; label: string })[];
         /** Valor seleccionado (two-way bindable). */
         value: string;
         /** Texto placeholder. @default "Seleccionar..." */
         placeholder?: string;
+        /** Deshabilitar el filtro. @default false */
+        disabled?: boolean;
         /** Callback al cambiar selección. */
         onchange?: (value: string) => void;
     };
@@ -25,6 +27,7 @@
         options,
         value = $bindable(),
         placeholder = "Seleccionar...",
+        disabled = false,
         onchange,
     }: Props = $props();
 </script>
@@ -41,11 +44,16 @@
         <Select
             bind:value
             {placeholder}
+            {disabled}
             class="h-11 font-bold bg-slate-50/50 backdrop-blur-sm border-slate-200/50 text-[13px] rounded-2xl"
             onchange={() => onchange?.(value)}
         >
             {#each options as option}
-                <option value={option}>{option}</option>
+                {#if typeof option === "string"}
+                    <option value={option}>{option}</option>
+                {:else}
+                    <option value={option.value}>{option.label}</option>
+                {/if}
             {/each}
         </Select>
     </div>

@@ -61,6 +61,31 @@
 
     let dependencyFilter = $state("");
     let buildingFilter = $state("");
+    let floorFilter = $state("");
+
+    // Pisos canónicos del edificio seleccionado (dependencia directa del filtro de edificio).
+    let selectedBuildingFloors = $derived.by(() => {
+        if (buildingFilter === "" || buildingFilter === "Sin Edificio") return [] as string[];
+        const building = buildings.find((b) => b.name === buildingFilter);
+        const floors = (building as { floors?: unknown } | undefined)?.floors;
+        if (!Array.isArray(floors)) return [] as string[];
+        return floors.filter((floor): floor is string => typeof floor === "string");
+    });
+    let floorOptions = $derived([
+        ...selectedBuildingFloors.map((floor) => ({ value: floor, label: floor })),
+        { value: "__none__", label: "Sin piso base" },
+    ]);
+    let isFloorFilterEnabled = $derived(buildingFilter !== "" && buildingFilter !== "Sin Edificio");
+    let floorFilterLabel = $derived(floorFilter === "__none__" ? "Sin piso base" : floorFilter);
+    let floorPlaceholder = $derived(
+        buildingFilter === ""
+            ? "Selecciona un edificio"
+            : buildingFilter === "Sin Edificio"
+              ? "No aplica sin edificio"
+              : selectedBuildingFloors.length > 0
+                ? "Todos los pisos"
+                : "Sin pisos",
+    );
 
     // Sincronizar los filtros de nombre → ID con el store
     $effect(() => {
@@ -68,6 +93,12 @@
             ? "__none__"
             : buildings.find((b) => b.name === buildingFilter)?.id || "";
         personnelState.filters.buildingId = bldgId;
+        if ((!bldgId || bldgId === "__none__" || (floorFilter !== "__none__" && !selectedBuildingFloors.includes(floorFilter))) && floorFilter !== "") {
+            floorFilter = "";
+        }
+    });
+    $effect(() => {
+        personnelState.filters.floor = floorFilter;
     });
     $effect(() => {
         const depId = dependencies.find((d) => d.name === dependencyFilter)?.id || "";
@@ -88,6 +119,7 @@
         personnelState.filters.status;
         personnelState.filters.dependencyId;
         personnelState.filters.buildingId;
+        personnelState.filters.floor;
 
         clearTimeout(filterDebounce);
         filterDebounce = setTimeout(() => personnelState.refresh(1), FILTER_DEBOUNCE_MS);
@@ -130,6 +162,7 @@
                 personnelState.filters.status,
                 depId,
                 bldgId,
+                floorFilter,
             );
 
             exportPersonnelToExcel(data as any[], {
@@ -137,6 +170,7 @@
                     status: personnelState.filters.status,
                     dependency: dependencyFilter,
                     building: buildingFilter,
+                    floor: floorFilterLabel,
                     search: personnelState.filters.search,
                 },
                 splitByDependency,
@@ -169,6 +203,8 @@
                     search: personnelState.filters.search,
                     buildingId: zipBldgId,
                     buildingName: buildingFilter,
+                    floor: floorFilter,
+                    floorName: floorFilterLabel,
                 },
                 (_current, _total, label) => {
                     toast.loading(`Procesando: ${label}`, { id: loadingToast });
@@ -297,6 +333,13 @@
                 options={buildingNames}
                 placeholder="Todos los edificios"
                 bind:value={buildingFilter}
+            />
+            <FilterSelect
+                label="Piso base"
+                options={isFloorFilterEnabled ? floorOptions : []}
+                placeholder={floorPlaceholder}
+                bind:value={floorFilter}
+                disabled={!isFloorFilterEnabled}
             />
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
