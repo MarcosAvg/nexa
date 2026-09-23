@@ -396,45 +396,70 @@ async function loadFloors() {
                             >{person.last_name}</span
                         >
                     </button>
-                    <div class="flex justify-between items-start gap-4">
-                        <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5">No. Empleado</span>
-                        <span class="text-sm font-bold text-slate-800 text-right break-words max-w-[60%]"
+                    <button
+                        type="button"
+                        class="flex justify-between items-start w-full text-left gap-4 group transition-colors cursor-pointer"
+                        onclick={() => copyToClipboard(person?.employee_no || '', 'No. Empleado')}
+                        title={person.employee_no ? `Copiar: ${person.employee_no}` : 'Copiar No. Empleado'}
+                    >
+                        <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors">No. Empleado</span>
+                        <span class="text-sm font-bold text-slate-800 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                             >{person.employee_no}</span
                         >
-                    </div>
-                    <div class="flex justify-between items-start gap-4">
-                        <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5">Dependencia</span>
-                        <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%]" title={person.dependency}
+                    </button>
+                    <button
+                        type="button"
+                        class="flex justify-between items-start w-full text-left gap-4 group transition-colors cursor-pointer"
+                        onclick={() => copyToClipboard(person?.dependency || '', 'Dependencia')}
+                        title={person.dependency ? `Copiar: ${person.dependency}` : 'Copiar dependencia'}
+                    >
+                        <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors">Dependencia</span>
+                        <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                             >{person.dependency}</span
                         >
-                    </div>
+                    </button>
                     {#if person.email}
-                        <div class="flex justify-between items-start gap-4">
-                            <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5">Correo</span>
-                            <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%]" title={person.email}
+                        <button
+                            type="button"
+                            class="flex justify-between items-start w-full text-left gap-4 group transition-colors cursor-pointer"
+                            onclick={() => copyToClipboard(person?.email || '', 'Correo')}
+                            title={person.email ? `Copiar: ${person.email}` : 'Copiar correo'}
+                        >
+                            <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors">Correo</span>
+                            <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                                 >{person.email}</span
                             >
-                        </div>
+                        </button>
                     {/if}
                     {#if person.area}
-                        <div class="flex justify-between items-start gap-4">
-                            <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5"
+                        <button
+                            type="button"
+                            class="flex justify-between items-start w-full text-left gap-4 group transition-colors cursor-pointer"
+                            onclick={() => copyToClipboard(person?.area || '', 'Área / Equipo')}
+                            title={person.area ? `Copiar: ${person.area}` : 'Copiar área'}
+                        >
+                            <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
                                 >Área / Equipo</span
                             >
-                            <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%]" title={person.area}
+                            <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                                 >{person.area}</span
                             >
-                        </div>
+                        </button>
                     {/if}
                     {#if person.position}
-                        <div class="flex justify-between items-start gap-4">
-                            <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5"
+                        <button
+                            type="button"
+                            class="flex justify-between items-start w-full text-left gap-4 group transition-colors cursor-pointer"
+                            onclick={() => copyToClipboard(person?.position || '', 'Puesto / Función')}
+                            title={person.position ? `Copiar: ${person.position}` : 'Copiar puesto'}
+                        >
+                            <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
                                 >Puesto / Función</span
                             >
-                            <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%]" title={person.position}
+                            <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                                 >{person.position}</span
                             >
-                        </div>
+                        </button>
                     {/if}
                 </div>
 
@@ -446,9 +471,16 @@ async function loadFloors() {
                             >Ubicación</span
                         >
                     </div>
-                    <p class="text-sm font-medium text-slate-700">
-                        {person.building} - {person.floor}
-                    </p>
+                    <button
+                        type="button"
+                        class="w-full text-left group transition-colors cursor-pointer"
+                        onclick={() => copyToClipboard(`${person?.building || ''} - ${person?.floor || ''}`, 'Ubicación')}
+                        title={person.building ? `Copiar: ${person.building} - ${person.floor || ''}` : 'Copiar ubicación'}
+                    >
+                        <p class="text-sm font-medium text-slate-700 group-hover:text-blue-600 transition-colors">
+                            {person.building} - {person.floor}
+                        </p>
+                    </button>
                 </div>
 
                 <!-- Pisos Asignados -->
@@ -525,10 +557,17 @@ async function loadFloors() {
                                 >Horario</span
                             >
                         </div>
-                        <p class="text-sm font-medium text-slate-700">
-                            {person.schedule.days}: {person.schedule.entry} - {person
-                                .schedule.exit}
-                        </p>
+                        <button
+                            type="button"
+                            class="w-full text-left group transition-colors cursor-pointer"
+                            onclick={() => copyToClipboard(`${person?.schedule?.days || ''}: ${person?.schedule?.entry || ''} - ${person?.schedule?.exit || ''}`, 'Horario')}
+                            title={person.schedule ? `Copiar: ${person.schedule.days}: ${person.schedule.entry} - ${person.schedule.exit}` : 'Copiar horario'}
+                        >
+                            <p class="text-sm font-medium text-slate-700 group-hover:text-blue-600 transition-colors">
+                                {person.schedule.days}: {person.schedule.entry} - {person
+                                    .schedule.exit}
+                            </p>
+                        </button>
                     </div>
                 {/if}
 

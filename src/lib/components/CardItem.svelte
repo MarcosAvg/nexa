@@ -12,6 +12,7 @@
         Wrench,
     } from "lucide-svelte";
     import PermissionGuard from "./PermissionGuard.svelte";
+    import { toast } from "svelte-sonner";
     import { uiState } from "../stores/ui.svelte";
     import { mediaTypeVariant } from "../utils/mediaTypeAppearance";
 
@@ -79,6 +80,16 @@
         { value: "pending", label: "Sin Programar", badge: "blue" },
         { value: "done",    label: "Programada",    badge: "emerald" },
     ] as const;
+
+    async function copyFolio() {
+        if (!folio) return;
+        try {
+            await navigator.clipboard.writeText(folio);
+            toast.success("Folio copiado");
+        } catch {
+            toast.error("Error al copiar");
+        }
+    }
 </script>
 
 <div
@@ -91,7 +102,12 @@
             <Badge variant={mediaTypeVariant(type)}>
                 {type}
             </Badge>
-            <span class="text-sm font-bold text-slate-800">{folio}</span>
+            <button
+                type="button"
+                class="text-sm font-bold text-slate-800 hover:text-blue-600 transition-colors cursor-pointer"
+                onclick={copyFolio}
+                title={folio ? `Copiar folio: ${folio}` : "Copiar folio"}
+            >{folio}</button>
 
             <ResponsivaProgramBadges {responsiva_status} {programming_status} />
         </div>
