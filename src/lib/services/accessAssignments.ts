@@ -252,11 +252,15 @@ export const accessAssignmentService = {
                     if (!mediaApplies(assignment.media_type_id, bid)) continue;
                     for (const f of list) {
                         const key = f.trim();
-                        const dedupeKey = `${bid}:${key.toLowerCase()}`;
-                        if (!key || seenFloors.has(dedupeKey)) continue;
-                        seenFloors.add(dedupeKey);
+                        if (!key) continue;
                         const floorId = resolveFloorId(bid, key);
                         if (floorId == null) continue; // piso no válido en el edificio: omitir
+                        // Dedupe por floor_id resuelto: alias distintos ("PB" /
+                        // "Planta Baja") colapsan al mismo piso y violarían el
+                        // índice único (assignment_id, floor_id).
+                        const dedupeKey = `${bid}:${floorId}`;
+                        if (seenFloors.has(dedupeKey)) continue;
+                        seenFloors.add(dedupeKey);
                         allRows.push({
                             assignment_id: assignment.id,
                             resource_type: "floor",
@@ -431,11 +435,14 @@ export async function buildPermissionPlan(
             if (!mediaApplies(mediaTypeId, bid)) continue;
             for (const f of list) {
                 const key = f.trim();
-                const dedupeKey = `${bid}:${key.toLowerCase()}`;
-                if (!key || seenFloors.has(dedupeKey)) continue;
-                seenFloors.add(dedupeKey);
+                if (!key) continue;
                 const floorId = resolveFloorId(bid, key);
                 if (floorId == null) continue; // piso no válido en el edificio: omitir
+                // Dedupe por floor_id resuelto (ver savePersonAccess): alias
+                // distintos pueden colapsar al mismo piso.
+                const dedupeKey = `${bid}:${floorId}`;
+                if (seenFloors.has(dedupeKey)) continue;
+                seenFloors.add(dedupeKey);
                 rows.push({
                     assignment_index: index,
                     resource_type: "floor",

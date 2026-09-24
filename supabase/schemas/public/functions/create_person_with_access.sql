@@ -221,7 +221,8 @@ begin
                     nullif(v_perf->>'floor_id', '')::bigint,
                     nullif(v_perf->>'special_access_id', '')::bigint,
                     'allow'
-                );
+                )
+                on conflict do nothing;
             end if;
         end loop;
     exception when unique_violation then

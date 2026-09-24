@@ -31,7 +31,8 @@ begin
         insert into public.access_assignment_permissions
           (assignment_id, resource_type, permission, building_id, floor_id, special_access_id)
         values
-          (v_assignment_id, v_resource_type, 'allow', v_building_id, v_floor_id, v_special_access_id);
+          (v_assignment_id, v_resource_type, 'allow', v_building_id, v_floor_id, v_special_access_id)
+        on conflict do nothing;
     end loop;
 end;
 $function$;
