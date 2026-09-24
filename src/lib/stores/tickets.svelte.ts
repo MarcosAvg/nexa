@@ -6,6 +6,8 @@ export type TicketFilters = {
     priority: string;
     search: string;
     dependencyId: string;
+    buildingId: string;
+    floor: string;
     section: string;
 };
 
@@ -18,6 +20,8 @@ export class TicketState {
         priority: "Todas",
         search: "",
         dependencyId: "",
+        buildingId: "",
+        floor: "",
         section: "General",
     });
 
@@ -72,6 +76,8 @@ export class TicketState {
                 this.filters.search,
                 this.filters.section,
                 this.filters.dependencyId,
+                this.filters.buildingId,
+                this.filters.floor,
             ),
             page,
         );

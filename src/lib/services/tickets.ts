@@ -190,20 +190,25 @@ export const ticketService = {
         priorityFilter: string = "Todas",
         search: string = "",
         section: string = "General",
-        dependencyId: string = ""
+        dependencyId: string = "",
+        buildingId: string = "",
+        floor: string = ""
     ): Promise<{ data: Ticket[]; count: number }> {
         return withErrorHandlingSafe(async () => {
             const from = (page - 1) * limit;
             const to = from + limit - 1;
 
-            let selectString = "*, personnel(first_name, last_name, dependency_id)";
-            if (dependencyId) {
-                selectString = "*, personnel!inner(first_name, last_name, dependency_id)";
+            // Al filtrar por persona (dependencia/edificio/piso) se usa
+            // personnel!inner, por lo que los tickets sin persona quedan fuera.
+            const useInner = Boolean(dependencyId || buildingId || floor);
+            let selectString = "*, personnel(first_name, last_name, dependency_id, building_id, floor)";
+            if (useInner) {
+                selectString = "*, personnel!inner(first_name, last_name, dependency_id, building_id, floor)";
             }
             if (section === "Responsivas") {
-                selectString = dependencyId
-                    ? "*, access_media(id, identifier, status, access_media_types(name)), personnel!inner(first_name, last_name, dependency_id, created_at)"
-                    : "*, access_media(id, identifier, status, access_media_types(name)), personnel(first_name, last_name, dependency_id, created_at)";
+                selectString = useInner
+                    ? "*, access_media(id, identifier, status, access_media_types(name)), personnel!inner(first_name, last_name, dependency_id, building_id, floor, created_at)"
+                    : "*, access_media(id, identifier, status, access_media_types(name)), personnel(first_name, last_name, dependency_id, building_id, floor, created_at)";
             }
 
             let query = supabase
@@ -224,6 +229,16 @@ export const ticketService = {
             }
             if (dependencyId) {
                 query = query.eq("personnel.dependency_id", dependencyId);
+            }
+            if (buildingId === "__none__") {
+                query = query.is("personnel.building_id", null);
+            } else if (buildingId) {
+                query = query.eq("personnel.building_id", buildingId);
+            }
+            if (floor === "__none__") {
+                query = query.or("floor.is.null,floor.eq.", { foreignTable: "personnel" });
+            } else if (floor) {
+                query = query.eq("personnel.floor", floor);
             }
             if (search) {
                 const terms = search.trim().split(/\s+/).filter(Boolean);
@@ -277,12 +292,15 @@ export const ticketService = {
 
     async fetchResponsivasForExport(
         dependencyId: string = "",
-        search: string = ""
+        search: string = "",
+        buildingId: string = "",
+        floor: string = ""
     ): Promise<(Ticket & { movementType: string; assignmentDate: string })[]> {
         return withErrorHandlingSafe(async () => {
-            const personnelSelect = dependencyId
-                ? "personnel!inner(id, first_name, last_name, employee_no, dependency_id, created_at, dependencies(name))"
-                : "personnel(id, first_name, last_name, employee_no, dependency_id, created_at, dependencies(name))";
+            const useInner = Boolean(dependencyId || buildingId || floor);
+            const personnelSelect = useInner
+                ? "personnel!inner(id, first_name, last_name, employee_no, dependency_id, building_id, floor, created_at, dependencies(name))"
+                : "personnel(id, first_name, last_name, employee_no, dependency_id, building_id, floor, created_at, dependencies(name))";
 
             // Resolver IDs de personas para la búsqueda una sola vez (fuera del batch)
             let searchPersonIds: string[] = [];
@@ -306,6 +324,16 @@ export const ticketService = {
 
                 if (dependencyId) {
                     query = query.eq("personnel.dependency_id", dependencyId);
+                }
+                if (buildingId === "__none__") {
+                    query = query.is("personnel.building_id", null);
+                } else if (buildingId) {
+                    query = query.eq("personnel.building_id", buildingId);
+                }
+                if (floor === "__none__") {
+                    query = query.or("floor.is.null,floor.eq.", { foreignTable: "personnel" });
+                } else if (floor) {
+                    query = query.eq("personnel.floor", floor);
                 }
                 if (search) {
                     const searchTerm = `%${search}%`;

@@ -39,6 +39,8 @@
 
     // Filtros de UI que mapean nombre → ID antes de aplicar
     let depNameFilter = $state("Todas");
+    let buildingNameFilter = $state("Todos");
+    let floorFilter = $state("Todos");
 
     let responsivaFilter = $state("Todas");
     let movementTypeFilter = $state("Todas");
@@ -51,12 +53,45 @@
         ticketState.filters.dependencyId = depId;
     });
 
+    // Sincronizar edificio/piso (radicación de la persona) → store.
+    // Piso dependiente del edificio, como en Personal.
+    let buildings = $derived(catalogState.buildings);
+    let selectedBuildingFloors = $derived.by(() => {
+        if (buildingNameFilter === "Todos" || buildingNameFilter === "Sin Edificio") return [] as string[];
+        const building = buildings.find((b) => b.name === buildingNameFilter);
+        const floors = (building as { floors?: unknown } | undefined)?.floors;
+        if (!Array.isArray(floors)) return [] as string[];
+        return floors.filter((f): f is string => typeof f === "string");
+    });
+    let floorOptions = $derived(["Todos", ...selectedBuildingFloors, "Sin piso base"]);
+    let isFloorFilterEnabled = $derived(buildingNameFilter !== "Todos" && buildingNameFilter !== "Sin Edificio");
+    $effect(() => {
+        const bldgId = buildingNameFilter === "Todos"
+            ? ""
+            : buildingNameFilter === "Sin Edificio"
+              ? "__none__"
+              : buildings.find((b) => b.name === buildingNameFilter)?.id || "";
+        ticketState.filters.buildingId = bldgId;
+        if ((!bldgId || bldgId === "__none__" || (floorFilter !== "Sin piso base" && !selectedBuildingFloors.includes(floorFilter))) && floorFilter !== "Todos") {
+            floorFilter = "Todos";
+        }
+    });
+    $effect(() => {
+        ticketState.filters.floor = floorFilter === "Todos"
+            ? ""
+            : floorFilter === "Sin piso base"
+              ? "__none__"
+              : floorFilter;
+    });
+
     // Debounced auto-refresh cuando cambian los filtros
     let filterDebounce: ReturnType<typeof setTimeout>;
     $effect(() => {
         ticketState.filters.type;
         ticketState.filters.search;
         ticketState.filters.dependencyId;
+        ticketState.filters.buildingId;
+        ticketState.filters.floor;
         ticketState.filters.section;
 
         clearTimeout(filterDebounce);
@@ -72,6 +107,8 @@
         ticketState.filters.type = "Todos";
         ticketState.filters.search = "";
         depNameFilter = "Todas";
+        buildingNameFilter = "Todos";
+        floorFilter = "Todos";
         movementTypeFilter = "Todas";
         responsivaFilter = "Todas";
         // El $effect debounced dispara refresh(1) automáticamente
@@ -294,6 +331,8 @@ function onStartCompletion(ticket: any) {
                 await ticketService.fetchResponsivasForExport(
                     ticketState.filters.dependencyId,
                     ticketState.filters.search,
+                    ticketState.filters.buildingId,
+                    ticketState.filters.floor,
                 );
 
             // Aplicar los mismos filtros de la vista (tipo de movimiento + estado de responsiva),
@@ -436,6 +475,27 @@ function onStartCompletion(ticket: any) {
                     </div>
                 {/if}
 
+                <!-- Edificio (radicación de la persona) -->
+                <div class="w-full xl:w-auto">
+                    <FilterSelect
+                        label="Edificio"
+                        options={["Todos", ...buildings.map((b) => b.name), "Sin Edificio"]}
+                        placeholder=""
+                        bind:value={buildingNameFilter}
+                    />
+                </div>
+
+                <!-- Piso base (depende del edificio) -->
+                <div class="w-full xl:w-auto">
+                    <FilterSelect
+                        label="Piso"
+                        options={floorOptions}
+                        placeholder={buildingNameFilter === "Todos" ? "Elige edificio" : "Todos los pisos"}
+                        bind:value={floorFilter}
+                        disabled={!isFloorFilterEnabled}
+                    />
+                </div>
+
                 <!-- Search -->
                 <div class="flex-1 min-w-[200px] w-full relative">
                     <Search
@@ -500,16 +560,18 @@ function onStartCompletion(ticket: any) {
         emptyDescription="No hay tickets pendientes en este momento. Todo está en orden."
         emptyDescriptionFiltered="No encontramos tickets con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={ClipboardList}
-        emptyIconBgClass={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || depNameFilter !== "Todas")
+        emptyIconBgClass={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || depNameFilter !== "Todas" || buildingNameFilter !== "Todos" || floorFilter !== "Todos")
             ? "from-slate-50 to-slate-100 ring-1 ring-slate-200/60 text-slate-400"
             : "from-emerald-50 to-emerald-100 ring-1 ring-emerald-200/60 text-emerald-400"}
-        hasFilters={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || depNameFilter !== "Todas")}
+        hasFilters={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || depNameFilter !== "Todas" || buildingNameFilter !== "Todos" || floorFilter !== "Todos")}
         onClearFilters={() => {
             ticketState.filters.type = 'Todos';
             ticketState.filters.search = '';
             responsivaFilter = 'Todas';
             movementTypeFilter = 'Todas';
             depNameFilter = 'Todas';
+            buildingNameFilter = 'Todos';
+            floorFilter = 'Todos';
             // El $effect debounced dispara refresh(1) automáticamente
         }}
         skeletonColumns={4}
