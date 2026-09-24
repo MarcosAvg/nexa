@@ -52,7 +52,16 @@ async function fetchCardAssignmentTypes(
         const cardId = (log.details as Record<string, unknown>)?.related_card_id as string | undefined;
         if (!cardId) continue;
         const existing = byCard[cardId];
-        if (!existing || log.timestamp > existing.timestamp) {
+        // Regla estricta: solo REPLACE_CARD marca Reposición, y ante empate de
+        // timestamp se prioriza REPLACE sobre ASSIGN para no degradar a Asignación.
+        // No se infiere Reposición desde otras tarjetas de la persona.
+        if (
+            !existing ||
+            log.timestamp > existing.timestamp ||
+            (log.timestamp === existing.timestamp &&
+                log.action === "REPLACE_CARD" &&
+                existing.action !== "REPLACE_CARD")
+        ) {
             byCard[cardId] = {
                 action: log.action,
                 timestamp: log.timestamp,
@@ -139,6 +148,8 @@ async function enrichWithMovementType(tickets: Ticket[]): Promise<(Ticket & { mo
         let assignmentDate = info?.registeredAt || t.created_at;
 
         const personnelWithDate = t.personnel as { created_at?: string } | null;
+        // Sin historial: se clasifica por antigüedad (Alta vs Asignación).
+        // Nunca se infiere Reposición aquí: requiere REPLACE_CARD para esa tarjeta.
         if (movementType === "Sin clasificar" && t.person_id && personnelWithDate?.created_at) {
             const createDate = new Date(personnelWithDate.created_at);
             const ticketDate = new Date(t.created_at);
@@ -337,6 +348,18 @@ export const ticketService = {
         metadata?: Record<string, unknown>;
     }) {
         return withErrorHandling(async () => {
+            // Legacy no requiere firma: bloquear creación manual de Firma Responsiva.
+            if (data.type === "Firma Responsiva" && data.access_media_id) {
+                const { data: media, error: mediaError } = await supabase
+                    .from("access_media")
+                    .select("responsiva_status")
+                    .eq("id", data.access_media_id)
+                    .single();
+                if (mediaError) throw mediaError;
+                if (media?.responsiva_status === "legacy") {
+                    throw new Error("El medio está en Legacy, no requiere firma de responsiva.");
+                }
+            }
             const payload = {
                 type: data.type,
                 description: data.description,

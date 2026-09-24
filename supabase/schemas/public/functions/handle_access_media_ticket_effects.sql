@@ -52,7 +52,9 @@ begin
     if new.person_id is not null
        and new.programming_status = 'done'
        and coalesce(new.responsiva_status, 'unsigned') not in ('signed', 'legacy')
-       and (tg_op = 'INSERT' or old.programming_status is distinct from 'done')
+       and (tg_op = 'INSERT'
+            or old.programming_status is distinct from 'done'
+            or old.person_id is distinct from new.person_id)
     then
         if not exists (
             select 1 from tickets
