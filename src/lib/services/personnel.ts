@@ -859,6 +859,41 @@ export const personnelService = {
                 };
 
                 await accessAssignmentService.savePersonAccess(personId, merged, mergedSpecialIds, base);
+                // Verificación: detectar pisos solicitados que no quedaron escritos
+                // (medio que no aplica al edificio o label que no resolvió a floor_id).
+                // Antes se omitían en silencio y había que quitar/reponer edificios
+                // y pisos a mano; ahora quedan registrados en el historial.
+                try {
+                    const written = await accessAssignmentService.fetchPersonAccess(personId);
+                    const writtenSet = new Set<string>();
+                    for (const [bidStr, groups] of Object.entries(written.floorsByBuilding)) {
+                        for (const g of groups) {
+                            for (const f of g.floors) {
+                                writtenSet.add(`${bidStr}:${g.mediaTypeId}:${f}`);
+                            }
+                        }
+                    }
+                    const omitted: { building_id: number; media_type_id: string; floor: string }[] = [];
+                    for (const [bidStr, typeMap] of Object.entries(merged)) {
+                        for (const [typeId, floors] of Object.entries(typeMap)) {
+                            for (const f of floors) {
+                                if (!writtenSet.has(`${bidStr}:${typeId}:${f}`)) {
+                                    omitted.push({ building_id: Number(bidStr), media_type_id: typeId, floor: f });
+                                }
+                            }
+                        }
+                    }
+                    if (omitted.length > 0) {
+                        await HistoryService.log("PERSON", personId, "UPDATE", {
+                            message: `Vinculación desde importación: ${omitted.length} piso(s) omitidos (no aplican al edificio o no existen en catálogo)`,
+                            omitted_floors: omitted,
+                            origin: "Importación de registros",
+                            entityName: `${fresh.first_name} ${fresh.last_name}`,
+                        });
+                    }
+                } catch {
+                    // La verificación es informativa: no debe revertir la vinculación.
+                }
                 return { updatedFields, assignedFolios };
             });
         }, "Link Registro Legacy a Existente");
@@ -873,7 +908,32 @@ export const personnelService = {
     ): Promise<{ creados: number; errores: { index: number; rowNumber: number; message: string }[] }> {
         const errores: { index: number; rowNumber: number; message: string }[] = [];
         let creados = 0;
+        // Pre-chequeo: el mismo folio para el mismo medio en dos filas del lote
+        // choca en el RPC (asignación única por medio). Fallar temprano con
+        // mensaje por fila en vez de dejar el duplicado genérico de BD.
+        const seenFolios = new Map<string, number>();
+        const skipped = new Set<number>();
+        rows.forEach((row, i) => {
+            for (const [key, value] of Object.entries(row.fields)) {
+                if (!key.endsWith("_folio")) continue;
+                const folio = (value || "").trim().toLowerCase();
+                if (!folio) continue;
+                const mapKey = `${key}:${folio}`;
+                const first = seenFolios.get(mapKey);
+                if (first !== undefined) {
+                    errores.push({
+                        index: i,
+                        rowNumber: row.rowNumber,
+                        message: `Folio duplicado en el archivo (también en fila ${rows[first].rowNumber}): "${(value || "").trim()}"`,
+                    });
+                    skipped.add(i);
+                    break;
+                }
+                seenFolios.set(mapKey, i);
+            }
+        });
         for (let i = 0; i < rows.length; i++) {
+            if (skipped.has(i)) continue;
             try {
                 await this.importDirectLegacy(rows[i].fields);
                 creados++;

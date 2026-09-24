@@ -27,6 +27,7 @@ declare
     v_eno text;
     v_dupe boolean;
     v_existing_status text;
+    v_existing_assignment uuid;
     v_constraint text;
     v_flow_id uuid;
 begin
@@ -161,11 +162,27 @@ begin
                 end if;
             end if;
 
-            insert into access_assignments (
-                person_id, media_type_id, access_media_id, status
-            )
-            values (v_person_id, v_media_type, v_media_id, 'active')
-            returning id into v_assignment_id;
+            -- Reutilizar fila de asignación existente del medio (revocada previa)
+            -- en lugar de insertar y chocar con idx_access_assignments_access_media_id.
+            select id into v_existing_assignment
+              from access_assignments where access_media_id = v_media_id limit 1;
+            if v_existing_assignment is not null then
+                update access_assignments
+                   set person_id = v_person_id,
+                       media_type_id = v_media_type,
+                       assigned_at = now(),
+                       revoked_at = null,
+                       status = 'active',
+                       updated_at = now()
+                 where id = v_existing_assignment;
+                v_assignment_id := v_existing_assignment;
+            else
+                insert into access_assignments (
+                    person_id, media_type_id, access_media_id, status
+                )
+                values (v_person_id, v_media_type, v_media_id, 'active')
+                returning id into v_assignment_id;
+            end if;
 
             v_assignment_ids[(v_i + 1)] := v_assignment_id;
 

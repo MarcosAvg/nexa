@@ -476,6 +476,17 @@
                 if (!m.has_floors) continue;
                 const raw = parseFloors(fields[`pisos_${m.key}`]);
                 if (raw.length === 0) continue;
+                // El guardado omite en silencio los pisos de un medio que no aplica
+                // a ese edificio: convertirlo en error visible por fila.
+                const rawMedia = (cat.mediaTypes as any[]).find((x) => x?.key === m.key);
+                const allowed = rawMedia?.access_media_type_buildings as { building_id?: number }[] | undefined;
+                if (Array.isArray(allowed) && allowed.length > 0 && b?.id !== undefined) {
+                    const applies = allowed.some((r) => Number(r?.building_id) === Number((b as any).id));
+                    if (!applies) {
+                        problems.push(`${m.name} no aplica al edificio ${fields.edificio} (pisos se omitirían)`);
+                        continue;
+                    }
+                }
                 const { unresolved } = resolveFloorList(raw, canonical);
                 if (unresolved.length) problems.push(`Pisos ${m.name}: ${unresolved.join(", ")}`);
             }
