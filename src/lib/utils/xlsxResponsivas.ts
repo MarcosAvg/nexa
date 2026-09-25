@@ -36,16 +36,18 @@ function formatPickupTrackingLabel(
 }
 
 /**
- * Evalúa los filtros de la sección Responsivas (tipo de movimiento + estado) para un ticket
- * ya enriquecido con movementType, needsBaja y daysElapsed. Usado por la vista y la exportación
+ * Evalúa los filtros de la sección Responsivas (tipo de movimiento + estado + medio) para un ticket
+ * ya enriquecido con movementType, needsBaja, daysElapsed y cardType. Usado por la vista y la exportación
  * para mantener el mismo criterio en ambos lugares.
  */
 export function matchesResponsivaFilters(
-    t: { type?: string; movementType?: string; needsBaja?: boolean; daysElapsed?: number | null },
+    t: { type?: string; movementType?: string; needsBaja?: boolean; daysElapsed?: number | null; cardType?: string; cards?: { type?: string } },
     movementTypeFilter: string,
     responsivaFilter: string,
-    warnDays: number
+    warnDays: number,
+    mediaFilter: string = "Todas"
 ): boolean {
+    if (mediaFilter !== "Todas" && (t.cardType || t.cards?.type || "") !== mediaFilter) return false;
     if (movementTypeFilter !== "Todas" && t.movementType !== movementTypeFilter) return false;
     if (responsivaFilter === "Todas") return true;
     if (t.type !== "Firma Responsiva" || t.daysElapsed == null) return false;

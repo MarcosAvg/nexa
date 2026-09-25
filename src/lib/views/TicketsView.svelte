@@ -44,6 +44,8 @@
 
     let responsivaFilter = $state("Todas");
     let movementTypeFilter = $state("Todas");
+    let mediaFilter = $state("Todas");
+    let mediaOptions = $derived(["Todas", ...catalogState.activeMediaTypeNames()]);
 
     // Sincronizar nombre de dependencia → ID en el store
     $effect(() => {
@@ -111,6 +113,7 @@
         floorFilter = "Todos";
         movementTypeFilter = "Todas";
         responsivaFilter = "Todas";
+        mediaFilter = "Todas";
         // El $effect debounced dispara refresh(1) automáticamente
     }
 
@@ -176,7 +179,7 @@
             return { ...t, personName, cardType, cardFolio, movementType: t.movementType, needsBaja, daysElapsed };
         })
         .filter((t) =>
-            matchesResponsivaFilters(t, movementTypeFilter, responsivaFilter, settingsState.responsivaWarnDays),
+            matchesResponsivaFilters(t, movementTypeFilter, responsivaFilter, settingsState.responsivaWarnDays, mediaFilter),
         ),
     );
 
@@ -335,11 +338,12 @@ function onStartCompletion(ticket: any) {
                     ticketState.filters.floor,
                 );
 
-            // Aplicar los mismos filtros de la vista (tipo de movimiento + estado de responsiva),
+            // Aplicar los mismos filtros de la vista (tipo de movimiento + estado + medio),
             // enriqueciendo cada ticket con needsBaja/daysElapsed como hace filteredTickets.
             if (
                 movementTypeFilter !== "Todas" ||
-                responsivaFilter !== "Todas"
+                responsivaFilter !== "Todas" ||
+                mediaFilter !== "Todas"
             ) {
                 data = data
                     .map((t: any) => {
@@ -362,7 +366,8 @@ function onStartCompletion(ticket: any) {
                             t,
                             movementTypeFilter,
                             responsivaFilter,
-                            settingsState.responsivaWarnDays
+                            settingsState.responsivaWarnDays,
+                            mediaFilter
                         )
                     );
             }
@@ -459,6 +464,18 @@ function onStartCompletion(ticket: any) {
                             label="Estado"
                             options={["Todas", "Pendiente", "Por vencer", "Baja de Registro"]}
                             bind:value={responsivaFilter}
+                        />
+                    </div>
+                {/if}
+
+                <!-- Medio (solo Responsivas) -->
+                {#if currentSection === "Responsivas"}
+                    <div class="w-full xl:w-auto">
+                        <FilterSelect
+                            label="Medio"
+                            options={mediaOptions}
+                            placeholder=""
+                            bind:value={mediaFilter}
                         />
                     </div>
                 {/if}
@@ -560,15 +577,16 @@ function onStartCompletion(ticket: any) {
         emptyDescription="No hay tickets pendientes en este momento. Todo está en orden."
         emptyDescriptionFiltered="No encontramos tickets con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={ClipboardList}
-        emptyIconBgClass={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || depNameFilter !== "Todas" || buildingNameFilter !== "Todos" || floorFilter !== "Todos")
+        emptyIconBgClass={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || mediaFilter !== "Todas" || depNameFilter !== "Todas" || buildingNameFilter !== "Todos" || floorFilter !== "Todos")
             ? "from-slate-50 to-slate-100 ring-1 ring-slate-200/60 text-slate-400"
             : "from-emerald-50 to-emerald-100 ring-1 ring-emerald-200/60 text-emerald-400"}
-        hasFilters={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || depNameFilter !== "Todas" || buildingNameFilter !== "Todos" || floorFilter !== "Todos")}
+        hasFilters={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || mediaFilter !== "Todas" || depNameFilter !== "Todas" || buildingNameFilter !== "Todos" || floorFilter !== "Todos")}
         onClearFilters={() => {
             ticketState.filters.type = 'Todos';
             ticketState.filters.search = '';
             responsivaFilter = 'Todas';
             movementTypeFilter = 'Todas';
+            mediaFilter = 'Todas';
             depNameFilter = 'Todas';
             buildingNameFilter = 'Todos';
             floorFilter = 'Todos';
