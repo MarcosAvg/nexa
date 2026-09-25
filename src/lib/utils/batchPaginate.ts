@@ -34,7 +34,7 @@ export interface DbError {
  */
 export async function batchPaginate<T>(
     fetchPage: (from: number, to: number) => Promise<{ data: T[] | null; error?: DbError | null }>,
-    pageSize: number = DEFAULT_PAGE_SIZE
+    pageSize: number = DEFAULT_PAGE_SIZE,
 ): Promise<T[]> {
     const allData: T[] = [];
     let page = 0;
@@ -72,7 +72,7 @@ export async function batchPaginate<T>(
 export async function batchForEach<T>(
     fetchPage: (from: number, to: number) => Promise<{ data: T[] | null; error?: DbError | null }>,
     processPage: (items: T[]) => void,
-    pageSize: number = DEFAULT_PAGE_SIZE
+    pageSize: number = DEFAULT_PAGE_SIZE,
 ): Promise<void> {
     let page = 0;
     let hasMore = true;
@@ -106,17 +106,21 @@ export async function batchForEach<T>(
  */
 export async function batchCollectIds<T extends Record<string, any>>(
     fetchPage: (from: number, to: number) => Promise<{ data: T[] | null; error?: DbError | null }>,
-    idField: string = "id",
-    pageSize: number = DEFAULT_PAGE_SIZE
+    idField: string = 'id',
+    pageSize: number = DEFAULT_PAGE_SIZE,
 ): Promise<Set<string>> {
     const ids = new Set<string>();
 
-    await batchForEach(fetchPage, (items) => {
-        for (const item of items) {
-            const id = item[idField];
-            if (id != null) ids.add(String(id));
-        }
-    }, pageSize);
+    await batchForEach(
+        fetchPage,
+        (items) => {
+            for (const item of items) {
+                const id = item[idField];
+                if (id != null) ids.add(String(id));
+            }
+        },
+        pageSize,
+    );
 
     return ids;
 }

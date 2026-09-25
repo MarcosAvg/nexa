@@ -1,26 +1,26 @@
-import { supabase } from "../supabase";
-import { withErrorHandling, withErrorHandlingSafe, exportCardlessRegistryToExcel } from "../utils";
-import type { CardlessRegistry } from "../types";
-import type { CardlessRegistryExportFilters } from "../utils";
-import { networkStore } from "../stores/network.svelte";
+import { supabase } from '../supabase';
+import { withErrorHandling, withErrorHandlingSafe } from '../utils';
+import type { CardlessRegistry } from '../types';
+import type { CardlessRegistryExportFilters } from '../utils';
+import { networkStore } from '../stores/network.svelte';
 
 const REASONS = [
-    "No se le ha entregado",
-    "Nuevo ingreso (trámite pendiente)",
-    "Credencial en proceso de emisión",
-    "Reposición en proceso",
-    "Olvidada en casa",
-    "Olvidada en el área de trabajo",
-    "Extraviada",
-    "Robada",
-    "Dañada",
-    "Desmagnetizada / No funciona",
-    "En resguardo de Enlace Administrativo",
-    "Bloqueada por Seguridad",
-    "Olvidada en otro sitio",
-    "No la porta",
-    "Cambio de área o nivel de acceso",
-    "Otro"
+    'No se le ha entregado',
+    'Nuevo ingreso (trámite pendiente)',
+    'Credencial en proceso de emisión',
+    'Reposición en proceso',
+    'Olvidada en casa',
+    'Olvidada en el área de trabajo',
+    'Extraviada',
+    'Robada',
+    'Dañada',
+    'Desmagnetizada / No funciona',
+    'En resguardo de Enlace Administrativo',
+    'Bloqueada por Seguridad',
+    'Olvidada en otro sitio',
+    'No la porta',
+    'Cambio de área o nivel de acceso',
+    'Otro',
 ] as const;
 
 export type CardlessRegistryReason = (typeof REASONS)[number];
@@ -71,21 +71,30 @@ async function fetchPendingResponsivaSet(personIds: string[]): Promise<Set<strin
     if (unique.length === 0) return new Set();
 
     const { data, error } = await supabase
-        .from("tickets")
-        .select("person_id, access_media!access_media_id(access_media_types(requires_responsiva))")
-        .eq("type", "Firma Responsiva")
-        .eq("status", "pending")
-        .in("person_id", unique);
+        .from('tickets')
+        .select('person_id, access_media!access_media_id(access_media_types(requires_responsiva))')
+        .eq('type', 'Firma Responsiva')
+        .eq('status', 'pending')
+        .in('person_id', unique);
 
     if (error || !data) return new Set();
 
     return new Set(
-        (data as { person_id: string; access_media?: { access_media_types?: { requires_responsiva?: boolean | null } | null }[] | null }[])
-            .filter((t) => t.access_media?.some?.((c) => c.access_media_types?.requires_responsiva === true) ?? false)
-            .map((t) => t.person_id)
+        (
+            data as {
+                person_id: string;
+                access_media?:
+                    { access_media_types?: { requires_responsiva?: boolean | null } | null }[] | null;
+            }[]
+        )
+            .filter(
+                (t) =>
+                    t.access_media?.some?.((c) => c.access_media_types?.requires_responsiva === true) ??
+                    false,
+            )
+            .map((t) => t.person_id),
     );
 }
-
 
 interface RegistryRow {
     id: number;
@@ -111,7 +120,7 @@ interface RegistryRow {
 const mapCardlessRegistryRecord = (r: RegistryRow): CardlessRegistry => {
     const personName = r.personnel
         ? `${r.personnel.first_name} ${r.personnel.last_name}`
-        : [r.first_name, r.last_name].filter(Boolean).join(" ") || undefined;
+        : [r.first_name, r.last_name].filter(Boolean).join(' ') || undefined;
 
     return {
         id: r.id,
@@ -131,28 +140,28 @@ const mapCardlessRegistryRecord = (r: RegistryRow): CardlessRegistry => {
         personName,
         buildingName: r.buildings?.name || undefined,
         dependencyName: r.dependencies?.name || undefined,
-        recordedByName: r.profiles?.full_name || undefined
+        recordedByName: r.profiles?.full_name || undefined,
     };
 };
 
 async function enrichWithResponsiva(
     registries: CardlessRegistry[],
-    mediaTypeId?: string
+    mediaTypeId?: string,
 ): Promise<CardlessRegistry[]> {
     // mediaTypeId identifica el tipo de medio; no se usa en la consulta porque
     // fetchPendingResponsivaSet no filtra por tipo de medio (solo se renombra).
     // Solo consultar estado actual de ticket para registros sin snapshot almacenado
     // (i.e. pre-migration records where responsiva_status_at_registration is null).
     const legacyIds = registries
-        .filter(r => r.person_id && r.responsiva_status_at_registration === null)
-        .map(r => r.person_id as string);
+        .filter((r) => r.person_id && r.responsiva_status_at_registration === null)
+        .map((r) => r.person_id as string);
 
     let pendingSet = new Set<string>();
     if (legacyIds.length > 0) {
         pendingSet = await fetchPendingResponsivaSet(legacyIds);
     }
 
-    return registries.map(r => {
+    return registries.map((r) => {
         // Si el snapshot ya está almacenado, usarlo directamente.
         if (r.responsiva_status_at_registration !== null) {
             return { ...r, pendingResponsiva: r.responsiva_status_at_registration ?? false };
@@ -178,31 +187,29 @@ function applyFilters<T extends FilterQuery<T>>(query: T, filters: CardlessRegis
     const end = filters.endDate;
 
     if (start && end && start > end) {
-        throw new Error("La fecha de inicio no puede ser posterior a la fecha fin");
+        throw new Error('La fecha de inicio no puede ser posterior a la fecha fin');
     }
 
     if (start) {
-        query = query.gte("recorded_at", `${start}T00:00:00`);
+        query = query.gte('recorded_at', `${start}T00:00:00`);
     }
 
     // Incluir el día completo de fecha fin (date input es YYYY-MM-DD)
     if (end) {
-        query = query.lte("recorded_at", `${end}T23:59:59.999`);
+        query = query.lte('recorded_at', `${end}T23:59:59.999`);
     }
 
     if (filters.reason) {
-        query = query.eq("reason", filters.reason);
+        query = query.eq('reason', filters.reason);
     }
 
     if (filters.search && filters.search.trim()) {
         const term = `%${filters.search.trim()}%`;
-        query = query.or(
-            `first_name.ilike.${term},last_name.ilike.${term},employee_no.ilike.${term}`
-        );
+        query = query.or(`first_name.ilike.${term},last_name.ilike.${term},employee_no.ilike.${term}`);
     }
 
-    if (filters.dependencyId !== undefined && filters.dependencyId !== "" && filters.dependencyId !== null) {
-        query = query.eq("dependency_id", filters.dependencyId);
+    if (filters.dependencyId !== undefined && filters.dependencyId !== '' && filters.dependencyId !== null) {
+        query = query.eq('dependency_id', filters.dependencyId);
     }
 
     return query;
@@ -214,16 +221,14 @@ export const cardlessRegistryService = {
     async fetchAll(
         page: number = 1,
         limit: number = 50,
-        filters: CardlessRegistryFilters = {}
+        filters: CardlessRegistryFilters = {},
     ): Promise<{ data: CardlessRegistry[]; count: number }> {
         return withErrorHandling(async () => {
             if (!networkStore.isOnline) {
                 return { data: [], count: 0 };
             }
 
-            let query = supabase
-                .from("cardless_registry")
-                .select(SELECT_WITH_RELATIONS, { count: "exact" });
+            let query = supabase.from('cardless_registry').select(SELECT_WITH_RELATIONS, { count: 'exact' });
 
             query = applyFilters(query, filters);
 
@@ -231,16 +236,16 @@ export const cardlessRegistryService = {
             const to = from + limit - 1;
 
             const { data, error, count } = await query
-                .order("recorded_at", { ascending: false })
+                .order('recorded_at', { ascending: false })
                 .range(from, to);
 
             if (error) throw error;
 
             return {
                 data: data ? await enrichWithResponsiva(data.map(mapCardlessRegistryRecord)) : [],
-                count: count || 0
+                count: count || 0,
             };
-        }, "Fetch Registry");
+        }, 'Fetch Registry');
     },
 
     /** Todas las filas que cumplen filtros (para exportar). */
@@ -262,75 +267,87 @@ export const cardlessRegistryService = {
     },
 
     async create(data: CardlessRegistryInput): Promise<CardlessRegistry | null> {
-        return withErrorHandlingSafe(async () => {
-            if (!networkStore.isOnline) {
-                throw new Error("Sin conexión a internet");
-            }
+        return withErrorHandlingSafe(
+            async () => {
+                if (!networkStore.isOnline) {
+                    throw new Error('Sin conexión a internet');
+                }
 
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("No autenticado");
+                const {
+                    data: { user },
+                } = await supabase.auth.getUser();
+                if (!user) throw new Error('No autenticado');
 
-            const { data: result, error } = await supabase
-                .from("cardless_registry")
-                .insert({
-                    ...data,
-                    recorded_by: user.id
-                })
-                .select(SELECT_WITH_RELATIONS)
-                .single();
+                const { data: result, error } = await supabase
+                    .from('cardless_registry')
+                    .insert({
+                        ...data,
+                        recorded_by: user.id,
+                    })
+                    .select(SELECT_WITH_RELATIONS)
+                    .single();
 
-            if (error) throw error;
+                if (error) throw error;
 
-            const mapped = mapCardlessRegistryRecord(result);
+                const mapped = mapCardlessRegistryRecord(result);
 
-            return mapped;
-        }, "Create Registry", null);
+                return mapped;
+            },
+            'Create Registry',
+            null,
+        );
     },
 
     async update(id: number, data: Partial<CardlessRegistryInput>): Promise<CardlessRegistry | null> {
-        return withErrorHandlingSafe(async () => {
-            if (!networkStore.isOnline) {
-                throw new Error("Sin conexión a internet");
-            }
+        return withErrorHandlingSafe(
+            async () => {
+                if (!networkStore.isOnline) {
+                    throw new Error('Sin conexión a internet');
+                }
 
-            const { data: result, error } = await supabase
-                .from("cardless_registry")
-                .update(data)
-                .eq("id", id)
-                .select(SELECT_WITH_RELATIONS)
-                .single();
+                const { data: result, error } = await supabase
+                    .from('cardless_registry')
+                    .update(data)
+                    .eq('id', id)
+                    .select(SELECT_WITH_RELATIONS)
+                    .single();
 
-            if (error) throw error;
+                if (error) throw error;
 
-            const mapped = mapCardlessRegistryRecord(result);
+                const mapped = mapCardlessRegistryRecord(result);
 
-            return mapped;
-        }, "Update Registry", null);
+                return mapped;
+            },
+            'Update Registry',
+            null,
+        );
     },
 
     async delete(id: number): Promise<boolean> {
-        return withErrorHandlingSafe(async () => {
-            if (!networkStore.isOnline) {
-                throw new Error("Sin conexión a internet");
-            }
+        return withErrorHandlingSafe(
+            async () => {
+                if (!networkStore.isOnline) {
+                    throw new Error('Sin conexión a internet');
+                }
 
-            const { error } = await supabase
-                .from("cardless_registry")
-                .delete()
-                .eq("id", id);
+                const { error } = await supabase.from('cardless_registry').delete().eq('id', id);
 
-            if (error) throw error;
+                if (error) throw error;
 
-            return true;
-        }, "Delete Registry", false);
+                return true;
+            },
+            'Delete Registry',
+            false,
+        );
     },
 
     async exportToExcel(
         registries: CardlessRegistry[],
-        filters?: CardlessRegistryExportFilters
+        filters?: CardlessRegistryExportFilters,
     ): Promise<void> {
         return withErrorHandling(async () => {
+            const { exportCardlessRegistryToExcel } = await import('../utils/xlsxExport');
             await exportCardlessRegistryToExcel(registries, filters);
-        }, "Export Registry");
-    }
+        }, 'Export Registry');
+    },
 };

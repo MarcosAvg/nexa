@@ -3,27 +3,28 @@
         tabs: { id: T; label: string; icon?: any }[];
         active: T;
         onSelect: (id: T) => void;
-        variant?: "underline" | "pill";
+        variant?: 'underline' | 'pill';
         className?: string;
     };
 
-    let {
-        tabs,
-        active,
-        onSelect,
-        variant = "underline",
-        className = "",
-    }: Props = $props();
+    let { tabs, active, onSelect, variant = 'underline', className = '' }: Props = $props();
 </script>
 
 <div
-    class="flex items-center gap-2 overflow-x-auto scrollbar-none {variant === 'underline' ? 'border-b border-slate-200' : 'pb-1'} {className}"
+    role="tablist"
+    class="flex items-center gap-2 overflow-x-auto scrollbar-none {variant === 'underline'
+        ? 'border-b border-slate-200'
+        : 'pb-1'} {className}"
 >
     {#each tabs as tab}
         <button
-            class="inline-flex items-center gap-2 whitespace-nowrap text-sm font-bold transition-colors {variant === 'underline'
+            role="tab"
+            aria-selected={active === tab.id}
+            class="inline-flex items-center gap-2 whitespace-nowrap text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 {variant ===
+            'underline'
                 ? 'px-6 py-3 border-b-2 -mb-px '
-                : 'px-5 py-2.5 rounded-2xl text-[13px] font-extrabold active:scale-95 '}{variant === 'underline'
+                : 'px-5 py-2.5 rounded-2xl text-[13px] font-extrabold active:scale-95 '}{variant ===
+            'underline'
                 ? active === tab.id
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'

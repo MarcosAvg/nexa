@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import bgImg from "../../assets/responsiva_bg.png";
-    import { fetchLegalText } from "../services/responsiva";
+    import { onMount } from 'svelte';
+    import bgImg from '../../assets/responsiva_bg.webp';
+    import { fetchLegalText } from '../services/responsiva';
 
     /**
      * ResponsivaTemplate — Plantilla visual de la Carta Responsiva.
@@ -26,7 +26,7 @@
         /** ID para el elemento contenedor. */
         id?: string;
         /** Modo de visualización: oculto, previsualización o solo texto. @default "preview" */
-        mode?: "hidden" | "preview" | "text";
+        mode?: 'hidden' | 'preview' | 'text';
         /** Firma digital en base64. */
         signature?: string;
         /** Snapshot del texto legal guardado en BD. */
@@ -37,11 +37,11 @@
 
     let {
         data = null,
-        id = "responsiva-template",
-        mode = "hidden",
-        signature = "",
-        legalSnapshot = "",
-        cardType = "",
+        id = 'responsiva-template',
+        mode = 'hidden',
+        signature = '',
+        legalSnapshot = '',
+        cardType = '',
     }: Props = $props();
 
     let fallbackTexts = $state<string[]>([]);
@@ -57,7 +57,7 @@
     });
 
     const paragraphs = $derived.by(() => {
-        if (legalSnapshot) return legalSnapshot.split("\n");
+        if (legalSnapshot) return legalSnapshot.split('\n');
         return fallbackTexts;
     });
 </script>
@@ -69,7 +69,7 @@
         : mode === 'text'
           ? 'text-mode'
           : 'preview-mode'}"
-    style={mode !== "text" ? `--bg-url: url('${bgImg}')` : ""}
+    style={mode !== 'text' ? `--bg-url: url('${bgImg}')` : ''}
 >
     {#if data}
         <div class="page">
@@ -90,28 +90,14 @@
             <div class="content">
                 {#each paragraphs as paragraph}
                     <p>
-                        {@html paragraph.includes("{")
+                        <!-- eslint-disable-next-line svelte/no-at-html-tags -- plantilla legal configurada por admin; se interpola nombre/fecha controlados -->
+                        {@html paragraph.includes('{')
                             ? paragraph
-                                  .replace(
-                                      "{nombre}",
-                                      `<strong>${data.nombre}</strong>`,
-                                  )
-                                  .replace(
-                                      "{numEmpleado}",
-                                      `<strong>${data.numEmpleado}</strong>`,
-                                  )
-                                  .replace(
-                                      "{dependencia}",
-                                      `<strong>${data.dependencia}</strong>`,
-                                  )
-                                  .replace(
-                                      "{folio}",
-                                      `<strong>${data.folio}</strong>`,
-                                  )
-                            : paragraph.replace(
-                                  /\*\*(.*?)\*\*/g,
-                                  "<strong>$1</strong>",
-                              )}
+                                  .replace('{nombre}', `<strong>${data.nombre}</strong>`)
+                                  .replace('{numEmpleado}', `<strong>${data.numEmpleado}</strong>`)
+                                  .replace('{dependencia}', `<strong>${data.dependencia}</strong>`)
+                                  .replace('{folio}', `<strong>${data.folio}</strong>`)
+                            : paragraph.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}
                     </p>
                 {/each}
             </div>
@@ -121,11 +107,7 @@
                 <div class="signature-box">
                     <div class="signature-wrapper">
                         {#if signature}
-                            <img
-                                src={signature}
-                                alt="Firma"
-                                class="signature-img"
-                            />
+                            <img src={signature} alt="Firma" class="signature-img" />
                         {/if}
                         <div class="signature-line"></div>
                     </div>
@@ -147,7 +129,7 @@
         /* min-height: 279.4mm; Letter height */
         background: white;
         color: black;
-        font-family: "Arial", sans-serif; /* Standard legal font */
+        font-family: 'Arial', sans-serif; /* Standard legal font */
     }
 
     .page {

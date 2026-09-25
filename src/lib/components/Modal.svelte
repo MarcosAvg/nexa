@@ -1,7 +1,8 @@
 <script lang="ts">
-    import { type Snippet } from "svelte";
-    import { X } from "lucide-svelte";
-    import { scrollLock } from "../utils";
+    import { type Snippet, tick } from 'svelte';
+    import { X } from 'lucide-svelte';
+    import { scrollLock, overlayStack, overlayHistory } from '../utils';
+    import { mediaState } from '../stores';
 
     /**
      * Modal — Modal genérico con footer, tamaños y cierre con Escape/backdrop.
@@ -22,10 +23,12 @@
         /** Subtítulo/descripción del modal. */
         description?: string;
         /** Tamaño/ancho máximo del modal. @default "md" */
-        size?: "sm" | "md" | "lg" | "xl" | "full";
+        size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+        /** En móvil ocupa toda la pantalla (ideal para formularios grandes). */
+        mobileFullScreen?: boolean;
         /** Muestra el botón de cerrar (X). @default true */
         showClose?: boolean;
-        /** Clase de z-index personalizada. @default "z-50" */
+        /** Clase de z-index personalizada. @default "z-[60]" */
         zIndex?: string;
         /** Contenido del cuerpo del modal. */
         children?: Snippet;
@@ -39,36 +42,94 @@
         isOpen = $bindable(),
         title,
         description,
-        size = "md",
+        size = 'md',
+        mobileFullScreen = false,
         showClose = true,
-        zIndex = "z-50",
+        zIndex = 'z-[60]',
         children,
         footer,
         onclose,
     }: Props = $props();
 
+    // Pantalla completa: `size="full"` siempre, o en móvil si `mobileFullScreen`.
+    let fullScreen = $derived(size === 'full' || (mobileFullScreen && mediaState.isMobile.matches));
+
     const sizeClasses = {
-        sm: "max-w-sm",
-        md: "max-w-lg",
-        lg: "max-w-2xl",
-        xl: "max-w-4xl",
-        full: "max-w-full w-full h-full rounded-none",
+        sm: 'max-w-sm',
+        md: 'max-w-lg',
+        lg: 'max-w-2xl',
+        xl: 'max-w-4xl',
+        full: 'max-w-full w-full h-full rounded-none',
     };
+
+    // Id único por instancia para evitar colisiones con modales anidados.
+    const titleId = `modal-title-${Math.random().toString(36).slice(2, 9)}`;
+    const overlayId = Symbol('modal');
+
+    let dialogEl = $state<HTMLDivElement | null>(null);
+    let previouslyFocused: HTMLElement | null = null;
 
     function close() {
         isOpen = false;
         onclose?.();
     }
 
-    function handleKeydown(e: KeyboardEvent) {
-        if (e.key === "Escape") close();
+    function getFocusable(): HTMLElement[] {
+        if (!dialogEl) return [];
+        return Array.from(
+            dialogEl.querySelectorAll<HTMLElement>(
+                'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ),
+        );
     }
 
-    // Bloquea el scroll de fondo mientras el modal está abierto.
+    function handleKeydown(e: KeyboardEvent) {
+        if (e.key === 'Escape') {
+            // Solo el overlay superior responde a Escape.
+            if (isOpen && overlayStack.isTop(overlayId)) {
+                e.stopPropagation();
+                close();
+            }
+            return;
+        }
+
+        if (e.key === 'Tab' && isOpen) {
+            const focusable = getFocusable();
+            if (focusable.length === 0) {
+                e.preventDefault();
+                dialogEl?.focus();
+                return;
+            }
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+    }
+
+    // Foco, trap y scroll lock mientras el modal está abierto.
     $effect(() => {
         if (!isOpen) return;
+        overlayStack.push(overlayId);
+        overlayHistory.push(overlayId, close);
+        previouslyFocused = document.activeElement as HTMLElement | null;
         scrollLock.lock();
-        return () => scrollLock.unlock();
+        tick().then(() => {
+            const focusable = getFocusable();
+            (focusable[0] ?? dialogEl)?.focus();
+        });
+        return () => {
+            overlayStack.pop(overlayId);
+            overlayHistory.close(overlayId);
+            scrollLock.unlock();
+            if (previouslyFocused?.isConnected) previouslyFocused.focus();
+            previouslyFocused = null;
+        };
     });
 </script>
 
@@ -85,41 +146,41 @@
 
     <!-- Contenedor del modal -->
     <div
-        class="fixed inset-0 {zIndex} flex items-center justify-center sm:items-center max-sm:items-end {size ===
-        'full'
-            ? 'p-0'
-            : 'p-4 max-sm:p-0'} pointer-events-none"
+        class="fixed inset-0 {zIndex} flex items-center justify-center sm:items-center {fullScreen
+            ? 'p-0 items-stretch'
+            : 'p-4 max-sm:p-0 max-sm:items-end'} pointer-events-none"
     >
         <div
-            class="pointer-events-auto w-full {sizeClasses[size]} {size !==
-            'full'
-                ? 'max-h-[95dvh] max-sm:max-h-[90dvh] rounded-[24px] max-sm:rounded-t-[32px] max-sm:rounded-b-none'
-                : 'h-dvh'} flex flex-col bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200/50 overflow-hidden ring-1 ring-black/5 transition-all duration-300"
+            bind:this={dialogEl}
+            class="pointer-events-auto w-full {fullScreen
+                ? 'max-w-full h-dvh rounded-none'
+                : sizeClasses[size] +
+                  ' max-h-[95dvh] max-sm:max-h-[90dvh] rounded-overlay max-sm:rounded-t-[32px] max-sm:rounded-b-none'} flex flex-col bg-white shadow-overlay border border-slate-200/50 overflow-hidden ring-1 ring-black/5 transition-all duration-300 focus-visible:outline-none"
             role="dialog"
+            tabindex="-1"
             aria-modal="true"
-            aria-labelledby="modal-title"
+            aria-labelledby={titleId}
         >
             <!-- Indicador de arrastre superior para móvil -->
-            {#if size !== "full"}
-                <div class="sm:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-1 flex-shrink-0"></div>
+            {#if !fullScreen}
+                <div
+                    class="sm:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-1 flex-shrink-0"
+                ></div>
             {/if}
 
             <!-- Encabezado -->
-            {#if size !== "full"}
+            {#if size !== 'full'}
                 <div
-                    class="flex items-start justify-between gap-4 p-8 pb-6 max-sm:p-6 max-sm:pt-2 bg-slate-50/30 backdrop-blur-sm"
+                    class="flex items-start justify-between gap-4 p-8 pb-6 max-sm:p-6 {fullScreen
+                        ? 'max-sm:pt-[max(1rem,env(safe-area-inset-top,0px))]'
+                        : 'max-sm:pt-2'} bg-slate-50/30 backdrop-blur-sm flex-shrink-0"
                 >
                     <div>
-                        <h2
-                            id="modal-title"
-                            class="text-xl font-bold text-slate-900 tracking-tight"
-                        >
+                        <h2 id={titleId} class="text-xl font-bold text-slate-900 tracking-tight">
                             {title}
                         </h2>
                         {#if description}
-                            <p
-                                class="mt-1.5 text-sm text-slate-500 font-medium"
-                            >
+                            <p class="mt-1.5 text-sm text-slate-500 font-medium">
                                 {description}
                             </p>
                         {/if}
@@ -138,14 +199,12 @@
             {/if}
 
             <!-- Cuerpo -->
-            <div
-                class="flex-1 overflow-y-auto {size === 'full' ? 'p-0' : 'p-6'}"
-            >
+            <div class="flex-1 overflow-y-auto {size === 'full' ? 'p-0' : 'p-6'}">
                 {@render children?.()}
             </div>
 
             <!-- Pie -->
-            {#if footer && size !== "full"}
+            {#if footer && size !== 'full'}
                 <div
                     class="flex items-center justify-end gap-3 p-8 pt-6 max-sm:pb-[max(1.5rem,env(safe-area-inset-bottom))] border-t border-slate-100 bg-slate-50/40 backdrop-blur-sm"
                 >

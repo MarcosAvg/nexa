@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { type Snippet, type ComponentType } from "svelte";
-    import { FilterX } from "lucide-svelte";
+    import { type Snippet, type ComponentType } from 'svelte';
+    import { FilterX } from 'lucide-svelte';
 
     /**
      * EmptyState — Estado vacío con ícono, título, descripción y acciones.
@@ -36,7 +36,7 @@
 
     let {
         icon: Icon,
-        iconBgClass = "from-slate-100 to-slate-200",
+        iconBgClass = 'from-slate-100 to-slate-200',
         title,
         titleFiltered,
         description,
@@ -52,7 +52,9 @@
 
 <div class="flex flex-col items-center justify-center py-20 px-8">
     {#if Icon}
-        <div class="w-20 h-20 rounded-2xl bg-gradient-to-br {iconBgClass} flex items-center justify-center mb-6 shadow-inner">
+        <div
+            class="w-20 h-20 rounded-2xl bg-gradient-to-br {iconBgClass} flex items-center justify-center mb-6 shadow-inner"
+        >
             <Icon size={40} strokeWidth={1.5} />
         </div>
     {/if}
@@ -61,7 +63,7 @@
         {displayTitle}
     </h3>
 
-    <p class="text-sm font-medium text-slate-400 text-center max-w-sm mb-8">
+    <p class="text-sm font-medium text-slate-500 text-center max-w-sm mb-8">
         {displayDescription}
     </p>
 

@@ -1,20 +1,20 @@
 /** Tipos de ticket funcionales del sistema. No son un catálogo editable. */
 export const TICKET_TYPES = {
-    alta: "Alta de Persona",
-    modificacion: "Modificación de datos",
-    baja: "Baja de Persona",
-    reposicion: "Reposición",
-    reporteFalla: "Reporte de Falla",
-    programacion: "Programación",
-    firmaResponsiva: "Firma Responsiva",
-    otro: "Otro",
+    alta: 'Alta de Persona',
+    modificacion: 'Modificación de datos',
+    baja: 'Baja de Persona',
+    reposicion: 'Reposición',
+    reporteFalla: 'Reporte de Falla',
+    programacion: 'Programación',
+    firmaResponsiva: 'Firma Responsiva',
+    otro: 'Otro',
 } as const;
 
 /** Tipos que deben aparecer en el filtro de la sección General. */
 export const GENERAL_TICKET_TYPES = [
     TICKET_TYPES.alta,
     TICKET_TYPES.modificacion,
-    "Modificación",
+    'Modificación',
     TICKET_TYPES.baja,
     TICKET_TYPES.reposicion,
     TICKET_TYPES.reporteFalla,
@@ -29,7 +29,4 @@ export const RESPONSIVA_TICKET_TYPES = [TICKET_TYPES.firmaResponsiva];
  * Se muestran por separado (Firmas y Programación) y no inflan
  * el conteo de tiquets pendientes.
  */
-export const DASHBOARD_EXCLUDED_TICKET_TYPES = [
-    TICKET_TYPES.firmaResponsiva,
-    TICKET_TYPES.programacion,
-];
+export const DASHBOARD_EXCLUDED_TICKET_TYPES = [TICKET_TYPES.firmaResponsiva, TICKET_TYPES.programacion];

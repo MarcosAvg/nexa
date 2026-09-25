@@ -1,14 +1,24 @@
 <script lang="ts">
-    import { link } from "svelte-spa-router";
-    import active from "svelte-spa-router/active";
-    import { uiState, userState } from "../stores";
-    import { supabase } from "../supabase";
-    import { MoreHorizontal, Search, X, LogOut, Wrench } from "lucide-svelte";
-    import { slide } from "svelte/transition";
+    import { link } from 'svelte-spa-router';
+    import active from 'svelte-spa-router/active';
+    import { location } from 'svelte-spa-router';
+    import { uiState, userState } from '../stores';
+    import { supabase } from '../supabase';
+    import { overlayHistory } from '../utils';
+    import { MoreHorizontal, Search, X, LogOut, Wrench } from 'lucide-svelte';
+    import { slide } from 'svelte/transition';
 
     type NavItem = { label: string; href: string; icon?: any };
 
     let { items = [] }: { items?: NavItem[] } = $props();
+
+    const moreOverlayId = Symbol('more-menu');
+
+    $effect(() => {
+        if (!uiState.isMoreMenuOpen) return;
+        overlayHistory.push(moreOverlayId, () => uiState.closeMoreMenu());
+        return () => overlayHistory.close(moreOverlayId);
+    });
 
     // Se muestran hasta 4 destinos como acceso directo; el resto vive en "Más".
     const primaryItems = $derived(items.slice(0, 4));
@@ -30,6 +40,7 @@
 </script>
 
 <nav
+    data-bottom-nav
     class="fixed bottom-0 inset-x-0 z-50 lg:hidden bg-white/80 backdrop-blur-xl border-t border-slate-200/60 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
     style="padding-bottom: env(safe-area-inset-bottom, 0px);"
 >
@@ -39,8 +50,9 @@
                 href={item.href}
                 use:link
                 use:active={{
-                    className: "active-bottom-nav",
+                    className: 'active-bottom-nav',
                 }}
+                aria-current={$location === item.href ? 'page' : undefined}
                 class="group relative flex flex-col items-center justify-center gap-0.5 flex-1 text-slate-400 transition-all duration-300"
             >
                 <!-- Punto indicador activo -->
@@ -71,7 +83,9 @@
         >
             <!-- Punto indicador activo (se muestra cuando la hoja está abierta) -->
             <div
-                class="absolute top-1 w-1 h-1 rounded-full bg-blue-500 transition-all duration-300 {uiState.isMoreMenuOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0'}"
+                class="absolute top-1 w-1 h-1 rounded-full bg-blue-500 transition-all duration-300 {uiState.isMoreMenuOpen
+                    ? 'scale-100 opacity-100'
+                    : 'scale-0 opacity-0'}"
             ></div>
 
             <div
@@ -80,7 +94,9 @@
                 <MoreHorizontal size={22} strokeWidth={2} />
             </div>
             <span
-                class="text-[10px] font-bold tracking-tight transition-colors duration-300 {uiState.isMoreMenuOpen ? 'text-blue-600 font-extrabold' : ''}"
+                class="text-[10px] font-bold tracking-tight transition-colors duration-300 {uiState.isMoreMenuOpen
+                    ? 'text-blue-600 font-extrabold'
+                    : ''}"
             >
                 Más
             </span>
@@ -92,13 +108,13 @@
 {#if uiState.isMoreMenuOpen}
     <button
         type="button"
-        class="fixed inset-0 z-50 lg:hidden bg-slate-900/50 backdrop-blur-sm"
+        class="fixed inset-0 z-[55] lg:hidden bg-slate-900/50 backdrop-blur-sm"
         onclick={closeMore}
         aria-label="Cerrar menú"
     ></button>
 
     <div
-        class="fixed z-50 lg:hidden bottom-0 inset-x-0 max-h-[88dvh] overflow-y-auto overscroll-contain bg-white rounded-t-[28px] border-t border-slate-200 shadow-2xl pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]"
+        class="fixed z-[60] lg:hidden bottom-0 inset-x-0 max-h-[88dvh] overflow-y-auto overscroll-contain bg-white rounded-t-[28px] border-t border-slate-200 shadow-2xl pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]"
         role="dialog"
         aria-modal="true"
         aria-label="Más opciones"
@@ -107,9 +123,7 @@
         <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 mb-1"></div>
 
         <div class="flex items-center justify-between px-5 pt-2 pb-3">
-            <h2 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">
-                Más opciones
-            </h2>
+            <h2 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Más opciones</h2>
             <button
                 type="button"
                 onclick={closeMore}
@@ -161,18 +175,18 @@
                         {#if userState.profile.avatar_url}
                             <img
                                 src={userState.profile.avatar_url}
-                                alt={userState.profile.full_name || "Usuario"}
+                                alt={userState.profile.full_name || 'Usuario'}
                                 class="h-full w-full object-cover"
                             />
                         {:else}
                             <span class="text-sm">
-                                {(userState.profile.full_name || "U").charAt(0).toUpperCase()}
+                                {(userState.profile.full_name || 'U').charAt(0).toUpperCase()}
                             </span>
                         {/if}
                     </div>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-extrabold text-slate-800 truncate">
-                            {userState.profile.full_name || "Usuario"}
+                            {userState.profile.full_name || 'Usuario'}
                         </p>
                         <p class="text-[11px] font-medium text-slate-400 truncate">
                             {userState.profile.email}
@@ -181,7 +195,7 @@
                 </div>
             {/if}
 
-            {#if userState.profile?.role === "admin"}
+            {#if userState.profile?.role === 'admin'}
                 <button
                     type="button"
                     onclick={() => uiState.toggleDirectEditMode()}
@@ -192,7 +206,7 @@
                     <Wrench size={18} strokeWidth={2.5} />
                     <span class="text-sm font-bold">Editor Directo</span>
                     <span class="ml-auto text-[11px] font-extrabold uppercase tracking-wider">
-                        {uiState.isDirectEditMode ? "Activo" : "Inactivo"}
+                        {uiState.isDirectEditMode ? 'Activo' : 'Inactivo'}
                     </span>
                 </button>
             {/if}

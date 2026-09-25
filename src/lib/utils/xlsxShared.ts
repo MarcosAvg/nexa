@@ -48,7 +48,7 @@ export async function createExcelWorkbook(): Promise<{
 }> {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
-        import('file-saver')
+        import('file-saver'),
     ]);
     const ExcelJS = ExcelJSModule.default || ExcelJSModule;
     const workbook = new ExcelJS.Workbook();
@@ -61,17 +61,17 @@ export async function createExcelWorkbook(): Promise<{
 export async function saveWorkbook(
     workbook: ExcelJSTypes.Workbook,
     filename: string,
-    returnBuffer?: false
+    returnBuffer?: false,
 ): Promise<void>;
 export async function saveWorkbook(
     workbook: ExcelJSTypes.Workbook,
     filename: string,
-    returnBuffer: true
+    returnBuffer: true,
 ): Promise<{ buffer: ArrayBuffer; filename: string }>;
 export async function saveWorkbook(
     workbook: ExcelJSTypes.Workbook,
     filename: string,
-    returnBuffer?: boolean
+    returnBuffer?: boolean,
 ): Promise<void | { buffer: ArrayBuffer; filename: string }> {
     const buffer = await workbook.xlsx.writeBuffer();
     if (returnBuffer) {
@@ -113,7 +113,11 @@ export async function addTitleAndMetaRow(config: TitleRowConfig): Promise<void> 
     worksheet.mergeCells(`A2:${lastCol}2`);
     const metaCell = worksheet.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
-        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
     });
     const metaText = [`Reporte generado: ${dateStr}`, ...(metaLines || [])].join('  |  ');
     metaCell.value = metaText;
@@ -124,7 +128,10 @@ export async function addTitleAndMetaRow(config: TitleRowConfig): Promise<void> 
 
 // ─── Logo Helper ───────────────────────────────────────────────────
 
-export async function addLogoToSheet(workbook: ExcelJSTypes.Workbook, worksheet: ExcelJSTypes.Worksheet): Promise<void> {
+export async function addLogoToSheet(
+    workbook: ExcelJSTypes.Workbook,
+    worksheet: ExcelJSTypes.Worksheet,
+): Promise<void> {
     try {
         const response = await fetch('/favicon.svg');
         if (response.ok) {
@@ -133,7 +140,9 @@ export async function addLogoToSheet(workbook: ExcelJSTypes.Workbook, worksheet:
             const imageId = workbook.addImage({ buffer, extension: 'svg' as any });
             worksheet.addImage(imageId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 32, height: 32 } });
         }
-    } catch { /* logo optional */ }
+    } catch {
+        /* logo optional */
+    }
 }
 
 // ─── Header Group Helpers ──────────────────────────────────────────
@@ -158,7 +167,7 @@ export function applyHeaderGroup(worksheet: ExcelJSTypes.Worksheet, group: Heade
         top: { style: 'thin', color: { argb: BORDER_COLOR } },
         left: { style: 'thin', color: { argb: BORDER_COLOR } },
         bottom: { style: 'thin', color: { argb: BORDER_COLOR } },
-        right: { style: 'medium', color: { argb: XLSX_COLORS.separator } }
+        right: { style: 'medium', color: { argb: XLSX_COLORS.separator } },
     };
 }
 
@@ -169,7 +178,7 @@ export function styleSubHeaderCell(
     cell: ExcelJSTypes.Cell,
     group: { colors: { sub: string } },
     isGroupEnd: boolean,
-    label: string
+    label: string,
 ): void {
     cell.value = label;
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
@@ -177,7 +186,10 @@ export function styleSubHeaderCell(
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
     cell.border = {
         bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
-        right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? XLSX_COLORS.separator : 'FFFFFFFF' } }
+        right: {
+            style: isGroupEnd ? 'medium' : 'thin',
+            color: { argb: isGroupEnd ? XLSX_COLORS.separator : 'FFFFFFFF' },
+        },
     };
 }
 
@@ -192,15 +204,15 @@ export interface CellBorderConfig {
 /**
  * Applies bottom + right borders typical of ExcelJS data tables.
  */
-export function applyDataCellBorder(
-    cell: ExcelJSTypes.Cell,
-    config: CellBorderConfig
-): void {
+export function applyDataCellBorder(cell: ExcelJSTypes.Cell, config: CellBorderConfig): void {
     const sep = config.separatorColor || XLSX_COLORS.separator;
     const border = config.borderColor || BORDER_COLOR;
     cell.border = {
         bottom: { style: 'thin', color: { argb: border } },
-        right: { style: config.isGroupEnd ? 'medium' : 'thin', color: { argb: config.isGroupEnd ? sep : border } }
+        right: {
+            style: config.isGroupEnd ? 'medium' : 'thin',
+            color: { argb: config.isGroupEnd ? sep : border },
+        },
     };
 }
 
@@ -208,10 +220,12 @@ export function applyDataCellBorder(
  * Determines which header group a column letter belongs to.
  */
 export function findGroupForColumn(colLetter: string, groups: HeaderGroup[]): HeaderGroup {
-    return groups.find(g => {
-        const parts = g.range.replace(/[0-9]/g, '').split(':');
-        return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
-    }) || groups[0];
+    return (
+        groups.find((g) => {
+            const parts = g.range.replace(/[0-9]/g, '').split(':');
+            return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
+        }) || groups[0]
+    );
 }
 
 /**
@@ -221,7 +235,7 @@ export function styleDataCell(
     cell: ExcelJSTypes.Cell,
     groupColors: { fill: string },
     isGroupEnd: boolean,
-    horizontal: 'left' | 'center' | 'right' = 'center'
+    horizontal: 'left' | 'center' | 'right' = 'center',
 ): void {
     cell.font = { name: 'Arial', size: 9, color: { argb: XLSX_COLORS.black } };
     cell.alignment = { vertical: 'middle', horizontal, wrapText: true };
@@ -254,7 +268,7 @@ export function addSectionTitle(
     row: number,
     text: string,
     lastCol: string,
-    colors: { sectionHead: string; separator: string }
+    colors: { sectionHead: string; separator: string },
 ): number {
     ws.mergeCells(`B${row}:${lastCol}${row}`);
     const cell = ws.getCell(`B${row}`);
@@ -282,7 +296,7 @@ export function addKpiCard(
     label: string,
     value: number | string,
     colors: { bg: string; fg: string },
-    pctStr?: string
+    pctStr?: string,
 ): void {
     const valCol = String.fromCharCode(col.charCodeAt(0) + 1);
     const pctCol = String.fromCharCode(col.charCodeAt(0) + 2);
@@ -320,7 +334,7 @@ export function addTableHeader(
     row: number,
     cols: { col: string; label: string }[],
     colors: { bg: string; fg: string },
-    whiteColor: string
+    whiteColor: string,
 ): void {
     cols.forEach(({ col, label }) => {
         const cell = ws.getCell(`${col}${row}`);
@@ -351,7 +365,7 @@ export function addTableHeader(
 export function autoRowHeight(
     worksheet: ExcelJSTypes.Worksheet,
     rowNum: number,
-    minHeight: number = 22
+    minHeight: number = 22,
 ): void {
     const row = worksheet.getRow(rowNum);
     let maxLines = 1;
@@ -387,17 +401,21 @@ export function addTableRow(
     colors: { bg: string; fg: string },
     sectionHeadColor: string,
     whiteColor: string,
-    bold = false
+    bold = false,
 ): void {
     cols.forEach(({ col, value }, i) => {
         const cell = ws.getCell(`${col}${row}`);
         cell.value = value;
         cell.font = { name: 'Arial', size: 9, color: { argb: sectionHeadColor }, bold };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i === 0 ? colors.bg : whiteColor } };
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: i === 0 ? colors.bg : whiteColor },
+        };
         cell.alignment = {
             vertical: 'middle',
             horizontal: i === 0 ? 'left' : 'center',
-            indent: i === 0 ? 1 : 0
+            indent: i === 0 ? 1 : 0,
         };
         addBorder(cell);
     });

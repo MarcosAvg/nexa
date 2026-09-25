@@ -52,17 +52,23 @@ type CardlessPersonAgg = {
 function cardlessPersonKey(reg: CardlessRegistryExportRow): string {
     const emp = (reg.employee_no || '').trim().toLowerCase();
     if (emp) return `emp:${emp}`;
-    const name = (
-        reg.personName ||
-        [reg.first_name, reg.last_name].filter(Boolean).join(' ') ||
-        'sin nombre'
-    ).trim().toLowerCase().replace(/\s+/g, ' ');
+    const name = (reg.personName || [reg.first_name, reg.last_name].filter(Boolean).join(' ') || 'sin nombre')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
     return `name:${name}`;
 }
 
-function cardlessPersonLabel(reg: CardlessRegistryExportRow): { name: string; firstName: string; lastName: string; employeeNo: string } {
-    const firstName = reg.first_name || (reg.personName ? reg.personName.split(' ').slice(0, -1).join(' ') : '') || '';
-    const lastName = reg.last_name || (reg.personName ? reg.personName.split(' ').slice(-1).join(' ') : '') || '';
+function cardlessPersonLabel(reg: CardlessRegistryExportRow): {
+    name: string;
+    firstName: string;
+    lastName: string;
+    employeeNo: string;
+} {
+    const firstName =
+        reg.first_name || (reg.personName ? reg.personName.split(' ').slice(0, -1).join(' ') : '') || '';
+    const lastName =
+        reg.last_name || (reg.personName ? reg.personName.split(' ').slice(-1).join(' ') : '') || '';
     const name = reg.personName || [firstName, lastName].filter(Boolean).join(' ') || 'Sin nombre';
     return { name, firstName, lastName, employeeNo: reg.employee_no || '' };
 }
@@ -74,18 +80,15 @@ async function fetchResponsivaSignDates(mediaTypeId?: string): Promise<Map<strin
     const mediaKey = typeof mediaTypeId === 'string' ? mediaTypeId : 'kone';
 
     try {
-        const allRows = await batchPaginate<any>(
-            async (from, to) => {
-                const { data, error } = await supabase
-                    .from('signed_documents')
-                    .select('person_id, created_at, document_templates!inner(access_media_types!inner(key))')
-                    .eq('document_templates.access_media_types.key', mediaKey)
-                    .order('created_at', { ascending: false })
-                    .range(from, to);
-                return { data, error };
-            },
-            1000
-        );
+        const allRows = await batchPaginate<any>(async (from, to) => {
+            const { data, error } = await supabase
+                .from('signed_documents')
+                .select('person_id, created_at, document_templates!inner(access_media_types!inner(key))')
+                .eq('document_templates.access_media_types.key', mediaKey)
+                .order('created_at', { ascending: false })
+                .range(from, to);
+            return { data, error };
+        }, 1000);
 
         for (const row of allRows as { person_id: string; created_at: string }[]) {
             if (!row.person_id) continue;
@@ -129,9 +132,20 @@ function aggregateCardlessData(data: CardlessRegistryExportRow[]) {
 
         let agg = personMap.get(key);
         if (!agg) {
-            agg = { key, name: label.name, firstName: label.firstName, lastName: label.lastName,
-                employeeNo: label.employeeNo, dependency: dep, building: bldg,
-                count: 0, reasons: {}, dates: [], operators: new Set(), isLinked: false };
+            agg = {
+                key,
+                name: label.name,
+                firstName: label.firstName,
+                lastName: label.lastName,
+                employeeNo: label.employeeNo,
+                dependency: dep,
+                building: bldg,
+                count: 0,
+                reasons: {},
+                dates: [],
+                operators: new Set(),
+                isLinked: false,
+            };
             personMap.set(key, agg);
         }
         agg.count++;
@@ -152,7 +166,9 @@ function aggregateCardlessData(data: CardlessRegistryExportRow[]) {
         }
     });
 
-    const people = [...personMap.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(a.name, 'es'));
+    const people = [...personMap.values()].sort(
+        (a, b) => b.count - a.count || a.name.localeCompare(a.name, 'es'),
+    );
     return { people, reasonMap, depMap, buildingMap, operatorMap };
 }
 
@@ -161,7 +177,7 @@ function aggregateCardlessData(data: CardlessRegistryExportRow[]) {
 async function addCardlessEvidenceSheet(
     workbook: ExcelJSTypes.Workbook,
     data: CardlessRegistryExportRow[],
-    filterDescription: string
+    filterDescription: string,
 ) {
     const ws = workbook.addWorksheet('Evidencia');
 
@@ -181,9 +197,17 @@ async function addCardlessEvidenceSheet(
     };
 
     ws.columns = [
-        { width: 4 }, { width: 28 }, { width: 14 }, { width: 14 },
-        { width: 26 }, { width: 16 }, { width: 16 }, { width: 14 },
-        { width: 42 }, { width: 20 }, { width: 20 },
+        { width: 4 },
+        { width: 28 },
+        { width: 14 },
+        { width: 14 },
+        { width: 26 },
+        { width: 16 },
+        { width: 16 },
+        { width: 14 },
+        { width: 42 },
+        { width: 20 },
+        { width: 20 },
     ];
 
     let row = 1;
@@ -238,7 +262,13 @@ async function addCardlessEvidenceSheet(
     const operatorEntries = Object.entries(operatorMap).sort((a, b) => b[1] - a[1]);
 
     const formatDate = (ms: number) =>
-        new Date(ms).toLocaleString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        new Date(ms).toLocaleString('es-MX', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
 
     ws.mergeCells('A1:K1');
     const titleCell = ws.getCell('A1');
@@ -253,7 +283,11 @@ async function addCardlessEvidenceSheet(
     ws.mergeCells('A2:K2');
     const metaCell = ws.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
-        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
     });
     metaCell.value = `Reporte generado: ${dateStr}  |  Total registros: ${total}  |  Personas únicas: ${uniquePeople}${filterDescription}`;
     metaCell.font = { name: 'Arial', size: 9, color: { argb: C.meta } };
@@ -299,8 +333,16 @@ async function addCardlessEvidenceSheet(
             const cell = ws.getCell(row, i + 2);
             cell.value = value;
             cell.font = { name: 'Arial', size: 9, bold: i === 0, color: { argb: C.sectionHead } };
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i === 0 ? C.rose.bg : C.white } };
-            cell.alignment = { vertical: 'middle', horizontal: i === 0 ? 'left' : 'center', indent: i === 0 ? 1 : 0 };
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: i === 0 ? C.rose.bg : C.white },
+            };
+            cell.alignment = {
+                vertical: 'middle',
+                horizontal: i === 0 ? 'left' : 'center',
+                indent: i === 0 ? 1 : 0,
+            };
             setBorder(cell);
         });
         ws.getRow(row).height = 22;
@@ -342,8 +384,16 @@ async function addCardlessEvidenceSheet(
                 const cell = ws.getCell(row, colIdx + 2);
                 cell.value = value;
                 cell.font = { name: 'Arial', size: 9, bold: colIdx === 0, color: { argb: C.sectionHead } };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colIdx === 0 ? C.emerald.bg : C.white } };
-                cell.alignment = { vertical: 'middle', horizontal: colIdx === 0 ? 'left' : 'center', indent: colIdx === 0 ? 1 : 0 };
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: colIdx === 0 ? C.emerald.bg : C.white },
+                };
+                cell.alignment = {
+                    vertical: 'middle',
+                    horizontal: colIdx === 0 ? 'left' : 'center',
+                    indent: colIdx === 0 ? 1 : 0,
+                };
                 setBorder(cell);
             });
         }
@@ -353,8 +403,16 @@ async function addCardlessEvidenceSheet(
                 const cell = ws.getCell(row, colIdx + 7);
                 cell.value = value;
                 cell.font = { name: 'Arial', size: 9, bold: colIdx === 0, color: { argb: C.sectionHead } };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colIdx === 0 ? C.amber.bg : C.white } };
-                cell.alignment = { vertical: 'middle', horizontal: colIdx === 0 ? 'left' : 'center', indent: colIdx === 0 ? 1 : 0 };
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: colIdx === 0 ? C.amber.bg : C.white },
+                };
+                cell.alignment = {
+                    vertical: 'middle',
+                    horizontal: colIdx === 0 ? 'left' : 'center',
+                    indent: colIdx === 0 ? 1 : 0,
+                };
                 setBorder(cell);
             });
         }
@@ -381,8 +439,16 @@ async function addCardlessEvidenceSheet(
             const cell = ws.getCell(row, i + 2);
             cell.value = value;
             cell.font = { name: 'Arial', size: 9, bold: i === 0, color: { argb: C.sectionHead } };
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i === 0 ? C.slate.bg : C.white } };
-            cell.alignment = { vertical: 'middle', horizontal: i === 0 ? 'left' : 'center', indent: i === 0 ? 1 : 0 };
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: i === 0 ? C.slate.bg : C.white },
+            };
+            cell.alignment = {
+                vertical: 'middle',
+                horizontal: i === 0 ? 'left' : 'center',
+                indent: i === 0 ? 1 : 0,
+            };
             setBorder(cell);
         });
         ws.getRow(row).height = 22;
@@ -392,7 +458,8 @@ async function addCardlessEvidenceSheet(
     row += 2;
     ws.mergeCells(`B${row}:K${row}`);
     const footer = ws.getCell(`B${row}`);
-    footer.value = 'Nota: Esta hoja resume la evidencia del periodo exportado. El detalle de reincidencia por persona está en "Reincidencia" y el detalle completo en "Detalle".';
+    footer.value =
+        'Nota: Esta hoja resume la evidencia del periodo exportado. El detalle de reincidencia por persona está en "Reincidencia" y el detalle completo en "Detalle".';
     footer.font = { name: 'Arial', size: 8, italic: true, color: { argb: C.meta } };
 
     ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 2 }];
@@ -404,7 +471,7 @@ async function addCardlessReincidenceSheet(
     workbook: ExcelJSTypes.Workbook,
     data: CardlessRegistryExportRow[],
     filterDescription: string,
-    mediaLabel: string
+    mediaLabel: string,
 ) {
     const ws = workbook.addWorksheet('Reincidencia');
 
@@ -430,7 +497,13 @@ async function addCardlessReincidenceSheet(
     const manualPeople = uniquePeople - linkedPeople;
 
     const formatDate = (ms: number) =>
-        new Date(ms).toLocaleString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        new Date(ms).toLocaleString('es-MX', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
 
     ws.columns = [
         { key: 'num', width: 6 },
@@ -462,7 +535,11 @@ async function addCardlessReincidenceSheet(
     ws.mergeCells('A2:O2');
     const metaCell = ws.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
-        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
     });
     metaCell.value = [
         `Reporte generado: ${dateStr}`,
@@ -479,7 +556,8 @@ async function addCardlessReincidenceSheet(
 
     ws.mergeCells('A3:O3');
     const legendCell = ws.getCell('A3');
-    legendCell.value = '  Vínculo: ✔ Registrado = persona en sistema  |  ✗ No Registrado = ingresado sin vínculo    Severidad: Normal  |  Reincidente ≥2 (ámbar)  |  Frecuente ≥3 (rojo)';
+    legendCell.value =
+        '  Vínculo: ✔ Registrado = persona en sistema  |  ✗ No Registrado = ingresado sin vínculo    Severidad: Normal  |  Reincidente ≥2 (ámbar)  |  Frecuente ≥3 (rojo)';
     legendCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: COLORS.meta } };
     legendCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.head } };
     legendCell.alignment = { vertical: 'middle', horizontal: 'left' };
@@ -561,13 +639,21 @@ async function addCardlessReincidenceSheet(
 
         const responsivaLabel = !person.isLinked
             ? 'N/A'
-            : person.pendingResponsiva ? 'PENDIENTE DE RECOGER' : 'ENTREGADA';
+            : person.pendingResponsiva
+              ? 'PENDIENTE DE RECOGER'
+              : 'ENTREGADA';
 
         const signedAtLabel = !person.isLinked
             ? ''
             : person.responsivaSignedAt
-                ? new Date(person.responsivaSignedAt).toLocaleString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-                : '';
+              ? new Date(person.responsivaSignedAt).toLocaleString('es-MX', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                })
+              : '';
 
         const rowData = {
             num: idx + 1,
@@ -689,23 +775,23 @@ export async function exportCardlessRegistryToExcel(
     data: CardlessRegistryExportRow[],
     filters?: CardlessRegistryExportFilters,
     returnBuffer?: false,
-    mediaKey?: string
+    mediaKey?: string,
 ): Promise<void>;
 export async function exportCardlessRegistryToExcel(
     data: CardlessRegistryExportRow[],
     filters: CardlessRegistryExportFilters | undefined,
     returnBuffer: true,
-    mediaKey?: string
+    mediaKey?: string,
 ): Promise<{ buffer: ArrayBuffer; filename: string }>;
 export async function exportCardlessRegistryToExcel(
     data: CardlessRegistryExportRow[],
     filters?: CardlessRegistryExportFilters,
     returnBuffer?: boolean,
-    mediaKey = 'kone'
+    mediaKey = 'kone',
 ): Promise<void | { buffer: ArrayBuffer; filename: string }> {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
-        import('file-saver')
+        import('file-saver'),
     ]);
     const workbook = new (ExcelJSModule.default || ExcelJSModule).Workbook();
 
@@ -721,7 +807,7 @@ export async function exportCardlessRegistryToExcel(
         emerald: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
         rose: { head: 'FFFEE2E2', sub: 'FF991B1B', fill: 'FFFFF1F2' },
         violet: { head: 'FFEDE9FE', sub: 'FF5B21B6', fill: 'FFFAF5FF' },
-        slate: { head: 'FFF1F5F9', sub: 'FF334155', fill: 'FFF8FAFC' }
+        slate: { head: 'FFF1F5F9', sub: 'FF334155', fill: 'FFF8FAFC' },
     };
 
     const filterParts: string[] = [];
@@ -733,7 +819,7 @@ export async function exportCardlessRegistryToExcel(
     const filterDescription = filterParts.length ? `  |  ${filterParts.join('  |  ')}` : '';
 
     const signDateMap = await fetchResponsivaSignDates(mediaKey);
-    const enrichedData: CardlessRegistryExportRow[] = data.map(row => ({
+    const enrichedData: CardlessRegistryExportRow[] = data.map((row) => ({
         ...row,
         responsivaSignedAt: row.person_id ? (signDateMap.get(row.person_id) ?? null) : null,
     }));
@@ -772,7 +858,11 @@ export async function exportCardlessRegistryToExcel(
     worksheet.mergeCells('A2:M2');
     const metaCell = worksheet.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
-        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
     });
     metaCell.value = `Reporte generado: ${dateStr}  |  Registros: ${enrichedData.length}${filterDescription}`;
     metaCell.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
@@ -799,16 +889,26 @@ export async function exportCardlessRegistryToExcel(
             top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
             left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
             bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-            right: { style: 'medium', color: { argb: COLORS.separator } }
+            right: { style: 'medium', color: { argb: COLORS.separator } },
         };
     });
 
     const headerRow = worksheet.getRow(4);
     headerRow.height = 30;
     const headerLabels = [
-        'VÍNCULO', 'NOMBRES', 'APELLIDOS', '# EMPLEADO',
-        'DEPENDENCIA', 'EDIFICIO', 'PISO BASE', 'MOTIVO',
-        'COMENTARIOS', 'FECHA / HORA', 'REGISTRADO POR', `TARJETA ${mediaLabel}`, 'FECHA ENTREGA',
+        'VÍNCULO',
+        'NOMBRES',
+        'APELLIDOS',
+        '# EMPLEADO',
+        'DEPENDENCIA',
+        'EDIFICIO',
+        'PISO BASE',
+        'MOTIVO',
+        'COMENTARIOS',
+        'FECHA / HORA',
+        'REGISTRADO POR',
+        `TARJETA ${mediaLabel}`,
+        'FECHA ENTREGA',
     ];
 
     const groupEnds = new Set(groups.map((g) => g.endCol));
@@ -816,11 +916,12 @@ export async function exportCardlessRegistryToExcel(
     headerLabels.forEach((label, i) => {
         const cell = headerRow.getCell(i + 1);
         cell.value = label;
-        const group = groups.find((g) => {
-            const col = String.fromCharCode(65 + i);
-            const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
-            return col >= (start || 'A') && col <= (end || start || 'A');
-        }) || groups[0];
+        const group =
+            groups.find((g) => {
+                const col = String.fromCharCode(65 + i);
+                const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
+                return col >= (start || 'A') && col <= (end || start || 'A');
+            }) || groups[0];
 
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
         cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
@@ -829,8 +930,8 @@ export async function exportCardlessRegistryToExcel(
             bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
             right: {
                 style: groupEnds.has(i + 1) ? 'medium' : 'thin',
-                color: { argb: groupEnds.has(i + 1) ? COLORS.separator : 'FFFFFFFF' }
-            }
+                color: { argb: groupEnds.has(i + 1) ? COLORS.separator : 'FFFFFFFF' },
+            },
         };
     });
 
@@ -840,7 +941,13 @@ export async function exportCardlessRegistryToExcel(
         const { firstName, lastName } = cardlessPersonLabel(reg);
         const isLinked = !!reg.person_id;
         const signedAt = reg.responsivaSignedAt
-            ? new Date(reg.responsivaSignedAt).toLocaleString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+            ? new Date(reg.responsivaSignedAt).toLocaleString('es-MX', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+              })
             : null;
 
         const excelRow = worksheet.addRow({
@@ -855,31 +962,36 @@ export async function exportCardlessRegistryToExcel(
             comments: reg.comments || '',
             recorded_at: new Date(reg.recorded_at).toLocaleString('es-MX'),
             recorded_by: reg.recordedByName || '',
-            pending_responsiva: !isLinked ? 'N/A' : (reg.pendingResponsiva ? 'PENDIENTE DE RECOGER' : 'ENTREGADA'),
-            signed_at: !isLinked ? '' : (signedAt || ''),
+            pending_responsiva: !isLinked
+                ? 'N/A'
+                : reg.pendingResponsiva
+                  ? 'PENDIENTE DE RECOGER'
+                  : 'ENTREGADA',
+            signed_at: !isLinked ? '' : signedAt || '',
         });
 
         excelRow.eachCell((cell, colNumber) => {
             const colLetter = String.fromCharCode(64 + colNumber);
-            const group = groups.find((g) => {
-                const parts = g.range.replace(/[0-9]/g, '').split(':');
-                return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
-            }) || groups[0];
+            const group =
+                groups.find((g) => {
+                    const parts = g.range.replace(/[0-9]/g, '').split(':');
+                    return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
+                }) || groups[0];
 
             cell.font = { name: 'Arial', size: 9 };
             cell.alignment = {
                 vertical: 'middle',
                 horizontal: [1, 4, 7, 10, 12, 13].includes(colNumber) ? 'center' : 'left',
                 indent: [1, 4, 7, 10, 12, 13].includes(colNumber) ? 0 : 1,
-                wrapText: colNumber === 8 || colNumber === 9
+                wrapText: colNumber === 8 || colNumber === 9,
             };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.fill } };
             cell.border = {
                 bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
                 right: {
                     style: groupEnds.has(colNumber) ? 'medium' : 'thin',
-                    color: { argb: groupEnds.has(colNumber) ? COLORS.separator : 'FFCBD5E1' }
-                }
+                    color: { argb: groupEnds.has(colNumber) ? COLORS.separator : 'FFCBD5E1' },
+                },
             };
 
             if (colNumber === 1) {
@@ -904,7 +1016,12 @@ export async function exportCardlessRegistryToExcel(
                 let badge = COLORS.slate;
                 if (reg.reason.includes('Olvidada') || reg.reason === 'No la porta') badge = COLORS.amber;
                 else if (reg.reason === 'Extraviada' || reg.reason === 'Robada') badge = COLORS.rose;
-                else if (reg.reason === 'No se le ha entregado' || reg.reason.includes('proceso') || reg.reason.includes('ingreso') || reg.reason.includes('Reposición')) {
+                else if (
+                    reg.reason === 'No se le ha entregado' ||
+                    reg.reason.includes('proceso') ||
+                    reg.reason.includes('ingreso') ||
+                    reg.reason.includes('Reposición')
+                ) {
                     badge = COLORS.sky;
                 }
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: badge.head } };
@@ -952,7 +1069,7 @@ export async function exportCardlessRegistryToExcel(
 
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
 
-    let fileNameParts = [`Registro_Sin_Tarjeta_${settingsState.orgName.replace(/\s+/g, '_')}`];
+    const fileNameParts = [`Registro_Sin_Tarjeta_${settingsState.orgName.replace(/\s+/g, '_')}`];
     if (filters?.dependency) {
         fileNameParts.push(filters.dependency.replace(/\s+/g, '_'));
     }

@@ -5,10 +5,12 @@ import type { Enlace } from '../types';
 
 export const enlaceService = {
     async fetchAll(): Promise<Enlace[]> {
-        return withErrorHandlingSafe(async () => {
-            const { data, error } = await supabase
-                .from('enlaces')
-                .select(`
+        return withErrorHandlingSafe(
+            async () => {
+                const { data, error } = await supabase
+                    .from('enlaces')
+                    .select(
+                        `
                     id, 
                     person_id, 
                     extension, 
@@ -24,12 +26,16 @@ export const enlaceService = {
                         employee_no,
                         status
                     )
-                `)
-                .order('created_at', { ascending: false });
+                `,
+                    )
+                    .order('created_at', { ascending: false });
 
-            if (error) throw error;
-            return data as any[];
-        }, 'Fetch Enlaces', []);
+                if (error) throw error;
+                return data as any[];
+            },
+            'Fetch Enlaces',
+            [],
+        );
     },
 
     async add(personId: string, extension: string): Promise<Enlace> {
@@ -37,7 +43,8 @@ export const enlaceService = {
             const { data, error } = await supabase
                 .from('enlaces')
                 .insert([{ person_id: personId, extension }])
-                .select(`
+                .select(
+                    `
                     id, 
                     person_id, 
                     extension, 
@@ -53,15 +60,16 @@ export const enlaceService = {
                         employee_no,
                         status
                     )
-                `)
+                `,
+                )
                 .single();
 
             if (error) throw error;
 
             const personnelData: any = data.personnel;
-            await HistoryService.log("ENLACE", data.id, "CREATE", {
+            await HistoryService.log('ENLACE', data.id, 'CREATE', {
                 message: `Enlace administrativo asignado (Ext: ${extension})`,
-                entityName: `Enlace: ${personnelData.first_name} ${personnelData.last_name}`
+                entityName: `Enlace: ${personnelData.first_name} ${personnelData.last_name}`,
             });
 
             return data as any;
@@ -79,9 +87,9 @@ export const enlaceService = {
 
             if (error) throw error;
 
-            await HistoryService.log("ENLACE", id, "UPDATE", {
+            await HistoryService.log('ENLACE', id, 'UPDATE', {
                 message: `Extensión actualizada a "${extension}"`,
-                entityName: `Enlace: ${personName}`
+                entityName: `Enlace: ${personName}`,
             });
 
             return data;
@@ -90,17 +98,14 @@ export const enlaceService = {
 
     async remove(id: string, personName: string) {
         return withErrorHandling(async () => {
-            const { error } = await supabase
-                .from('enlaces')
-                .delete()
-                .eq('id', id);
+            const { error } = await supabase.from('enlaces').delete().eq('id', id);
 
             if (error) throw error;
 
-            await HistoryService.log("ENLACE", id, "DELETE", {
+            await HistoryService.log('ENLACE', id, 'DELETE', {
                 message: `Enlace administrativo removido`,
-                entityName: `Enlace: ${personName}`
+                entityName: `Enlace: ${personName}`,
             });
         }, 'Remove Enlace');
-    }
+    },
 };

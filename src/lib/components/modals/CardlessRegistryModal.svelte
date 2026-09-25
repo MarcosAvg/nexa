@@ -1,20 +1,19 @@
 <script lang="ts">
-    import Modal from "../Modal.svelte";
-    import Button from "../Button.svelte";
-    import Input from "../Input.svelte";
-    import Select from "../Select.svelte";
-    import { User, X, LinkIcon } from "lucide-svelte";
-    import { cardlessRegistryService } from "../../services/cardlessRegistry";
-    import { personnelService } from "../../services/personnel";
-    import { catalogState } from "../../stores";
-    import type { CardlessRegistry, Person } from "../../types";
-    import { toast } from "svelte-sonner";
-    import { networkStore } from "../../stores/network.svelte";
-    import { updateWithLock, fetchCurrentVersion } from "../../utils/optimisticLock";
+    import Modal from '../Modal.svelte';
+    import Button from '../Button.svelte';
+    import Input from '../Input.svelte';
+    import Select from '../Select.svelte';
+    import { User, X, LinkIcon } from 'lucide-svelte';
+    import { cardlessRegistryService } from '../../services/cardlessRegistry';
+    import { personnelService } from '../../services/personnel';
+    import { catalogState } from '../../stores';
+    import type { CardlessRegistry, Person } from '../../types';
+    import { toast } from 'svelte-sonner';
+    import { networkStore } from '../../stores/network.svelte';
+    import { updateWithLock, fetchCurrentVersion } from '../../utils/optimisticLock';
 
     /** Mensaje cuando otro usuario modificó el registro mientras se editaba. */
-    const CONFLICT_MSG =
-        "Este registro fue modificado por otra persona. Recarga e inténtalo de nuevo.";
+    const CONFLICT_MSG = 'Este registro fue modificado por otra persona. Recarga e inténtalo de nuevo.';
 
     let {
         /** Controla la visibilidad del modal (two-way bindable). */
@@ -39,26 +38,26 @@
     let reasons = $derived(cardlessRegistryService.REASONS);
 
     // Campos de persona — siempre visibles
-    let manualFirstName = $state("");
-    let manualLastName  = $state("");
-    let manualEmployeeNo = $state("");
-    let manualDependency = $state("");
+    let manualFirstName = $state('');
+    let manualLastName = $state('');
+    let manualEmployeeNo = $state('');
+    let manualDependency = $state('');
 
     // Persona vinculada (cuando se elige una sugerencia)
     let selectedPerson = $state<Person | null>(null);
 
     // Desplegable de sugerencias
-    let searchResults  = $state<Person[]>([]);
-    let isSearching    = $state(false);
+    let searchResults = $state<Person[]>([]);
+    let isSearching = $state(false);
     let searchTimeout: ReturnType<typeof setTimeout> | undefined;
     let searchSeq = 0;
 
     // Resto del formulario
-    let manualBuilding = $state("");
-    let manualFloor    = $state("");
-    let selectedReason = $state("");
-    let comments       = $state("");
-    let recordedAt     = $state("");
+    let manualBuilding = $state('');
+    let manualFloor = $state('');
+    let selectedReason = $state('');
+    let comments = $state('');
+    let recordedAt = $state('');
 
     let isSubmitting = $state(false);
 
@@ -70,7 +69,7 @@
 
     /** Compara la versión de la lista con la actual en BD y marca si quedó obsoleta. */
     async function checkStale(id: string | number, loadedVersion: string | null) {
-        const fresh = await fetchCurrentVersion("cardless_registry", id);
+        const fresh = await fetchCurrentVersion('cardless_registry', id);
         isStale = !!fresh && !!loadedVersion && fresh !== loadedVersion;
     }
 
@@ -79,7 +78,7 @@
     function toDatetimeLocalValue(isoOrEmpty?: string | null): string {
         const d = isoOrEmpty ? new Date(isoOrEmpty) : new Date();
         if (Number.isNaN(d.getTime())) return toDatetimeLocalValue(null);
-        const pad = (n: number) => String(n).padStart(2, "0");
+        const pad = (n: number) => String(n).padStart(2, '0');
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
 
@@ -87,11 +86,11 @@
         return value.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
     }
 
-    function handleNameInput(e: Event, field: "first" | "last") {
+    function handleNameInput(e: Event, field: 'first' | 'last') {
         const input = e.target as HTMLInputElement;
         const upped = input.value.toUpperCase();
         const pos = input.selectionStart ?? upped.length;
-        if (field === "first") manualFirstName = upped;
+        if (field === 'first') manualFirstName = upped;
         else manualLastName = upped;
         requestAnimationFrame(() => input.setSelectionRange(pos, pos));
         triggerPersonSearch();
@@ -105,8 +104,8 @@
         if (selectedPerson) return;
 
         const first = manualFirstName.trim();
-        const last  = manualLastName.trim();
-        const query = [first, last].filter(Boolean).join(" ");
+        const last = manualLastName.trim();
+        const query = [first, last].filter(Boolean).join(' ');
 
         if (query.length < 3) {
             searchResults = [];
@@ -127,74 +126,80 @@
     }
 
     function selectPerson(person: Person) {
-        selectedPerson   = person;
-        manualFirstName  = person.first_name || "";
-        manualLastName   = person.last_name  || "";
-        manualEmployeeNo = person.employee_no || "";
-        if (person.dependency && person.dependency !== "N/A") manualDependency = person.dependency;
-        if (person.building   && person.building   !== "N/A") manualBuilding   = person.building;
+        selectedPerson = person;
+        manualFirstName = person.first_name || '';
+        manualLastName = person.last_name || '';
+        manualEmployeeNo = person.employee_no || '';
+        if (person.dependency && person.dependency !== 'N/A') manualDependency = person.dependency;
+        if (person.building && person.building !== 'N/A') manualBuilding = person.building;
         if (person.floor) manualFloor = person.floor;
         searchResults = [];
     }
 
     function clearSelectedPerson() {
         selectedPerson = null;
-        searchResults  = [];
+        searchResults = [];
     }
 
     // ── form lifecycle ───────────────────────────────────────────
 
     function resetForm() {
         editingUpdatedAt = null;
-        isStale          = false;
-        selectedPerson   = null;
-        searchResults    = [];
-        manualFirstName  = "";
-        manualLastName   = "";
-        manualEmployeeNo = "";
-        manualBuilding   = "";
-        manualDependency = "";
-        manualFloor      = "";
-        selectedReason   = "";
-        comments         = "";
-        recordedAt       = toDatetimeLocalValue(null);
+        isStale = false;
+        selectedPerson = null;
+        searchResults = [];
+        manualFirstName = '';
+        manualLastName = '';
+        manualEmployeeNo = '';
+        manualBuilding = '';
+        manualDependency = '';
+        manualFloor = '';
+        selectedReason = '';
+        comments = '';
+        recordedAt = toDatetimeLocalValue(null);
     }
 
     function hydrateFromRegistry(reg: CardlessRegistry) {
         if (reg.person_id) {
             selectedPerson = {
                 id: reg.person_id,
-                first_name:  reg.first_name  || "",
-                last_name:   reg.last_name   || "",
-                name: reg.personName || [reg.first_name, reg.last_name].filter(Boolean).join(" "),
-                employee_no: reg.employee_no || "",
-                building:    reg.buildingName   || "",
-                dependency:  reg.dependencyName || "",
-                status_raw: "", status: "",
-                schedule: null, cards: [],
-                floors: [], specialAccesses: [],
+                first_name: reg.first_name || '',
+                last_name: reg.last_name || '',
+                name: reg.personName || [reg.first_name, reg.last_name].filter(Boolean).join(' '),
+                employee_no: reg.employee_no || '',
+                building: reg.buildingName || '',
+                dependency: reg.dependencyName || '',
+                status_raw: '',
+                status: '',
+                schedule: null,
+                cards: [],
+                floors: [],
+                specialAccesses: [],
             };
         } else {
             selectedPerson = null;
         }
 
-        manualFirstName  = reg.first_name   || "";
-        manualLastName   = reg.last_name    || "";
-        manualEmployeeNo = reg.employee_no  || "";
-        manualBuilding   = reg.buildingName  || "";
-        manualDependency = reg.dependencyName || "";
-        manualFloor      = reg.floor         || "";
-        selectedReason   = reg.reason        || "";
-        comments         = reg.comments      || "";
-        recordedAt       = toDatetimeLocalValue(reg.recorded_at);
+        manualFirstName = reg.first_name || '';
+        manualLastName = reg.last_name || '';
+        manualEmployeeNo = reg.employee_no || '';
+        manualBuilding = reg.buildingName || '';
+        manualDependency = reg.dependencyName || '';
+        manualFloor = reg.floor || '';
+        selectedReason = reg.reason || '';
+        comments = reg.comments || '';
+        recordedAt = toDatetimeLocalValue(reg.recorded_at);
         editingUpdatedAt = (reg as any).updated_at ?? null;
     }
 
     let formKey = $state<string | null>(null);
 
     $effect(() => {
-        if (!isOpen) { if (formKey !== null) formKey = null; return; }
-        const key = editingRegistry ? `edit-${editingRegistry.id}` : "new";
+        if (!isOpen) {
+            if (formKey !== null) formKey = null;
+            return;
+        }
+        const key = editingRegistry ? `edit-${editingRegistry.id}` : 'new';
         if (formKey === key) return;
         formKey = key;
         if (editingRegistry) {
@@ -213,8 +218,14 @@
         if (editingRegistry && selectedPerson.id === editingRegistry.person_id) {
             return !!editingRegistry.pendingResponsiva;
         }
-        const responsivaCard = selectedPerson.cards?.find(c => c.requires_responsiva !== false && c.requires_responsiva === true);
-        return !!(responsivaCard && responsivaCard.responsiva_status !== "signed" && responsivaCard.responsiva_status !== "legacy");
+        const responsivaCard = selectedPerson.cards?.find(
+            (c) => c.requires_responsiva !== false && c.requires_responsiva === true,
+        );
+        return !!(
+            responsivaCard &&
+            responsivaCard.responsiva_status !== 'signed' &&
+            responsivaCard.responsiva_status !== 'legacy'
+        );
     });
 
     /**
@@ -229,14 +240,16 @@
         if (editingRegistry && selectedPerson.id === editingRegistry.person_id) {
             return editingRegistry.responsiva_status_at_registration ?? null;
         }
-        const responsivaCard = selectedPerson.cards?.find(c => c.requires_responsiva !== false && c.requires_responsiva === true);
+        const responsivaCard = selectedPerson.cards?.find(
+            (c) => c.requires_responsiva !== false && c.requires_responsiva === true,
+        );
         // Sin tarjeta que requiera responsiva asignada
         if (!responsivaCard) return null;
         // Tiene tarjeta del medio — verificar si responsiva sigue pendiente
-        const isPending = responsivaCard.responsiva_status !== "signed" && responsivaCard.responsiva_status !== "legacy";
+        const isPending =
+            responsivaCard.responsiva_status !== 'signed' && responsivaCard.responsiva_status !== 'legacy';
         return isPending;
     });
-
 
     function resolveBuildingId(): number | null {
         const b = buildings.find((b: { name: string; id: number | string }) => b.name === manualBuilding);
@@ -244,50 +257,53 @@
     }
 
     function resolveDependencyId(): number | null {
-        const d = dependencies.find((d: { name: string; id: number | string }) => d.name === manualDependency);
+        const d = dependencies.find(
+            (d: { name: string; id: number | string }) => d.name === manualDependency,
+        );
         return d?.id != null ? Number(d.id) : null;
     }
 
     async function handleSubmit() {
-        if (!networkStore.isOnline) { toast.error("Sin conexión a internet"); return; }
+        if (!networkStore.isOnline) {
+            toast.error('Sin conexión a internet');
+            return;
+        }
         if (!manualFirstName.trim() || !manualLastName.trim()) {
-            toast.error("Ingresa nombre y apellidos");
+            toast.error('Ingresa nombre y apellidos');
             return;
         }
         if (!manualDependency.trim()) {
-            toast.error("Selecciona una dependencia");
+            toast.error('Selecciona una dependencia');
             return;
         }
         if (!manualBuilding.trim()) {
-            toast.error("Selecciona un edificio");
+            toast.error('Selecciona un edificio');
             return;
         }
         if (!manualFloor.trim()) {
-            toast.error("Selecciona un piso");
+            toast.error('Selecciona un piso');
             return;
         }
         if (!selectedReason) {
-            toast.error("Selecciona un motivo");
+            toast.error('Selecciona un motivo');
             return;
         }
 
         isSubmitting = true;
         try {
-            const recordedAtIso = recordedAt
-                ? new Date(recordedAt).toISOString()
-                : new Date().toISOString();
+            const recordedAtIso = recordedAt ? new Date(recordedAt).toISOString() : new Date().toISOString();
 
             const payload = {
-                reason:        selectedReason,
-                comments:      comments.trim() || null,
-                recorded_at:   recordedAtIso,
-                building_id:   resolveBuildingId(),
+                reason: selectedReason,
+                comments: comments.trim() || null,
+                recorded_at: recordedAtIso,
+                building_id: resolveBuildingId(),
                 dependency_id: resolveDependencyId(),
-                floor:         manualFloor || null,
-                person_id:     selectedPerson?.id ?? null,
-                first_name:    manualFirstName.trim(),
-                last_name:     manualLastName.trim(),
-                employee_no:   manualEmployeeNo.trim() || null,
+                floor: manualFloor || null,
+                person_id: selectedPerson?.id ?? null,
+                first_name: manualFirstName.trim(),
+                last_name: manualLastName.trim(),
+                employee_no: manualEmployeeNo.trim() || null,
                 // Snapshot: null = sin persona vinculada o sin tarjeta del medio asignada.
                 // true = tarjeta del medio asignada pero responsiva aún pendiente.
                 // false = tarjeta del medio asignada y ya firmada (digital o legacy).
@@ -299,7 +315,7 @@
                 if (editingUpdatedAt) {
                     // Optimistic locking: la edición aplica la condición de versión.
                     const lock = await updateWithLock(
-                        "cardless_registry",
+                        'cardless_registry',
                         editingRegistry.id,
                         payload,
                         editingUpdatedAt,
@@ -308,69 +324,105 @@
                         toast.error(CONFLICT_MSG);
                         return;
                     }
-                    toast.success("Registro actualizado");
+                    toast.success('Registro actualizado');
                 } else {
                     // Sin versión conocida (registro legacy): comportamiento actual.
                     result = await cardlessRegistryService.update(editingRegistry.id, payload);
                     if (!result) return; // error ya reportado por el servicio
-                    toast.success("Registro actualizado");
+                    toast.success('Registro actualizado');
                 }
             } else {
                 result = await cardlessRegistryService.create(payload);
-                if (result) toast.success("Registro creado exitosamente");
+                if (result) toast.success('Registro creado exitosamente');
             }
 
-            if (editingRegistry || result) { isOpen = false; onSave?.(); }
+            if (editingRegistry || result) {
+                isOpen = false;
+                onSave?.();
+            }
         } catch {
-            toast.error("Error al guardar registro");
+            toast.error('Error al guardar registro');
         } finally {
             isSubmitting = false;
         }
     }
 
-    function handleClose() { isOpen = false; resetForm(); }
+    function handleClose() {
+        isOpen = false;
+        resetForm();
+    }
 
     let canSubmit = $derived(
         !!selectedReason &&
-        !!manualFirstName.trim() &&
-        !!manualLastName.trim() &&
-        !!manualDependency.trim() &&
-        !!manualBuilding.trim() &&
-        !!manualFloor.trim()
+            !!manualFirstName.trim() &&
+            !!manualLastName.trim() &&
+            !!manualDependency.trim() &&
+            !!manualBuilding.trim() &&
+            !!manualFloor.trim(),
     );
 </script>
 
-<Modal bind:isOpen title={editingRegistry ? "Editar Registro" : "Nuevo Registro"} size="lg" onclose={handleClose}>
+<Modal
+    bind:isOpen
+    title={editingRegistry ? 'Editar Registro' : 'Nuevo Registro'}
+    size="lg"
+    onclose={handleClose}
+>
     <div class="space-y-5">
-
         {#if isStale}
             <div
                 class="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3 text-xs font-semibold"
             >
-                ⚠️ Este registro fue modificado por otra persona luego de que lo
-                abriste. Puedes seguir editando; al guardar se validará la
-                versión.
+                ⚠️ Este registro fue modificado por otra persona luego de que lo abriste. Puedes seguir
+                editando; al guardar se validará la versión.
             </div>
         {/if}
 
         <!-- ── Person fields ─────────────────────────────────────── -->
-        <div class="space-y-3 rounded-xl border p-4 transition-colors duration-200
+        <div
+            class="space-y-3 rounded-xl border p-4 transition-colors duration-200
             {selectedPerson
                 ? 'bg-emerald-50/60 border-emerald-200'
-                : (manualFirstName || manualLastName)
-                    ? 'bg-amber-50/60 border-amber-200'
-                    : 'bg-slate-50/60 border-slate-200'}">
-
+                : manualFirstName || manualLastName
+                  ? 'bg-amber-50/60 border-amber-200'
+                  : 'bg-slate-50/60 border-slate-200'}"
+        >
             <div class="flex items-center justify-between">
                 <p class="text-sm font-medium text-slate-700">Datos de la persona</p>
                 {#if selectedPerson}
                     <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="11"
+                            height="11"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="3"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg
+                        >
                         Vinculado al sistema
                     </span>
                 {:else if manualFirstName || manualLastName}
                     <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="11"
+                            height="11"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            ><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line
+                                x1="12"
+                                y1="16"
+                                x2="12.01"
+                                y2="16"
+                            /></svg
+                        >
                         Sin vínculo al sistema
                     </span>
                 {/if}
@@ -378,31 +430,37 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1" for="manual-first-name">Nombres <span class="text-rose-500">*</span></label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1" for="manual-first-name"
+                        >Nombres <span class="text-rose-500">*</span></label
+                    >
                     <Input
                         id="manual-first-name"
                         type="text"
                         bind:value={manualFirstName}
-                        oninput={(e: Event) => handleNameInput(e, "first")}
+                        oninput={(e: Event) => handleNameInput(e, 'first')}
                         placeholder="Nombres"
                         disabled={!!selectedPerson}
                         style="text-transform: uppercase"
                     />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1" for="manual-last-name">Apellidos <span class="text-rose-500">*</span></label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1" for="manual-last-name"
+                        >Apellidos <span class="text-rose-500">*</span></label
+                    >
                     <Input
                         id="manual-last-name"
                         type="text"
                         bind:value={manualLastName}
-                        oninput={(e: Event) => handleNameInput(e, "last")}
+                        oninput={(e: Event) => handleNameInput(e, 'last')}
                         placeholder="Apellidos"
                         disabled={!!selectedPerson}
                         style="text-transform: uppercase"
                     />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1" for="manual-employee-no"># Empleado</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1" for="manual-employee-no"
+                        ># Empleado</label
+                    >
                     <Input
                         id="manual-employee-no"
                         type="text"
@@ -412,7 +470,9 @@
                     />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-dependency">Dependencia <span class="text-rose-500">*</span></label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-dependency"
+                        >Dependencia <span class="text-rose-500">*</span></label
+                    >
                     <Select
                         id="reg-dependency"
                         options={dependencyNames}
@@ -421,16 +481,21 @@
                         disabled={!!selectedPerson}
                     />
                 </div>
-            </div>                    <!-- Lista de sugerencias -->
+            </div>
+            <!-- Lista de sugerencias -->
             {#if searchResults.length > 0 && !selectedPerson}
                 <div class="rounded-xl border border-blue-200 bg-blue-50/60 overflow-hidden">
                     <div class="px-3 py-2 flex items-center gap-2 border-b border-blue-100">
                         {#if isSearching}
-                            <div class="animate-spin h-3.5 w-3.5 border-2 border-blue-300 border-t-blue-600 rounded-full"></div>
+                            <div
+                                class="animate-spin h-3.5 w-3.5 border-2 border-blue-300 border-t-blue-600 rounded-full"
+                            ></div>
                         {:else}
                             <LinkIcon size={14} class="text-blue-500" />
                         {/if}
-                        <span class="text-xs font-semibold text-blue-700">Posibles coincidencias — selecciona para vincular</span>
+                        <span class="text-xs font-semibold text-blue-700"
+                            >Posibles coincidencias — selecciona para vincular</span
+                        >
                     </div>
                     <ul class="max-h-44 overflow-auto divide-y divide-blue-100">
                         {#each searchResults as person (person.id)}
@@ -442,7 +507,8 @@
                                 >
                                     <div class="font-medium text-slate-900 text-sm">{person.name}</div>
                                     <div class="text-xs text-slate-500">
-                                        #{person.employee_no || "—"} · {person.building || "Sin edificio"} · {person.dependency || "Sin dependencia"}
+                                        #{person.employee_no || '—'} · {person.building || 'Sin edificio'} · {person.dependency ||
+                                            'Sin dependencia'}
                                     </div>
                                 </button>
                             </li>
@@ -451,10 +517,13 @@
                 </div>
             {:else if isSearching}
                 <div class="flex items-center gap-2 text-xs text-slate-500 px-1">
-                    <div class="animate-spin h-3.5 w-3.5 border-2 border-slate-300 border-t-blue-600 rounded-full"></div>
+                    <div
+                        class="animate-spin h-3.5 w-3.5 border-2 border-slate-300 border-t-blue-600 rounded-full"
+                    ></div>
                     Buscando coincidencias...
                 </div>
-            {/if}                    <!-- Chip de persona vinculada -->
+            {/if}
+            <!-- Chip de persona vinculada -->
             {#if selectedPerson}
                 <div class="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
                     <div class="flex items-center justify-between gap-3">
@@ -464,25 +533,61 @@
                             </div>
                             <div>
                                 <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
-                                    <p class="text-emerald-800 font-semibold text-sm">{selectedPerson.name}</p>
+                                    <p class="text-emerald-800 font-semibold text-sm">
+                                        {selectedPerson.name}
+                                    </p>
                                     {#if responsivaStatusSnapshot === true}
-                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 leading-none whitespace-nowrap">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                        <span
+                                            class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 leading-none whitespace-nowrap"
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="8"
+                                                height="8"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="3"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                ><circle cx="12" cy="12" r="10" /><line
+                                                    x1="12"
+                                                    y1="8"
+                                                    x2="12"
+                                                    y2="12"
+                                                /><line x1="12" y1="16" x2="12.01" y2="16" /></svg
+                                            >
                                             Pendiente de recoger la tarjeta
                                         </span>
                                     {:else if responsivaStatusSnapshot === false}
-                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 leading-none whitespace-nowrap">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                        <span
+                                            class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 leading-none whitespace-nowrap"
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="8"
+                                                height="8"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="3"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                ><polyline points="20 6 9 17 4 12" /></svg
+                                            >
                                             Tarjeta entregada
                                         </span>
                                     {:else}
-                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 leading-none whitespace-nowrap">
+                                        <span
+                                            class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 leading-none whitespace-nowrap"
+                                        >
                                             Sin tarjeta del medio
                                         </span>
                                     {/if}
                                 </div>
                                 <p class="text-emerald-600 text-xs">
-                                    #{selectedPerson.employee_no || "—"} · {selectedPerson.building || "Sin edificio"} · {selectedPerson.dependency || "Sin dependencia"}
+                                    #{selectedPerson.employee_no || '—'} · {selectedPerson.building ||
+                                        'Sin edificio'} · {selectedPerson.dependency || 'Sin dependencia'}
                                 </p>
                             </div>
                         </div>
@@ -497,28 +602,54 @@
                     </div>
                 </div>
             {/if}
-        </div><!-- end person fields -->
+        </div>
+        <!-- end person fields -->
 
         <!-- ── Location ──────────────────────────────────────────── -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-building">Edificio <span class="text-rose-500">*</span></label>
-                <Select id="reg-building" options={buildingNames} bind:value={manualBuilding} placeholder="Seleccionar edificio" disabled={!!selectedPerson} />
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-building"
+                    >Edificio <span class="text-rose-500">*</span></label
+                >
+                <Select
+                    id="reg-building"
+                    options={buildingNames}
+                    bind:value={manualBuilding}
+                    placeholder="Seleccionar edificio"
+                    disabled={!!selectedPerson}
+                />
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-floor">Piso Base <span class="text-rose-500">*</span></label>
-                <Select id="reg-floor" options={availableFloors} bind:value={manualFloor} placeholder="Seleccionar piso" disabled={!manualBuilding || !!selectedPerson} />
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-floor"
+                    >Piso Base <span class="text-rose-500">*</span></label
+                >
+                <Select
+                    id="reg-floor"
+                    options={availableFloors}
+                    bind:value={manualFloor}
+                    placeholder="Seleccionar piso"
+                    disabled={!manualBuilding || !!selectedPerson}
+                />
             </div>
         </div>
 
         <!-- ── Reason + date ─────────────────────────────────────── -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-reason">Motivo <span class="text-rose-500">*</span></label>
-                <Select id="reg-reason" options={reasons} bind:value={selectedReason} placeholder="Seleccionar motivo" />
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-reason"
+                    >Motivo <span class="text-rose-500">*</span></label
+                >
+                <Select
+                    id="reg-reason"
+                    options={reasons}
+                    bind:value={selectedReason}
+                    placeholder="Seleccionar motivo"
+                />
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1" for="recorded-at">Fecha y Hora</label>
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="recorded-at"
+                    >Fecha y Hora</label
+                >
                 <Input id="recorded-at" type="datetime-local" bind:value={recordedAt} />
             </div>
         </div>
@@ -528,11 +659,10 @@
             <label class="block text-sm font-medium text-slate-700 mb-1" for="comments">Comentarios</label>
             <textarea
                 id="comments"
-                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 text-sm"
                 rows="3"
                 bind:value={comments}
-                placeholder="Comentarios adicionales..."
-            ></textarea>
+                placeholder="Comentarios adicionales..."></textarea>
         </div>
     </div>
 
@@ -540,15 +670,23 @@
         <div class="flex w-full items-center justify-between gap-3">
             <div>
                 {#if editingRegistry}
-                    <Button variant="danger" onclick={() => onDelete?.(editingRegistry)} disabled={isSubmitting || !networkStore.isOnline}>
+                    <Button
+                        variant="danger"
+                        onclick={() => onDelete?.(editingRegistry)}
+                        disabled={isSubmitting || !networkStore.isOnline}
+                    >
                         Eliminar
                     </Button>
                 {/if}
             </div>
             <div class="flex items-center gap-2">
                 <Button variant="ghost" onclick={handleClose} disabled={isSubmitting}>Cancelar</Button>
-                <Button onclick={handleSubmit} loading={isSubmitting} disabled={!canSubmit || isSubmitting || !networkStore.isOnline}>
-                    {editingRegistry ? "Guardar Cambios" : "Registrar"}
+                <Button
+                    onclick={handleSubmit}
+                    loading={isSubmitting}
+                    disabled={!canSubmit || isSubmitting || !networkStore.isOnline}
+                >
+                    {editingRegistry ? 'Guardar Cambios' : 'Registrar'}
                 </Button>
             </div>
         </div>

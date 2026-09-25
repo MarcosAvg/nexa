@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { onMount, onDestroy } from "svelte";
-    import { cardService } from "../services/cards";
+    import { onMount, onDestroy } from 'svelte';
+    import { cardService } from '../services/cards';
     import {
         Search,
         User,
@@ -14,24 +14,53 @@
         History,
         Link2,
         Loader2,
-        ChevronRight
-    } from "lucide-svelte";
-    import { personnelService } from "../services/personnel";
-    import { personnelState, uiState } from "../stores";
-    import { handleError, fullName, scrollLock } from "../utils";
-    import { push } from "svelte-spa-router";
+        ChevronRight,
+    } from 'lucide-svelte';
+    import { personnelService } from '../services/personnel';
+    import { personnelState, uiState } from '../stores';
+    import { handleError, fullName, scrollLock, overlayHistory } from '../utils';
+    import { push } from 'svelte-spa-router';
 
     const isOpen = $derived(uiState.isCommandPaletteOpen);
-    let query = $state("");
+    const paletteOverlayId = Symbol('command-palette');
+    let query = $state('');
     let results = $state<any[]>([]);
     let isLoading = $state(false);
     let selectedIndex = $state(0);
     let inputElement = $state<HTMLInputElement | null>(null);
 
+    // ─── Búsquedas recientes (persistidas) ──────────────────────────────
+    const RECENTS_KEY = 'nexa.cmdpalette.recents';
+    const MAX_RECENTS = 5;
+    let recentQueries = $state<string[]>([]);
+
+    function loadRecents() {
+        try {
+            const raw = localStorage.getItem(RECENTS_KEY);
+            const parsed = raw ? JSON.parse(raw) : [];
+            recentQueries = Array.isArray(parsed)
+                ? parsed.filter((x) => typeof x === 'string').slice(0, MAX_RECENTS)
+                : [];
+        } catch {
+            recentQueries = [];
+        }
+    }
+
+    function recordRecent(value: string) {
+        const v = value.trim();
+        if (v.length < 2) return;
+        recentQueries = [v, ...recentQueries.filter((x) => x !== v)].slice(0, MAX_RECENTS);
+        try {
+            localStorage.setItem(RECENTS_KEY, JSON.stringify(recentQueries));
+        } catch {
+            // localStorage puede estar bloqueado; no es crítico.
+        }
+    }
+
     // Reinicia búsqueda cada vez que se abre (incluye apertura táctil externa).
     $effect(() => {
         if (isOpen) {
-            query = "";
+            query = '';
             selectedIndex = 0;
         }
     });
@@ -40,7 +69,11 @@
     $effect(() => {
         if (!isOpen) return;
         scrollLock.lock();
-        return () => scrollLock.unlock();
+        overlayHistory.push(paletteOverlayId, close);
+        return () => {
+            scrollLock.unlock();
+            overlayHistory.close(paletteOverlayId);
+        };
     });
 
     // Auto-foco al input al abrir
@@ -56,67 +89,67 @@
 
     const quickActions = [
         {
-            title: "Nueva Alta de Personal",
-            subtitle: "Registrar un nuevo colaborador",
+            title: 'Nueva Alta de Personal',
+            subtitle: 'Registrar un nuevo colaborador',
             icon: PlusCircle,
-            category: "Acción",
+            category: 'Acción',
             action: () => {
                 personnelState.openEditModal(null);
                 close();
             },
         },
         {
-            title: "Gestión de Enlaces",
-            subtitle: "Administrar responsables por área",
+            title: 'Gestión de Enlaces',
+            subtitle: 'Administrar responsables por área',
             icon: Link2,
-            category: "Acción",
+            category: 'Acción',
             action: () => {
-                push("/enlaces");
+                push('/enlaces');
                 close();
             },
         },
         {
-            title: "Configuración del Sistema",
-            subtitle: "Catálogos y preferencias",
+            title: 'Configuración del Sistema',
+            subtitle: 'Catálogos y preferencias',
             icon: Settings,
-            category: "Navegación",
+            category: 'Navegación',
             action: () => {
-                push("/settings");
+                push('/settings');
                 close();
             },
-        }
+        },
     ];
 
     const navItems = [
         {
-            title: "Dashboard",
-            path: "/",
+            title: 'Dashboard',
+            path: '/',
             icon: Zap,
-            category: "Navegación",
+            category: 'Navegación',
         },
         {
-            title: "Personal",
-            path: "/personal",
+            title: 'Personal',
+            path: '/personal',
             icon: User,
-            category: "Navegación",
+            category: 'Navegación',
         },
         {
-            title: "Inventario",
-            path: "/cards",
+            title: 'Inventario',
+            path: '/cards',
             icon: CreditCard,
-            category: "Navegación",
+            category: 'Navegación',
         },
         {
-            title: "Tickets",
-            path: "/tickets",
+            title: 'Tickets',
+            path: '/tickets',
             icon: ClipboardList,
-            category: "Navegación",
+            category: 'Navegación',
         },
         {
-            title: "Auditoría",
-            path: "/history",
+            title: 'Auditoría',
+            path: '/history',
             icon: History,
-            category: "Navegación",
+            category: 'Navegación',
         },
     ];
 
@@ -139,19 +172,19 @@
         isLoading = true;
         try {
             const [people, cards] = await Promise.all([
-                personnelService.searchByName("", query),
+                personnelService.searchByName('', query),
                 cardService.searchByFolio(query),
             ]);
 
             const peopleResults = people.slice(0, 5).map((p) => ({
                 id: p.id,
                 title: fullName(p.first_name, p.last_name),
-                subtitle: `${p.employee_no || "S/E"} • ${p.dependency || "Sin dep."}`,
+                subtitle: `${p.employee_no || 'S/E'} • ${p.dependency || 'Sin dep.'}`,
                 icon: User,
-                category: "Personal",
+                category: 'Personal',
                 action: () => {
                     personnelState.selectPerson(p.id);
-                    push("/personal");
+                    push('/personal');
                     close();
                 },
             }));
@@ -161,15 +194,15 @@
                 title: `Folio: ${c.folio} (${c.type})`,
                 subtitle: c.person_id
                     ? `Asignada a: ${c.personnel?.first_name} ${c.personnel?.last_name}`
-                    : "Disponible en inventario",
+                    : 'Disponible en inventario',
                 icon: CreditCard,
-                category: "Tarjeta",
+                category: 'Tarjeta',
                 action: () => {
                     if (c.person_id) {
                         personnelState.selectPerson(c.person_id);
-                        push("/personal");
+                        push('/personal');
                     } else {
-                        push("/cards");
+                        push('/cards');
                     }
                     close();
                 },
@@ -177,14 +210,14 @@
 
             results = [...peopleResults, ...cardResults];
         } catch (e) {
-            handleError(e, "Búsqueda Global");
+            handleError(e, 'Búsqueda Global');
         } finally {
             isLoading = false;
         }
     }
 
     function handleKeydown(e: KeyboardEvent) {
-        if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
             e.preventDefault();
             uiState.toggleCommandPalette();
             return;
@@ -192,17 +225,15 @@
 
         if (!isOpen) return;
 
-        if (e.key === "Escape") {
+        if (e.key === 'Escape') {
             close();
-        } else if (e.key === "ArrowDown") {
+        } else if (e.key === 'ArrowDown') {
             e.preventDefault();
             selectedIndex = (selectedIndex + 1) % (allResults.length || 1);
-        } else if (e.key === "ArrowUp") {
+        } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            selectedIndex =
-                (selectedIndex - 1 + allResults.length) %
-                (allResults.length || 1);
-        } else if (e.key === "Enter") {
+            selectedIndex = (selectedIndex - 1 + allResults.length) % (allResults.length || 1);
+        } else if (e.key === 'Enter') {
             e.preventDefault();
             if (allResults[selectedIndex]) {
                 executeAction(allResults[selectedIndex]);
@@ -211,15 +242,24 @@
     }
 
     const allResults = $derived([
-        ...quickActions
-            .filter((item) =>
+        ...(query.trim()
+            ? []
+            : recentQueries.map((q) => ({
+                  title: q,
+                  subtitle: 'Búsqueda reciente',
+                  icon: History,
+                  category: 'Reciente',
+                  action: () => {
+                      query = q;
+                  },
+              }))),
+        ...quickActions.filter(
+            (item) =>
                 item.title.toLowerCase().includes(query.toLowerCase()) ||
-                item.subtitle.toLowerCase().includes(query.toLowerCase())
-            ),
+                item.subtitle.toLowerCase().includes(query.toLowerCase()),
+        ),
         ...navItems
-            .filter((item) =>
-                item.title.toLowerCase().includes(query.toLowerCase())
-            )
+            .filter((item) => item.title.toLowerCase().includes(query.toLowerCase()))
             .map((item) => ({
                 ...item,
                 subtitle: `Ir a ${item.title}`,
@@ -232,22 +272,27 @@
     ]);
 
     function executeAction(item: any) {
+        // Registrar la búsqueda solo cuando el usuario ejecuta un resultado real.
+        if (query.trim() && item.category !== 'Reciente') {
+            recordRecent(query);
+        }
         item.action();
     }
 
     function close() {
         uiState.closeCommandPalette();
-        query = "";
+        query = '';
         results = [];
         selectedIndex = 0;
     }
 
     onMount(() => {
-        window.addEventListener("keydown", handleKeydown);
+        loadRecents();
+        window.addEventListener('keydown', handleKeydown);
     });
 
     onDestroy(() => {
-        window.removeEventListener("keydown", handleKeydown);
+        window.removeEventListener('keydown', handleKeydown);
     });
 </script>
 
@@ -270,29 +315,41 @@
             <!-- Barra de búsqueda -->
             <div class="relative group">
                 <div class="flex items-center px-6 py-5 gap-4">
-                    <Search class="text-indigo-500 group-focus-within:scale-110 transition-transform" size={22} />
+                    <Search
+                        class="text-indigo-500 group-focus-within:scale-110 transition-transform"
+                        size={22}
+                    />
                     <input
                         bind:this={inputElement}
                         type="text"
                         bind:value={query}
                         placeholder="Busca personal, tarjetas, comandos..."
+                        aria-label="Buscar personal, tarjetas o comandos"
                         class="flex-1 bg-transparent border-none outline-none text-slate-800 placeholder:text-slate-400 text-lg font-medium"
                     />
                     {#if isLoading}
                         <Loader2 class="animate-spin text-indigo-500" size={20} />
                     {:else if query}
-                        <button onclick={() => query = ""} class="text-slate-400 hover:text-slate-600 transition-colors">
+                        <button
+                            onclick={() => (query = '')}
+                            class="text-slate-400 hover:text-slate-600 transition-colors"
+                            aria-label="Limpiar búsqueda"
+                        >
                             <X size={20} />
                         </button>
                     {/if}
-                    <div class="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-lg border border-slate-200/50 shrink-0">
+                    <div
+                        class="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-lg border border-slate-200/50 shrink-0"
+                    >
                         <span class="text-[10px] font-bold text-slate-500">ESC</span>
                     </div>
                 </div>
-                
+
                 <!-- Barra de progreso de carga sutil -->
                 {#if isLoading}
-                    <div class="absolute bottom-0 left-0 h-[2px] bg-indigo-500 animate-progress-indefinite w-full"></div>
+                    <div
+                        class="absolute bottom-0 left-0 h-[2px] bg-indigo-500 animate-progress-indefinite w-full"
+                    ></div>
                 {/if}
             </div>
 
@@ -320,17 +377,27 @@
                             <!-- Contenido -->
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center justify-between gap-2">
-                                    <p class="text-sm font-bold truncate {isSelected ? 'text-white' : 'text-slate-700'}">
+                                    <p
+                                        class="text-sm font-bold truncate {isSelected
+                                            ? 'text-white'
+                                            : 'text-slate-700'}"
+                                    >
                                         {item.title}
                                     </p>
-                                    <span class="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0 {isSelected 
-                                        ? 'bg-white/20 text-white' 
-                                        : 'bg-slate-100 text-slate-400'}">
+                                    <span
+                                        class="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0 {isSelected
+                                            ? 'bg-white/20 text-white'
+                                            : 'bg-slate-100 text-slate-400'}"
+                                    >
                                         {item.category}
                                     </span>
                                 </div>
                                 {#if item.subtitle}
-                                    <p class="text-[11px] mt-0.5 truncate {isSelected ? 'text-indigo-100' : 'text-slate-500'}">
+                                    <p
+                                        class="text-[11px] mt-0.5 truncate {isSelected
+                                            ? 'text-indigo-100'
+                                            : 'text-slate-500'}"
+                                    >
                                         {item.subtitle}
                                     </p>
                                 {/if}
@@ -338,18 +405,25 @@
 
                             <!-- Indicador de flecha al seleccionar -->
                             {#if isSelected}
-                                <ChevronRight size={16} class="text-white/70 animate-in slide-in-from-left-2" />
+                                <ChevronRight
+                                    size={16}
+                                    class="text-white/70 animate-in slide-in-from-left-2"
+                                />
                             {/if}
                         </button>
                     {/each}
                 {:else if query.length > 0 && !isLoading}
                     <div class="py-16 flex flex-col items-center justify-center text-center">
-                        <div class="w-16 h-16 bg-slate-50 text-slate-200 rounded-3xl flex items-center justify-center mb-4 border border-dashed border-slate-200">
+                        <div
+                            class="w-16 h-16 bg-slate-50 text-slate-200 rounded-3xl flex items-center justify-center mb-4 border border-dashed border-slate-200"
+                        >
                             <Search size={32} />
                         </div>
                         <h3 class="text-slate-900 font-bold">Sin coincidencias</h3>
                         <p class="text-sm text-slate-500 mt-1 max-w-[200px]">
-                            No encontramos nada para "<span class="text-indigo-600 font-semibold">{query}</span>"
+                            No encontramos nada para "<span class="text-indigo-600 font-semibold"
+                                >{query}</span
+                            >"
                         </p>
                     </div>
                 {:else if !query}
@@ -357,7 +431,9 @@
                     <div class="p-2">
                         <div class="flex items-center gap-2 px-3 mb-3">
                             <Zap size={14} class="text-amber-500 fill-amber-500" />
-                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Sugerencias rápidas</span>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]"
+                                >Sugerencias rápidas</span
+                            >
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {#each navItems as item}
@@ -368,11 +444,17 @@
                                         close();
                                     }}
                                 >
-                                    <div class="p-2 rounded-lg bg-slate-50 text-slate-400 group-hover:bg-white group-hover:text-indigo-600 group-hover:shadow-sm transition-all">
+                                    <div
+                                        class="p-2 rounded-lg bg-slate-50 text-slate-400 group-hover:bg-white group-hover:text-indigo-600 group-hover:shadow-sm transition-all"
+                                    >
                                         <item.icon size={18} />
                                     </div>
                                     <div class="flex-1">
-                                        <p class="text-xs font-bold text-slate-600 group-hover:text-slate-900">{item.title}</p>
+                                        <p
+                                            class="text-xs font-bold text-slate-600 group-hover:text-slate-900"
+                                        >
+                                            {item.title}
+                                        </p>
                                         <p class="text-[10px] text-slate-400">Navegación rápida</p>
                                     </div>
                                 </button>
@@ -383,20 +465,30 @@
             </div>
 
             <!-- Pie de página mejorado -->
-            <div class="px-6 py-4 bg-slate-50/80 backdrop-blur-sm border-t border-slate-100 flex items-center justify-between">
+            <div
+                class="px-6 py-4 bg-slate-50/80 backdrop-blur-sm border-t border-slate-100 flex items-center justify-between"
+            >
                 <div class="flex items-center gap-5">
                     <div class="flex items-center gap-2">
-                        <kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-white text-[10px] font-bold text-slate-500 shadow-sm">↵</kbd>
+                        <kbd
+                            class="px-1.5 py-0.5 rounded border border-slate-300 bg-white text-[10px] font-bold text-slate-500 shadow-sm"
+                            >↵</kbd
+                        >
                         <span class="text-[10px] font-medium text-slate-400">Ejecutar</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-white text-[10px] font-bold text-slate-500 shadow-sm">↑↓</kbd>
+                        <kbd
+                            class="px-1.5 py-0.5 rounded border border-slate-300 bg-white text-[10px] font-bold text-slate-500 shadow-sm"
+                            >↑↓</kbd
+                        >
                         <span class="text-[10px] font-medium text-slate-400">Navegar</span>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
                     <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nexa Live Search</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest"
+                        >Nexa Live Search</span
+                    >
                 </div>
             </div>
         </div>
@@ -413,12 +505,20 @@
     }
 
     @keyframes progress-indefinite {
-        0% { transform: translateX(-100%); width: 30%; }
-        50% { transform: translateX(50%); width: 50%; }
-        100% { transform: translateX(100%); width: 30%; }
+        0% {
+            transform: translateX(-100%);
+            width: 30%;
+        }
+        50% {
+            transform: translateX(50%);
+            width: 50%;
+        }
+        100% {
+            transform: translateX(100%);
+            width: 30%;
+        }
     }
     .animate-progress-indefinite {
         animation: progress-indefinite 1.5s infinite linear;
     }
 </style>
-

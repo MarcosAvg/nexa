@@ -1,7 +1,14 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import type { CatalogItem } from '../types';
-import { activeMediaTypes, ALTAS_BASE, altasMediaCols, modifMediaCols, reposMediaCols, type MediaInfo } from './mediaContract';
+import {
+    activeMediaTypes,
+    ALTAS_BASE,
+    altasMediaCols,
+    modifMediaCols,
+    reposMediaCols,
+    type MediaInfo,
+} from './mediaContract';
 import { settingsState } from '../stores';
 
 // ─────────────────────────────────────────
@@ -50,10 +57,10 @@ const C = {
 // ─────────────────────────────────────────
 function sortFloors(floors: string[]): string[] {
     const ORDER: Record<string, number> = {
-        'Sótano': -2,
-        'Sotano': -2,
+        Sótano: -2,
+        Sotano: -2,
         'Planta Baja': -1,
-        'PB': -1,
+        PB: -1,
     };
     return [...floors].sort((a, b) => {
         const oa = ORDER[a] ?? parseInt(a);
@@ -93,11 +100,13 @@ function styleCell(
         wrap?: boolean;
         italic?: boolean;
         borders?: boolean;
-    } = {}
+    } = {},
 ) {
     cell.font = {
-        name: 'Arial', size: opts.size ?? 9,
-        bold: opts.bold ?? false, italic: opts.italic ?? false,
+        name: 'Arial',
+        size: opts.size ?? 9,
+        bold: opts.bold ?? false,
+        italic: opts.italic ?? false,
         color: { argb: opts.fontColor ?? C.titleText },
     };
     if (opts.fillColor) {
@@ -142,31 +151,54 @@ function addGroupHeaders(ws: ExcelJS.Worksheet, row: number, groups: GroupConfig
         cell.font = { name: 'Arial', bold: true, size: 8, color: { argb: g.color.head } };
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         cell.border = {
-            top: { style: 'thin', color: { argb: C.border } }, bottom: { style: 'thin', color: { argb: C.border } },
-            left: { style: 'thin', color: { argb: C.border } }, right: { style: 'medium', color: { argb: C.border } },
+            top: { style: 'thin', color: { argb: C.border } },
+            bottom: { style: 'thin', color: { argb: C.border } },
+            left: { style: 'thin', color: { argb: C.border } },
+            right: { style: 'medium', color: { argb: C.border } },
         };
         col += g.cols;
     }
     ws.getRow(row).height = 24;
 }
 
-function addColumnHeaders(ws: ExcelJS.Worksheet, row: number, headers: { label: string; mandatory?: boolean; recommended?: boolean }[]) {
+function addColumnHeaders(
+    ws: ExcelJS.Worksheet,
+    row: number,
+    headers: { label: string; mandatory?: boolean; recommended?: boolean }[],
+) {
     headers.forEach((h, i) => {
         const cell = ws.getCell(row, i + 1);
         cell.value = h.mandatory ? `${h.label} *` : h.label;
         const fill = h.mandatory ? C.mandatoryFill : h.recommended ? C.recommendedFill : C.optionalFill;
         const fontColor = h.mandatory ? C.mandatoryText : h.recommended ? C.recommendedText : C.optionalText;
-        styleCell(cell, { bold: true, size: 8, fontColor, fillColor: fill, align: 'center', wrap: true, borders: true });
+        styleCell(cell, {
+            bold: true,
+            size: 8,
+            fontColor,
+            fillColor: fill,
+            align: 'center',
+            wrap: true,
+            borders: true,
+        });
     });
     ws.getRow(row).height = 32;
 }
 
-function addDropdown(ws: ExcelJS.Worksheet, col: string | number, from: number, to: number, formulae: string) {
+function addDropdown(
+    ws: ExcelJS.Worksheet,
+    col: string | number,
+    from: number,
+    to: number,
+    formulae: string,
+) {
     const colStr = typeof col === 'number' ? colLetter(col - 1) : col;
     for (let r = from; r <= to; r++) {
         ws.getCell(`${colStr}${r}`).dataValidation = {
-            type: 'list', allowBlank: true, formulae: [formulae],
-            showErrorMessage: true, errorTitle: 'Valor inválido',
+            type: 'list',
+            allowBlank: true,
+            formulae: [formulae],
+            showErrorMessage: true,
+            errorTitle: 'Valor inválido',
             error: 'Selecciona una opción de la lista desplegable.',
         };
     }
@@ -176,11 +208,22 @@ function addYesNoDropdown(ws: ExcelJS.Worksheet, col: string | number, from: num
     addDropdown(ws, col, from, to, '"Sí,No"');
 }
 
-function paintDataRows(ws: ExcelJS.Worksheet, fromRow: number, toRow: number, totalCols: number, mandatoryCols: number[], recommendedCols: number[] = []) {
+function paintDataRows(
+    ws: ExcelJS.Worksheet,
+    fromRow: number,
+    toRow: number,
+    totalCols: number,
+    mandatoryCols: number[],
+    recommendedCols: number[] = [],
+) {
     for (let r = fromRow; r <= toRow; r++) {
         for (let c = 1; c <= totalCols; c++) {
             const cell = ws.getCell(r, c);
-            const fill = mandatoryCols.includes(c) ? C.mandatoryFill : recommendedCols.includes(c) ? C.recommendedFill : C.optionalFill;
+            const fill = mandatoryCols.includes(c)
+                ? C.mandatoryFill
+                : recommendedCols.includes(c)
+                  ? C.recommendedFill
+                  : C.optionalFill;
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
             cell.font = { name: 'Arial', size: 9, color: { argb: C.titleText } };
             cell.alignment = { vertical: 'middle', horizontal: 'left' };
@@ -197,12 +240,12 @@ function paintDataRows(ws: ExcelJS.Worksheet, fromRow: number, toRow: number, to
 // ─────────────────────────────────────────
 
 function prepareCatalogData(catalogs: TemplateCatalogs) {
-    const depsNames = catalogs.dependencies.map(d => d.name);
-    const buildingNames = catalogs.buildings.map(b => b.name);
-    const accessNames = catalogs.specialAccesses.map(a => a.name);
-    const scheduleNames = catalogs.schedules.map(s => s.name);
+    const depsNames = catalogs.dependencies.map((d) => d.name);
+    const buildingNames = catalogs.buildings.map((b) => b.name);
+    const accessNames = catalogs.specialAccesses.map((a) => a.name);
+    const scheduleNames = catalogs.schedules.map((s) => s.name);
     const allFloors = new Set<string>();
-    catalogs.buildings.forEach(b => (b.floors || []).forEach(f => allFloors.add(f)));
+    catalogs.buildings.forEach((b) => (b.floors || []).forEach((f) => allFloors.add(f)));
     const floorList = sortFloors(Array.from(allFloors));
 
     // Tipos de tarjeta derivados del catálogo de medios (activos); "Ambas" al final.
@@ -228,14 +271,27 @@ function prepareCatalogData(catalogs: TemplateCatalogs) {
         urgenciaRef: () => `CATALOGOS!$K$2:$K$4`,
         mediosTipoRef: () => `CATALOGOS!$L$1:$L$${mediosTipoList.length}`,
     };
-    return { refs, lists: { depsNames, buildingNames, accessNames, scheduleNames, floorList, cardTypeList, mediosTipoList } };
+    return {
+        refs,
+        lists: {
+            depsNames,
+            buildingNames,
+            accessNames,
+            scheduleNames,
+            floorList,
+            cardTypeList,
+            mediosTipoList,
+        },
+    };
 }
 
 function writeCatalogSheet(wb: ExcelJS.Workbook, lists: ReturnType<typeof prepareCatalogData>['lists']) {
     const ws = wb.addWorksheet('CATALOGOS');
     ws.state = 'hidden';
     const write = (col: number, items: string[]) =>
-        items.forEach((item, i) => { ws.getCell(i + 1, col).value = item; });
+        items.forEach((item, i) => {
+            ws.getCell(i + 1, col).value = item;
+        });
     write(1, lists.depsNames);
     write(2, lists.buildingNames);
     write(3, lists.floorList);
@@ -260,21 +316,32 @@ type CatalogRefs = ReturnType<typeof prepareCatalogData>['refs'];
 function buildInstructionsSheet(wb: ExcelJS.Workbook) {
     const ws = wb.addWorksheet('📋 INSTRUCCIONES');
     ws.views = [{ showGridLines: false }];
-    ws.columns = [
-        { width: 4 }, { width: 32 }, { width: 90 }
-    ];
+    ws.columns = [{ width: 4 }, { width: 32 }, { width: 90 }];
 
     // Título
     ws.mergeCells('A1:C1');
     const title = ws.getCell('A1');
     title.value = 'Plantilla de Solicitudes de Acceso';
-    styleCell(title, { bold: true, size: 18, fontColor: C.white, fillColor: C.groupBlue.head, align: 'center' });
+    styleCell(title, {
+        bold: true,
+        size: 18,
+        fontColor: C.white,
+        fillColor: C.groupBlue.head,
+        align: 'center',
+    });
     ws.getRow(1).height = 48;
 
     ws.mergeCells('A2:C2');
     const subtitle = ws.getCell('A2');
     subtitle.value = 'Lea las instrucciones completas antes de llenar cualquier hoja';
-    styleCell(subtitle, { size: 16, fontColor: C.metaText, fillColor: 'FFF8FAFC', align: 'center', italic: true, bold: true });
+    styleCell(subtitle, {
+        size: 16,
+        fontColor: C.metaText,
+        fillColor: 'FFF8FAFC',
+        align: 'center',
+        italic: true,
+        bold: true,
+    });
     ws.getRow(2).height = 24;
 
     let r = 4;
@@ -288,56 +355,160 @@ function buildInstructionsSheet(wb: ExcelJS.Workbook) {
         r++;
     };
 
-    const addRow = (label: string, description: string, type?: 'mandatory' | 'recommended' | 'optional' | 'note') => {
+    const addRow = (
+        label: string,
+        description: string,
+        type?: 'mandatory' | 'recommended' | 'optional' | 'note',
+    ) => {
         ws.getCell(`B${r}`).value = label;
-        const fill = type === 'mandatory' ? C.mandatoryFill : type === 'recommended' ? C.recommendedFill : type === 'note' ? 'FFFFFBEB' : C.optionalFill;
-        const fontColor = type === 'mandatory' ? C.mandatoryText : type === 'recommended' ? C.recommendedText : type === 'note' ? 'FF92400E' : C.optionalText;
-        styleCell(ws.getCell(`B${r}`), { bold: type === 'mandatory', size: 9, fontColor, fillColor: fill, borders: true, valign: 'top' });
+        const fill =
+            type === 'mandatory'
+                ? C.mandatoryFill
+                : type === 'recommended'
+                  ? C.recommendedFill
+                  : type === 'note'
+                    ? 'FFFFFBEB'
+                    : C.optionalFill;
+        const fontColor =
+            type === 'mandatory'
+                ? C.mandatoryText
+                : type === 'recommended'
+                  ? C.recommendedText
+                  : type === 'note'
+                    ? 'FF92400E'
+                    : C.optionalText;
+        styleCell(ws.getCell(`B${r}`), {
+            bold: type === 'mandatory',
+            size: 9,
+            fontColor,
+            fillColor: fill,
+            borders: true,
+            valign: 'top',
+        });
         ws.getCell(`C${r}`).value = description;
-        styleCell(ws.getCell(`C${r}`), { size: 9, fontColor, fillColor: fill, borders: true, wrap: true, valign: 'top' });
+        styleCell(ws.getCell(`C${r}`), {
+            size: 9,
+            fontColor,
+            fillColor: fill,
+            borders: true,
+            wrap: true,
+            valign: 'top',
+        });
         // Altura dinámica: ~18px por línea + 10px padding
         const lines = description.split('\n').length + Math.ceil(description.replace(/\n/g, '').length / 105);
         ws.getRow(r).height = Math.max(10, lines * 10);
         r++;
     };
 
-    const space = (h = 10) => { ws.getRow(r).height = h; r++; };
+    const space = (h = 10) => {
+        ws.getRow(r).height = h;
+        r++;
+    };
 
     // ─ LEGEND ─
     sectionTitle('🎨  LEYENDA DE COLORES');
-    addRow('CAMPO OBLIGATORIO *', 'Debe llenarse siempre.\nLa solicitud será rechazada si falta este dato.', 'mandatory');
-    addRow('CAMPO RECOMENDADO', 'Importante para procesar la solicitud correctamente.\nAyuda a evitar retrasos o aclaraciones adicionales.', 'recommended');
-    addRow('CAMPO OPCIONAL', 'Complételo solo si aplica al caso.\nPuede dejarse en blanco sin afectar la solicitud.');
+    addRow(
+        'CAMPO OBLIGATORIO *',
+        'Debe llenarse siempre.\nLa solicitud será rechazada si falta este dato.',
+        'mandatory',
+    );
+    addRow(
+        'CAMPO RECOMENDADO',
+        'Importante para procesar la solicitud correctamente.\nAyuda a evitar retrasos o aclaraciones adicionales.',
+        'recommended',
+    );
+    addRow(
+        'CAMPO OPCIONAL',
+        'Complételo solo si aplica al caso.\nPuede dejarse en blanco sin afectar la solicitud.',
+    );
     space();
 
     // ─ SHEETS ─
     sectionTitle('📑  DESCRIPCIÓN DE CADA HOJA');
-    addRow('✅ ALTAS', 'Para dar de alta a personas nuevas en el sistema.\nIncluye trabajadores de planta, honorarios, servicio social, etc.');
-    addRow('✏️ MODIFICACIONES', 'Para corregir o actualizar datos de personas ya registradas.\nImportante: Solo llene los campos que desea cambiar. Los campos vacíos NO se modificarán.');
-    addRow('🚫 BAJA DE PERSONA', 'Para dar de baja a una persona del sistema de accesos.\nEsta acción desactiva todos sus accesos. Para dar de baja solo una tarjeta, use la hoja de REPOSICIÓN.');
-    addRow('🔄 REPOSICIÓN DE TARJETA', 'Para solicitar la reposición de una tarjeta P2000 (Puertas), KONE (Elevadores), o ambas al mismo tiempo.\nPuede indicar Sí en una o en ambas en una misma fila.');
-    addRow('🔧 REPORTE DE FALLA', 'Para reportar cuando una tarjeta no funciona correctamente (no abre la puerta, lector no la lee, elevador no responde).\nEl área de accesos verificará antes de determinar si se requiere reposición.');
+    addRow(
+        '✅ ALTAS',
+        'Para dar de alta a personas nuevas en el sistema.\nIncluye trabajadores de planta, honorarios, servicio social, etc.',
+    );
+    addRow(
+        '✏️ MODIFICACIONES',
+        'Para corregir o actualizar datos de personas ya registradas.\nImportante: Solo llene los campos que desea cambiar. Los campos vacíos NO se modificarán.',
+    );
+    addRow(
+        '🚫 BAJA DE PERSONA',
+        'Para dar de baja a una persona del sistema de accesos.\nEsta acción desactiva todos sus accesos. Para dar de baja solo una tarjeta, use la hoja de REPOSICIÓN.',
+    );
+    addRow(
+        '🔄 REPOSICIÓN DE TARJETA',
+        'Para solicitar la reposición de una tarjeta P2000 (Puertas), KONE (Elevadores), o ambas al mismo tiempo.\nPuede indicar Sí en una o en ambas en una misma fila.',
+    );
+    addRow(
+        '🔧 REPORTE DE FALLA',
+        'Para reportar cuando una tarjeta no funciona correctamente (no abre la puerta, lector no la lee, elevador no responde).\nEl área de accesos verificará antes de determinar si se requiere reposición.',
+    );
     space();
 
     // ─ RULES ─
     sectionTitle('⚠️  REGLAS Y ACLARACIONES IMPORTANTES');
-    addRow('Listas desplegables', 'Los campos con lista desplegable (▼) NO aceptan valores escritos a mano.\nUse siempre las opciones predefinidas.', 'mandatory');
-    addRow('Número de Empleado', 'Solo el PERSONAL DE PLANTA (Trabajador) debe incluir número de empleado.\nPersonal externo, honorarios, servicio social, etc., deben dejar este campo vacío\ne indicar su categoría en el campo "Tipo de Personal".', 'recommended');
-    addRow('Apellidos y Nombres', 'Use siempre DOS campos separados: Apellidos y Nombres.\nEsto evita confusiones al buscar personas en el sistema.', 'note');
-    addRow('Asignación de Pisos', 'Los pisos se anotan separados por coma.\nLos únicos pisos escritos con letra son: "Planta Baja" y "Sótano".\nLos demás se anotan con número. Ejemplo: Sótano, Planta Baja, 1, 5', 'note');
-    addRow('Aclaración de pisos asignados', 'Una persona puede tener acceso al ELEVADOR para llegar a un piso, pero esto NO implica tener acceso a las PUERTAS de ese piso.\nSon sistemas independientes (P2000 (Puertas) y KONE (Elevadores)). Registre cada uno según corresponda.', 'note');
-    addRow('Accesos Especiales', 'Solo para accesos fuera de lo ordinario (ej: Filtro 1, Filtro 2, Estacionamiento).\nSi no aplica, dejar en blanco.', 'recommended');
-    addRow('Modificaciones — Campos vacíos', 'En la hoja de MODIFICACIONES, dejar una celda en blanco significa "sin cambio".\nSi los datos son iguales a los actuales, no es necesario llenarlos.', 'mandatory');
-    addRow('Acción sobre Pisos (Modificaciones)', '"Reemplazar" → sustituye todos los pisos asignados por los nuevos indicados.\n"Sumar" → agrega los pisos indicados a los que ya tiene asignados.\n"Quitar" → elimina únicamente los pisos indicados, sin afectar los demás.', 'mandatory');
-    addRow('Múltiples registros', 'Puede incluir varias solicitudes en cada hoja, una por fila.\nNo modifique ni elimine las filas de encabezado.', 'recommended');
+    addRow(
+        'Listas desplegables',
+        'Los campos con lista desplegable (▼) NO aceptan valores escritos a mano.\nUse siempre las opciones predefinidas.',
+        'mandatory',
+    );
+    addRow(
+        'Número de Empleado',
+        'Solo el PERSONAL DE PLANTA (Trabajador) debe incluir número de empleado.\nPersonal externo, honorarios, servicio social, etc., deben dejar este campo vacío\ne indicar su categoría en el campo "Tipo de Personal".',
+        'recommended',
+    );
+    addRow(
+        'Apellidos y Nombres',
+        'Use siempre DOS campos separados: Apellidos y Nombres.\nEsto evita confusiones al buscar personas en el sistema.',
+        'note',
+    );
+    addRow(
+        'Asignación de Pisos',
+        'Los pisos se anotan separados por coma.\nLos únicos pisos escritos con letra son: "Planta Baja" y "Sótano".\nLos demás se anotan con número. Ejemplo: Sótano, Planta Baja, 1, 5',
+        'note',
+    );
+    addRow(
+        'Aclaración de pisos asignados',
+        'Una persona puede tener acceso al ELEVADOR para llegar a un piso, pero esto NO implica tener acceso a las PUERTAS de ese piso.\nSon sistemas independientes (P2000 (Puertas) y KONE (Elevadores)). Registre cada uno según corresponda.',
+        'note',
+    );
+    addRow(
+        'Accesos Especiales',
+        'Solo para accesos fuera de lo ordinario (ej: Filtro 1, Filtro 2, Estacionamiento).\nSi no aplica, dejar en blanco.',
+        'recommended',
+    );
+    addRow(
+        'Modificaciones — Campos vacíos',
+        'En la hoja de MODIFICACIONES, dejar una celda en blanco significa "sin cambio".\nSi los datos son iguales a los actuales, no es necesario llenarlos.',
+        'mandatory',
+    );
+    addRow(
+        'Acción sobre Pisos (Modificaciones)',
+        '"Reemplazar" → sustituye todos los pisos asignados por los nuevos indicados.\n"Sumar" → agrega los pisos indicados a los que ya tiene asignados.\n"Quitar" → elimina únicamente los pisos indicados, sin afectar los demás.',
+        'mandatory',
+    );
+    addRow(
+        'Múltiples registros',
+        'Puede incluir varias solicitudes en cada hoja, una por fila.\nNo modifique ni elimine las filas de encabezado.',
+        'recommended',
+    );
     space();
 
     // ─ CONTACT ─
     sectionTitle('📬  ENVÍO DE LA SOLICITUD');
     addRow('Correo de envío', settingsState.orgSupportEmail || 'soporte@example.com', 'note');
-    addRow('Asunto del correo', 'Formato sugerido: [TIPO DE MOVIMIENTO] – [DEPENDENCIA]\nEjemplo: ALTA – SECRETARÍA DEL TRABAJO\nEjemplo: BAJA – SECRETARÍA DE ADMINISTRACIÓN\nEjemplo: ALTA/REPOSICIÓN – SECRETARÍA DE ADMINISTRACIÓN', 'note');
+    addRow(
+        'Asunto del correo',
+        'Formato sugerido: [TIPO DE MOVIMIENTO] – [DEPENDENCIA]\nEjemplo: ALTA – SECRETARÍA DEL TRABAJO\nEjemplo: BAJA – SECRETARÍA DE ADMINISTRACIÓN\nEjemplo: ALTA/REPOSICIÓN – SECRETARÍA DE ADMINISTRACIÓN',
+        'note',
+    );
     addRow('Tiempo de respuesta', 'Las solicitudes se procesan en un plazo de 1 a 3 días hábiles.');
-    addRow('Dudas o aclaraciones', `Comuníquese al área de Control de Accesos - [Ext: ${settingsState.orgSupportExtension || '0000'}] antes de enviar la solicitud\nsi tiene dudas sobre qué tipo de hoja usar.`);
+    addRow(
+        'Dudas o aclaraciones',
+        `Comuníquese al área de Control de Accesos - [Ext: ${settingsState.orgSupportExtension || '0000'}] antes de enviar la solicitud\nsi tiene dudas sobre qué tipo de hoja usar.`,
+    );
     space();
 }
 
@@ -356,10 +527,22 @@ function buildAltasSheet(wb: ExcelJS.Workbook, refs: CatalogRefs, mediaTypes: Me
 
     const widthOf = (key: string) => {
         const BASE_WIDTH: Record<string, number> = {
-            apellidos: 22, nombres: 22, tipo_personal: 22, no_empleado: 14,
-            dependencia: 26, edificio: 22, piso_base: 13, area: 22, puesto: 22,
-            acceso1: 22, acceso2: 22, acceso3: 22, horario: 22,
-            hora_entrada: 13, hora_salida: 13, correo: 30,
+            apellidos: 22,
+            nombres: 22,
+            tipo_personal: 22,
+            no_empleado: 14,
+            dependencia: 26,
+            edificio: 22,
+            piso_base: 13,
+            area: 22,
+            puesto: 22,
+            acceso1: 22,
+            acceso2: 22,
+            acceso3: 22,
+            horario: 22,
+            hora_entrada: 13,
+            hora_salida: 13,
+            correo: 30,
         };
         if (BASE_WIDTH[key]) return BASE_WIDTH[key];
         if (key.startsWith('pisos_')) return 28;
@@ -381,7 +564,8 @@ function buildAltasSheet(wb: ExcelJS.Workbook, refs: CatalogRefs, mediaTypes: Me
 
     ws.mergeCells(`A2:${colLetter(totalCols - 1)}2`);
     const banner = ws.getCell('A2');
-    banner.value = 'Use esta hoja para dar de alta a personas nuevas en el sistema de accesos (Trabajadores, Honorarios, Servicio Social, etc.). Llene todos los campos marcados con *.';
+    banner.value =
+        'Use esta hoja para dar de alta a personas nuevas en el sistema de accesos (Trabajadores, Honorarios, Servicio Social, etc.). Llene todos los campos marcados con *.';
     styleCell(banner, { size: 9, fontColor: 'FF065F46', fillColor: 'FFD1FAE5', align: 'center', wrap: true });
     ws.getRow(2).height = 24;
 
@@ -409,7 +593,10 @@ function buildAltasSheet(wb: ExcelJS.Workbook, refs: CatalogRefs, mediaTypes: Me
         ...base.map((b) => ({ label: b.label, mandatory: b.required })),
         ...mediaCols.map((c) => ({ label: c.label, mandatory: c.required })),
         ...accesoCols.map((k, i) => ({ label: `Acceso Especial ${i + 1}` })),
-        ...jornadaCols.map((k, i) => ({ label: ['Horario', 'Hora Entrada', 'Hora Salida'][i], mandatory: i === 0 })),
+        ...jornadaCols.map((k, i) => ({
+            label: ['Horario', 'Hora Entrada', 'Hora Salida'][i],
+            mandatory: i === 0,
+        })),
         { label: 'Correo Electrónico' },
     ];
     addColumnHeaders(ws, 4, headers);
@@ -437,7 +624,9 @@ function buildAltasSheet(wb: ExcelJS.Workbook, refs: CatalogRefs, mediaTypes: Me
         const reqIdx = mediaStartIdx + i * altasMediaCols(m).length;
         addYesNoDropdown(ws, colLetter(reqIdx), 5, 5 + ROWS);
     });
-    accesoCols.forEach((k, i) => addDropdown(ws, colLetter(accesoStartIdx + i), 5, 5 + ROWS, refs.accessRef()));
+    accesoCols.forEach((k, i) =>
+        addDropdown(ws, colLetter(accesoStartIdx + i), 5, 5 + ROWS, refs.accessRef()),
+    );
     addDropdown(ws, colLetter(jornadaStartIdx), 5, 5 + ROWS, refs.schedulesRef());
 
     ws.autoFilter = `A4:${colLetter(totalCols - 1)}4`;
@@ -492,8 +681,16 @@ function buildModificacionesSheet(wb: ExcelJS.Workbook, refs: CatalogRefs, media
 
     ws.mergeCells(`A2:${colLetter(totalCols - 1)}2`);
     const note = ws.getCell('A2');
-    note.value = '⚠️  IMPORTANTE: Solo llene los campos que desea MODIFICAR. Los campos vacíos NO serán alterados en el sistema. Si un valor es igual al actual, puede dejarlo en blanco.';
-    styleCell(note, { bold: true, size: 9, fontColor: 'FF92400E', fillColor: 'FFFFFBEB', align: 'center', wrap: true });
+    note.value =
+        '⚠️  IMPORTANTE: Solo llene los campos que desea MODIFICAR. Los campos vacíos NO serán alterados en el sistema. Si un valor es igual al actual, puede dejarlo en blanco.';
+    styleCell(note, {
+        bold: true,
+        size: 9,
+        fontColor: 'FF92400E',
+        fillColor: 'FFFFFBEB',
+        align: 'center',
+        wrap: true,
+    });
     ws.getRow(2).height = 24;
 
     const mediaStartIdx = base.length;
@@ -569,7 +766,8 @@ function buildBajaPersonaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
     // Fila 2: banner explicativo
     ws.mergeCells('A2:G2');
     const banner = ws.getCell('A2');
-    banner.value = 'Use esta hoja para solicitar la baja total de una persona del sistema de accesos. Esta acción desactivará todos sus accesos (P2000 y KONE). Para dar de baja solo una tarjeta use la hoja de REPOSICIÓN.';
+    banner.value =
+        'Use esta hoja para solicitar la baja total de una persona del sistema de accesos. Esta acción desactivará todos sus accesos (P2000 y KONE). Para dar de baja solo una tarjeta use la hoja de REPOSICIÓN.';
     styleCell(banner, { size: 9, fontColor: 'FF9D174D', fillColor: 'FFFCE7F3', align: 'center', wrap: true });
     ws.getRow(2).height = 24;
 
@@ -632,7 +830,8 @@ function buildReposicionSheet(wb: ExcelJS.Workbook, refs: CatalogRefs, mediaType
 
     ws.mergeCells(`A2:${colLetter(totalCols - 1)}2`);
     const banner = ws.getCell('A2');
-    banner.value = 'Use esta hoja para solicitar la reposición de una tarjeta del sistema de accesos. Puede solicitar una o varias al mismo tiempo en una sola fila. Indique "Sí" en la(s) tarjeta(s) que requiere reponer.';
+    banner.value =
+        'Use esta hoja para solicitar la reposición de una tarjeta del sistema de accesos. Puede solicitar una o varias al mismo tiempo en una sola fila. Indique "Sí" en la(s) tarjeta(s) que requiere reponer.';
     styleCell(banner, { size: 9, fontColor: 'FF92400E', fillColor: 'FFFEF3C7', align: 'center', wrap: true });
     ws.getRow(2).height = 24;
 
@@ -709,7 +908,8 @@ function buildReporteFallaSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
     // Banner de nota
     ws.mergeCells('A2:K2');
     const note = ws.getCell('A2');
-    note.value = 'Use esta hoja para reportar cuando su tarjeta de acceso no funciona correctamente (no abre la puerta, el elevador no responde, lector no lee la tarjeta, etc.). El área de Control de Accesos verificará el estado de la tarjeta y determinará si se requiere reposición u otro procedimiento.';
+    note.value =
+        'Use esta hoja para reportar cuando su tarjeta de acceso no funciona correctamente (no abre la puerta, el elevador no responde, lector no lee la tarjeta, etc.). El área de Control de Accesos verificará el estado de la tarjeta y determinará si se requiere reposición u otro procedimiento.';
     styleCell(note, { size: 9, fontColor: 'FF075985', fillColor: 'FFE0F2FE', align: 'center', wrap: true });
     ws.getRow(2).height = 32;
 
@@ -767,13 +967,12 @@ function buildMediosSheet(wb: ExcelJS.Workbook, refs: CatalogRefs) {
 
     ws.mergeCells('A2:B2');
     const banner = ws.getCell('A2');
-    banner.value = 'Use esta hoja para registrar medios en inventario. Cada fila es un medio (folio) con su tipo. Los medios quedarán disponibles para asignar.';
+    banner.value =
+        'Use esta hoja para registrar medios en inventario. Cada fila es un medio (folio) con su tipo. Los medios quedarán disponibles para asignar.';
     styleCell(banner, { size: 9, fontColor: 'FF065F46', fillColor: 'FFD1FAE5', align: 'center', wrap: true });
     ws.getRow(2).height = 24;
 
-    addGroupHeaders(ws, 3, [
-        { label: 'MEDIO', cols: 2, color: C.groupSky },
-    ]);
+    addGroupHeaders(ws, 3, [{ label: 'MEDIO', cols: 2, color: C.groupSky }]);
     addColumnHeaders(ws, 4, [
         { label: 'Tipo', mandatory: true },
         { label: 'Folio', mandatory: false },
@@ -825,7 +1024,7 @@ export async function generateMediosTemplate(catalogs: TemplateCatalogs) {
     saveAs(new Blob([buffer]), 'Plantilla_Medios_Inventario.xlsx');
 }
 
-export async function generateUsageTemplate(mediaLabel: string = "Uso de tarjetas") {
+export async function generateUsageTemplate(mediaLabel: string = 'Uso de tarjetas') {
     const wb = new ExcelJS.Workbook();
     wb.created = new Date();
 
@@ -842,8 +1041,15 @@ export async function generateUsageTemplate(mediaLabel: string = "Uso de tarjeta
 
     ws.mergeCells('A2:D2');
     const banner = ws.getCell('A2');
-    banner.value = 'Instrucciones: Ingrese el folio de la tarjeta y la cantidad de usos (conteo). Las columnas de fecha son opcionales pero altamente recomendadas para filtrar tarjetas inactivas correctamente.';
-    styleCell(banner, { size: 9, fontColor: C.metaText, fillColor: C.groupSky.fill, align: 'center', wrap: true });
+    banner.value =
+        'Instrucciones: Ingrese el folio de la tarjeta y la cantidad de usos (conteo). Las columnas de fecha son opcionales pero altamente recomendadas para filtrar tarjetas inactivas correctamente.';
+    styleCell(banner, {
+        size: 9,
+        fontColor: C.metaText,
+        fillColor: C.groupSky.fill,
+        align: 'center',
+        wrap: true,
+    });
     ws.getRow(2).height = 36;
 
     addColumnHeaders(ws, 3, [

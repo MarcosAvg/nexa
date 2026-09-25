@@ -23,9 +23,11 @@ function inMemoryNavLock(
     fn: () => Promise<unknown>,
 ): Promise<unknown> {
     const prev = navLocks.get(name) ?? Promise.resolve();
-    const next = prev.then(() => fn()).finally(() => {
-        if (navLocks.get(name) === next) navLocks.delete(name);
-    });
+    const next = prev
+        .then(() => fn())
+        .finally(() => {
+            if (navLocks.get(name) === next) navLocks.delete(name);
+        });
     navLocks.set(name, next);
     return next;
 }
@@ -40,7 +42,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 export const auth = {
     async signIn(email: string) {
-        // Usando Magic Links por simplicidad y seguridad si está configurado, 
+        // Usando Magic Links por simplicidad y seguridad si está configurado,
         // or password if the user prefers. Let's start with a generic signIn.
         const { error } = await supabase.auth.signInWithOtp({ email });
         return { error };
@@ -55,11 +57,7 @@ export const auth = {
         });
     },
     async getProfile(userId: string) {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
         return { data, error };
-    }
+    },
 };

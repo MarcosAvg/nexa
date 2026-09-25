@@ -1,10 +1,10 @@
 <script lang="ts">
-    import { userState } from "../stores";
-    import { type Snippet } from "svelte";
+    import { userState } from '../stores';
+    import { type Snippet } from 'svelte';
 
     interface Props {
         /** Roles autorizados para ver este contenido. Si está vacío, se basa en 'requireEdit' o 'requireAdmin' */
-        allowedRoles?: ("admin" | "operator" | "viewer")[];
+        allowedRoles?: ('admin' | 'operator' | 'viewer')[];
         /** Requiere permisos de edición (Admin u Operador) */
         requireEdit?: boolean;
         /** Requiere permisos de administrador */
@@ -36,8 +36,7 @@
 
         if (requireAdmin) return userState.isAdmin;
         if (requireEdit) return userState.canEdit;
-        if (allowedRoles.length > 0)
-            return allowedRoles.includes(userState.profile.role);
+        if (allowedRoles.length > 0) return allowedRoles.includes(userState.profile.role);
 
         return true;
     });

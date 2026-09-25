@@ -4,7 +4,7 @@
  * y muestra un indicador de estado "Al día" o "Actualización disponible".
  */
 export class VersionState {
-    localBuildTime = $state<string>("");
+    localBuildTime = $state<string>('');
     isUpdateAvailable = $state(false);
     /** true cuando la primera verificación ya se completó. */
     hasChecked = $state(false);
@@ -16,12 +16,12 @@ export class VersionState {
         if (!this.localBuildTime) return null;
         try {
             const d = new Date(this.localBuildTime);
-            return d.toLocaleString("es-MX", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
+            return d.toLocaleString('es-MX', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
             });
         } catch {
             return this.localBuildTime.slice(0, 10);
@@ -40,12 +40,12 @@ export class VersionState {
 
         // Cargar build-time actual
         try {
-            const res = await fetch("/build-info.json");
+            const res = await fetch('/build-info.json');
             const data = await res.json();
-            this.localBuildTime = data.buildTime ?? "";
+            this.localBuildTime = data.buildTime ?? '';
         } catch {
             // Si no existe el archivo (dev), ignorar
-            this.localBuildTime = "";
+            this.localBuildTime = '';
         }
 
         // Verificar cada 2 minutos si hay versión nueva
@@ -62,7 +62,7 @@ export class VersionState {
         try {
             const res = await fetch(`/build-info.json?t=${Date.now()}`);
             const data = await res.json();
-            const serverBuildTime = data.buildTime ?? "";
+            const serverBuildTime = data.buildTime ?? '';
 
             if (serverBuildTime && serverBuildTime !== this.localBuildTime) {
                 this.isUpdateAvailable = true;
@@ -71,10 +71,7 @@ export class VersionState {
                 // Si el usuario había descartado una versión anterior y ahora hay
                 // una versión distinta, reseteamos el descarte para que el modal
                 // se muestre automáticamente de nuevo.
-                if (
-                    this.dismissedBuildTime &&
-                    this.dismissedBuildTime !== serverBuildTime
-                ) {
+                if (this.dismissedBuildTime && this.dismissedBuildTime !== serverBuildTime) {
                     this.dismissedBuildTime = null;
                 }
             }
@@ -115,8 +112,7 @@ export class VersionState {
      */
     async refreshPage() {
         try {
-            const registration =
-                await navigator.serviceWorker?.getRegistration();
+            const registration = await navigator.serviceWorker?.getRegistration();
             if (registration) {
                 // Forzar la comprobación de actualización del SW
                 await registration.update();
@@ -127,29 +123,20 @@ export class VersionState {
                     await new Promise<void>((resolve) => {
                         const timeout = setTimeout(resolve, 3000);
                         const onStateChange = () => {
-                            if (
-                                installing.state === "installed" ||
-                                installing.state === "activated"
-                            ) {
+                            if (installing.state === 'installed' || installing.state === 'activated') {
                                 clearTimeout(timeout);
-                                installing.removeEventListener(
-                                    "statechange",
-                                    onStateChange,
-                                );
+                                installing.removeEventListener('statechange', onStateChange);
                                 resolve();
                             }
                         };
-                        installing.addEventListener(
-                            "statechange",
-                            onStateChange,
-                        );
+                        installing.addEventListener('statechange', onStateChange);
                     });
                 }
 
                 // Si hay un nuevo SW esperando, pedirle que se active
                 if (registration.waiting) {
                     registration.waiting.postMessage({
-                        type: "SKIP_WAITING",
+                        type: 'SKIP_WAITING',
                     });
                 }
 
@@ -161,10 +148,7 @@ export class VersionState {
         }
 
         const url = new URL(window.location.href);
-        url.searchParams.set(
-            "_cb",
-            `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        );
+        url.searchParams.set('_cb', `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`);
         // replace en vez de href para no contaminar el historial del navegador
         window.location.replace(url.toString());
     }

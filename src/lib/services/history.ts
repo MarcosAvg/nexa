@@ -1,6 +1,11 @@
-import { supabase } from "../supabase";
-import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, batchPaginate } from "../utils";
-import type { HistoryLog } from "../types";
+import { supabase } from '../supabase';
+import {
+    withErrorHandling,
+    withErrorHandlingSafe,
+    withErrorHandlingConditional,
+    batchPaginate,
+} from '../utils';
+import type { HistoryLog } from '../types';
 
 // Caché de userId a nivel de módulo — evita llamar a getSession() en cada registro
 let _cachedUserId: string | undefined;
@@ -36,9 +41,7 @@ function applyFilters(q: any, filters: HistoryFilters) {
         q = q.ilike('entity_name', `%${filters.person}%`);
     }
     if (filters.cardType && filters.cardType !== 'Todos') {
-        q = q
-            .eq('entity_type', 'CARD')
-            .ilike('entity_name', `${filters.cardType}%`);
+        q = q.eq('entity_type', 'CARD').ilike('entity_name', `${filters.cardType}%`);
     }
     if (filters.folio) {
         q = q.ilike('entity_name', `%${filters.folio}%`);
@@ -60,11 +63,11 @@ function applyFilters(q: any, filters: HistoryFilters) {
 export const HistoryService = {
     /**
      * Log an action to the history table.
-     * 
+     *
      * PERF: Entity name is now accepted as an optional parameter so callers
      * can pass it directly (they almost always have it). This eliminates
      * 1-3 extra SELECT queries that the old implementation used to resolve names.
-     * 
+     *
      * @param entityType - 'PERSONNEL', 'CARD', 'TICKET', 'SYSTEM'
      * @param entityId - The ID of the entity (string or number, converted to string)
      * @param action - Short action name e.g. 'CREATE', 'UPDATE', 'BLOCK'
@@ -72,9 +75,16 @@ export const HistoryService = {
      * @param performedBy - Optional user UUID (cached after first call)
      * @param flowId - Optional flow id to group this log with others of the same operation.
      */
-    async log(entityType: string, entityId: string | number | undefined, action: string, details: Record<string, unknown> | string, performedBy?: string, flowId?: string) {
+    async log(
+        entityType: string,
+        entityId: string | number | undefined,
+        action: string,
+        details: Record<string, unknown> | string,
+        performedBy?: string,
+        flowId?: string,
+    ) {
         if (!entityId) {
-            console.warn("HistoryService: No entityId provided for log", { entityType, action });
+            console.warn('HistoryService: No entityId provided for log', { entityType, action });
         }
 
         const idStr = entityId ? String(entityId) : null;
@@ -91,15 +101,16 @@ export const HistoryService = {
         let userId = performedBy;
         if (!userId) {
             if (!_cachedUserId) {
-                const { data: { session } } = await supabase.auth.getSession();
+                const {
+                    data: { session },
+                } = await supabase.auth.getSession();
                 _cachedUserId = session?.user?.id;
             }
             userId = _cachedUserId;
         }
 
-        const { error } = await supabase
-            .from("history_logs")
-            .insert([{
+        const { error } = await supabase.from('history_logs').insert([
+            {
                 entity_type: entityType,
                 entity_id: idStr,
                 entity_name: entityName,
@@ -107,7 +118,8 @@ export const HistoryService = {
                 details: detailsObj,
                 performed_by: userId,
                 flow_id: flowId ?? _activeFlowId ?? null,
-            }]);
+            },
+        ]);
 
         if (error) {
             // Manejar errores de registro de historial silenciosamente - no crítico para el flujo
@@ -148,19 +160,19 @@ export const HistoryService = {
         if (uids.length === 0) return rows;
         try {
             const { data: profiles } = await supabase
-                .from("profiles")
-                .select("id, full_name")
-                .in("id", uids as string[]);
+                .from('profiles')
+                .select('id, full_name')
+                .in('id', uids as string[]);
             const map = new Map<string, string>();
-            for (const p of profiles || []) map.set(p.id, p.full_name || "");
+            for (const p of profiles || []) map.set(p.id, p.full_name || '');
             return rows.map((r) => ({
                 ...r,
-                performed_by_name: r.performed_by ? (map.get(r.performed_by) || "—") : "—",
+                performed_by_name: r.performed_by ? map.get(r.performed_by) || '—' : '—',
             }));
         } catch {
             return rows.map((r) => ({
                 ...r,
-                performed_by_name: r.performed_by ? "—" : "—",
+                performed_by_name: r.performed_by ? '—' : '—',
             }));
         }
     },
@@ -169,37 +181,47 @@ export const HistoryService = {
         page: number = 1,
         limit: number = 50,
         filters: HistoryFilters = {},
-        throwOnError: boolean = false
+        throwOnError: boolean = false,
     ) {
-        return withErrorHandlingConditional(async () => {
-            const from = (page - 1) * limit;
-            let query = supabase
-                .from("history_logs")
-                .select("id, timestamp, entity_type, entity_id, entity_name, action, details, performed_by, flow_id", { count: "exact" });
+        return withErrorHandlingConditional(
+            async () => {
+                const from = (page - 1) * limit;
+                let query = supabase
+                    .from('history_logs')
+                    .select(
+                        'id, timestamp, entity_type, entity_id, entity_name, action, details, performed_by, flow_id',
+                        { count: 'exact' },
+                    );
 
-            query = applyFilters(query, filters);
+                query = applyFilters(query, filters);
 
-            const { data, count, error } = await query
-                .order("timestamp", { ascending: false })
-                .range(from, from + limit - 1);
+                const { data, count, error } = await query
+                    .order('timestamp', { ascending: false })
+                    .range(from, from + limit - 1);
 
-            if (error) throw error;
-            const enriched = await this._attachUserNames(data || []);
-            return { data: enriched, count: count || 0 };
-        }, "Fetch History", throwOnError, { data: [], count: 0 });
+                if (error) throw error;
+                const enriched = await this._attachUserNames(data || []);
+                return { data: enriched, count: count || 0 };
+            },
+            'Fetch History',
+            throwOnError,
+            { data: [], count: 0 },
+        );
     },
 
-    async fetchForExport(
-        filters: HistoryFilters = {}
-    ) {
-        return withErrorHandlingSafe(async () => {
-            const rows = await batchPaginate<any>(async (from, to) => {
-                let q = supabase.from("history_logs").select("*");
-                q = applyFilters(q, filters);
-                return q.order("timestamp", { ascending: false }).range(from, to);
-            });
-            return await this._attachUserNames(rows);
-        }, "Fetch History for Export", []);
+    async fetchForExport(filters: HistoryFilters = {}) {
+        return withErrorHandlingSafe(
+            async () => {
+                const rows = await batchPaginate<any>(async (from, to) => {
+                    let q = supabase.from('history_logs').select('*');
+                    q = applyFilters(q, filters);
+                    return q.order('timestamp', { ascending: false }).range(from, to);
+                });
+                return await this._attachUserNames(rows);
+            },
+            'Fetch History for Export',
+            [],
+        );
     },
 
     /**
@@ -234,58 +256,63 @@ export const HistoryService = {
     async fetchFlows(
         page: number = 1,
         limit: number = 50,
-        filters: HistoryFilters = {}
+        filters: HistoryFilters = {},
     ): Promise<{ data: HistoryStory[]; count: number }> {
-        return withErrorHandlingSafe(async () => {
-            // 1) Claves de flujo (flow_id) + su timestamp más reciente, y filas sin flow_id como singletons.
-            let flowQ = supabase.from("history_logs").select("flow_id, timestamp");
-            flowQ = applyFilters(flowQ, filters);
-            const { data: flowRows } = await flowQ
-                .not("flow_id", "is", null)
-                .order("timestamp", { ascending: false });
+        return withErrorHandlingSafe(
+            async () => {
+                // 1) Claves de flujo (flow_id) + su timestamp más reciente, y filas sin flow_id como singletons.
+                let flowQ = supabase.from('history_logs').select('flow_id, timestamp');
+                flowQ = applyFilters(flowQ, filters);
+                const { data: flowRows } = await flowQ
+                    .not('flow_id', 'is', null)
+                    .order('timestamp', { ascending: false });
 
-            let nullQ = supabase.from("history_logs").select("id, timestamp");
-            nullQ = applyFilters(nullQ, filters);
-            const { data: nullRows } = await nullQ
-                .is("flow_id", null)
-                .order("timestamp", { ascending: false });
+                let nullQ = supabase.from('history_logs').select('id, timestamp');
+                nullQ = applyFilters(nullQ, filters);
+                const { data: nullRows } = await nullQ
+                    .is('flow_id', null)
+                    .order('timestamp', { ascending: false });
 
-            const flowLatest = new Map<string, string>();
-            for (const r of flowRows || []) {
-                if (!flowLatest.has(r.flow_id)) flowLatest.set(r.flow_id, r.timestamp);
-            }
+                const flowLatest = new Map<string, string>();
+                for (const r of flowRows || []) {
+                    if (!flowLatest.has(r.flow_id)) flowLatest.set(r.flow_id, r.timestamp);
+                }
 
-            const keys: { key: string; last: string; single?: boolean }[] = [];
-            for (const [key, last] of flowLatest) keys.push({ key, last });
-            for (const r of nullRows || []) keys.push({ key: `row-${r.id}`, last: r.timestamp, single: true });
+                const keys: { key: string; last: string; single?: boolean }[] = [];
+                for (const [key, last] of flowLatest) keys.push({ key, last });
+                for (const r of nullRows || [])
+                    keys.push({ key: `row-${r.id}`, last: r.timestamp, single: true });
 
-            keys.sort((a, b) => (b.last).localeCompare(a.last));
+                keys.sort((a, b) => b.last.localeCompare(a.last));
 
-            const total = keys.length;
-            const from = (page - 1) * limit;
-            const pageKeys = keys.slice(from, from + limit);
+                const total = keys.length;
+                const from = (page - 1) * limit;
+                const pageKeys = keys.slice(from, from + limit);
 
-            const flowIds = pageKeys.filter((k) => !k.single).map((k) => k.key);
-            const singleIds = pageKeys.filter((k) => k.single).map((k) => Number(k.key.replace("row-", "")));
+                const flowIds = pageKeys.filter((k) => !k.single).map((k) => k.key);
+                const singleIds = pageKeys
+                    .filter((k) => k.single)
+                    .map((k) => Number(k.key.replace('row-', '')));
 
-            const rows: any[] = [];
-            if (flowIds.length > 0) {
-                let q = supabase.from("history_logs").select("*");
-                q = applyFilters(q, filters);
-                const { data } = await q.in("flow_id", flowIds);
-                rows.push(...(data || []));
-            }
-            if (singleIds.length > 0) {
-                let q = supabase.from("history_logs").select("*");
-                q = applyFilters(q, filters);
-                const { data } = await q.in("id", singleIds);
-                rows.push(...(data || []));
-            }
+                const rows: any[] = [];
+                if (flowIds.length > 0) {
+                    let q = supabase.from('history_logs').select('*');
+                    q = applyFilters(q, filters);
+                    const { data } = await q.in('flow_id', flowIds);
+                    rows.push(...(data || []));
+                }
+                if (singleIds.length > 0) {
+                    let q = supabase.from('history_logs').select('*');
+                    q = applyFilters(q, filters);
+                    const { data } = await q.in('id', singleIds);
+                    rows.push(...(data || []));
+                }
 
-            const enriched = await this._attachUserNames(rows);
-            return { data: this._groupStories(enriched), count: total };
-        }, "Fetch History Flows", { data: [], count: 0 });
+                const enriched = await this._attachUserNames(rows);
+                return { data: this._groupStories(enriched), count: total };
+            },
+            'Fetch History Flows',
+            { data: [], count: 0 },
+        );
     },
-
-
 };

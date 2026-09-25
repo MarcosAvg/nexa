@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { type Snippet } from "svelte";
+    import { type Snippet } from 'svelte';
 
     /**
      * Badge — Etiqueta de estado/color con variantes.
@@ -9,7 +9,18 @@
      */
     type Props = {
         /** Variante de color del badge. */
-        variant?: "slate" | "amber" | "emerald" | "blue" | "rose" | "violet" | "orange" | "red";
+        variant?:
+            | 'slate'
+            | 'amber'
+            | 'emerald'
+            | 'green'
+            | 'blue'
+            | 'sky'
+            | 'indigo'
+            | 'violet'
+            | 'orange'
+            | 'rose'
+            | 'red';
         /** Clases CSS adicionales (twMerge). */
         class?: string;
         /** Contenido interno del badge. */
@@ -18,30 +29,26 @@
         [key: string]: any;
     };
 
-    let {
-        variant = "slate",
-        class: className = "",
-        children,
-        ...rest
-    }: Props = $props();
+    let { variant = 'slate', class: className = '', children, ...rest }: Props = $props();
 
     const baseStyles =
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider transition-all duration-300 select-none";
+        'inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider transition-all duration-300 select-none';
 
     const variants = {
-        slate: "border-slate-500/10 bg-slate-500/5 text-slate-500",
-        amber: "border-amber-500/20 bg-amber-500/10 text-amber-600",
-        emerald: "border-emerald-500/20 bg-emerald-500/10 text-emerald-600",
-        blue: "border-blue-500/20 bg-blue-500/10 text-blue-600",
-        rose: "border-rose-500/20 bg-rose-500/10 text-rose-600",
-        violet: "border-violet-500/20 bg-violet-500/10 text-violet-600",
-        orange: "border-orange-500/20 bg-orange-500/10 text-orange-600",
-        red: "border-red-500/20 bg-red-500/10 text-red-600",
+        slate: 'border-slate-500/10 bg-slate-500/5 text-slate-500',
+        amber: 'border-amber-500/20 bg-amber-500/10 text-amber-600',
+        emerald: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600',
+        green: 'border-green-500/20 bg-green-500/10 text-green-600',
+        blue: 'border-blue-500/20 bg-blue-500/10 text-blue-600',
+        sky: 'border-sky-500/20 bg-sky-500/10 text-sky-600',
+        indigo: 'border-indigo-500/20 bg-indigo-500/10 text-indigo-600',
+        rose: 'border-rose-500/20 bg-rose-500/10 text-rose-600',
+        violet: 'border-violet-500/20 bg-violet-500/10 text-violet-600',
+        orange: 'border-orange-500/20 bg-orange-500/10 text-orange-600',
+        red: 'border-red-500/20 bg-red-500/10 text-red-600',
     };
 
-    let computedClass = $derived(
-        `${baseStyles} ${variants[variant]} ${className}`,
-    );
+    let computedClass = $derived(`${baseStyles} ${variants[variant]} ${className}`);
 </script>
 
 <span class={computedClass} {...rest}>

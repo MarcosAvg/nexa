@@ -10,19 +10,20 @@
  * previsualiza siempre coincide con lo que se guarda.
  */
 
-export type FloorAction = "replace" | "add" | "remove" | "clear";
+export type FloorAction = 'replace' | 'add' | 'remove' | 'clear';
 
 /** Reconoce si una acción corresponde a un tipo, tolerando variantes en mayúsculas/acentos. */
 export function isAction(act: string | null | undefined, type: FloorAction): boolean {
-    const a = (act ?? "").toLowerCase();
-    if (type === "clear")
-        return a.includes("todo") || a.includes("vaciar") || a.includes("limpiar");
-    if (type === "replace")
-        return a.includes("reemplazar") || a.includes("remplazar") || a.includes("sustituir");
-    if (type === "add")
-        return a.includes("añadir") || a.includes("anadir") || a.includes("sumar") || a.includes("agregar");
-    if (type === "remove")
-        return a.includes("quitar") || a.includes("eliminar") || a.includes("borrar") || a.includes("remover");
+    const a = (act ?? '').toLowerCase();
+    if (type === 'clear') return a.includes('todo') || a.includes('vaciar') || a.includes('limpiar');
+    if (type === 'replace')
+        return a.includes('reemplazar') || a.includes('remplazar') || a.includes('sustituir');
+    if (type === 'add')
+        return a.includes('añadir') || a.includes('anadir') || a.includes('sumar') || a.includes('agregar');
+    if (type === 'remove')
+        return (
+            a.includes('quitar') || a.includes('eliminar') || a.includes('borrar') || a.includes('remover')
+        );
     return false;
 }
 
@@ -45,12 +46,12 @@ export function applyFloorAction(
     const cur = Array.from(new Set(current || []));
     const req = Array.from(new Set(requested || []));
 
-    if (isAction(action, "clear")) return [];
-    if (isAction(action, "replace")) return [...req];
-    if (isAction(action, "add")) {
+    if (isAction(action, 'clear')) return [];
+    if (isAction(action, 'replace')) return [...req];
+    if (isAction(action, 'add')) {
         return [...new Set([...cur, ...req])];
     }
-    if (isAction(action, "remove")) {
+    if (isAction(action, 'remove')) {
         return cur.filter((f) => !req.includes(f));
     }
     // Sin acción reconocida: devolver lo actual (sin cambios).

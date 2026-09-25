@@ -1,11 +1,11 @@
 <script lang="ts">
-    import Modal from "../Modal.svelte";
-    import Button from "../Button.svelte";
-    import Input from "../Input.svelte";
-    import { enlaceService } from "../../services/enlaces";
-    import { toast } from "svelte-sonner";
-    import { Save } from "lucide-svelte";
-    import type { Enlace } from "../../types";
+    import Modal from '../Modal.svelte';
+    import Button from '../Button.svelte';
+    import Input from '../Input.svelte';
+    import { enlaceService } from '../../services/enlaces';
+    import { toast } from 'svelte-sonner';
+    import { Save } from 'lucide-svelte';
+    import type { Enlace } from '../../types';
 
     /**
      * EditEnlaceModal — Modal para editar la extensión de un enlace.
@@ -24,17 +24,17 @@
 
     let { isOpen = $bindable(), enlace = null, onComplete }: Props = $props();
 
-    let extension = $state("");
+    let extension = $state('');
     let isSubmitting = $state(false);
 
     $effect(() => {
         if (isOpen && enlace) {
-            extension = enlace.extension || "";
+            extension = enlace.extension || '';
         }
     });
 
     function reset() {
-        extension = "";
+        extension = '';
         isOpen = false;
     }
 
@@ -43,18 +43,16 @@
 
         isSubmitting = true;
         try {
-            const name =
-                `${enlace.personnel?.first_name} ${enlace.personnel?.last_name}`.trim();
+            const name = `${enlace.personnel?.first_name} ${enlace.personnel?.last_name}`.trim();
             await enlaceService.update(enlace.id, extension.trim(), name);
-            toast.success("Enlace Actualizado", {
-                description: "Se ha modificado la extensión correctamente.",
+            toast.success('Enlace Actualizado', {
+                description: 'Se ha modificado la extensión correctamente.',
             });
             onComplete();
             reset();
         } catch (error: any) {
-            toast.error("Error", {
-                description:
-                    error.message || "No se pudo actualizar el enlace.",
+            toast.error('Error', {
+                description: error.message || 'No se pudo actualizar el enlace.',
             });
         } finally {
             isSubmitting = false;
@@ -66,15 +64,14 @@
     bind:isOpen
     title="Editar Extensión"
     description={enlace
-        ? `Modificando extensión para ${enlace.personnel?.first_name || ""} ${enlace.personnel?.last_name || ""}`
-        : ""}
+        ? `Modificando extensión para ${enlace.personnel?.first_name || ''} ${enlace.personnel?.last_name || ''}`
+        : ''}
     size="sm"
     onclose={reset}
 >
     <div class="space-y-4">
         <div class="space-y-1">
-            <span
-                class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
                 >Nueva Extensión Telefónica</span
             >
             <Input

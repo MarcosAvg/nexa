@@ -17,5 +17,5 @@ export const dbCache = {
             console.error(`Failed to load cache for key: ${key}`, err);
             return null;
         }
-    }
+    },
 };

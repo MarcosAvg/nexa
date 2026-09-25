@@ -1,6 +1,6 @@
 <script lang="ts">
-    import Input from "./Input.svelte";
-    import { Search } from "lucide-svelte";
+    import Input from './Input.svelte';
+    import { Search } from 'lucide-svelte';
 
     /**
      * SearchInput — Input de búsqueda con ícono de lupa integrado.
@@ -22,23 +22,14 @@
 
     let {
         value = $bindable(),
-        placeholder = "Buscar...",
+        placeholder = 'Buscar...',
         oninput,
-        class: className = "",
+        class: className = '',
         id,
     }: Props = $props();
 </script>
 
 <div class="relative">
-    <Search
-        size={14}
-        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-    />
-    <Input
-        {placeholder}
-        bind:value
-        {oninput}
-        {id}
-        class="pl-9 {className}"
-    />
+    <Search size={14} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+    <Input {placeholder} bind:value {oninput} {id} class="pl-9 {className}" />
 </div>

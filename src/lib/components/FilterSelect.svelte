@@ -1,5 +1,5 @@
 <script lang="ts">
-    import Select from "./Select.svelte";
+    import Select from './Select.svelte';
 
     /**
      * FilterSelect — Select compacto con label para filtros de vista.
@@ -26,22 +26,24 @@
         label,
         options,
         value = $bindable(),
-        placeholder = "Seleccionar...",
+        placeholder = 'Seleccionar...',
         disabled = false,
         onchange,
     }: Props = $props();
+
+    const selectId = $derived(`filter-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
 </script>
 
-<div
-    class="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto sm:flex-1"
->
-    <span
+<div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto sm:flex-1">
+    <label
+        for={selectId}
         class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap pl-1"
     >
         {label}
-    </span>
+    </label>
     <div class="flex-1">
         <Select
+            id={selectId}
             bind:value
             {placeholder}
             {disabled}
@@ -49,7 +51,7 @@
             onchange={() => onchange?.(value)}
         >
             {#each options as option}
-                {#if typeof option === "string"}
+                {#if typeof option === 'string'}
                     <option value={option}>{option}</option>
                 {:else}
                     <option value={option.value}>{option.label}</option>

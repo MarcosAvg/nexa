@@ -1,21 +1,21 @@
 <script lang="ts">
-    import Modal from "../Modal.svelte";
-    import Button from "../Button.svelte";
-    import { AlertTriangle, Info } from "lucide-svelte";
+    import Modal from '../Modal.svelte';
+    import Button from '../Button.svelte';
+    import { AlertTriangle, Info } from 'lucide-svelte';
 
     let {
         /** Controla la visibilidad (two-way bindable). @default false */
         isOpen = $bindable(false),
         /** Título del modal. @default "¿Estás seguro?" */
-        title = "¿Estás seguro?",
+        title = '¿Estás seguro?',
         /** Descripción del modal. @default "Esta acción no se puede deshacer." */
-        description = "Esta acción no se puede deshacer.",
+        description = 'Esta acción no se puede deshacer.',
         /** Texto del botón de confirmación. @default "Confirmar" */
-        confirmText = "Confirmar",
+        confirmText = 'Confirmar',
         /** Texto del botón de cancelar. @default "Cancelar" */
-        cancelText = "Cancelar",
+        cancelText = 'Cancelar',
         /** Variante visual. @default "danger" */
-        variant = "danger", // danger, warning, info
+        variant = 'danger', // danger, warning, info
         /** Callback al confirmar. */
         onConfirm,
         /** Callback al cancelar. */
@@ -50,7 +50,7 @@
                       ? 'bg-amber-100 text-amber-600'
                       : 'bg-blue-100 text-blue-600'}"
             >
-                {#if variant === "info"}
+                {#if variant === 'info'}
                     <Info size={24} />
                 {:else}
                     <AlertTriangle size={24} />
@@ -69,11 +69,7 @@
             {cancelText}
         </Button>
         <Button
-            variant={variant === "danger"
-                ? "danger"
-                : variant === "warning"
-                  ? "amber"
-                  : "primary"}
+            variant={variant === 'danger' ? 'danger' : variant === 'warning' ? 'amber' : 'primary'}
             onclick={handleConfirm}
             loading={isSubmitting}
         >

@@ -1,20 +1,19 @@
 // src/lib/utils/pdfGenerator.ts
-import type { jsPDF as jsPDFType } from "jspdf";
-import { RESPONSIVA_LEGAL_TEXT } from "../constants/legal";
-import { mediaTypeRgb } from "./mediaTypeAppearance";
-import { settingsState } from "../stores";
+import type { jsPDF as jsPDFType } from 'jspdf';
+import { RESPONSIVA_LEGAL_TEXT } from '../constants/legal';
+/* eslint-disable no-useless-catch -- se conserva el try/catch como punto único
+   de manejo de errores de jsPDF para poder enriquecerlos más adelante. */
+import { mediaTypeRgb } from './mediaTypeAppearance';
+import { settingsState } from '../stores';
 
-export async function generateCardPdf(
-    folio: string,
-    type: string
-) {
-    const { jsPDF } = await import("jspdf");
+export async function generateCardPdf(folio: string, type: string) {
+    const { jsPDF } = await import('jspdf');
 
     // Dimensiones estándar de tarjeta CR80: 54mm x 85.6mm (vertical)
     const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: [54, 85.6]
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [54, 85.6],
     });
 
     const pageWidth = 54;
@@ -23,23 +22,23 @@ export async function generateCardPdf(
     try {
         // Fondo - blanco
         doc.setFillColor(255, 255, 255);
-        doc.rect(0, 0, pageWidth, pageHeight, "F");
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
         // Color determinista por tipo de medio (paleta del catálogo).
         const typeColor = mediaTypeRgb(type);
-        const typeLabel = "Medio de Acceso";
+        const typeLabel = 'Medio de Acceso';
 
         // Etiqueta de tipo (grande, centrada arriba)
         doc.setTextColor(typeColor[0], typeColor[1], typeColor[2]);
-        doc.setFont("helvetica", "bold");
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(18);
-        doc.text(type, pageWidth / 2, 15, { align: "center" });
+        doc.text(type, pageWidth / 2, 15, { align: 'center' });
 
         // Subtítulo (más pequeño, debajo del tipo)
         doc.setTextColor(100, 100, 100);
-        doc.setFont("helvetica", "normal");
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
-        doc.text(typeLabel, pageWidth / 2, 22, { align: "center" });
+        doc.text(typeLabel, pageWidth / 2, 22, { align: 'center' });
 
         // Línea divisoria
         doc.setDrawColor(typeColor[0], typeColor[1], typeColor[2]);
@@ -48,15 +47,15 @@ export async function generateCardPdf(
 
         // Etiqueta de folio
         doc.setTextColor(100, 100, 100);
-        doc.setFont("helvetica", "normal");
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
-        doc.text("FOLIO", pageWidth / 2, 38, { align: "center" });
+        doc.text('FOLIO', pageWidth / 2, 38, { align: 'center' });
 
         // Número de folio (grande, centrado)
         doc.setTextColor(0, 0, 0);
-        doc.setFont("helvetica", "bold");
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(24);
-        doc.text(folio, pageWidth / 2, 52, { align: "center" });
+        doc.text(folio, pageWidth / 2, 52, { align: 'center' });
 
         // Abrir diálogo de impresión
         doc.autoPrint();
@@ -72,36 +71,45 @@ export async function generateResponsivaPdf(
     data: any,
     signature: string,
     bgImage: string,
-    filename: string = "document.pdf",
+    filename: string = 'document.pdf',
     paragraphs: string[] = RESPONSIVA_LEGAL_TEXT,
-    shouldSave: boolean = true
+    shouldSave: boolean = true,
 ) {
-    const { jsPDF } = await import("jspdf");
+    const { jsPDF } = await import('jspdf');
     const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "letter"
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'letter',
     });
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 25;
-    const contentWidth = pageWidth - (margin * 2);
+    const contentWidth = pageWidth - margin * 2;
 
     try {
         // 1. Background
         if (bgImage) {
-            doc.addImage(bgImage, 'PNG', 0, 0, pageWidth, doc.internal.pageSize.getHeight(), undefined, 'FAST');
+            doc.addImage(
+                bgImage,
+                'PNG',
+                0,
+                0,
+                pageWidth,
+                doc.internal.pageSize.getHeight(),
+                undefined,
+                'FAST',
+            );
         }
 
         // 2. Header Date (Date line: 11pt, 55mm from top)
-        doc.setFont("helvetica", "normal");
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(11);
-        doc.text(`Monterrey, N.L. a ${data.fecha}`, pageWidth - margin, 55, { align: "right" });
+        doc.text(`Monterrey, N.L. a ${data.fecha}`, pageWidth - margin, 55, { align: 'right' });
 
         // 3. Title (14pt, Bold, 80mm from top)
-        doc.setFont("helvetica", "bold");
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(14);
-        doc.text("CARTA RESPONSIVA DE ENTREGA DE ACCESO", pageWidth / 2, 80, { align: "center" });
+        doc.text('CARTA RESPONSIVA DE ENTREGA DE ACCESO', pageWidth / 2, 80, { align: 'center' });
 
         // 4. Body Paragraphs (11pt, 100mm from top, Justified with Bold spots)
         let currentY = 100;
@@ -112,23 +120,23 @@ export async function generateResponsivaPdf(
         const drawRichText = (text: string, x: number, y: number, maxWidth: number) => {
             // Dividir por palabras pero preservar lógica de espacios
             const rawWords = text.split(/\s+/);
-            let lines: any[] = [];
+            const lines: any[] = [];
             let currentLine: any[] = [];
             let currentLineWidth = 0;
 
             doc.setFontSize(fontSize);
-            const spaceWidth = doc.getTextWidth(" ");
+            const spaceWidth = doc.getTextWidth(' ');
 
-            rawWords.forEach(word => {
-                let weight: "normal" | "bold" = "normal";
+            rawWords.forEach((word) => {
+                let weight: 'normal' | 'bold' = 'normal';
                 let cleanWord = word;
 
-                if (word.includes("**")) {
-                    cleanWord = word.replace(/\*\*/g, "");
-                    weight = "bold";
+                if (word.includes('**')) {
+                    cleanWord = word.replace(/\*\*/g, '');
+                    weight = 'bold';
                 }
 
-                doc.setFont("helvetica", weight);
+                doc.setFont('helvetica', weight);
                 const wordWidth = doc.getTextWidth(cleanWord);
 
                 // Verificar si añadir esta palabra (y espacio si no es la primera) excede el ancho
@@ -159,7 +167,7 @@ export async function generateResponsivaPdf(
                 }
 
                 line.words.forEach((wordObj: any, wordIdx: number) => {
-                    doc.setFont("helvetica", wordObj.weight);
+                    doc.setFont('helvetica', wordObj.weight);
                     doc.text(wordObj.text, cursorX, y);
                     cursorX += wordObj.width;
                     if (wordIdx < line.words.length - 1) {
@@ -172,15 +180,15 @@ export async function generateResponsivaPdf(
             return y;
         };
 
-        paragraphs.forEach(p => {
+        paragraphs.forEach((p) => {
             // Asegurar que los placeholders se reemplacen (si existen)
             const processedText = p
                 .replace(/{nombre}/g, `**${data.nombre}**`)
                 .replace(/{numEmpleado}/g, `**${data.numEmpleado}**`)
                 .replace(/{dependencia}/g, `**${data.dependencia}**`)
                 .replace(/{folio}/g, `**${data.folio}**`)
-                .replace(/{monto}/g, settingsState.replacementCost || "")
-                .replace(/{organizacion}/g, settingsState.orgName || "");
+                .replace(/{monto}/g, settingsState.replacementCost || '')
+                .replace(/{organizacion}/g, settingsState.orgName || '');
 
             currentY = drawRichText(processedText, margin, currentY, contentWidth);
             currentY += 4; // Espacio entre párrafos (4mm)
@@ -204,14 +212,14 @@ export async function generateResponsivaPdf(
 
         // Etiquetas (9pt Negrita, 10pt Normal)
         doc.setTextColor(68, 68, 68); // #444
-        doc.setFont("helvetica", "bold");
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
-        doc.text("FIRMA DEL EMPLEADO", pageWidth / 2, currentY + 5, { align: "center" });
+        doc.text('FIRMA DEL EMPLEADO', pageWidth / 2, currentY + 5, { align: 'center' });
 
         doc.setTextColor(0, 0, 0); // Negro
-        doc.setFont("helvetica", "normal");
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
-        doc.text(data.nombre, pageWidth / 2, currentY + 11, { align: "center" });
+        doc.text(data.nombre, pageWidth / 2, currentY + 11, { align: 'center' });
 
         if (shouldSave) {
             doc.save(filename);

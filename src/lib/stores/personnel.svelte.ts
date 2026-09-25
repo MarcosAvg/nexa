@@ -1,6 +1,6 @@
-import type { Person, Card, DashboardMetrics, DashboardStats, DashboardGrowth } from "../types";
-import { handleError } from "../utils";
-import { PaginatedListState } from "./paginatedList.svelte";
+import type { Person, Card, DashboardMetrics, DashboardStats, DashboardGrowth } from '../types';
+import { handleError } from '../utils';
+import { PaginatedListState } from './paginatedList.svelte';
 
 export type PersonnelFilters = {
     search: string;
@@ -14,7 +14,7 @@ export type PersonnelFilters = {
 export class PersonnelState {
     pagination = new PaginatedListState<Person>();
 
-    personnelOptions = $state<{ id: string, name: string, employee_no: string }[]>([]);
+    personnelOptions = $state<{ id: string; name: string; employee_no: string }[]>([]);
     selectedPersonId = $state<string | null>(null);
     extraCards = $state<Card[]>([]);
     isDetailsOpen = $state(false);
@@ -26,12 +26,12 @@ export class PersonnelState {
 
     /** Filtros unificados. Las vistas pueden bindear directamente. */
     filters: PersonnelFilters = $state({
-        search: "",
-        status: "Todos",
-        dependencyId: "",
-        buildingId: "",
-        floor: "",
-        mediaTypeId: "",
+        search: '',
+        status: 'Todos',
+        dependencyId: '',
+        buildingId: '',
+        floor: '',
+        mediaTypeId: '',
     });
 
     dashboardStats = $state<DashboardStats>({
@@ -40,7 +40,16 @@ export class PersonnelState {
     });
     dashboardMetrics = $state<DashboardMetrics>({
         totalPersonnel: 0,
-        statusCounts: { activo: 0, parcial: 0, en_proceso: 0, media_otro_edificio: 0, media_otro_edificio_pendiente: 0, sin_acceso: 0, bloqueado: 0, baja: 0 },
+        statusCounts: {
+            activo: 0,
+            parcial: 0,
+            en_proceso: 0,
+            media_otro_edificio: 0,
+            media_otro_edificio_pendiente: 0,
+            sin_acceso: 0,
+            bloqueado: 0,
+            baja: 0,
+        },
         cardCoverage: [],
         operativos: 0,
         noActivos: 0,
@@ -63,17 +72,17 @@ export class PersonnelState {
     });
     growthLoading = $state(false);
     /** Fecha de inicio (YYYY-MM-DD). Vacío = "desde creación". */
-    growthStartDate = $state("");
+    growthStartDate = $state('');
     /** Fecha de fin (YYYY-MM-DD). Vacío = hoy. */
-    growthEndDate = $state("");
+    growthEndDate = $state('');
 
-    setPersonnelOptions(data: { id: string, name: string, employee_no: string }[]) {
+    setPersonnelOptions(data: { id: string; name: string; employee_no: string }[]) {
         this.personnelOptions = data;
     }
 
     async refreshDashboardStats() {
         try {
-            const { supabase } = await import("../supabase");
+            const { supabase } = await import('../supabase');
             const { data, error } = await supabase.rpc('get_dashboard_stats');
             if (error) throw error;
             if (data) {
@@ -84,7 +93,7 @@ export class PersonnelState {
             // Fallback: usar implementación multi-query si la RPC aún no está disponible
         }
         try {
-            const { personnelService } = await import("../services/personnel");
+            const { personnelService } = await import('../services/personnel');
             const stats = await personnelService.fetchDashboardStats();
             this.dashboardStats = stats;
         } catch (error) {
@@ -95,7 +104,7 @@ export class PersonnelState {
     async refreshDashboardMetrics() {
         this.metricsLoading = true;
         try {
-            const { personnelService } = await import("../services/personnel");
+            const { personnelService } = await import('../services/personnel');
             this.dashboardMetrics = await personnelService.fetchDashboardMetrics();
         } catch (error) {
             // Manejar error de actualización de métricas silenciosamente - reintentará
@@ -107,7 +116,7 @@ export class PersonnelState {
     async refreshDashboardGrowth() {
         this.growthLoading = true;
         try {
-            const { personnelService } = await import("../services/personnel");
+            const { personnelService } = await import('../services/personnel');
             const startDate = this.growthStartDate || null;
             const endDate = this.growthEndDate || null;
             this.growth = await personnelService.fetchDashboardGrowth(startDate, endDate);
@@ -129,9 +138,19 @@ export class PersonnelState {
     }
 
     async refresh(page?: number) {
-        const { personnelService } = await import("../services/personnel");
+        const { personnelService } = await import('../services/personnel');
         await this.pagination.fetchPage(
-            (p, s) => personnelService.fetchAll(p, s, this.filters.search, this.filters.status, this.filters.dependencyId, this.filters.buildingId, this.filters.floor, this.filters.mediaTypeId),
+            (p, s) =>
+                personnelService.fetchAll(
+                    p,
+                    s,
+                    this.filters.search,
+                    this.filters.status,
+                    this.filters.dependencyId,
+                    this.filters.buildingId,
+                    this.filters.floor,
+                    this.filters.mediaTypeId,
+                ),
             page,
         );
     }
@@ -181,7 +200,7 @@ export class PersonnelState {
 
     async initRealtime() {
         try {
-            const { personnelService } = await import("../services/personnel");
+            const { personnelService } = await import('../services/personnel');
             personnelService.subscribeToChanges((payload) => {
                 // Siempre actualizar métricas en cualquier cambio
                 this.refreshDashboardMetrics();
@@ -190,7 +209,7 @@ export class PersonnelState {
                 if (payload.eventType === 'UPDATE') {
                     // Actualizar el array local de personal de forma óptima
                     const newData = payload.new as Record<string, unknown>;
-                    const index = this.pagination.items.findIndex(p => p.id === newData.id);
+                    const index = this.pagination.items.findIndex((p) => p.id === newData.id);
                     if (index !== -1) {
                         // Aplicar cambios optimistas para campos básicos
                         const current = this.pagination.items[index];
@@ -220,16 +239,16 @@ export class PersonnelState {
                 }
             });
         } catch (error) {
-            console.warn("Failed to initialize Realtime:", error);
+            console.warn('Failed to initialize Realtime:', error);
         }
     }
 
     async _refreshOptimisticPerson(id: string) {
         try {
-            const { personnelService } = await import("../services/personnel");
+            const { personnelService } = await import('../services/personnel');
             const updated = await personnelService.fetchById(id);
             if (updated) {
-                const index = this.pagination.items.findIndex(p => p.id === id);
+                const index = this.pagination.items.findIndex((p) => p.id === id);
                 if (index !== -1) {
                     this.pagination.items[index] = updated;
                 }

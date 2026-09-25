@@ -1,7 +1,9 @@
 <script lang="ts">
-    import { Edit2, Trash2, GripVertical } from "lucide-svelte";
+    import { Edit2, Trash2, GripVertical } from 'lucide-svelte';
+    import IconButton from '../IconButton.svelte';
 
     type Props = {
+        /** Muestra las acciones de edición/borrado. @default true */
         canEdit?: boolean;
         showDrag?: boolean;
         editLabel?: string;
@@ -11,10 +13,10 @@
     };
 
     let {
-        canEdit = false,
+        canEdit = true,
         showDrag = true,
-        editLabel = "Editar",
-        deleteLabel = "Eliminar",
+        editLabel = 'Editar',
+        deleteLabel = 'Eliminar',
         onEdit,
         onDelete,
     }: Props = $props();
@@ -22,14 +24,16 @@
 
 <div class="flex justify-end gap-1">
     {#if showDrag}
-        <span class="p-1.5 text-slate-300 group-hover:text-slate-400 cursor-grab transition-colors" title="Arrastrar para reordenar" aria-hidden="true">
+        <span
+            class="flex items-center justify-center h-9 w-9 text-slate-300 group-hover:text-slate-400 cursor-grab transition-colors"
+            title="Arrastrar para reordenar"
+            aria-hidden="true"
+        >
             <GripVertical size={16} />
         </span>
     {/if}
-    <button class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" onclick={onEdit} title={editLabel} aria-label={editLabel}>
-        <Edit2 size={16} />
-    </button>
-    <button class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" onclick={onDelete} title={deleteLabel} aria-label={deleteLabel}>
-        <Trash2 size={16} />
-    </button>
+    {#if canEdit}
+        <IconButton icon={Edit2} label={editLabel} tone="blue" size="sm" onclick={onEdit} />
+        <IconButton icon={Trash2} label={deleteLabel} tone="rose" size="sm" onclick={onDelete} />
+    {/if}
 </div>

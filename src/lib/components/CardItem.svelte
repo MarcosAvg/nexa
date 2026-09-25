@@ -1,20 +1,14 @@
 <script lang="ts">
-    import Badge from "./Badge.svelte";
-    import ResponsivaProgramBadges from "./ResponsivaProgramBadges.svelte";
-    import Button from "./Button.svelte";
-    import {
-        FileSignature,
-        Lock,
-        Ban,
-        RefreshCw,
-        CheckCircle2,
-        Printer,
-        Wrench,
-    } from "lucide-svelte";
-    import PermissionGuard from "./PermissionGuard.svelte";
-    import { toast } from "svelte-sonner";
-    import { uiState } from "../stores/ui.svelte";
-    import { mediaTypeVariant } from "../utils/mediaTypeAppearance";
+    import Badge from './Badge.svelte';
+    import StatusBadge from './StatusBadge.svelte';
+    import IconButton from './IconButton.svelte';
+    import ResponsivaProgramBadges from './ResponsivaProgramBadges.svelte';
+    import Button from './Button.svelte';
+    import { FileSignature, Lock, Ban, RefreshCw, CheckCircle2, Printer, Wrench } from 'lucide-svelte';
+    import PermissionGuard from './PermissionGuard.svelte';
+    import { toast } from 'svelte-sonner';
+    import { uiState } from '../stores/ui.svelte';
+    import { mediaTypeVariant } from '../utils/mediaTypeAppearance';
 
     /**
      * CardItem — Item de tarjeta de acceso en el panel de detalles.
@@ -31,7 +25,7 @@
         /** Folio único de la tarjeta. */
         folio: string;
         /** Estado de la tarjeta. @default "active" */
-        status?: "active" | "blocked" | "inactive";
+        status?: 'active' | 'blocked' | 'inactive';
         /** Estado de responsiva: "signed" | "legacy" | null. */
         responsiva_status?: string;
         /** Estado de programación: "done" | "pending" | null. */
@@ -51,13 +45,16 @@
         /** Callback para generar PDF/impresión. */
         onPrint?: () => void;
         /** Callback para cambiar estado directamente (Modo Dios). */
-        onDirectStatusChange?: (field: "responsiva_status" | "programming_status", value: string | null) => void;
+        onDirectStatusChange?: (
+            field: 'responsiva_status' | 'programming_status',
+            value: string | null,
+        ) => void;
     };
 
     let {
         type,
         folio,
-        status = "active",
+        status = 'active',
         responsiva_status,
         programming_status,
         isHighlighted = false,
@@ -71,23 +68,23 @@
     }: Props = $props();
 
     const RESPONSIVA_OPTIONS = [
-        { value: null,      label: "Sin Firmar",  badge: "rose" },
-        { value: "legacy",  label: "Legacy",      badge: "slate" },
-        { value: "signed",  label: "Firmada",     badge: "emerald" },
+        { value: null, label: 'Sin Firmar', badge: 'rose' },
+        { value: 'legacy', label: 'Legacy', badge: 'slate' },
+        { value: 'signed', label: 'Firmada', badge: 'emerald' },
     ] as const;
 
     const PROGRAM_OPTIONS = [
-        { value: "pending", label: "Sin Programar", badge: "blue" },
-        { value: "done",    label: "Programada",    badge: "emerald" },
+        { value: 'pending', label: 'Sin Programar', badge: 'blue' },
+        { value: 'done', label: 'Programada', badge: 'emerald' },
     ] as const;
 
     async function copyFolio() {
         if (!folio) return;
         try {
             await navigator.clipboard.writeText(folio);
-            toast.success("Folio copiado");
+            toast.success('Folio copiado');
         } catch {
-            toast.error("Error al copiar");
+            toast.error('Error al copiar');
         }
     }
 </script>
@@ -106,29 +103,15 @@
                 type="button"
                 class="text-sm font-bold text-slate-800 hover:text-blue-600 transition-colors cursor-pointer"
                 onclick={copyFolio}
-                title={folio ? `Copiar folio: ${folio}` : "Copiar folio"}
-            >{folio}</button>
+                title={folio ? `Copiar folio: ${folio}` : 'Copiar folio'}>{folio}</button
+            >
 
             <ResponsivaProgramBadges {responsiva_status} {programming_status} />
         </div>
-        <Badge
-            variant={status === "active"
-                ? "emerald"
-                : status === "blocked"
-                  ? "rose"
-                  : "slate"}
-        >
-            {status === "active"
-                ? "Activa"
-                : status === "blocked"
-                  ? "Bloqueada"
-                  : "Baja"}
-        </Badge>
+        <StatusBadge domain="card" value={status} />
     </div>
 
-    <div
-        class="flex items-center justify-between pt-3 border-t border-slate-100"
-    >
+    <div class="flex items-center justify-between pt-3 border-t border-slate-100">
         <PermissionGuard requireEdit disabledOnly>
             {#snippet children({ disabled: permissionDisabled })}
                 <!-- Responsiva: icono Esmeralda distintivo con etiqueta -->
@@ -138,28 +121,24 @@
                         'done' && !permissionDisabled
                         ? 'text-emerald-600 hover:bg-emerald-50'
                         : 'text-slate-300 cursor-not-allowed grayscale bg-slate-50'}"
-                    onclick={programming_status === "done" &&
-                    !permissionDisabled
+                    onclick={programming_status === 'done' && !permissionDisabled
                         ? onGenerateResponsiva
                         : undefined}
-                    disabled={programming_status !== "done" ||
-                        permissionDisabled}
-                    title={programming_status === "done"
-                        ? "Generar y firmar responsiva"
-                        : "Debe programar la tarjeta antes de generar la responsiva"}
+                    disabled={programming_status !== 'done' || permissionDisabled}
+                    title={programming_status === 'done'
+                        ? 'Generar y firmar responsiva'
+                        : 'Debe programar la tarjeta antes de generar la responsiva'}
                 >
                     <FileSignature
                         size={16}
-                        class={programming_status === "done"
-                            ? "group-hover:scale-110 transition-transform"
-                            : ""}
+                        class={programming_status === 'done'
+                            ? 'group-hover:scale-110 transition-transform'
+                            : ''}
                     />
-                    <span class="text-[10px] font-bold uppercase tracking-wider"
-                        >Responsiva</span
-                    >
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Responsiva</span>
                 </button>
 
-                {#if programming_status !== "done"}
+                {#if programming_status !== 'done'}
                     <!-- Programar: Azul -->
                     <button
                         type="button"
@@ -168,61 +147,52 @@
                         disabled={permissionDisabled}
                         title="Marcar tarjeta como programada físicamente"
                     >
-                        <CheckCircle2
-                            size={16}
-                            class="group-hover:scale-110 transition-transform"
-                        />
-                        <span
-                            class="text-[10px] font-bold uppercase tracking-wider"
-                            >Programar</span
-                        >
+                        <CheckCircle2 size={16} class="group-hover:scale-110 transition-transform" />
+                        <span class="text-[10px] font-bold uppercase tracking-wider">Programar</span>
                     </button>
                 {/if}
 
                 <div class="flex items-center gap-1">
                     <!-- Imprimir: Pizarra -->
-                    <button
-                        type="button"
-                        class="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all duration-200 disabled:opacity-50"
-                        onclick={onPrint}
+                    <IconButton
+                        icon={Printer}
+                        label="Imprimir tarjeta"
+                        tone="slate"
+                        size="sm"
                         disabled={permissionDisabled}
-                        title="Imprimir tarjeta"
-                    >
-                        <Printer size={16} />
-                    </button>
+                        onclick={onPrint}
+                    />
 
                     <!-- Bloquear: Ámbar -->
-                    <button
-                        type="button"
-                        class="p-2 rounded-full text-slate-400 hover:text-amber-500 hover:bg-amber-50 transition-all duration-200 disabled:opacity-50"
-                        onclick={onBlock}
+                    <IconButton
+                        icon={Lock}
+                        label={status === 'active' ? 'Bloquear tarjeta' : 'Desbloquear tarjeta'}
+                        title={status === 'active' ? 'Bloquear' : 'Desbloquear'}
+                        tone="amber"
+                        size="sm"
                         disabled={permissionDisabled}
-                        title={status === "active" ? "Bloquear" : "Desbloquear"}
-                    >
-                        <Lock size={16} />
-                    </button>
+                        onclick={onBlock}
+                    />
 
                     <!-- Reposición: Indigo -->
-                    <button
-                        type="button"
-                        class="p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all duration-200 disabled:opacity-50"
-                        onclick={onReplace}
+                    <IconButton
+                        icon={RefreshCw}
+                        label="Reposición por extravío"
+                        tone="indigo"
+                        size="sm"
                         disabled={permissionDisabled}
-                        title="Reposición por extravío"
-                    >
-                        <RefreshCw size={16} />
-                    </button>
+                        onclick={onReplace}
+                    />
 
                     <!-- Dar de baja: Rosa -->
-                    <button
-                        type="button"
-                        class="p-2 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200 disabled:opacity-50"
-                        onclick={onUnassign}
+                    <IconButton
+                        icon={Ban}
+                        label="Dar de baja (desvincular)"
+                        tone="rose"
+                        size="sm"
                         disabled={permissionDisabled}
-                        title="Dar de baja (Desvincular)"
-                    >
-                        <Ban size={16} />
-                    </button>
+                        onclick={onUnassign}
+                    />
                 </div>
             {/snippet}
         </PermissionGuard>
@@ -233,7 +203,9 @@
         <div class="pt-3 border-t border-amber-200 bg-amber-50/60 -mx-4 -mb-4 px-4 pb-4 rounded-b-xl">
             <div class="flex items-center gap-1.5 mb-2.5">
                 <Wrench size={11} class="text-amber-600 animate-pulse" />
-                <span class="text-[9px] font-extrabold uppercase tracking-[0.2em] text-amber-600">Modo Dios — Edición Directa</span>
+                <span class="text-[9px] font-extrabold uppercase tracking-[0.2em] text-amber-600"
+                    >Modo Dios — Edición Directa</span
+                >
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <!-- Estado de Responsiva -->
@@ -243,7 +215,10 @@
                         {#each RESPONSIVA_OPTIONS as opt}
                             <button
                                 type="button"
-                                class="text-left px-2 py-1 rounded-lg text-[10px] font-bold transition-all border {(responsiva_status ?? null) === opt.value ? 'bg-amber-500 text-white border-amber-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-700'}"
+                                class="text-left px-2 py-1 rounded-lg text-[10px] font-bold transition-all border {(responsiva_status ??
+                                    null) === opt.value
+                                    ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-700'}"
                                 onclick={() => onDirectStatusChange?.('responsiva_status', opt.value)}
                             >
                                 {opt.label}
@@ -258,7 +233,10 @@
                         {#each PROGRAM_OPTIONS as opt}
                             <button
                                 type="button"
-                                class="text-left px-2 py-1 rounded-lg text-[10px] font-bold transition-all border {(programming_status ?? 'pending') === opt.value ? 'bg-amber-500 text-white border-amber-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-700'}"
+                                class="text-left px-2 py-1 rounded-lg text-[10px] font-bold transition-all border {(programming_status ??
+                                    'pending') === opt.value
+                                    ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-700'}"
                                 onclick={() => onDirectStatusChange?.('programming_status', opt.value)}
                             >
                                 {opt.label}

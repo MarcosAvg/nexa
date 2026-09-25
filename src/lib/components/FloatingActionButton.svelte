@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Plus } from "lucide-svelte";
+    import { Plus } from 'lucide-svelte';
 
     /**
      * FloatingActionButton — Botón de acción flotante (visible solo en móvil).
@@ -16,8 +16,10 @@
         label?: string;
     };
 
-    let { onclick, icon: Icon = Plus, label = "Crear nuevo" }: Props = $props();
-</script>    <!-- FAB: visible solo en móvil, posicionado sobre BottomNav -->
+    let { onclick, icon: Icon = Plus, label = 'Crear nuevo' }: Props = $props();
+</script>
+
+<!-- FAB: visible solo en móvil, posicionado sobre BottomNav -->
 <button
     type="button"
     class="fixed z-50 lg:hidden right-5 bottom-[calc(5rem_+_env(safe-area-inset-bottom,0px))] flex items-center justify-center w-14 h-14 rounded-full bg-blue-600 text-white shadow-xl shadow-blue-500/30 hover:bg-blue-700 active:scale-90 transition-all duration-300 ring-4 ring-white/80"

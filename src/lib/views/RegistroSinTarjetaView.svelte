@@ -1,44 +1,51 @@
 <script lang="ts">
+    import { cardlessRegistryState, catalogState } from '../stores';
+    import { pullRefresh } from '../stores';
     import {
-        cardlessRegistryState,
-        catalogState,
-    } from "../stores";
-    import {
-        SectionHeader, FilterSelect, FilterToolbar, Button, Card, DataTable,
-        Badge, PermissionGuard, Pagination, FloatingActionButton,
-        ContentView, SearchInput, Input, ExportDropdown, ExportMenuItem,
-        CardlessRegistryModal, ConfirmationModal,
-    } from "../components";
-    import {
-        FileSpreadsheet,
-        Plus,
-        Loader2,
-        Trash2,
-        FolderArchive,
-        FileX,
-    } from "lucide-svelte";
-    import { cardlessRegistryService } from "../services/cardlessRegistry";
-    import { exportCardlessRegistryAllDependenciesAsZip, handleError, formatDate } from "../utils";
-    import { reasonVariant } from "../constants/appearance";
-    import type { CardlessRegistry } from "../types";
-    import { toast } from "svelte-sonner";
-    
-    import { networkStore } from "../stores/network.svelte";
+        SectionHeader,
+        FilterSelect,
+        FilterToolbar,
+        Button,
+        Card,
+        DataTable,
+        DataList,
+        Badge,
+        PermissionGuard,
+        Pagination,
+        FloatingActionButton,
+        ContentView,
+        SearchInput,
+        Input,
+        ExportDropdown,
+        ExportMenuItem,
+        CardlessRegistryModal,
+        ConfirmationModal,
+    } from '../components';
+    import { FileSpreadsheet, Plus, Loader2, Trash2, FolderArchive, FileX } from 'lucide-svelte';
+    import { cardlessRegistryService } from '../services/cardlessRegistry';
+    import { handleError, formatDate } from '../utils';
+    import { reasonVariant } from '../constants/appearance';
+    import type { CardlessRegistry } from '../types';
+    import { toast } from 'svelte-sonner';
+
+    import { networkStore } from '../stores/network.svelte';
     let registries = $derived(cardlessRegistryState.pagination.items);
+
+    $effect(() => pullRefresh.register(() => cardlessRegistryState.refresh(1)));
     let totalCount = $derived(cardlessRegistryState.pagination.totalRecords);
     let currentPage = $derived(cardlessRegistryState.pagination.currentPage);
     let pageSize = $derived(cardlessRegistryState.pagination.pageSize);
     let isLoading = $derived(cardlessRegistryState.pagination.isLoading);
 
-    let dateRangeError = $state("");
+    let dateRangeError = $state('');
 
     // Filtros que mapean nombre → ID antes de aplicar
-    let depNameFilter = $state("");
+    let depNameFilter = $state('');
 
     $effect(() => {
         const depId = depNameFilter
-            ? String(dependencies.find((d) => d.name === depNameFilter)?.id ?? "")
-            : "";
+            ? String(dependencies.find((d) => d.name === depNameFilter)?.id ?? '')
+            : '';
         cardlessRegistryState.filters.dependencyId = depId;
     });
 
@@ -48,8 +55,14 @@
     let reasons = $derived(cardlessRegistryService.REASONS);
 
     function clearRegistroFilters() {
-        depNameFilter = "";
-        cardlessRegistryState.setFilters({ startDate: "", endDate: "", reason: "", search: "", dependencyId: "" });
+        depNameFilter = '';
+        cardlessRegistryState.setFilters({
+            startDate: '',
+            endDate: '',
+            reason: '',
+            search: '',
+            dependencyId: '',
+        });
     }
 
     // Chips de filtros activos para el toolbar.
@@ -58,16 +71,20 @@
         const f = cardlessRegistryState.filters;
         if (f.startDate || f.endDate) {
             chips.push({
-                label: "Fechas",
-                value: [f.startDate || "…", f.endDate || "…"].join(" → "),
-                onClear: () => cardlessRegistryState.setFilters({ startDate: "", endDate: "" }),
+                label: 'Fechas',
+                value: [f.startDate || '…', f.endDate || '…'].join(' → '),
+                onClear: () => cardlessRegistryState.setFilters({ startDate: '', endDate: '' }),
             });
         }
         if (depNameFilter) {
-            chips.push({ label: "Dependencia", value: depNameFilter, onClear: () => (depNameFilter = "") });
+            chips.push({ label: 'Dependencia', value: depNameFilter, onClear: () => (depNameFilter = '') });
         }
         if (f.reason) {
-            chips.push({ label: "Motivo", value: f.reason, onClear: () => cardlessRegistryState.setFilters({ reason: "" }) });
+            chips.push({
+                label: 'Motivo',
+                value: f.reason,
+                onClear: () => cardlessRegistryState.setFilters({ reason: '' }),
+            });
         }
         return chips;
     });
@@ -83,15 +100,15 @@
     // No onMount necesario: el $effect debounced dispara la carga inicial automáticamente
 
     function dependencyIdFromName(name: string): string {
-        if (!name) return "";
-        return String(dependencies.find((d) => d.name === name)?.id ?? "");
+        if (!name) return '';
+        return String(dependencies.find((d) => d.name === name)?.id ?? '');
     }
 
     function registryDisplayName(reg: CardlessRegistry | null): string {
-        if (!reg) return "este registro";
+        if (!reg) return 'este registro';
         return (
             reg.personName ||
-            [reg.first_name, reg.last_name].filter(Boolean).join(" ") ||
+            [reg.first_name, reg.last_name].filter(Boolean).join(' ') ||
             `registro #${reg.id}`
         );
     }
@@ -111,8 +128,13 @@
 
         clearTimeout(filterDebounce);
         filterDebounce = setTimeout(() => {
-            if (isValidDateRange(cardlessRegistryState.filters.startDate, cardlessRegistryState.filters.endDate)) {
-                dateRangeError = "";
+            if (
+                isValidDateRange(
+                    cardlessRegistryState.filters.startDate,
+                    cardlessRegistryState.filters.endDate,
+                )
+            ) {
+                dateRangeError = '';
                 cardlessRegistryState.refresh(1);
             }
         }, 400);
@@ -153,7 +175,7 @@
         const ok = await cardlessRegistryService.delete(registryToDelete.id);
         if (!ok) return;
 
-        toast.success("Registro eliminado");
+        toast.success('Registro eliminado');
 
         const remaining = Math.max(0, totalCount - 1);
         const maxPage = Math.max(1, Math.ceil(remaining / pageSize) || 1);
@@ -167,11 +189,9 @@
     async function handleExport() {
         isExporting = true;
         try {
-            const rows = await cardlessRegistryService.fetchAllMatching(
-                cardlessRegistryState.filters
-            );
+            const rows = await cardlessRegistryService.fetchAllMatching(cardlessRegistryState.filters);
             if (rows.length === 0) {
-                toast.error("No hay registros para exportar");
+                toast.error('No hay registros para exportar');
                 return;
             }
             await cardlessRegistryService.exportToExcel(rows, {
@@ -183,7 +203,7 @@
             });
             toast.success(`Reporte exportado (${rows.length} registros)`);
         } catch {
-            toast.error("Error al exportar");
+            toast.error('Error al exportar');
         } finally {
             isExporting = false;
         }
@@ -191,12 +211,13 @@
 
     async function handleExportAllDepsZip() {
         if (dependencies.length === 0) {
-            toast.error("No hay dependencias registradas");
+            toast.error('No hay dependencias registradas');
             return;
         }
         isZipExporting = true;
-        const loadingToast = toast.loading("Preparando ZIP...");
+        const loadingToast = toast.loading('Preparando ZIP...');
         try {
+            const { exportCardlessRegistryAllDependenciesAsZip } = await import('../utils/zipExport');
             await exportCardlessRegistryAllDependenciesAsZip(
                 dependencies,
                 {
@@ -209,10 +230,10 @@
                     toast.loading(`Procesando: ${label}`, { id: loadingToast });
                 },
             );
-            toast.success("ZIP descargado", { id: loadingToast });
+            toast.success('ZIP descargado', { id: loadingToast });
         } catch (error) {
             toast.dismiss(loadingToast);
-            handleError(error, "Exportar ZIP Sin Tarjeta");
+            handleError(error, 'Exportar ZIP Sin Tarjeta');
         } finally {
             isZipExporting = false;
         }
@@ -223,23 +244,47 @@
         cardlessRegistryState.pagination.currentPage = page;
         refreshData();
     }
-
 </script>
 
 {#snippet renderPersonName(row: CardlessRegistry)}
     <div class="flex flex-col gap-0.5">
         <span class="font-bold text-slate-900 truncate">
-            {row.personName || [row.first_name, row.last_name].filter(Boolean).join(" ") || "Sin nombre"}
+            {row.personName || [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Sin nombre'}
         </span>
-        <span class="text-xs text-slate-500">{row.employee_no || "Sin # empleado"}</span>
+        <span class="text-xs text-slate-500">{row.employee_no || 'Sin # empleado'}</span>
         {#if row.person_id}
-            <span class="inline-flex w-fit items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 leading-none">
-                <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span
+                class="inline-flex w-fit items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 leading-none"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="8"
+                    height="8"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg
+                >
                 Registrado
             </span>
         {:else}
-            <span class="inline-flex w-fit items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 leading-none">
-                <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <span
+                class="inline-flex w-fit items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 leading-none"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="8"
+                    height="8"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg
+                >
                 No Registrado
             </span>
         {/if}
@@ -247,13 +292,13 @@
 {/snippet}
 
 {#snippet renderDependency(row: CardlessRegistry)}
-    <span class="text-sm text-slate-700">{row.dependencyName || "-"}</span>
+    <span class="text-sm text-slate-700">{row.dependencyName || '-'}</span>
 {/snippet}
 
 {#snippet renderLocation(row: CardlessRegistry)}
     <div class="flex flex-col">
-        <span class="font-medium text-slate-900">{row.buildingName || "-"}</span>
-        <span class="text-xs text-slate-500">{row.floor || "Sin piso"}</span>
+        <span class="font-medium text-slate-900">{row.buildingName || '-'}</span>
+        <span class="text-xs text-slate-500">{row.floor || 'Sin piso'}</span>
     </div>
 {/snippet}
 
@@ -266,12 +311,17 @@
 {#snippet renderDate(row: CardlessRegistry)}
     <div class="flex flex-col">
         <span class="text-sm text-slate-700">{formatDate(row.recorded_at)}</span>
-        <span class="text-xs text-slate-500">{new Date(row.recorded_at).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
+        <span class="text-xs text-slate-500"
+            >{new Date(row.recorded_at).toLocaleTimeString('es-MX', {
+                hour: '2-digit',
+                minute: '2-digit',
+            })}</span
+        >
     </div>
 {/snippet}
 
 {#snippet renderRecordedBy(row: CardlessRegistry)}
-    <span class="text-sm text-slate-600">{row.recordedByName || "-"}</span>
+    <span class="text-sm text-slate-600">{row.recordedByName || '-'}</span>
 {/snippet}
 
 {#snippet renderResponsiva(row: CardlessRegistry)}
@@ -280,78 +330,195 @@
     {:else if row.responsiva_status_at_registration === null}
         <!-- Legacy record: no snapshot stored, showing live status as fallback -->
         {#if row.pendingResponsiva}
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap" title="Estado actual (registro anterior al historial de snapshots)">
-                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap"
+                title="Estado actual (registro anterior al historial de snapshots)"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line
+                        x1="12"
+                        y1="16"
+                        x2="12.01"
+                        y2="16"
+                    /></svg
+                >
                 Pendiente
                 <span class="text-rose-400 text-[9px]">~</span>
             </span>
         {:else}
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap" title="Estado actual (registro anterior al historial de snapshots)">
-                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap"
+                title="Estado actual (registro anterior al historial de snapshots)"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg
+                >
                 Entregada
                 <span class="text-emerald-400 text-[9px]">~</span>
             </span>
         {/if}
     {:else if row.responsiva_status_at_registration}
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap" title="Estado al momento del registro">
-            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap"
+            title="Estado al momento del registro"
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line
+                    x1="12"
+                    y1="16"
+                    x2="12.01"
+                    y2="16"
+                /></svg
+            >
             Pendiente
         </span>
     {:else}
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap" title="Estado al momento del registro">
-            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <span
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap"
+            title="Estado al momento del registro"
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3"
+                stroke-linecap="round"
+                stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg
+            >
             Entregada
         </span>
     {/if}
 {/snippet}
 
-{#snippet mobileCard(row: CardlessRegistry)}
-    <article class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="p-4 space-y-3">
-            <div class="flex justify-between items-start gap-2">
-                {@render renderPersonName(row)}
-                {@render renderReason(row)}
+{#snippet mobileList(rows: CardlessRegistry[])}
+    <DataList
+        items={rows}
+        key={(r: CardlessRegistry) => r.id}
+        sheetTitle={(r: CardlessRegistry) => r.personName}
+        sheetSubtitle={(r: CardlessRegistry) => r.reason}
+    >
+        {#snippet leading()}
+            <div class="h-8 w-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+                <FileX size={14} strokeWidth={2.5} />
             </div>
-            <div class="text-sm text-slate-500">
-                <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Dependencia</div>
-                {@render renderDependency(row)}
+        {/snippet}
+        {#snippet title(r: CardlessRegistry)}
+            {r.personName}
+        {/snippet}
+        {#snippet subtitle(r: CardlessRegistry)}
+            {r.dependencyName || '-'} · {formatDate(r.recorded_at)}
+        {/snippet}
+        {#snippet trailing(r: CardlessRegistry)}
+            {@render renderReason(r)}
+        {/snippet}
+        {#snippet details(r: CardlessRegistry)}
+            <div class="space-y-3 text-sm">
+                <div>
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                        Persona
+                    </div>
+                    {@render renderPersonName(r)}
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                        Motivo
+                    </div>
+                    {@render renderReason(r)}
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                        Dependencia
+                    </div>
+                    {@render renderDependency(r)}
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                        Ubicación
+                    </div>
+                    {@render renderLocation(r)}
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                        Fecha
+                    </div>
+                    {@render renderDate(r)}
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                        Registrado por
+                    </div>
+                    {@render renderRecordedBy(r)}
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                        Responsiva
+                    </div>
+                    {@render renderResponsiva(r)}
+                </div>
             </div>
-            {@render renderLocation(row)}
-            <div class="text-sm text-slate-500">
-                <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Fecha</div>
-                {@render renderDate(row)}
-            </div>
-            <div class="text-sm text-slate-500">
-                <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Registrado por</div>
-                {@render renderRecordedBy(row)}
-            </div>
-        </div>
-        <div class="px-4 py-3 bg-slate-50/50 border-t border-slate-100 flex justify-end gap-2">
-            <PermissionGuard allowedRoles={["admin", "operator"]}>
-                <Button variant="soft-blue" size="sm" class="h-11 px-4 rounded-xl" onclick={() => openEditModal(row)}>
+        {/snippet}
+        {#snippet sheetActions(r: CardlessRegistry)}
+            <PermissionGuard allowedRoles={['admin', 'operator']}>
+                <Button variant="soft-blue" size="sm" class="flex-1" onclick={() => openEditModal(r)}>
                     Editar
                 </Button>
                 <Button
                     variant="ghost"
                     size="sm"
-                    class="h-11 px-3.5 rounded-xl text-rose-600 hover:bg-rose-50"
-                    onclick={() => requestDelete(row)}
+                    class="text-rose-600 hover:bg-rose-50"
+                    onclick={() => requestDelete(r)}
                     disabled={!networkStore.isOnline}
                 >
                     <Trash2 size={16} />
                 </Button>
             </PermissionGuard>
-        </div>
-    </article>
+        {/snippet}
+    </DataList>
 {/snippet}
 
-<div class="space-y-6">
-    <SectionHeader title="Sin Tarjeta">
+<div class="space-y-4">
+    <SectionHeader
+        title="Sin Tarjeta"
+        filtersCount={registroChips.length}
+        onClearFilters={clearRegistroFilters}
+    >
         {#snippet filters()}
             <FilterToolbar chips={registroChips} onClearAll={clearRegistroFilters}>
                 {#snippet primary()}
                     <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha Inicio</span>
+                        <span
+                            class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap"
+                            >Fecha Inicio</span
+                        >
                         <Input
                             type="date"
                             bind:value={cardlessRegistryState.filters.startDate}
@@ -360,7 +527,10 @@
                         />
                     </div>
                     <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha Fin</span>
+                        <span
+                            class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap"
+                            >Fecha Fin</span
+                        >
                         <Input
                             type="date"
                             bind:value={cardlessRegistryState.filters.endDate}
@@ -369,7 +539,10 @@
                         />
                     </div>
                     <div class="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-[200px] w-full">
-                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Búsqueda</span>
+                        <span
+                            class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap"
+                            >Búsqueda</span
+                        >
                         <SearchInput
                             placeholder="Nombre o # empleado..."
                             bind:value={cardlessRegistryState.filters.search}
@@ -404,14 +577,14 @@
                 {#snippet items()}
                     <ExportMenuItem
                         icon={FileSpreadsheet}
-                        label={isExporting ? "Exportando..." : "Exportar (Filtro actual)"}
+                        label={isExporting ? 'Exportando...' : 'Exportar (Filtro actual)'}
                         disabled={isExporting}
                         onclick={handleExport}
                     />
                     <div class="mx-3 my-1 border-t border-slate-100"></div>
                     <ExportMenuItem
                         icon={FolderArchive}
-                        label={isZipExporting ? "Generando ZIP..." : "Todas las Dependencias (ZIP)"}
+                        label={isZipExporting ? 'Generando ZIP...' : 'Todas las Dependencias (ZIP)'}
                         iconBgClass="bg-violet-50"
                         iconColorClass="text-violet-600"
                         disabled={isZipExporting || dependencies.length === 0}
@@ -420,7 +593,7 @@
                 {/snippet}
             </ExportDropdown>
 
-            <PermissionGuard allowedRoles={["admin", "operator"]}>
+            <PermissionGuard allowedRoles={['admin', 'operator']}>
                 <Button
                     variant="primary"
                     class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
@@ -436,8 +609,10 @@
 
     <Card class="overflow-hidden relative min-h-[200px]">
         <ContentView
-            isLoading={isLoading}
+            {isLoading}
             data={registries}
+            error={cardlessRegistryState.pagination.error}
+            onRetry={() => cardlessRegistryState.refresh(1)}
             emptyTitle="No hay registros"
             emptyDescription="Ajusta los filtros o crea un nuevo registro."
             emptyIcon={FileX}
@@ -452,52 +627,52 @@
                     actionsWidth="140px"
                     columns={[
                         {
-                            key: "personName",
-                            label: "Persona",
+                            key: 'personName',
+                            label: 'Persona',
                             render: renderPersonName,
-                            width: "200px",
+                            width: '200px',
                         },
                         {
-                            key: "dependencyName",
-                            label: "Dependencia",
+                            key: 'dependencyName',
+                            label: 'Dependencia',
                             render: renderDependency,
-                            width: "180px",
+                            width: '180px',
                         },
                         {
-                            key: "location",
-                            label: "Ubicación",
+                            key: 'location',
+                            label: 'Ubicación',
                             render: renderLocation,
-                            width: "160px",
+                            width: '160px',
                         },
                         {
-                            key: "reason",
-                            label: "Motivo",
+                            key: 'reason',
+                            label: 'Motivo',
                             render: renderReason,
-                            width: "220px",
+                            width: '220px',
                         },
                         {
-                            key: "recorded_at",
-                            label: "Fecha",
+                            key: 'recorded_at',
+                            label: 'Fecha',
                             render: renderDate,
-                            width: "140px",
+                            width: '140px',
                         },
                         {
-                            key: "recorded_by",
-                            label: "Registrado por",
+                            key: 'recorded_by',
+                            label: 'Registrado por',
                             render: renderRecordedBy,
-                            width: "140px",
+                            width: '140px',
                         },
                         {
-                            key: "responsiva_status_at_registration",
-                            label: "Estado de responsiva",
+                            key: 'responsiva_status_at_registration',
+                            label: 'Estado de responsiva',
                             render: renderResponsiva,
-                            width: "160px",
+                            width: '160px',
                         },
                     ]}
-                    mobileCard={mobileCard}
+                    {mobileList}
                 >
                     {#snippet actions(row: CardlessRegistry)}
-                        <PermissionGuard allowedRoles={["admin", "operator"]}>
+                        <PermissionGuard allowedRoles={['admin', 'operator']}>
                             <div class="flex items-center justify-end gap-1">
                                 <Button
                                     variant="soft-blue"
@@ -542,14 +717,14 @@
     />
 </div>
 
-<PermissionGuard allowedRoles={["admin", "operator"]}>
+<PermissionGuard allowedRoles={['admin', 'operator']}>
     <FloatingActionButton onclick={openAddModal} label="Nuevo Registro" />
 </PermissionGuard>
 
 {#if isModalOpen}
     <CardlessRegistryModal
         bind:isOpen={isModalOpen}
-        editingRegistry={editingRegistry}
+        {editingRegistry}
         onSave={handleModalSave}
         onDelete={handleDeleteFromModal}
     />

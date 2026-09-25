@@ -1,15 +1,21 @@
 <script lang="ts">
+    import { ticketState, personnelState, catalogState } from '../stores';
+    import { pullRefresh } from '../stores';
     import {
-        ticketState,
-        personnelState,
-        catalogState,
-    } from "../stores";
-    import {
-        SectionHeader, TaskBanner, Button, FilterSelect,
-        FilterToolbar, Input, PermissionGuard, ContentView,
-        Pagination, ExportDropdown, ExportMenuItem, Tabs,
+        SectionHeader,
+        TaskBanner,
+        Button,
+        FilterSelect,
+        FilterToolbar,
+        Input,
+        PermissionGuard,
+        ContentView,
+        Pagination,
+        ExportDropdown,
+        ExportMenuItem,
+        Tabs,
         ModificationCompareModal,
-    } from "../components";
+    } from '../components';
     import {
         Search,
         FileSpreadsheet,
@@ -17,17 +23,15 @@
         FolderArchive,
         ClipboardList,
         FileSignature,
-    } from "lucide-svelte";
-    import { ticketService } from "../services/tickets";
-    import { cardService } from "../services/cards";
-    import { toast } from "svelte-sonner";
-    import { handleError, exportResponsivasToExcel, exportResponsivasAllDependenciesAsZip, fullName } from "../utils";
-    import { settingsState } from "../stores";
-    import { computeResponsivaManagement, matchesResponsivaFilters } from "../utils/xlsxResponsivas";
-    import {
-        ImportPreviewModal, ConfirmAltaModal, TicketImportedDetailsModal,
-    } from "../components";
-    import { networkStore } from "../stores/network.svelte";
+    } from 'lucide-svelte';
+    import { ticketService } from '../services/tickets';
+    import { cardService } from '../services/cards';
+    import { toast } from 'svelte-sonner';
+    import { handleError, fullName } from '../utils';
+    import { settingsState } from '../stores';
+    import { computeResponsivaManagement, matchesResponsivaFilters } from '../utils/xlsxResponsivas';
+    import { ImportPreviewModal, ConfirmAltaModal, TicketImportedDetailsModal } from '../components';
+    import { networkStore } from '../stores/network.svelte';
 
     // Tickets paginados del servidor vía TicketState
     let tickets = $derived(ticketState.pagination.items);
@@ -38,20 +42,21 @@
     let isZipExporting = $state(false);
 
     // Filtros de UI que mapean nombre → ID antes de aplicar
-    let depNameFilter = $state("Todas");
-    let buildingNameFilter = $state("Todos");
-    let floorFilter = $state("Todos");
+    let depNameFilter = $state('Todas');
+    let buildingNameFilter = $state('Todos');
+    let floorFilter = $state('Todos');
 
-    let responsivaFilter = $state("Todas");
-    let movementTypeFilter = $state("Todas");
-    let mediaFilter = $state("Todas");
-    let mediaOptions = $derived(["Todas", ...catalogState.activeMediaTypeNames()]);
+    let responsivaFilter = $state('Todas');
+    let movementTypeFilter = $state('Todas');
+    let mediaFilter = $state('Todas');
+    let mediaOptions = $derived(['Todas', ...catalogState.activeMediaTypeNames()]);
 
     // Sincronizar nombre de dependencia → ID en el store
     $effect(() => {
-        const depId = depNameFilter === "Todas"
-            ? ""
-            : catalogState.dependencies.find((d) => d.name === depNameFilter)?.id || "";
+        const depId =
+            depNameFilter === 'Todas'
+                ? ''
+                : catalogState.dependencies.find((d) => d.name === depNameFilter)?.id || '';
         ticketState.filters.dependencyId = depId;
     });
 
@@ -59,31 +64,36 @@
     // Piso dependiente del edificio, como en Personal.
     let buildings = $derived(catalogState.buildings);
     let selectedBuildingFloors = $derived.by(() => {
-        if (buildingNameFilter === "Todos" || buildingNameFilter === "Sin Edificio") return [] as string[];
+        if (buildingNameFilter === 'Todos' || buildingNameFilter === 'Sin Edificio') return [] as string[];
         const building = buildings.find((b) => b.name === buildingNameFilter);
         const floors = (building as { floors?: unknown } | undefined)?.floors;
         if (!Array.isArray(floors)) return [] as string[];
-        return floors.filter((f): f is string => typeof f === "string");
+        return floors.filter((f): f is string => typeof f === 'string');
     });
-    let floorOptions = $derived(["Todos", ...selectedBuildingFloors, "Sin piso base"]);
-    let isFloorFilterEnabled = $derived(buildingNameFilter !== "Todos" && buildingNameFilter !== "Sin Edificio");
+    let floorOptions = $derived(['Todos', ...selectedBuildingFloors, 'Sin piso base']);
+    let isFloorFilterEnabled = $derived(
+        buildingNameFilter !== 'Todos' && buildingNameFilter !== 'Sin Edificio',
+    );
     $effect(() => {
-        const bldgId = buildingNameFilter === "Todos"
-            ? ""
-            : buildingNameFilter === "Sin Edificio"
-              ? "__none__"
-              : buildings.find((b) => b.name === buildingNameFilter)?.id || "";
+        const bldgId =
+            buildingNameFilter === 'Todos'
+                ? ''
+                : buildingNameFilter === 'Sin Edificio'
+                  ? '__none__'
+                  : buildings.find((b) => b.name === buildingNameFilter)?.id || '';
         ticketState.filters.buildingId = bldgId;
-        if ((!bldgId || bldgId === "__none__" || (floorFilter !== "Sin piso base" && !selectedBuildingFloors.includes(floorFilter))) && floorFilter !== "Todos") {
-            floorFilter = "Todos";
+        if (
+            (!bldgId ||
+                bldgId === '__none__' ||
+                (floorFilter !== 'Sin piso base' && !selectedBuildingFloors.includes(floorFilter))) &&
+            floorFilter !== 'Todos'
+        ) {
+            floorFilter = 'Todos';
         }
     });
     $effect(() => {
-        ticketState.filters.floor = floorFilter === "Todos"
-            ? ""
-            : floorFilter === "Sin piso base"
-              ? "__none__"
-              : floorFilter;
+        ticketState.filters.floor =
+            floorFilter === 'Todos' ? '' : floorFilter === 'Sin piso base' ? '__none__' : floorFilter;
     });
 
     // Debounced auto-refresh cuando cambian los filtros
@@ -103,6 +113,8 @@
     // Secciones
     let currentSection = $derived(ticketState.filters.section);
 
+    $effect(() => pullRefresh.register(() => ticketState.refresh(1)));
+
     function clearTicketFilters() {
         ticketState.filters.type = 'Todos';
         ticketState.filters.search = '';
@@ -117,41 +129,61 @@
     // Chips de filtros activos para el toolbar.
     let ticketChips = $derived.by(() => {
         const chips: { label: string; value: string; onClear: () => void }[] = [];
-        if (currentSection === "General" && ticketState.filters.type !== "Todos") {
-            chips.push({ label: "Tipo", value: ticketState.filters.type, onClear: () => (ticketState.filters.type = "Todos") });
+        if (currentSection === 'General' && ticketState.filters.type !== 'Todos') {
+            chips.push({
+                label: 'Tipo',
+                value: ticketState.filters.type,
+                onClear: () => (ticketState.filters.type = 'Todos'),
+            });
         }
-        if (currentSection === "Responsivas" && movementTypeFilter !== "Todas") {
-            chips.push({ label: "Tipo", value: movementTypeFilter, onClear: () => (movementTypeFilter = "Todas") });
+        if (currentSection === 'Responsivas' && movementTypeFilter !== 'Todas') {
+            chips.push({
+                label: 'Tipo',
+                value: movementTypeFilter,
+                onClear: () => (movementTypeFilter = 'Todas'),
+            });
         }
-        if (currentSection === "Responsivas" && responsivaFilter !== "Todas") {
-            chips.push({ label: "Estado", value: responsivaFilter, onClear: () => (responsivaFilter = "Todas") });
+        if (currentSection === 'Responsivas' && responsivaFilter !== 'Todas') {
+            chips.push({
+                label: 'Estado',
+                value: responsivaFilter,
+                onClear: () => (responsivaFilter = 'Todas'),
+            });
         }
-        if (currentSection === "Responsivas" && mediaFilter !== "Todas") {
-            chips.push({ label: "Medio", value: mediaFilter, onClear: () => (mediaFilter = "Todas") });
+        if (currentSection === 'Responsivas' && mediaFilter !== 'Todas') {
+            chips.push({ label: 'Medio', value: mediaFilter, onClear: () => (mediaFilter = 'Todas') });
         }
-        if (currentSection === "Responsivas" && depNameFilter !== "Todas") {
-            chips.push({ label: "Dependencia", value: depNameFilter, onClear: () => (depNameFilter = "Todas") });
+        if (currentSection === 'Responsivas' && depNameFilter !== 'Todas') {
+            chips.push({
+                label: 'Dependencia',
+                value: depNameFilter,
+                onClear: () => (depNameFilter = 'Todas'),
+            });
         }
-        if (buildingNameFilter !== "Todos") {
-            chips.push({ label: "Edificio", value: buildingNameFilter, onClear: () => (buildingNameFilter = "Todos") });
+        if (buildingNameFilter !== 'Todos') {
+            chips.push({
+                label: 'Edificio',
+                value: buildingNameFilter,
+                onClear: () => (buildingNameFilter = 'Todos'),
+            });
         }
-        if (floorFilter !== "Todos") {
-            chips.push({ label: "Piso", value: floorFilter, onClear: () => (floorFilter = "Todos") });
+        if (floorFilter !== 'Todos') {
+            chips.push({ label: 'Piso', value: floorFilter, onClear: () => (floorFilter = 'Todos') });
         }
         return chips;
     });
 
-    function switchSection(section: "General" | "Responsivas") {
+    function switchSection(section: 'General' | 'Responsivas') {
         if (ticketState.filters.section === section) return;
         ticketState.filters.section = section;
-        ticketState.filters.type = "Todos";
-        ticketState.filters.search = "";
-        depNameFilter = "Todas";
-        buildingNameFilter = "Todos";
-        floorFilter = "Todos";
-        movementTypeFilter = "Todas";
-        responsivaFilter = "Todas";
-        mediaFilter = "Todas";
+        ticketState.filters.type = 'Todos';
+        ticketState.filters.search = '';
+        depNameFilter = 'Todas';
+        buildingNameFilter = 'Todos';
+        floorFilter = 'Todos';
+        movementTypeFilter = 'Todas';
+        responsivaFilter = 'Todas';
+        mediaFilter = 'Todas';
         // El $effect debounced dispara refresh(1) automáticamente
     }
 
@@ -172,59 +204,74 @@
 
     // Datos paginados del servidor con resolución de nombre de persona
     let filteredTickets = $derived(
-        tickets.map((t) => {
-            let personName = "Desconocido";
-            if (t.personnel) {
-                personName = fullName(t.personnel.first_name, t.personnel.last_name);
-            } else if (t.payload?.nombres || t.payload?.apellidos) {
-                personName = fullName(t.payload.nombres, t.payload.apellidos);
-            } else if (t.payload?.relatedPerson?.name) {
-                personName = t.payload.relatedPerson.name;
-            }
-
-            let cardType = t.cardType || t.cards?.type;
-            let cardFolio = t.cardFolio || t.cards?.folio;
-
-            if (!cardFolio && t.payload) {
-                // Derivar de forma multi-medio: claves del payload `folio_<key>`.
-                const matchedKey = Object.keys(t.payload).find((k) =>
-                    /^folio_.+/.test(k) && t.payload[k],
-                );
-                if (matchedKey) {
-                    const mediaKey = matchedKey.replace(/^folio_/, "");
-                    cardType = mediaKey.toUpperCase();
-                    cardFolio = t.payload[matchedKey];
-                } else if (t.payload.folio) {
-                    cardType = t.payload.tipo_tarjeta || "N/A";
-                    cardFolio = t.payload.folio;
+        tickets
+            .map((t) => {
+                let personName = 'Desconocido';
+                if (t.personnel) {
+                    personName = fullName(t.personnel.first_name, t.personnel.last_name);
+                } else if (t.payload?.nombres || t.payload?.apellidos) {
+                    personName = fullName(t.payload.nombres, t.payload.apellidos);
+                } else if (t.payload?.relatedPerson?.name) {
+                    personName = t.payload.relatedPerson.name;
                 }
-            }
 
-            // Determinar si la firma de responsiva requiere baja de registro
-            let needsBaja = false;
-            let daysElapsed = 0;
-            if (t.type === "Firma Responsiva" && t.created_at) {
-                const mgmt = computeResponsivaManagement(
-                    t.movementType || "Sin clasificar",
-                    t.assignmentDate || t.created_at,
-                    t.created_at,
-                    settingsState.responsivaPickupDays
-                );
-                needsBaja = mgmt.needsBaja;
-                daysElapsed = mgmt.daysElapsed;
-            }
+                let cardType = t.cardType || t.cards?.type;
+                let cardFolio = t.cardFolio || t.cards?.folio;
 
-            return { ...t, personName, cardType, cardFolio, movementType: t.movementType, needsBaja, daysElapsed };
-        })
-        .filter((t) =>
-            matchesResponsivaFilters(t, movementTypeFilter, responsivaFilter, settingsState.responsivaWarnDays, mediaFilter),
-        ),
+                if (!cardFolio && t.payload) {
+                    // Derivar de forma multi-medio: claves del payload `folio_<key>`.
+                    const matchedKey = Object.keys(t.payload).find(
+                        (k) => /^folio_.+/.test(k) && t.payload[k],
+                    );
+                    if (matchedKey) {
+                        const mediaKey = matchedKey.replace(/^folio_/, '');
+                        cardType = mediaKey.toUpperCase();
+                        cardFolio = t.payload[matchedKey];
+                    } else if (t.payload.folio) {
+                        cardType = t.payload.tipo_tarjeta || 'N/A';
+                        cardFolio = t.payload.folio;
+                    }
+                }
+
+                // Determinar si la firma de responsiva requiere baja de registro
+                let needsBaja = false;
+                let daysElapsed = 0;
+                if (t.type === 'Firma Responsiva' && t.created_at) {
+                    const mgmt = computeResponsivaManagement(
+                        t.movementType || 'Sin clasificar',
+                        t.assignmentDate || t.created_at,
+                        t.created_at,
+                        settingsState.responsivaPickupDays,
+                    );
+                    needsBaja = mgmt.needsBaja;
+                    daysElapsed = mgmt.daysElapsed;
+                }
+
+                return {
+                    ...t,
+                    personName,
+                    cardType,
+                    cardFolio,
+                    movementType: t.movementType,
+                    needsBaja,
+                    daysElapsed,
+                };
+            })
+            .filter((t) =>
+                matchesResponsivaFilters(
+                    t,
+                    movementTypeFilter,
+                    responsivaFilter,
+                    settingsState.responsivaWarnDays,
+                    mediaFilter,
+                ),
+            ),
     );
 
-    import { GENERAL_TICKET_TYPES } from "../constants/tickets";
-    const ticketTypes = ["Todos", ...GENERAL_TICKET_TYPES];
+    import { GENERAL_TICKET_TYPES } from '../constants/tickets';
+    const ticketTypes = ['Todos', ...GENERAL_TICKET_TYPES];
 
-    import { supabase } from "../supabase";
+    import { supabase } from '../supabase';
 
     /** Si otro usuario eliminó/atendió el ticket, cerrar modales y avisar. */
     async function validateOpenModalsAgainstDb() {
@@ -232,7 +279,7 @@
         const entries: Entry[] = [];
 
         const add = (id: unknown, onGone: () => void) => {
-            if (typeof id === "number" && !Number.isNaN(id)) {
+            if (typeof id === 'number' && !Number.isNaN(id)) {
                 entries.push({ id, onGone });
             }
         };
@@ -260,11 +307,7 @@
         for (const { id, onGone } of entries) {
             if (seen.has(id)) continue;
             seen.add(id);
-            const { data } = await supabase
-                .from("tickets")
-                .select("id")
-                .eq("id", id)
-                .maybeSingle();
+            const { data } = await supabase.from('tickets').select('id').eq('id', id).maybeSingle();
             if (!data) {
                 onGone();
                 closedAny = true;
@@ -272,7 +315,7 @@
         }
         if (closedAny) {
             toast.info(
-                "Un ticket que tenías abierto ya no está disponible (puede haber sido atendido por otro usuario).",
+                'Un ticket que tenías abierto ya no está disponible (puede haber sido atendido por otro usuario).',
             );
         }
     }
@@ -288,15 +331,15 @@
 
     // Manejadores
     const IMPORTED_TYPES = new Set([
-        "Alta de Persona",
-        "Modificación",
-        "Baja de Persona",
-        "Reposición",
-        "Reporte de Falla",
+        'Alta de Persona',
+        'Modificación',
+        'Baja de Persona',
+        'Reposición',
+        'Reporte de Falla',
     ]);
 
     function onManageTicket(ticket: any) {
-        if (ticket.type === "Alta de Persona") {
+        if (ticket.type === 'Alta de Persona') {
             altaTicket = ticket;
             isAltaOpen = true;
             return;
@@ -327,19 +370,16 @@
     }
 
     function isModificacionType(type: string): boolean {
-    return type === "Modificación" || type === "Modificación de datos";
-}
+        return type === 'Modificación' || type === 'Modificación de datos';
+    }
 
-function onStartCompletion(ticket: any) {
-        if (
-            ticket.type === "Firma Responsiva" ||
-            ticket.type === "Programación"
-        ) {
+    function onStartCompletion(ticket: any) {
+        if (ticket.type === 'Firma Responsiva' || ticket.type === 'Programación') {
             if (ticket.person_id) {
                 personnelState.selectPerson(ticket.person_id);
                 personnelState.highlightedCardId = ticket.access_media_id || null;
             } else {
-                toast.error("Este ticket no tiene una persona vinculada");
+                toast.error('Este ticket no tiene una persona vinculada');
             }
             return;
         }
@@ -357,7 +397,7 @@ function onStartCompletion(ticket: any) {
 
         // Tipos sin acción configurada: NO eliminar silenciosamente.
         toast.info(
-            "Este tipo de ticket no tiene una acción automática. Reprocesa desde la vista de detalle o cancela el ticket.",
+            'Este tipo de ticket no tiene una acción automática. Reprocesa desde la vista de detalle o cancela el ticket.',
         );
     }
 
@@ -366,33 +406,28 @@ function onStartCompletion(ticket: any) {
     }
 
     async function handleExportResponsivas() {
-        const loadingToast = toast.loading("Preparando exportación...");
+        const loadingToast = toast.loading('Preparando exportación...');
         try {
-            let data =
-                await ticketService.fetchResponsivasForExport(
-                    ticketState.filters.dependencyId,
-                    ticketState.filters.search,
-                    ticketState.filters.buildingId,
-                    ticketState.filters.floor,
-                );
+            let data = await ticketService.fetchResponsivasForExport(
+                ticketState.filters.dependencyId,
+                ticketState.filters.search,
+                ticketState.filters.buildingId,
+                ticketState.filters.floor,
+            );
 
             // Aplicar los mismos filtros de la vista (tipo de movimiento + estado + medio),
             // enriqueciendo cada ticket con needsBaja/daysElapsed como hace filteredTickets.
-            if (
-                movementTypeFilter !== "Todas" ||
-                responsivaFilter !== "Todas" ||
-                mediaFilter !== "Todas"
-            ) {
+            if (movementTypeFilter !== 'Todas' || responsivaFilter !== 'Todas' || mediaFilter !== 'Todas') {
                 data = data
                     .map((t: any) => {
                         let needsBaja = false;
                         let daysElapsed = 0;
-                        if (t.type === "Firma Responsiva" && t.created_at) {
+                        if (t.type === 'Firma Responsiva' && t.created_at) {
                             const mgmt = computeResponsivaManagement(
-                                t.movementType || "Sin clasificar",
+                                t.movementType || 'Sin clasificar',
                                 t.assignmentDate || t.created_at,
                                 t.created_at,
-                                settingsState.responsivaPickupDays
+                                settingsState.responsivaPickupDays,
                             );
                             needsBaja = mgmt.needsBaja;
                             daysElapsed = mgmt.daysElapsed;
@@ -405,73 +440,77 @@ function onStartCompletion(ticket: any) {
                             movementTypeFilter,
                             responsivaFilter,
                             settingsState.responsivaWarnDays,
-                            mediaFilter
-                        )
+                            mediaFilter,
+                        ),
                     );
             }
 
             if (data.length === 0) {
-                toast.info("No hay responsivas pendientes para exportar", {
+                toast.info('No hay responsivas pendientes para exportar', {
                     id: loadingToast,
                 });
                 return;
             }
 
-            await exportResponsivasToExcel(data, depNameFilter, undefined, settingsState.responsivaPickupDays);
-            toast.success("Exportación completada", { id: loadingToast });
+            const { exportResponsivasToExcel } = await import('../utils/xlsxExport');
+            await exportResponsivasToExcel(
+                data,
+                depNameFilter,
+                undefined,
+                settingsState.responsivaPickupDays,
+            );
+            toast.success('Exportación completada', { id: loadingToast });
         } catch (error) {
             toast.dismiss(loadingToast);
-            handleError(error, "Exportar Responsivas");
+            handleError(error, 'Exportar Responsivas');
         }
     }
 
     async function handleExportResponsivasAllDepsZip() {
         const deps = catalogState.dependencies;
         if (deps.length === 0) {
-            toast.error("No hay dependencias registradas");
+            toast.error('No hay dependencias registradas');
             return;
         }
         isZipExporting = true;
-        const loadingToast = toast.loading("Preparando ZIP...");
+        const loadingToast = toast.loading('Preparando ZIP...');
         try {
-            await exportResponsivasAllDependenciesAsZip(
-                deps,
-                (_current, _total, label) => {
-                    toast.loading(`Procesando: ${label}`, { id: loadingToast });
-                },
-            );
-            toast.success("ZIP descargado", { id: loadingToast });
+            const { exportResponsivasAllDependenciesAsZip } = await import('../utils/zipExport');
+            await exportResponsivasAllDependenciesAsZip(deps, (_current, _total, label) => {
+                toast.loading(`Procesando: ${label}`, { id: loadingToast });
+            });
+            toast.success('ZIP descargado', { id: loadingToast });
         } catch (error) {
             toast.dismiss(loadingToast);
-            handleError(error, "Exportar ZIP Responsivas");
+            handleError(error, 'Exportar ZIP Responsivas');
         } finally {
             isZipExporting = false;
         }
     }
 </script>
 
-<div class="space-y-6">
+<div class="space-y-4">
     <SectionHeader
-        title={currentSection === "General"
-            ? "Tickets de trabajo"
-            : "Firmas de Responsiva"}
+        title={currentSection === 'General' ? 'Tickets de trabajo' : 'Firmas de Responsiva'}
+        filtersCount={ticketChips.length}
+        onClearFilters={clearTicketFilters}
     >
         {#snippet titleExtra()}
             <Tabs
                 variant="pill"
                 tabs={[
-                    { id: "General", label: "Tickets Generales", icon: ClipboardList },
-                    { id: "Responsivas", label: "Firmas de Responsiva", icon: FileSignature },
+                    { id: 'General', label: 'Tickets Generales', icon: ClipboardList },
+                    { id: 'Responsivas', label: 'Firmas de Responsiva', icon: FileSignature },
                 ]}
                 active={currentSection}
-                onSelect={(id) => switchSection(id as "General" | "Responsivas")}
+                onSelect={(id) => switchSection(id as 'General' | 'Responsivas')}
             />
         {/snippet}
         {#snippet filters()}
             <FilterToolbar chips={ticketChips} onClearAll={clearTicketFilters}>
                 {#snippet primary()}
                     <!-- Type Filters -->
-                    {#if currentSection === "General"}
+                    {#if currentSection === 'General'}
                         <div class="w-full xl:w-auto">
                             <FilterSelect
                                 label="Tipo"
@@ -483,11 +522,17 @@ function onStartCompletion(ticket: any) {
                     {/if}
 
                     <!-- Tipo de movimiento (solo Responsivas) -->
-                    {#if currentSection === "Responsivas"}
+                    {#if currentSection === 'Responsivas'}
                         <div class="w-full xl:w-auto">
                             <FilterSelect
                                 label="Tipo"
-                                options={["Todas", "Alta de Personal", "Reposición", "Asignación", "Sin clasificar"]}
+                                options={[
+                                    'Todas',
+                                    'Alta de Personal',
+                                    'Reposición',
+                                    'Asignación',
+                                    'Sin clasificar',
+                                ]}
                                 placeholder=""
                                 bind:value={movementTypeFilter}
                             />
@@ -495,18 +540,18 @@ function onStartCompletion(ticket: any) {
                     {/if}
 
                     <!-- Urgency (solo Responsivas) -->
-                    {#if currentSection === "Responsivas"}
+                    {#if currentSection === 'Responsivas'}
                         <div class="w-full xl:w-auto">
                             <FilterSelect
                                 label="Estado"
-                                options={["Todas", "Pendiente", "Por vencer", "Baja de Registro"]}
+                                options={['Todas', 'Pendiente', 'Por vencer', 'Baja de Registro']}
                                 bind:value={responsivaFilter}
                             />
                         </div>
                     {/if}
 
                     <!-- Medio (solo Responsivas) -->
-                    {#if currentSection === "Responsivas"}
+                    {#if currentSection === 'Responsivas'}
                         <div class="w-full xl:w-auto">
                             <FilterSelect
                                 label="Medio"
@@ -519,10 +564,7 @@ function onStartCompletion(ticket: any) {
 
                     <!-- Search -->
                     <div class="flex-1 min-w-[200px] w-full relative">
-                        <Search
-                            class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                            size={16}
-                        />
+                        <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <Input
                             id="ticket-search"
                             placeholder="Buscar por folio, persona..."
@@ -533,11 +575,11 @@ function onStartCompletion(ticket: any) {
                 {/snippet}
                 {#snippet overflow()}
                     <!-- Dependency -->
-                    {#if currentSection === "Responsivas"}
+                    {#if currentSection === 'Responsivas'}
                         <div class="w-full">
                             <FilterSelect
                                 label="Dependencia"
-                                options={["Todas", ...dependencies.map((d) => d.name)]}
+                                options={['Todas', ...dependencies.map((d) => d.name)]}
                                 placeholder=""
                                 bind:value={depNameFilter}
                             />
@@ -548,7 +590,7 @@ function onStartCompletion(ticket: any) {
                     <div class="w-full">
                         <FilterSelect
                             label="Edificio"
-                            options={["Todos", ...buildings.map((b) => b.name), "Sin Edificio"]}
+                            options={['Todos', ...buildings.map((b) => b.name), 'Sin Edificio']}
                             placeholder=""
                             bind:value={buildingNameFilter}
                         />
@@ -559,7 +601,9 @@ function onStartCompletion(ticket: any) {
                         <FilterSelect
                             label="Piso"
                             options={floorOptions}
-                            placeholder={buildingNameFilter === "Todos" ? "Elige edificio" : "Todos los pisos"}
+                            placeholder={buildingNameFilter === 'Todos'
+                                ? 'Elige edificio'
+                                : 'Todos los pisos'}
                             bind:value={floorFilter}
                             disabled={!isFloorFilterEnabled}
                         />
@@ -569,7 +613,7 @@ function onStartCompletion(ticket: any) {
         {/snippet}
 
         {#snippet actions()}
-            {#if currentSection === "Responsivas"}
+            {#if currentSection === 'Responsivas'}
                 <ExportDropdown
                     icon={Download}
                     label="Exportar Excel"
@@ -609,17 +653,35 @@ function onStartCompletion(ticket: any) {
     </SectionHeader>
 
     <ContentView
-        isLoading={isLoading}
+        {isLoading}
         data={filteredTickets}
+        error={ticketState.pagination.error}
+        onRetry={() => ticketState.refresh(1)}
         emptyTitle="Todo al día"
         emptyTitleFiltered="Sin resultados"
         emptyDescription="No hay tickets pendientes en este momento. Todo está en orden."
         emptyDescriptionFiltered="No encontramos tickets con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={ClipboardList}
-        emptyIconBgClass={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || mediaFilter !== "Todas" || depNameFilter !== "Todas" || buildingNameFilter !== "Todos" || floorFilter !== "Todos")
-            ? "from-slate-50 to-slate-100 ring-1 ring-slate-200/60 text-slate-400"
-            : "from-emerald-50 to-emerald-100 ring-1 ring-emerald-200/60 text-emerald-400"}
-        hasFilters={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || mediaFilter !== "Todas" || depNameFilter !== "Todas" || buildingNameFilter !== "Todos" || floorFilter !== "Todos")}
+        emptyIconBgClass={ticketState.filters.type !== 'Todos' ||
+        ticketState.filters.search ||
+        responsivaFilter !== 'Todas' ||
+        movementTypeFilter !== 'Todas' ||
+        mediaFilter !== 'Todas' ||
+        depNameFilter !== 'Todas' ||
+        buildingNameFilter !== 'Todos' ||
+        floorFilter !== 'Todos'
+            ? 'from-slate-50 to-slate-100 ring-1 ring-slate-200/60 text-slate-400'
+            : 'from-emerald-50 to-emerald-100 ring-1 ring-emerald-200/60 text-emerald-400'}
+        hasFilters={!!(
+            ticketState.filters.type !== 'Todos' ||
+            ticketState.filters.search ||
+            responsivaFilter !== 'Todas' ||
+            movementTypeFilter !== 'Todas' ||
+            mediaFilter !== 'Todas' ||
+            depNameFilter !== 'Todas' ||
+            buildingNameFilter !== 'Todos' ||
+            floorFilter !== 'Todos'
+        )}
         onClearFilters={() => {
             clearTicketFilters();
             // El $effect debounced dispara refresh(1) automáticamente
@@ -628,23 +690,20 @@ function onStartCompletion(ticket: any) {
         skeletonRows={6}
     >
         {#snippet children()}
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
+            <div
+                class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20"
+            >
                 {#each filteredTickets as ticket (ticket.id)}
-                    <TaskBanner
-                        {ticket}
-                        onManage={onManageTicket}
-                        onComplete={onStartCompletion}
-                    />
+                    <TaskBanner {ticket} onManage={onManageTicket} onComplete={onStartCompletion} />
                 {/each}
             </div>
         {/snippet}
-
     </ContentView>
 
     <Pagination
         {currentPage}
         {pageSize}
-        totalRecords={totalRecords}
+        {totalRecords}
         onPrevPage={() => ticketState.prevPage()}
         onNextPage={() => ticketState.nextPage()}
         onGoToPage={(page) => ticketState.goToPage(page)}
@@ -660,11 +719,7 @@ function onStartCompletion(ticket: any) {
 
 <ImportPreviewModal bind:isOpen={isImportOpen} onComplete={() => refreshData()} />
 
-<ConfirmAltaModal
-    bind:isOpen={isAltaOpen}
-    ticket={altaTicket}
-    onComplete={() => refreshData()}
-/>
+<ConfirmAltaModal bind:isOpen={isAltaOpen} ticket={altaTicket} onComplete={() => refreshData()} />
 
 <TicketImportedDetailsModal
     bind:isOpen={isImportedOpen}

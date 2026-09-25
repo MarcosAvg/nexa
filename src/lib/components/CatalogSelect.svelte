@@ -1,6 +1,6 @@
 <script lang="ts">
-    import Select from "./Select.svelte";
-    import type { CatalogItem } from "../types";
+    import Select from './Select.svelte';
+    import type { CatalogItem } from '../types';
 
     /**
      * CatalogSelect — Select genérico para catálogos del sistema.
@@ -27,22 +27,15 @@
     let {
         catalog,
         value = $bindable(),
-        placeholder = "Seleccionar...",
+        placeholder = 'Seleccionar...',
         disabled = false,
-        class: className = "",
+        class: className = '',
         id,
         onchange,
     }: Props = $props();
 </script>
 
-<Select
-    bind:value
-    {placeholder}
-    {disabled}
-    class={className}
-    {id}
-    {onchange}
->
+<Select bind:value {placeholder} {disabled} class={className} {id} {onchange}>
     {#each catalog as item}
         <option value={item.name}>{item.name}</option>
     {/each}

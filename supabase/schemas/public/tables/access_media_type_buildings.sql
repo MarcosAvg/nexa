@@ -11,6 +11,10 @@ create table "public"."access_media_type_buildings" (
 
 alter table "public"."access_media_type_buildings" enable row level security;
 
+-- Índice para la FK building_id (la PK compuesta empieza por media_type_id).
+create index if not exists idx_access_media_type_buildings_building_id
+  on public.access_media_type_buildings using btree (building_id);
+
 create policy "Media type buildings viewable by authenticated"
   on "public"."access_media_type_buildings"
   for select

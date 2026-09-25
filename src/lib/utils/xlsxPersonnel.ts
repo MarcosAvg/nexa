@@ -1,11 +1,5 @@
 import type * as ExcelJSTypes from 'exceljs';
-import {
-    addLogoToSheet,
-    calcPct,
-    addTableHeader,
-    addTableRow,
-    autoRowHeight,
-} from './xlsxShared';    // Re-exportar tipos desde aquí
+import { addLogoToSheet, calcPct, addTableHeader, addTableRow, autoRowHeight } from './xlsxShared'; // Re-exportar tipos desde aquí
 import { floorsForKey } from '../services/accessAssignments';
 import type { FloorGroup } from '../types';
 import { settingsState } from '../stores';
@@ -44,17 +38,18 @@ const MEDIA_PALETTE: { head: string; sub: string; fill: string }[] = [
 
 const pascal = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function buildMediaConfig(media: { key: string; name: string; has_floors: boolean }, idx: number): MediaExportConfig {
+function buildMediaConfig(
+    media: { key: string; name: string; has_floors: boolean },
+    idx: number,
+): MediaExportConfig {
     const colors = MEDIA_PALETTE[idx % MEDIA_PALETTE.length];
     const base = pascal(media.key);
     const headers: MediaExportConfig['headers'] = media.has_floors
         ? [
-            { key: `folio${base}`, width: 20, label: 'FOLIO ACCESO' },
-            { key: `pisos${base}Text`, width: 25, label: 'PISOS ASIGNADOS' },
-        ]
-        : [
-            { key: `folio${base}`, width: 20, label: 'FOLIO ACCESO' },
-        ];
+              { key: `folio${base}`, width: 20, label: 'FOLIO ACCESO' },
+              { key: `pisos${base}Text`, width: 25, label: 'PISOS ASIGNADOS' },
+          ]
+        : [{ key: `folio${base}`, width: 20, label: 'FOLIO ACCESO' }];
     return {
         key: media.key,
         name: media.name,
@@ -118,7 +113,7 @@ export interface ExportOptions {
         floor?: string;
         mediaType?: string;
         search?: string;
-    },
+    };
     splitByDependency?: boolean;
     /**
      * Tipos de tarjeta cuyas columnas (Directorio) y KPIs (Resumen) se incluyen.
@@ -133,7 +128,13 @@ export interface ExportOptions {
 }
 
 // ─── Statistics Sheet Helper ───────────────────────────────────────────
-async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPersonnelData[], filterInfo: string, cardTypes?: CardType[], mediaTypes?: any[]) {
+async function addStatsSheet(
+    workbook: ExcelJSTypes.Workbook,
+    data: ExportPersonnelData[],
+    filterInfo: string,
+    cardTypes?: CardType[],
+    mediaTypes?: any[],
+) {
     const ws = workbook.addWorksheet('Resumen Ejecutivo');
 
     const C = {
@@ -160,24 +161,31 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
         ['J', 'K', 'L'],
     ];
     ws.columns = [
-        { width: 2 },    // A margen
-        { width: 22 },   // B
-        { width: 12 },   // C
-        { width: 10 },   // D
-        { width: 3 },    // E separador
-        { width: 22 },   // F
-        { width: 12 },   // G
-        { width: 10 },   // H
-        { width: 3 },    // I separador
-        { width: 22 },   // J
-        { width: 12 },   // K
-        { width: 10 },   // L
-        { width: 3 },    // M separador
-        { width: 2 },    // N margen
+        { width: 2 }, // A margen
+        { width: 22 }, // B
+        { width: 12 }, // C
+        { width: 10 }, // D
+        { width: 3 }, // E separador
+        { width: 22 }, // F
+        { width: 12 }, // G
+        { width: 10 }, // H
+        { width: 3 }, // I separador
+        { width: 22 }, // J
+        { width: 12 }, // K
+        { width: 10 }, // L
+        { width: 3 }, // M separador
+        { width: 2 }, // N margen
     ];
 
     // Stat de hero: etiqueta + valor + % en un panel (3 celdas, sin merge).
-    const stat = (row: number, panel: number, label: string, value: number | string, pct?: string, colors?: { bg: string; fg: string }): void => {
+    const stat = (
+        row: number,
+        panel: number,
+        label: string,
+        value: number | string,
+        pct?: string,
+        colors?: { bg: string; fg: string },
+    ): void => {
         const [lc, vc, pc] = PANELS[panel];
         const c = colors || { bg: 'FFDBEAFE', fg: 'FF1E40AF' };
         [
@@ -190,13 +198,23 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
             cell.font = { name: 'Arial', size, bold, color: { argb: c.fg } };
             cell.alignment = { vertical: 'middle', horizontal: align as any, indent: indent ?? 0 };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.bg } };
-            cell.border = { top: { style: 'thin', color: { argb: c.fg } }, bottom: { style: 'thin', color: { argb: c.fg } }, left: { style: 'thin', color: { argb: c.fg } }, right: { style: 'thin', color: { argb: c.fg } } };
+            cell.border = {
+                top: { style: 'thin', color: { argb: c.fg } },
+                bottom: { style: 'thin', color: { argb: c.fg } },
+                left: { style: 'thin', color: { argb: c.fg } },
+                right: { style: 'thin', color: { argb: c.fg } },
+            };
         });
         ws.getRow(row).height = 46;
     };
 
     // Título de panel (sin merge): texto en el primer col + línea separadora en el panel.
-    const panelTitle = (row: number, panel: number, text: string, colors: { sectionHead: string; separator: string }): void => {
+    const panelTitle = (
+        row: number,
+        panel: number,
+        text: string,
+        colors: { sectionHead: string; separator: string },
+    ): void => {
         const [lc, vc, pc] = PANELS[panel];
         const cell = ws.getCell(`${lc}${row}`);
         cell.value = text;
@@ -204,19 +222,33 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
         cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
         [lc, vc, pc].forEach((col) => {
             const x = ws.getCell(`${col}${row}`);
-            x.border = { top: { style: 'medium', color: { argb: colors.separator } }, left: { style: 'thin', color: { argb: colors.separator } }, right: { style: 'thin', color: { argb: colors.separator } } };
+            x.border = {
+                top: { style: 'medium', color: { argb: colors.separator } },
+                left: { style: 'thin', color: { argb: colors.separator } },
+                right: { style: 'thin', color: { argb: colors.separator } },
+            };
         });
         ws.getRow(row).height = 26;
     };
 
     // Cabecera de tabla en un panel (a partir de una lista de etiquetas).
-    const tableHeader = (row: number, panel: number, labels: string[], colors: { bg: string; fg: string }): void => {
+    const tableHeader = (
+        row: number,
+        panel: number,
+        labels: string[],
+        colors: { bg: string; fg: string },
+    ): void => {
         const cols = PANELS[panel].slice(0, labels.length).map((col, i) => ({ col, label: labels[i] }));
         addTableHeader(ws, row, cols, colors, '#FFFFFFFF');
     };
 
     // Fila de tabla en un panel (valores, usa los N primeros cols del panel).
-    const tableRow = (row: number, panel: number, values: (string | number)[], colors: { bg: string; fg: string }): void => {
+    const tableRow = (
+        row: number,
+        panel: number,
+        values: (string | number)[],
+        colors: { bg: string; fg: string },
+    ): void => {
         const cols = PANELS[panel].slice(0, values.length).map((col, i) => ({ col, value: values[i] }));
         addTableRow(ws, row, cols, colors, '#0F172A', '#FFFFFFFF');
     };
@@ -224,15 +256,24 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     // Colores por estado (máquina de 8).
     const stateColors = (status: string): { bg: string; fg: string } => {
         switch (status) {
-            case 'Activo/a': return { bg: 'FFD1FAE5', fg: 'FF065F46' };
-            case 'Parcial': return { bg: 'FFFEF3C7', fg: 'FF92400E' };
-            case 'En proceso': return { bg: 'FFE0F2FE', fg: 'FF075985' };
-            case 'Media de otro edificio': return { bg: 'FFEDE9FE', fg: 'FF5B21B6' };
-            case 'Otro edificio en proceso': return { bg: 'FFE0E7FF', fg: 'FF3730A3' };
-            case 'Sin Acceso': return { bg: 'FFF1F5F9', fg: 'FF334155' };
-            case 'Bloqueado/a': return { bg: 'FFFEE2E2', fg: 'FF991B1B' };
-            case 'Baja': return { bg: 'FFE2E8F0', fg: 'FF475569' };
-            default: return { bg: 'FFF1F5F9', fg: 'FF334155' };
+            case 'Activo/a':
+                return { bg: 'FFD1FAE5', fg: 'FF065F46' };
+            case 'Parcial':
+                return { bg: 'FFFEF3C7', fg: 'FF92400E' };
+            case 'En proceso':
+                return { bg: 'FFE0F2FE', fg: 'FF075985' };
+            case 'Media de otro edificio':
+                return { bg: 'FFEDE9FE', fg: 'FF5B21B6' };
+            case 'Otro edificio en proceso':
+                return { bg: 'FFE0E7FF', fg: 'FF3730A3' };
+            case 'Sin Acceso':
+                return { bg: 'FFF1F5F9', fg: 'FF334155' };
+            case 'Bloqueado/a':
+                return { bg: 'FFFEE2E2', fg: 'FF991B1B' };
+            case 'Baja':
+                return { bg: 'FFE2E8F0', fg: 'FF475569' };
+            default:
+                return { bg: 'FFF1F5F9', fg: 'FF334155' };
         }
     };
 
@@ -240,29 +281,30 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
 
     // ── Compute all stats ──
     const total = data.length;
-    const activos = data.filter(p => p.status === 'Activo/a').length;
-    const parciales = data.filter(p => p.status === 'Parcial').length;
-    const bloqueados = data.filter(p => p.status === 'Bloqueado/a').length;
-    const sinAcceso = data.filter(p => p.status === 'Sin Acceso').length;
-    const bajas = data.filter(p => p.status === 'Baja').length;
+    const activos = data.filter((p) => p.status === 'Activo/a').length;
+    const parciales = data.filter((p) => p.status === 'Parcial').length;
+    const bloqueados = data.filter((p) => p.status === 'Bloqueado/a').length;
+    const sinAcceso = data.filter((p) => p.status === 'Sin Acceso').length;
+    const bajas = data.filter((p) => p.status === 'Baja').length;
     const activosOperativos = activos + parciales;
-    const operativos = data.filter(p => p.status === 'Activo/a' || p.status === 'Parcial');
-    const enProceso = data.filter(p => p.status === 'En proceso').length;
-    const mediaOtro = data.filter(p => p.status === 'Media de otro edificio').length;
-    const otroEnProceso = data.filter(p => p.status === 'Otro edificio en proceso').length;
+    const operativos = data.filter((p) => p.status === 'Activo/a' || p.status === 'Parcial');
+    const enProceso = data.filter((p) => p.status === 'En proceso').length;
+    const mediaOtro = data.filter((p) => p.status === 'Media de otro edificio').length;
+    const otroEnProceso = data.filter((p) => p.status === 'Otro edificio en proceso').length;
     const noActivos = Math.max(0, total - activosOperativos);
-    const selected = (cardTypes && cardTypes.length > 0 ? cardTypes : null);
+    const selected = cardTypes && cardTypes.length > 0 ? cardTypes : null;
     const mediaConfigs = buildMediaConfigs(mediaTypes).filter((m) => !selected || selected.includes(m.name));
-    const conByMedia = (name: string) => operativos.filter(p => p.cards?.some(c => c.type.toUpperCase() === name.toUpperCase())).length;
+    const conByMedia = (name: string) =>
+        operativos.filter((p) => p.cards?.some((c) => c.type.toUpperCase() === name.toUpperCase())).length;
     const sinByMedia = (name: string) => activosOperativos - conByMedia(name);
-    const sinEmail = data.filter(p => !p.email).length;
-    const sinSchedule = data.filter(p => !p.schedule?.days).length;
-    const sinPosition = data.filter(p => !p.position).length;
-    const sinArea = data.filter(p => !p.area).length;
-    const sinFloor = data.filter(p => !p.floor).length;
+    const sinEmail = data.filter((p) => !p.email).length;
+    const sinSchedule = data.filter((p) => !p.schedule?.days).length;
+    const sinPosition = data.filter((p) => !p.position).length;
+    const sinArea = data.filter((p) => !p.area).length;
+    const sinFloor = data.filter((p) => !p.floor).length;
 
     const depMap: Record<string, { total: number; activos: number; inactivos: number }> = {};
-    data.forEach(p => {
+    data.forEach((p) => {
         const dep = p.dependency || 'Sin Dependencia';
         if (!depMap[dep]) depMap[dep] = { total: 0, activos: 0, inactivos: 0 };
         depMap[dep].total++;
@@ -272,23 +314,23 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     const depEntries = Object.entries(depMap).sort((a, b) => b[1].total - a[1].total);
 
     const accessMap: Record<string, number> = {};
-    data.forEach(p => {
-        (p.specialAccesses || []).forEach(a => {
+    data.forEach((p) => {
+        (p.specialAccesses || []).forEach((a) => {
             accessMap[a] = (accessMap[a] || 0) + 1;
         });
     });
-    const conAccesoEspecial = data.filter(p => p.specialAccesses?.length > 0).length;
+    const conAccesoEspecial = data.filter((p) => p.specialAccesses?.length > 0).length;
     const accessEntries = Object.entries(accessMap).sort((a, b) => b[1] - a[1]);
 
     const schedMap: Record<string, number> = {};
-    data.forEach(p => {
+    data.forEach((p) => {
         const key = p.schedule?.days || null;
         if (key) schedMap[key] = (schedMap[key] || 0) + 1;
     });
     const schedEntries = Object.entries(schedMap).sort((a, b) => b[1] - a[1]);
 
     const buildMap: Record<string, number> = {};
-    data.forEach(p => {
+    data.forEach((p) => {
         const key = p.building || 'Sin Edificio';
         buildMap[key] = (buildMap[key] || 0) + 1;
     });
@@ -306,7 +348,11 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     // Fila 2: Meta (sin merge)
     const metaCell = ws.getCell('B2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
-        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
     });
     metaCell.value = `Reporte generado: ${dateStr}  |  Total de registros: ${total}`;
     metaCell.font = { name: 'Arial', size: 9, color: { argb: C.meta } };
@@ -317,23 +363,32 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
 
     // Hero KPIs (3 stats lado a lado, sin merge)
     stat(row, 0, 'TOTAL PERSONAL', total, calcPct(total, total), { bg: 'FFDBEAFE', fg: 'FF1E40AF' });
-    stat(row, 1, 'ACTIVOS OPERATIVOS', activosOperativos, calcPct(activosOperativos, total), { bg: 'FFD1FAE5', fg: 'FF065F46' });
+    stat(row, 1, 'ACTIVOS OPERATIVOS', activosOperativos, calcPct(activosOperativos, total), {
+        bg: 'FFD1FAE5',
+        fg: 'FF065F46',
+    });
     stat(row, 2, 'NO ACTIVOS', noActivos, calcPct(noActivos, total), { bg: 'FFFEE2E2', fg: 'FF991B1B' });
     row += 3;
 
     const stateOrder = [
-        'Activo/a', 'Parcial', 'En proceso', 'Media de otro edificio',
-        'Otro edificio en proceso', 'Sin Acceso', 'Bloqueado/a', 'Baja',
+        'Activo/a',
+        'Parcial',
+        'En proceso',
+        'Media de otro edificio',
+        'Otro edificio en proceso',
+        'Sin Acceso',
+        'Bloqueado/a',
+        'Baja',
     ];
     const stateCounts: Record<string, number> = {
         'Activo/a': activos,
-        'Parcial': parciales,
+        Parcial: parciales,
         'En proceso': enProceso,
         'Media de otro edificio': mediaOtro,
         'Otro edificio en proceso': otroEnProceso,
         'Sin Acceso': sinAcceso,
         'Bloqueado/a': bloqueados,
-        'Baja': bajas,
+        Baja: bajas,
     };
 
     const qualityRows: [string, number][] = [
@@ -348,59 +403,106 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     const bandStart = row;
     // Panel 0: Distribución por Estado
     let rEstado = bandStart;
-    panelTitle(rEstado, 0, '📊 DISTRIBUCIÓN POR ESTADO', C); rEstado++;
-    tableHeader(rEstado, 0, ['ESTADO', 'PERSONAS', '%'], C.violet); rEstado++;
+    panelTitle(rEstado, 0, '📊 DISTRIBUCIÓN POR ESTADO', C);
+    rEstado++;
+    tableHeader(rEstado, 0, ['ESTADO', 'PERSONAS', '%'], C.violet);
+    rEstado++;
     stateOrder.forEach((s, i) => {
         const colors = stateColors(s);
-        tableRow(rEstado, 0, [s, stateCounts[s], stateCounts[s] > 0 ? calcPct(stateCounts[s], total) : '0%'], colors);
+        tableRow(
+            rEstado,
+            0,
+            [s, stateCounts[s], stateCounts[s] > 0 ? calcPct(stateCounts[s], total) : '0%'],
+            colors,
+        );
         ws.getCell(`B${rEstado}`).font = { name: 'Arial', size: 9, bold: false, color: { argb: colors.fg } };
         rEstado++;
     });
     // Panel 1: Por Edificio
     let rEdificio = bandStart;
-    panelTitle(rEdificio, 1, '🏗️ POR EDIFICIO', C); rEdificio++;
-    tableHeader(rEdificio, 1, ['EDIFICIO', 'TOTAL', '%'], C.sky); rEdificio++;
-    buildEntries.forEach(([building, count]) => { tableRow(rEdificio, 1, [building, count, calcPct(count, total)], { bg: 'FFE0F2FE', fg: 'FF075985' }); rEdificio++; });
+    panelTitle(rEdificio, 1, '🏗️ POR EDIFICIO', C);
+    rEdificio++;
+    tableHeader(rEdificio, 1, ['EDIFICIO', 'TOTAL', '%'], C.sky);
+    rEdificio++;
+    buildEntries.forEach(([building, count]) => {
+        tableRow(rEdificio, 1, [building, count, calcPct(count, total)], { bg: 'FFE0F2FE', fg: 'FF075985' });
+        rEdificio++;
+    });
     // Panel 2: Calidad de datos
     let rCalidad = bandStart;
-    panelTitle(rCalidad, 2, '⚠️ CALIDAD DE DATOS', C); rCalidad++;
-    tableHeader(rCalidad, 2, ['CAMPO', 'SIN DATO', '%'], C.rose); rCalidad++;
+    panelTitle(rCalidad, 2, '⚠️ CALIDAD DE DATOS', C);
+    rCalidad++;
+    tableHeader(rCalidad, 2, ['CAMPO', 'SIN DATO', '%'], C.rose);
+    rCalidad++;
     qualityRows.forEach(([label, count]) => {
         const colors = count > 0 ? { bg: 'FFFEE2E2', fg: 'FF991B1B' } : { bg: 'FFD1FAE5', fg: 'FF065F46' };
-        tableRow(rCalidad, 2, [label, count, calcPct(count, total)], colors); rCalidad++;
+        tableRow(rCalidad, 2, [label, count, calcPct(count, total)], colors);
+        rCalidad++;
     });
     const totalMissing = qualityRows.reduce((sum, [, c]) => sum + c, 0);
     const maxPossible = total * qualityRows.length;
-    tableRow(rCalidad, 2, ['TOTAL VACÍOS', `${totalMissing} / ${maxPossible}`, calcPct(totalMissing, maxPossible)], { bg: 'FFF1F5F9', fg: 'FF334155' }); rCalidad++;
+    tableRow(
+        rCalidad,
+        2,
+        ['TOTAL VACÍOS', `${totalMissing} / ${maxPossible}`, calcPct(totalMissing, maxPossible)],
+        { bg: 'FFF1F5F9', fg: 'FF334155' },
+    );
+    rCalidad++;
     row = Math.max(rEstado, rEdificio, rCalidad) + 3;
 
     // ── Fila de tablas medianas lado a lado: Cobertura | Jornada | Accesos especiales ──
     const band2 = row;
     // Panel 0: Cobertura de tarjetas
     let rCob = band2;
-    panelTitle(rCob, 0, '🪪 COBERTURA DE TARJETAS', C); rCob++;
-    tableHeader(rCob, 0, ['MEDIO', 'CON', '%'], C.sky); rCob++;
+    panelTitle(rCob, 0, '🪪 COBERTURA DE TARJETAS', C);
+    rCob++;
+    tableHeader(rCob, 0, ['MEDIO', 'CON', '%'], C.sky);
+    rCob++;
     mediaConfigs.forEach((m) => {
         const con = conByMedia(m.name);
-        tableRow(rCob, 0, [`Tienen ${m.name}`, con, calcPct(con, activosOperativos)], { bg: m.colors.fill, fg: m.colors.sub }); rCob++;
+        tableRow(rCob, 0, [`Tienen ${m.name}`, con, calcPct(con, activosOperativos)], {
+            bg: m.colors.fill,
+            fg: m.colors.sub,
+        });
+        rCob++;
     });
     const conCualquiera = operativos.filter((p) =>
-        p.cards?.some((c) => mediaConfigs.some((m) => m.name.toUpperCase() === c.type.toUpperCase()))
+        p.cards?.some((c) => mediaConfigs.some((m) => m.name.toUpperCase() === c.type.toUpperCase())),
     ).length;
     const sinNinguna = activosOperativos - conCualquiera;
-    tableRow(rCob, 0, ['Sin ninguna tarjeta', sinNinguna, calcPct(sinNinguna, activosOperativos)], { bg: 'FFF1F5F9', fg: 'FF334155' }); rCob++;
+    tableRow(rCob, 0, ['Sin ninguna tarjeta', sinNinguna, calcPct(sinNinguna, activosOperativos)], {
+        bg: 'FFF1F5F9',
+        fg: 'FF334155',
+    });
+    rCob++;
     // Panel 1: Jornada laboral
     let rJor = band2;
-    panelTitle(rJor, 1, '🕐 JORNADA LABORAL', C); rJor++;
-    tableHeader(rJor, 1, ['JORNADA', 'PERSONAS', '%'], C.emerald); rJor++;
-    schedEntries.forEach(([sched, count]) => { tableRow(rJor, 1, [sched, count, calcPct(count, total)], { bg: 'FFD1FAE5', fg: 'FF065F46' }); rJor++; });
-    if (schedEntries.length === 0) { tableRow(rJor, 1, ['—', 0, '0%'], { bg: 'FFF1F5F9', fg: 'FF334155' }); rJor++; }
+    panelTitle(rJor, 1, '🕐 JORNADA LABORAL', C);
+    rJor++;
+    tableHeader(rJor, 1, ['JORNADA', 'PERSONAS', '%'], C.emerald);
+    rJor++;
+    schedEntries.forEach(([sched, count]) => {
+        tableRow(rJor, 1, [sched, count, calcPct(count, total)], { bg: 'FFD1FAE5', fg: 'FF065F46' });
+        rJor++;
+    });
+    if (schedEntries.length === 0) {
+        tableRow(rJor, 1, ['—', 0, '0%'], { bg: 'FFF1F5F9', fg: 'FF334155' });
+        rJor++;
+    }
     // Panel 2: Accesos especiales
     let rAcc = band2;
-    panelTitle(rAcc, 2, '🔐 ACCESOS ESPECIALES', C); rAcc++;
-    tableHeader(rAcc, 2, ['TIPO', 'PERSONAS', '%'], C.pink); rAcc++;
-    accessEntries.forEach(([access, count]) => { tableRow(rAcc, 2, [access, count, calcPct(count, total)], { bg: 'FFFCE7F3', fg: 'FF9D174D' }); rAcc++; });
-    if (accessEntries.length === 0) { tableRow(rAcc, 2, ['—', 0, '0%'], { bg: 'FFF1F5F9', fg: 'FF334155' }); rAcc++; }
+    panelTitle(rAcc, 2, '🔐 ACCESOS ESPECIALES', C);
+    rAcc++;
+    tableHeader(rAcc, 2, ['TIPO', 'PERSONAS', '%'], C.pink);
+    rAcc++;
+    accessEntries.forEach(([access, count]) => {
+        tableRow(rAcc, 2, [access, count, calcPct(count, total)], { bg: 'FFFCE7F3', fg: 'FF9D174D' });
+        rAcc++;
+    });
+    if (accessEntries.length === 0) {
+        tableRow(rAcc, 2, ['—', 0, '0%'], { bg: 'FFF1F5F9', fg: 'FF334155' });
+        rAcc++;
+    }
     row = Math.max(rCob, rJor, rAcc) + 2;
 
     // ── Banda ancha al fondo: Por dependencia (B..H, con E como separador interno; sin merge) ──
@@ -410,14 +512,45 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     depTitle.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
     ['B', 'C', 'D', 'F', 'G', 'H'].forEach((col) => {
         const x = ws.getCell(`${col}${row}`);
-        x.border = { top: { style: 'medium', color: { argb: C.separator } }, left: { style: 'thin', color: { argb: C.separator } }, right: { style: 'thin', color: { argb: C.separator } } };
+        x.border = {
+            top: { style: 'medium', color: { argb: C.separator } },
+            left: { style: 'thin', color: { argb: C.separator } },
+            right: { style: 'thin', color: { argb: C.separator } },
+        };
     });
     ws.getRow(row).height = 26;
     row++;
-    addTableHeader(ws, row, [{ col: 'B', label: 'DEPENDENCIA' }, { col: 'C', label: 'TOTAL' }, { col: 'D', label: '% DEL TOTAL' }, { col: 'F', label: 'ACTIVOS' }, { col: 'G', label: 'INACTIVOS' }, { col: 'H', label: '% ACTIVOS' }], C.violet, C.white);
+    addTableHeader(
+        ws,
+        row,
+        [
+            { col: 'B', label: 'DEPENDENCIA' },
+            { col: 'C', label: 'TOTAL' },
+            { col: 'D', label: '% DEL TOTAL' },
+            { col: 'F', label: 'ACTIVOS' },
+            { col: 'G', label: 'INACTIVOS' },
+            { col: 'H', label: '% ACTIVOS' },
+        ],
+        C.violet,
+        C.white,
+    );
     row++;
     depEntries.forEach(([dep, stats]) => {
-        addTableRow(ws, row, [{ col: 'B', value: dep }, { col: 'C', value: stats.total }, { col: 'D', value: calcPct(stats.total, total) }, { col: 'F', value: stats.activos }, { col: 'G', value: stats.inactivos }, { col: 'H', value: calcPct(stats.activos, stats.total) }], C.violet, C.sectionHead, C.white);
+        addTableRow(
+            ws,
+            row,
+            [
+                { col: 'B', value: dep },
+                { col: 'C', value: stats.total },
+                { col: 'D', value: calcPct(stats.total, total) },
+                { col: 'F', value: stats.activos },
+                { col: 'G', value: stats.inactivos },
+                { col: 'H', value: calcPct(stats.activos, stats.total) },
+            ],
+            C.violet,
+            C.sectionHead,
+            C.white,
+        );
         row++;
     });
     row++;
@@ -432,9 +565,10 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
         if (cur) cur.count++;
         else floorMap.set(key, { building: b, floor: f, count: 1 });
     });
-    const floorEntries = [...floorMap.values()].sort((a, b) =>
-        a.building.localeCompare(b.building)
-        || a.floor.localeCompare(b.floor, undefined, { numeric: true, sensitivity: 'base' }),
+    const floorEntries = [...floorMap.values()].sort(
+        (a, b) =>
+            a.building.localeCompare(b.building) ||
+            a.floor.localeCompare(b.floor, undefined, { numeric: true, sensitivity: 'base' }),
     );
 
     const floorTitle = ws.getCell(`B${row}`);
@@ -443,14 +577,41 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     floorTitle.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
     ['B', 'C', 'D', 'F', 'G', 'H'].forEach((col) => {
         const x = ws.getCell(`${col}${row}`);
-        x.border = { top: { style: 'medium', color: { argb: C.separator } }, left: { style: 'thin', color: { argb: C.separator } }, right: { style: 'thin', color: { argb: C.separator } } };
+        x.border = {
+            top: { style: 'medium', color: { argb: C.separator } },
+            left: { style: 'thin', color: { argb: C.separator } },
+            right: { style: 'thin', color: { argb: C.separator } },
+        };
     });
     ws.getRow(row).height = 26;
     row++;
-    addTableHeader(ws, row, [{ col: 'B', label: 'EDIFICIO' }, { col: 'C', label: 'PISO' }, { col: 'D', label: 'PERSONAS' }, { col: 'F', label: '% DEL TOTAL' }], C.sky, C.white);
+    addTableHeader(
+        ws,
+        row,
+        [
+            { col: 'B', label: 'EDIFICIO' },
+            { col: 'C', label: 'PISO' },
+            { col: 'D', label: 'PERSONAS' },
+            { col: 'F', label: '% DEL TOTAL' },
+        ],
+        C.sky,
+        C.white,
+    );
     row++;
     floorEntries.forEach(({ building, floor, count }) => {
-        addTableRow(ws, row, [{ col: 'B', value: building }, { col: 'C', value: floor }, { col: 'D', value: count }, { col: 'F', value: calcPct(count, total) }], { bg: 'FFE0F2FE', fg: 'FF075985' }, C.sectionHead, C.white);
+        addTableRow(
+            ws,
+            row,
+            [
+                { col: 'B', value: building },
+                { col: 'C', value: floor },
+                { col: 'D', value: count },
+                { col: 'F', value: calcPct(count, total) },
+            ],
+            { bg: 'FFE0F2FE', fg: 'FF075985' },
+            C.sectionHead,
+            C.white,
+        );
         row++;
     });
 
@@ -458,12 +619,24 @@ async function addStatsSheet(workbook: ExcelJSTypes.Workbook, data: ExportPerson
     ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1 };
 }
 
-export async function exportPersonnelToExcel(data: ExportPersonnelData[], options?: ExportOptions, returnBuffer?: false): Promise<void>;
-export async function exportPersonnelToExcel(data: ExportPersonnelData[], options: ExportOptions | undefined, returnBuffer: true): Promise<{ buffer: ArrayBuffer; filename: string }>;
-export async function exportPersonnelToExcel(data: ExportPersonnelData[], options?: ExportOptions, returnBuffer?: boolean): Promise<void | { buffer: ArrayBuffer; filename: string }> {
+export async function exportPersonnelToExcel(
+    data: ExportPersonnelData[],
+    options?: ExportOptions,
+    returnBuffer?: false,
+): Promise<void>;
+export async function exportPersonnelToExcel(
+    data: ExportPersonnelData[],
+    options: ExportOptions | undefined,
+    returnBuffer: true,
+): Promise<{ buffer: ArrayBuffer; filename: string }>;
+export async function exportPersonnelToExcel(
+    data: ExportPersonnelData[],
+    options?: ExportOptions,
+    returnBuffer?: boolean,
+): Promise<void | { buffer: ArrayBuffer; filename: string }> {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
-        import('file-saver')
+        import('file-saver'),
     ]);
     const workbook = new (ExcelJSModule.default || ExcelJSModule).Workbook();
 
@@ -480,11 +653,19 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         emerald: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
     };
 
-    const addDataSheet = async (sheetName: string, sheetData: ExportPersonnelData[], filterInfo: string, cardTypes?: CardType[], mediaTypes?: any[]) => {
+    const addDataSheet = async (
+        sheetName: string,
+        sheetData: ExportPersonnelData[],
+        filterInfo: string,
+        cardTypes?: CardType[],
+        mediaTypes?: any[],
+    ) => {
         const safeName = sheetName.replace(/[:\\/?*[\]]/g, '').substring(0, 31) || 'Hoja';
         const worksheet = workbook.addWorksheet(safeName);
-        const selected = (cardTypes && cardTypes.length > 0 ? cardTypes : null);
-        const mediaConfigs = buildMediaConfigs(mediaTypes).filter((m) => !selected || selected.includes(m.name));
+        const selected = cardTypes && cardTypes.length > 0 ? cardTypes : null;
+        const mediaConfigs = buildMediaConfigs(mediaTypes).filter(
+            (m) => !selected || selected.includes(m.name),
+        );
         // Conversor base-26 (A, B, …, Z, AA, AB) para columnas más allá de la Z.
         const colLetter = (n: number) => {
             let s = '';
@@ -507,7 +688,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
             { key: 'floor', width: 12 },
         ];
         const cardColumns = mediaConfigs.flatMap((m) =>
-            m.headers.map((h) => ({ key: h.key, width: h.width }))
+            m.headers.map((h) => ({ key: h.key, width: h.width })),
         );
         const tailColumns: { key: string; width: number }[] = [
             { key: 'status', width: 15 },
@@ -532,14 +713,22 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         worksheet.mergeCells(`A2:${lastCol}2`);
         const metaCell = worksheet.getCell('A2');
         const dateStr = new Date().toLocaleDateString('es-MX', {
-            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
         });
         metaCell.value = `Reporte generado: ${dateStr}  |  Registros en esta hoja: ${sheetData.length}`;
         metaCell.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
         metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
         worksheet.getRow(2).height = 20;
 
-        const groups: { label: string; range: string; colors: { head: string; sub: string; fill: string } }[] = [
+        const groups: {
+            label: string;
+            range: string;
+            colors: { head: string; sub: string; fill: string };
+        }[] = [
             { label: 'DATOS PERSONALES', range: 'A3:C3', colors: COLORS.personal },
             { label: 'UBICACIÓN Y PUESTO', range: 'D3:H3', colors: COLORS.location },
         ];
@@ -548,14 +737,34 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         mediaConfigs.forEach((m) => {
             const start = typeCol;
             const end = typeCol + m.headers.length - 1;
-            groups.push({ label: m.groupLabel, range: `${colLetter(start)}3:${colLetter(end)}3`, colors: m.colors });
+            groups.push({
+                label: m.groupLabel,
+                range: `${colLetter(start)}3:${colLetter(end)}3`,
+                colors: m.colors,
+            });
             typeCol = end + 1;
         });
         const tailStart = typeCol;
-        groups.push({ label: 'ESTADO', range: `${colLetter(tailStart)}3:${colLetter(tailStart)}3`, colors: COLORS.status });
-        groups.push({ label: 'ADICIONALES', range: `${colLetter(tailStart + 1)}3:${colLetter(tailStart + 1)}3`, colors: COLORS.additional });
-        groups.push({ label: 'JORNADA LABORAL', range: `${colLetter(tailStart + 2)}3:${colLetter(tailStart + 4)}3`, colors: COLORS.emerald });
-        groups.push({ label: 'CONTACTO', range: `${colLetter(tailStart + 5)}3:${colLetter(tailStart + 5)}3`, colors: COLORS.personal });
+        groups.push({
+            label: 'ESTADO',
+            range: `${colLetter(tailStart)}3:${colLetter(tailStart)}3`,
+            colors: COLORS.status,
+        });
+        groups.push({
+            label: 'ADICIONALES',
+            range: `${colLetter(tailStart + 1)}3:${colLetter(tailStart + 1)}3`,
+            colors: COLORS.additional,
+        });
+        groups.push({
+            label: 'JORNADA LABORAL',
+            range: `${colLetter(tailStart + 2)}3:${colLetter(tailStart + 4)}3`,
+            colors: COLORS.emerald,
+        });
+        groups.push({
+            label: 'CONTACTO',
+            range: `${colLetter(tailStart + 5)}3:${colLetter(tailStart + 5)}3`,
+            colors: COLORS.personal,
+        });
 
         // Inverso de colLetter: convierte letra(s) de columna a índice 1-based (A→1, Z→26, AA→27).
         const colNum = (letter: string) =>
@@ -566,7 +775,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
             groupEndCols.add(colNum(end || start));
         });
 
-        groups.forEach(group => {
+        groups.forEach((group) => {
             worksheet.mergeCells(group.range);
             const cell = worksheet.getCell(group.range.split(':')[0]);
             cell.value = group.label;
@@ -577,26 +786,39 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
                 top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
                 left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
                 bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-                right: { style: 'medium', color: { argb: COLORS.separator } }
+                right: { style: 'medium', color: { argb: COLORS.separator } },
             };
         });
 
         const headerRow = worksheet.getRow(4);
         headerRow.height = 30;
         const headerLabels = [
-            'APELLIDOS', 'NOMBRES', 'NO. EMPLEADO', 'EDIFICIO', 'DEPENDENCIA', 'EQUIPO', 'PUESTO', 'PISO BASE',
+            'APELLIDOS',
+            'NOMBRES',
+            'NO. EMPLEADO',
+            'EDIFICIO',
+            'DEPENDENCIA',
+            'EQUIPO',
+            'PUESTO',
+            'PISO BASE',
             ...mediaConfigs.flatMap((m) => m.headers.map((h) => h.label)),
-            'ESTADO', 'ACCESOS ESPECIALES', 'DIAS LABORALES', 'ENTRADA', 'SALIDA', 'CORREO ELECTRÓNICO'
+            'ESTADO',
+            'ACCESOS ESPECIALES',
+            'DIAS LABORALES',
+            'ENTRADA',
+            'SALIDA',
+            'CORREO ELECTRÓNICO',
         ];
 
         headerLabels.forEach((label, i) => {
             const cell = headerRow.getCell(i + 1);
             cell.value = label;
-            const group = groups.find(g => {
-                const col = String.fromCharCode(65 + i);
-                const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
-                return col >= (start || 'A') && col <= (end || start || 'A');
-            }) || groups[0];
+            const group =
+                groups.find((g) => {
+                    const col = String.fromCharCode(65 + i);
+                    const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
+                    return col >= (start || 'A') && col <= (end || start || 'A');
+                }) || groups[0];
 
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
             cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
@@ -605,7 +827,10 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
             const isGroupEnd = groupEndCols.has(i + 1);
             cell.border = {
                 bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
-                right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFFFFFFF' } }
+                right: {
+                    style: isGroupEnd ? 'medium' : 'thin',
+                    color: { argb: isGroupEnd ? COLORS.separator : 'FFFFFFFF' },
+                },
             };
         });
 
@@ -624,13 +849,17 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
                 days: person.schedule?.days || '-',
                 entry: person.schedule?.entry || '-',
                 exit: person.schedule?.exit || '-',
-                email: person.email || '-'
+                email: person.email || '-',
             };
             mediaConfigs.forEach((m) => {
-                const folio = person.cards?.filter(c => c.type.toUpperCase() === m.name.toUpperCase()).map(c => c.folio).join(', ') || '-';
+                const folio =
+                    person.cards
+                        ?.filter((c) => c.type.toUpperCase() === m.name.toUpperCase())
+                        .map((c) => c.folio)
+                        .join(', ') || '-';
                 rowData[m.folioField] = folio;
                 if (m.floorsField) {
-                    rowData[m.floorsField] = floorsForKey(person.floors, m.key).join(', ') || "-";
+                    rowData[m.floorsField] = floorsForKey(person.floors, m.key).join(', ') || '-';
                 }
             });
 
@@ -640,15 +869,17 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
 
             row.eachCell((cell, colNumber) => {
                 const colLetter = String.fromCharCode(64 + colNumber);
-                const group = groups.find(g => {
-                    const parts = g.range.replace(/[0-9]/g, '').split(':');
-                    return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
-                }) || groups[0];
+                const group =
+                    groups.find((g) => {
+                        const parts = g.range.replace(/[0-9]/g, '').split(':');
+                        return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
+                    }) || groups[0];
 
                 cell.font = {
-                    name: 'Arial', size: 9,
+                    name: 'Arial',
+                    size: 9,
                     color: { argb: isInactive ? 'FF64748B' : 'FF111827' },
-                    italic: isInactive
+                    italic: isInactive,
                 };
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
 
@@ -661,7 +892,10 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
                 const isGroupEnd = groupEndCols.has(colNumber);
                 cell.border = {
                     bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-                    right: { style: isGroupEnd ? 'medium' : 'thin', color: { argb: isGroupEnd ? COLORS.separator : 'FFCBD5E1' } }
+                    right: {
+                        style: isGroupEnd ? 'medium' : 'thin',
+                        color: { argb: isGroupEnd ? COLORS.separator : 'FFCBD5E1' },
+                    },
                 };
 
                 if (cell.value === '-' || cell.value === 'N/A' || !cell.value) {
@@ -695,7 +929,7 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
     };
 
     let filterDescription = '';
-    let fileNameParts: string[] = ['Directorio'];
+    const fileNameParts: string[] = ['Directorio'];
 
     if (options?.filters) {
         const { status, dependency, building, floor, mediaType, search } = options.filters;
@@ -714,11 +948,11 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
         }
         if (floor) {
             activeFilters.push(`Piso: ${floor}`);
-            fileNameParts.push(`Piso_${floor.replace(/\s+/g, "_")}`);
+            fileNameParts.push(`Piso_${floor.replace(/\s+/g, '_')}`);
         }
         if (mediaType) {
             activeFilters.push(`Tarjeta: ${mediaType}`);
-            fileNameParts.push(`Tarjeta_${mediaType.replace(/\s+/g, "_")}`);
+            fileNameParts.push(`Tarjeta_${mediaType.replace(/\s+/g, '_')}`);
         }
         if (search) {
             activeFilters.push(`Búsqueda: "${search}"`);
@@ -733,14 +967,20 @@ export async function exportPersonnelToExcel(data: ExportPersonnelData[], option
 
     if (options?.splitByDependency) {
         const groupedData: Record<string, ExportPersonnelData[]> = {};
-        data.forEach(person => {
+        data.forEach((person) => {
             const dep = person.dependency || 'Sin Dependencia';
             if (!groupedData[dep]) groupedData[dep] = [];
             groupedData[dep].push(person);
         });
         const deps = Object.keys(groupedData).sort();
         for (const dep of deps) {
-            await addDataSheet(dep, groupedData[dep], filterDescription, options?.cardTypes, options?.mediaTypes);
+            await addDataSheet(
+                dep,
+                groupedData[dep],
+                filterDescription,
+                options?.cardTypes,
+                options?.mediaTypes,
+            );
         }
         fileNameParts.push('Por_Dependencia');
     } else {

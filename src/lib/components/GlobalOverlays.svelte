@@ -1,18 +1,21 @@
 <script lang="ts">
-    import { personnelState } from "../stores";
-    import { personnelService } from "../services/personnel";
-    import { cardService } from "../services/cards";
-    import PersonDetailsPanel from "./PersonDetailsPanel.svelte";
-    import PersonModal from "./modals/PersonModal.svelte";
-    import AddCardModal from "./modals/AddCardModal.svelte";
-    import ConfirmationModal from "./modals/ConfirmationModal.svelte";
-    import DeletePersonnelModal from "./modals/DeletePersonnelModal.svelte";
-    import { personnelActions } from "../utils";
-    import { uiState } from "../stores/ui.svelte";
-    import { confirm } from "../utils/confirmModal.svelte";
-    import { toast } from "svelte-sonner";
-    import { handleError } from "../utils/error";
-    import { supabase } from "../supabase";
+    import { personnelState } from '../stores';
+    import { detailHost } from '../stores/detailHost.svelte';
+    import { personnelService } from '../services/personnel';
+    import { cardService } from '../services/cards';
+    import PersonDetailsPanel from './PersonDetailsPanel.svelte';
+    import SidePanel from './SidePanel.svelte';
+    import PersonModal from './modals/PersonModal.svelte';
+    import AddCardModal from './modals/AddCardModal.svelte';
+    import ConfirmationModal from './modals/ConfirmationModal.svelte';
+    import DeletePersonnelModal from './modals/DeletePersonnelModal.svelte';
+    import { personnelActions } from '../utils';
+    import { uiState } from '../stores/ui.svelte';
+    import { networkStore } from '../stores/network.svelte';
+    import { confirm } from '../utils/confirmModal.svelte';
+    import { toast } from 'svelte-sonner';
+    import { handleError } from '../utils/error';
+    import { supabase } from '../supabase';
 
     // Estado calculado desde el store global
     let isDetailsOpen = $derived(personnelState.isDetailsOpen);
@@ -22,24 +25,16 @@
 
     let selectedPerson = $derived.by(() => {
         if (!selectedPersonId) return null;
-        const pInStore = personnelState.pagination.items.find(
-            (p) => p.id === selectedPersonId,
-        );
+        const pInStore = personnelState.pagination.items.find((p) => p.id === selectedPersonId);
         if (pInStore) return pInStore;
-        if (fetchedPerson && fetchedPerson.id === selectedPersonId)
-            return fetchedPerson;
+        if (fetchedPerson && fetchedPerson.id === selectedPersonId) return fetchedPerson;
         return null;
     });
 
     $effect(() => {
         if (isDetailsOpen && selectedPersonId) {
-            const pInStore = personnelState.pagination.items.find(
-                (p) => p.id === selectedPersonId,
-            );
-            if (
-                !pInStore &&
-                (!fetchedPerson || fetchedPerson.id !== selectedPersonId)
-            ) {
+            const pInStore = personnelState.pagination.items.find((p) => p.id === selectedPersonId);
+            if (!pInStore && (!fetchedPerson || fetchedPerson.id !== selectedPersonId)) {
                 personnelService
                     .fetchById(selectedPersonId)
                     .then((p) => {
@@ -59,31 +54,39 @@
     let deleteModal = $state<{
         isOpen: boolean;
         person: any;
-        mode: "baja" | "eliminar";
+        mode: 'baja' | 'eliminar';
     }>({
         isOpen: false,
         person: null,
-        mode: "eliminar",
+        mode: 'eliminar',
     });
 
     // Auxiliar de actualización de datos
     async function refreshData() {
         await Promise.all([
             personnelState.refresh(personnelState.pagination.currentPage),
-            cardService
-                .fetchExtra()
-                .then((cards) => personnelState.setCards(cards)),
+            cardService.fetchExtra().then((cards) => personnelState.setCards(cards)),
         ]);
 
         if (selectedPersonId) {
-            const stillExists =
-                await personnelService.fetchById(selectedPersonId);
+            const stillExists = await personnelService.fetchById(selectedPersonId);
             if (!stillExists) {
                 personnelState.setDetailsOpen(false);
             } else {
                 fetchedPerson = stillExists;
             }
         }
+    }
+
+    /** Bloquea acciones de escritura cuando no hay conexión (modo solo lectura). */
+    function requireOnline(): boolean {
+        if (!networkStore.isOnline) {
+            toast.error(
+                'Sin conexión: la app está en modo solo lectura. Reintenta cuando recuperes internet.',
+            );
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -93,96 +96,105 @@
      * datos de la persona se conservan; solo se revoca el acceso. El sidepanel
      * permanece abierto para poder eliminar después.
      */
-    async function handleDeactivateWithCards(
-        person: any,
-        cardActionMap: Record<string, "delete" | "keep">,
-    ) {
+    async function handleDeactivateWithCards(person: any, cardActionMap: Record<string, 'delete' | 'keep'>) {
+        if (!requireOnline()) return;
         try {
-            const { error } = await supabase.rpc("deactivate_person_with_cards", {
+            const { error } = await supabase.rpc('deactivate_person_with_cards', {
                 p_person_id: person.id,
                 p_card_actions: cardActionMap ?? null,
             });
             if (error) throw error;
 
             // Actualización optimista de la lista (el RPC ya registró el estado).
-            const localPerson = personnelState.pagination.items.find(
-                (p) => p.id === person.id,
-            );
-            if (localPerson) localPerson.status_raw = "inactive";
+            const localPerson = personnelState.pagination.items.find((p) => p.id === person.id);
+            if (localPerson) localPerson.status_raw = 'inactive';
 
-            toast.success("Persona dada de baja");
+            toast.success('Persona dada de baja');
             await refreshData();
         } catch (e) {
-            handleError(e, "Error al dar de baja");
+            handleError(e, 'Error al dar de baja');
         }
     }
 
     // Envoltorios de acción que inyectan refreshData
     const onBlock = (p: any) => {
+        if (!requireOnline()) return;
         confirm.open({
-            title: p.status_raw === "blocked" ? "¿Desbloquear Persona?" : "¿Bloquear Persona?",
-            description: p.status_raw === "blocked"
-                ? "La persona volverá a tener acceso según sus tarjetas activas."
-                : "Se denegará el acceso a todas las instalaciones.",
-            variant: p.status_raw === "blocked" ? "info" : "warning",
-            confirmText: p.status_raw === "blocked" ? "Desbloquear" : "Bloquear",
+            title: p.status_raw === 'blocked' ? '¿Desbloquear Persona?' : '¿Bloquear Persona?',
+            description:
+                p.status_raw === 'blocked'
+                    ? 'La persona volverá a tener acceso según sus tarjetas activas.'
+                    : 'Se denegará el acceso a todas las instalaciones.',
+            variant: p.status_raw === 'blocked' ? 'info' : 'warning',
+            confirmText: p.status_raw === 'blocked' ? 'Desbloquear' : 'Bloquear',
             onConfirm: () => personnelActions.handleBlockPerson(p, refreshData),
         });
     };
 
     const onDeactivate = (p: any) => {
+        if (!requireOnline()) return;
         // La baja permite gestionar las tarjetas (eliminar vs dejar disponible)
         // antes de procesarla; los datos de la persona se conservan.
         deleteModal = {
             isOpen: true,
             person: p,
-            mode: "baja",
+            mode: 'baja',
         };
     };
 
-    const onReactivate = (p: any) =>
+    const onReactivate = (p: any) => {
+        if (!requireOnline()) return;
         personnelActions.handleReactivatePerson(p, refreshData);
+    };
 
     const onDeletePermanent = (p: any) => {
+        if (!requireOnline()) return;
         deleteModal = {
             isOpen: true,
             person: p,
-            mode: "eliminar",
+            mode: 'eliminar',
         };
     };
 
     const onCardBlock = (c: any) => {
-        const isReactivation = c.status === "blocked" || c.status === "inactive";
+        if (!requireOnline()) return;
+        const isReactivation = c.status === 'blocked' || c.status === 'inactive';
         confirm.open({
-            title: isReactivation ? "¿Reactivar tarjeta?" : "¿Bloquear tarjeta?",
-            description: isReactivation ? "La tarjeta volverá a estar disponible o activa." : "Se denegará el acceso a esta tarjeta.",
-            variant: isReactivation ? "info" : "warning",
-            confirmText: isReactivation ? "Reactivar" : "Bloquear",
+            title: isReactivation ? '¿Reactivar tarjeta?' : '¿Bloquear tarjeta?',
+            description: isReactivation
+                ? 'La tarjeta volverá a estar disponible o activa.'
+                : 'Se denegará el acceso a esta tarjeta.',
+            variant: isReactivation ? 'info' : 'warning',
+            confirmText: isReactivation ? 'Reactivar' : 'Bloquear',
             onConfirm: () => personnelActions.handleCardBlock(c, refreshData),
         });
     };
 
     const onCardUnassign = (c: any) => {
+        if (!requireOnline()) return;
         confirm.open({
-            title: "¿Desvincular tarjeta?",
-            description: "La tarjeta volverá al inventario como disponible.",
-            variant: "warning",
-            confirmText: "Desvincular",
+            title: '¿Desvincular tarjeta?',
+            description: 'La tarjeta volverá al inventario como disponible.',
+            variant: 'warning',
+            confirmText: 'Desvincular',
             onConfirm: () => personnelActions.handleCardUnassign(c, refreshData),
         });
     };
 
     const onCardReplace = (c: any) => {
+        if (!requireOnline()) return;
         replacingCard = c;
         isCardModalOpen = true;
     };
 
     const onCardProgram = (c: any) => {
+        if (!requireOnline()) return;
         confirm.open({
-            title: "¿Confirmar Programación?",
-            description: "Confirma que la tarjeta ha sido programada físicamente en el sistema externo. Esto también completará automáticamente cualquier ticket de programación pendiente asociado.",
-            variant: "info",
-            confirmText: "Completar Programación",
+            title: '¿Confirmar Programación?',
+            description:
+                'Confirma que la tarjeta ha sido programada físicamente en el sistema externo. Esto también completará automáticamente cualquier ticket de programación pendiente asociado.',
+            variant: 'info',
+            confirmText: 'Completar Programación',
             onConfirm: () => personnelActions.handleCardProgram(c, refreshData),
         });
     };
@@ -192,21 +204,20 @@
         cardData: { type: string; folio: string },
         replacementOptions?: { oldCardStatus: string },
     ) => {
+        if (!requireOnline()) return;
         if (!selectedPersonId) return;
 
-        await personnelActions.handleCardSave(
-            cardData,
-            selectedPersonId,
-            refreshData,
-            replacementOptions,
-        );
-        isCardModalOpen = false;            replacingCard = null; // Reiniciar
+        await personnelActions.handleCardSave(cardData, selectedPersonId, refreshData, replacementOptions);
+        isCardModalOpen = false;
+        replacingCard = null; // Reiniciar
     };
 
     function onEdit(person: any) {
         personnelState.openEditModal(person);
     }
-</script>        <!-- Panel de detalles global -->
+</script>
+
+<!-- Panel de detalles global -->
 <PersonDetailsPanel
     isOpen={isDetailsOpen}
     person={selectedPerson}
@@ -225,13 +236,15 @@
     {onCardProgram}
     onRefresh={refreshData}
     onclose={() => personnelState.setDetailsOpen(false)}
-/>        <!-- Modal de edición global -->
+/>
+<!-- Modal de edición global -->
 <PersonModal
     isOpen={personnelState.isEditModalOpen}
     editingPerson={personnelState.editingPerson}
     forceDirectSave={uiState.isDirectEditMode}
     onclose={() => personnelState.closeEditModal()}
-/>        <!-- Modal de añadir tarjeta global (desde Panel de detalles) -->
+/>
+<!-- Modal de añadir tarjeta global (desde Panel de detalles) -->
 <AddCardModal
     bind:isOpen={isCardModalOpen}
     mode="assign"
@@ -241,7 +254,8 @@
         replacingCard = null;
         isCardModalOpen = false;
     }}
-/>        <!-- Modal de confirmación genérico (singleton) -->
+/>
+<!-- Modal de confirmación genérico (singleton) -->
 <ConfirmationModal
     bind:isOpen={confirm.isOpen}
     title={confirm.title}
@@ -258,19 +272,29 @@
     person={deleteModal.person}
     mode={deleteModal.mode}
     onConfirm={(cardActionMap) => {
-        if (deleteModal.mode === "baja") {
-            return handleDeactivateWithCards(
-                deleteModal.person,
-                cardActionMap,
-            );
+        if (deleteModal.mode === 'baja') {
+            return handleDeactivateWithCards(deleteModal.person, cardActionMap);
         }
-        return personnelActions.handleDeletePersonPermanent(
-            deleteModal.person,
-            cardActionMap,
-            async () => {
-                personnelState.setDetailsOpen(false);
-                await refreshData();
-            },
-        );
+        return personnelActions.handleDeletePersonPermanent(deleteModal.person, cardActionMap, async () => {
+            personnelState.setDetailsOpen(false);
+            await refreshData();
+        });
     }}
 />
+
+<!-- Host global del panel de detalle de listas (fuera de Card → overlay real) -->
+<SidePanel
+    bind:isOpen={detailHost.isOpen}
+    title={detailHost.entry?.title ?? ''}
+    subtitle={detailHost.entry?.subtitle}
+    onclose={() => detailHost.clear()}
+>
+    {#if detailHost.entry}
+        {@render detailHost.entry.details?.(detailHost.entry.row)}
+    {/if}
+    {#snippet footer()}
+        {#if detailHost.entry}
+            {@render detailHost.entry.actions?.(detailHost.entry.row)}
+        {/if}
+    {/snippet}
+</SidePanel>

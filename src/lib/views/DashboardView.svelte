@@ -1,11 +1,6 @@
 <script lang="ts">
-    import {
-        personnelState,
-        ticketState,
-        userState,
-        historyState,
-    } from "../stores";
-    import { Card, Badge, Button, Input, Tabs } from "../components";
+    import { personnelState, ticketState, userState, historyState } from '../stores';
+    import { Card, Badge, Button, Input, Tabs, EmptyState, SectionHeader } from '../components';
     import {
         CreditCard,
         FileSignature,
@@ -21,16 +16,18 @@
         BarChart3,
         TrendingUp,
         Calendar,
-    } from "lucide-svelte";
-    import { onMount } from "svelte";
-    import { push } from "svelte-spa-router";
+        Inbox,
+    } from 'lucide-svelte';
+    import { onMount } from 'svelte';
+    import { push } from 'svelte-spa-router';
     import {
         mediaTypeVariant,
         mediaTypeBarClasses,
         mediaTypeStockClasses,
-    } from "../utils/mediaTypeAppearance";
-    import { timeAgo, fullName } from "../utils/format";
-    import { DASHBOARD_EXCLUDED_TICKET_TYPES } from "../constants/tickets";
+    } from '../utils/mediaTypeAppearance';
+    import { timeAgo, fullName } from '../utils/format';
+    import { DASHBOARD_EXCLUDED_TICKET_TYPES } from '../constants/tickets';
+    import { PERSONNEL_STATUS_META } from '../constants/status';
 
     onMount(() => {
         personnelState.refreshDashboardStats();
@@ -44,14 +41,14 @@
     // Navegación desde los contadores: pre-aplican el filtro en el store de destino.
     function goPersonnel(status: string) {
         personnelState.filters.status = status;
-        personnelState.filters.search = "";
-        push("/personal");
+        personnelState.filters.search = '';
+        push('/personal');
     }
-    function goTickets(section: "General" | "Responsivas", type: string = "Todos") {
+    function goTickets(section: 'General' | 'Responsivas', type: string = 'Todos') {
         ticketState.filters.section = section;
         ticketState.filters.type = type;
-        ticketState.filters.search = "";
-        push("/tickets");
+        ticketState.filters.search = '';
+        push('/tickets');
     }
 
     let pendingItems = $derived(ticketState.pendingItems);
@@ -65,12 +62,8 @@
     // Tarjetas KPI
     let activePersonnelCount = $derived(personnelState.dashboardStats.activePersonnel);
     let mediaStock = $derived(personnelState.dashboardStats.stock);
-    let pendingSignaturesCount = $derived(
-        pendingItems.filter((t) => t.type === "Firma Responsiva").length,
-    );
-    let pendingProgrammingCount = $derived(
-        pendingItems.filter((t) => t.type === "Programación").length,
-    );
+    let pendingSignaturesCount = $derived(pendingItems.filter((t) => t.type === 'Firma Responsiva').length);
+    let pendingProgrammingCount = $derived(pendingItems.filter((t) => t.type === 'Programación').length);
 
     // Métricas
     let metrics = $derived(personnelState.dashboardMetrics);
@@ -79,30 +72,32 @@
     // Crecimiento de personal
     let growth = $derived(personnelState.growth);
     let growthLoading = $derived(personnelState.growthLoading);
-    let growthTab = $state<"edificio" | "dependencia" | "piso">("edificio");
+    let growthTab = $state<'edificio' | 'dependencia' | 'piso'>('edificio');
 
     function growthSign(p: number | null): string {
-        if (p == null || p === 0) return "0";
+        if (p == null || p === 0) return '0';
         return p > 0 ? `+${p}` : `${p}`;
     }
     function growthPct(p: number | null): string {
-        if (p == null) return "—";
+        if (p == null) return '—';
         return `${p.toFixed(1)}%`;
     }
-    function growthVariant(p: number | null): "slate" | "blue" | "violet" | "amber" | "orange" | "emerald" | "rose" {
-        if (p == null || p === 0) return "slate";
-        if (p < 0) return "rose";
-        if (p < 5) return "blue";
-        if (p < 15) return "violet";
-        if (p < 35) return "amber";
-        if (p < 75) return "orange";
-        return "emerald";
+    function growthVariant(
+        p: number | null,
+    ): 'slate' | 'blue' | 'violet' | 'amber' | 'orange' | 'emerald' | 'rose' {
+        if (p == null || p === 0) return 'slate';
+        if (p < 0) return 'rose';
+        if (p < 5) return 'blue';
+        if (p < 15) return 'violet';
+        if (p < 35) return 'amber';
+        if (p < 75) return 'orange';
+        return 'emerald';
     }
     function applyGrowthRange() {
         personnelState.refreshDashboardGrowth();
     }
     function resetGrowthToCreation() {
-        personnelState.growthStartDate = "";
+        personnelState.growthStartDate = '';
         personnelState.refreshDashboardGrowth();
     }
 
@@ -110,22 +105,20 @@
     let ticketsByPriority = $derived.by(() => {
         const map = { Alta: 0, Media: 0, Baja: 0 };
         for (const t of operationalTickets) {
-            const p = String(t.priority || "").toLowerCase();
-            if (p === "alta") map.Alta++;
-            else if (p === "media") map.Media++;
-            else if (p === "baja") map.Baja++;
+            const p = String(t.priority || '').toLowerCase();
+            if (p === 'alta') map.Alta++;
+            else if (p === 'media') map.Media++;
+            else if (p === 'baja') map.Baja++;
         }
         return map;
     });
     let ticketPriorityList = $derived([
-        { label: "Alta", count: ticketsByPriority.Alta },
-        { label: "Media", count: ticketsByPriority.Media },
-        { label: "Baja", count: ticketsByPriority.Baja },
+        { label: 'Alta', count: ticketsByPriority.Alta },
+        { label: 'Media', count: ticketsByPriority.Media },
+        { label: 'Baja', count: ticketsByPriority.Baja },
     ]);
     let urgentTickets = $derived(
-        operationalTickets
-            .filter((t) => String(t.priority || "").toLowerCase() === "alta")
-            .slice(0, 6),
+        operationalTickets.filter((t) => String(t.priority || '').toLowerCase() === 'alta').slice(0, 6),
     );
 
     // Actividad reciente (feed precargado en el boot)
@@ -134,9 +127,9 @@
     // Saludo según hora del día
     function greeting(): string {
         const h = new Date().getHours();
-        if (h < 12) return "Buenos días";
-        if (h < 19) return "Buenas tardes";
-        return "Buenas noches";
+        if (h < 12) return 'Buenos días';
+        if (h < 19) return 'Buenas tardes';
+        return 'Buenas noches';
     }
 
     // Utilidades
@@ -144,31 +137,25 @@
         return total > 0 ? Math.round((n / total) * 100) : 0;
     }
 
-    const statusConfig = [
-        { key: "activo", label: "Activo/a", color: "bg-emerald-500", hex: "#10b981", textColor: "text-emerald-700", bgLight: "bg-emerald-50" },
-        { key: "parcial", label: "Parcial", color: "bg-amber-500", hex: "#f59e0b", textColor: "text-amber-700", bgLight: "bg-amber-50" },
-        { key: "en_proceso", label: "En proceso", color: "bg-sky-500", hex: "#0ea5e9", textColor: "text-sky-700", bgLight: "bg-sky-50" },
-        { key: "media_otro_edificio", label: "Media de otro edificio", color: "bg-violet-500", hex: "#8b5cf6", textColor: "text-violet-700", bgLight: "bg-violet-50" },
-        { key: "media_otro_edificio_pendiente", label: "Otro edificio en proceso", color: "bg-violet-300", hex: "#c4b5fd", textColor: "text-violet-600", bgLight: "bg-violet-50/60" },
-        { key: "sin_acceso", label: "Sin Acceso", color: "bg-slate-400", hex: "#94a3b8", textColor: "text-slate-600", bgLight: "bg-slate-50" },
-        { key: "bloqueado", label: "Bloqueado/a", color: "bg-rose-500", hex: "#f43f5e", textColor: "text-rose-700", bgLight: "bg-rose-50" },
-        { key: "baja", label: "Baja", color: "bg-slate-300", hex: "#cbd5e1", textColor: "text-slate-500", bgLight: "bg-slate-50/50" },
-    ];
+    const statusConfig = PERSONNEL_STATUS_META;
 
     function actionMeta(action: string, entity: string) {
-        const a = (action || "").toLowerCase();
-        if (a.includes("create") || a.includes("alta")) return { color: "text-emerald-600", bg: "bg-emerald-50", icon: "plus" };
-        if (a.includes("delete") || a.includes("baja")) return { color: "text-rose-600", bg: "bg-rose-50", icon: "minus" };
-        if (a.includes("assign") || a.includes("replac") || a.includes("reposic")) return { color: "text-violet-600", bg: "bg-violet-50", icon: "swap" };
-        if (a.includes("sign")) return { color: "text-sky-600", bg: "bg-sky-50", icon: "pen" };
-        return { color: "text-slate-600", bg: "bg-slate-50", icon: "dot" };
+        const a = (action || '').toLowerCase();
+        if (a.includes('create') || a.includes('alta'))
+            return { color: 'text-emerald-600', bg: 'bg-emerald-50', icon: 'plus' };
+        if (a.includes('delete') || a.includes('baja'))
+            return { color: 'text-rose-600', bg: 'bg-rose-50', icon: 'minus' };
+        if (a.includes('assign') || a.includes('replac') || a.includes('reposic'))
+            return { color: 'text-violet-600', bg: 'bg-violet-50', icon: 'swap' };
+        if (a.includes('sign')) return { color: 'text-sky-600', bg: 'bg-sky-50', icon: 'pen' };
+        return { color: 'text-slate-600', bg: 'bg-slate-50', icon: 'dot' };
     }
 
     let qualityItems = $derived([
-        { label: "Correo Electrónico", missing: metrics.dataQuality.sinEmail, icon: "✉" },
-        { label: "Días Laborales", missing: metrics.dataQuality.sinSchedule, icon: "🕐" },
-        { label: "Puesto", missing: metrics.dataQuality.sinPosition, icon: "💼" },
-        { label: "Área / Función", missing: metrics.dataQuality.sinArea, icon: "🏷" },
+        { label: 'Correo Electrónico', missing: metrics.dataQuality.sinEmail, icon: '✉' },
+        { label: 'Días Laborales', missing: metrics.dataQuality.sinSchedule, icon: '🕐' },
+        { label: 'Puesto', missing: metrics.dataQuality.sinPosition, icon: '💼' },
+        { label: 'Área / Función', missing: metrics.dataQuality.sinArea, icon: '🏷' },
     ]);
 
     let totalFields = $derived(metrics.dataQuality.total * 4);
@@ -194,38 +181,50 @@
     });
 
     async function importChart() {
-        const { default: Chart } = await import("chart.js/auto");
+        const { default: Chart } = await import('chart.js/auto');
         return Chart;
     }
 
     async function renderStateDonut() {
         if (!stateCanvas) return;
-        if (chartState) { chartState.destroy(); chartState = null; }
+        if (chartState) {
+            chartState.destroy();
+            chartState = null;
+        }
         const data = statusConfig
-            .map((s) => ({ label: s.label, value: metrics.statusCounts[s.key as keyof typeof metrics.statusCounts] ?? 0, hex: s.hex }))
+            .map((s) => ({
+                label: s.label,
+                value: metrics.statusCounts[s.key as keyof typeof metrics.statusCounts] ?? 0,
+                hex: s.hex,
+            }))
             .filter((d) => d.value > 0);
         if (data.length === 0) return;
         const Chart = await importChart();
         chartState = new Chart(stateCanvas, {
-            type: "doughnut",
+            type: 'doughnut',
             data: {
                 labels: data.map((d) => d.label),
-                datasets: [{
-                    data: data.map((d) => d.value),
-                    backgroundColor: data.map((d) => d.hex),
-                    borderColor: "#fff",
-                    borderWidth: 2,
-                    hoverOffset: 6,
-                }],
+                datasets: [
+                    {
+                        data: data.map((d) => d.value),
+                        backgroundColor: data.map((d) => d.hex),
+                        borderColor: '#fff',
+                        borderWidth: 2,
+                        hoverOffset: 6,
+                    },
+                ],
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: "70%",
+                cutout: '70%',
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        callbacks: { label: (ctx: any) => ` ${ctx.label}: ${ctx.parsed} (${pct(ctx.parsed, metrics.totalPersonnel)}%)` },
+                        callbacks: {
+                            label: (ctx: any) =>
+                                ` ${ctx.label}: ${ctx.parsed} (${pct(ctx.parsed, metrics.totalPersonnel)}%)`,
+                        },
                     },
                 },
             },
@@ -234,23 +233,31 @@
 
     async function renderQualityRing() {
         if (!qualityCanvas) return;
-        if (chartQuality) { chartQuality.destroy(); chartQuality = null; }
+        if (chartQuality) {
+            chartQuality.destroy();
+            chartQuality = null;
+        }
         if (!qualityCanvas) return;
         const Chart = await importChart();
         chartQuality = new Chart(qualityCanvas, {
-            type: "doughnut",
+            type: 'doughnut',
             data: {
-                labels: ["Completo", "Incompleto"],
-                datasets: [{
-                    data: [Math.max(0, totalFields - totalMissing), totalMissing],
-                    backgroundColor: [overallPct >= 90 ? "#10b981" : overallPct >= 70 ? "#f59e0b" : "#f43f5e", "#e2e8f0"],
-                    borderWidth: 0,
-                }],
+                labels: ['Completo', 'Incompleto'],
+                datasets: [
+                    {
+                        data: [Math.max(0, totalFields - totalMissing), totalMissing],
+                        backgroundColor: [
+                            overallPct >= 90 ? '#10b981' : overallPct >= 70 ? '#f59e0b' : '#f43f5e',
+                            '#e2e8f0',
+                        ],
+                        borderWidth: 0,
+                    },
+                ],
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: "78%",
+                cutout: '78%',
                 plugins: {
                     legend: { display: false },
                     tooltip: { enabled: true },
@@ -260,9 +267,19 @@
     }
 </script>
 
-<div class="space-y-8">
+{#snippet dashEmpty(label: string)}
+    <div class="flex flex-col items-center justify-center gap-2 py-9 text-center">
+        <Inbox size={22} class="text-slate-300" strokeWidth={1.8} />
+        <p class="text-xs font-medium text-slate-400">{label}</p>
+    </div>
+{/snippet}
+
+<div class="space-y-5">
+    <!-- Cabecera unificada (móvil con buscador; hero solo en desktop) -->
+    <SectionHeader title="Dashboard" />
+
     <!-- ── HERO ── -->
-    <section class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+    <section class="hidden lg:flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div class="min-w-0">
             <div class="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
                 <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -270,23 +287,39 @@
                 </h1>
                 {#if currentUser?.name}
                     <span class="text-2xl sm:text-3xl font-extrabold text-sky-600 tracking-tight break-words">
-                        {currentUser.name.split(" ")[0]}
+                        {currentUser.name.split(' ')[0]}
                     </span>
                 {/if}
             </div>
             <p class="text-[15px] font-medium text-slate-500 mt-1">
-                {new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" } )} · Resumen operativo de personal y accesos.
+                {new Date().toLocaleDateString('es-MX', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                })} · Resumen operativo de personal y accesos.
             </p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
             {#if userState.isAdmin}
-                <Badge variant="violet" class="text-[10px] font-extrabold px-2.5 py-1 uppercase tracking-wider">Administrador</Badge>
+                <Badge
+                    variant="violet"
+                    class="text-[10px] font-extrabold px-2.5 py-1 uppercase tracking-wider"
+                    >Administrador</Badge
+                >
             {:else if userState.isOperator}
-                <Badge variant="blue" class="text-[10px] font-extrabold px-2.5 py-1 uppercase tracking-wider">Operador</Badge>
+                <Badge variant="blue" class="text-[10px] font-extrabold px-2.5 py-1 uppercase tracking-wider"
+                    >Operador</Badge
+                >
             {:else}
-                <Badge variant="slate" class="text-[10px] font-extrabold px-2.5 py-1 uppercase tracking-wider">Consulta</Badge>
+                <Badge variant="slate" class="text-[10px] font-extrabold px-2.5 py-1 uppercase tracking-wider"
+                    >Consulta</Badge
+                >
             {/if}
-            <Badge variant={operationalTickets.length > 0 ? "amber" : "emerald"} class="text-[10px] font-extrabold px-2.5 py-1 uppercase tracking-wider">
+            <Badge
+                variant={operationalTickets.length > 0 ? 'amber' : 'emerald'}
+                class="text-[10px] font-extrabold px-2.5 py-1 uppercase tracking-wider"
+            >
                 {operationalTickets.length} pendientes
             </Badge>
         </div>
@@ -294,76 +327,150 @@
 
     <!-- ── KPIs ── -->
     <section class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300 cursor-pointer" onclick={() => goPersonnel("Activo/a")}>
+        <Card
+            class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
+            interactive
+            onclick={() => goPersonnel('Activo/a')}
+        >
             <div class="flex items-center gap-3.5">
-                <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                <div
+                    class="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-110 transition-transform duration-300"
+                >
                     <Users size={22} strokeWidth={2} />
                 </div>
                 <div>
-                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">Personal Activo</div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">
+                        Personal Activo
+                    </div>
                     <div class="text-2xl font-black text-slate-900 tabular-nums">{activePersonnelCount}</div>
                 </div>
             </div>
-            <div class="mt-2 text-[10px] font-medium text-slate-400">Incluye: Activo/a, Parcial y Media de otro edificio</div>
-            <div class="absolute -right-4 -bottom-4 text-emerald-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><Users size={96} /></div>
+            <div class="mt-2 text-[10px] font-medium text-slate-400">
+                Incluye: Activo/a, Parcial y Media de otro edificio
+            </div>
+            <div
+                class="absolute -right-4 -bottom-4 text-emerald-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+            >
+                <Users size={96} />
+            </div>
         </Card>
 
-        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300 cursor-pointer" onclick={() => goPersonnel("No Activos")}>
+        <Card
+            class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
+            interactive
+            onclick={() => goPersonnel('No Activos')}
+        >
             <div class="flex items-center gap-3.5">
-                <div class="p-3 bg-rose-50 text-rose-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                <div
+                    class="p-3 bg-rose-50 text-rose-600 rounded-xl group-hover:scale-110 transition-transform duration-300"
+                >
                     <Shield size={22} strokeWidth={2} />
                 </div>
                 <div>
-                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">No Activos</div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">
+                        No Activos
+                    </div>
                     <div class="text-2xl font-black text-slate-900 tabular-nums">{metrics.noActivos}</div>
                 </div>
             </div>
-            <div class="mt-2 text-[10px] font-medium text-slate-400">Sin acceso utilizable (en proceso, otro edificio en proceso, sin acceso, bloqueado o baja)</div>
-            <div class="absolute -right-4 -bottom-4 text-rose-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><Shield size={96} /></div>
+            <div class="mt-2 text-[10px] font-medium text-slate-400">
+                Sin acceso utilizable (en proceso, otro edificio en proceso, sin acceso, bloqueado o baja)
+            </div>
+            <div
+                class="absolute -right-4 -bottom-4 text-rose-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+            >
+                <Shield size={96} />
+            </div>
         </Card>
 
-        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300 cursor-pointer" onclick={() => goTickets("General")}>
+        <Card
+            class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
+            interactive
+            onclick={() => goTickets('General')}
+        >
             <div class="flex items-center gap-3.5">
-                <div class="p-3 bg-amber-50 text-amber-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                <div
+                    class="p-3 bg-amber-50 text-amber-600 rounded-xl group-hover:scale-110 transition-transform duration-300"
+                >
                     <FileText size={22} strokeWidth={2} />
                 </div>
                 <div>
-                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">Tickets Pendientes</div>
-                    <div class="text-2xl font-black text-slate-900 tabular-nums">{operationalTickets.length}</div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">
+                        Tickets Pendientes
+                    </div>
+                    <div class="text-2xl font-black text-slate-900 tabular-nums">
+                        {operationalTickets.length}
+                    </div>
                 </div>
             </div>
             <div class="mt-2 flex items-center gap-1.5">
                 {#each ticketPriorityList as item}
-                    <Badge variant={item.label === "Alta" ? "rose" : item.label === "Media" ? "amber" : "slate"} class="text-[9px] font-extrabold px-1.5 py-0.5 hidden sm:inline-flex">{item.label} {item.count}</Badge>
+                    <Badge
+                        variant={item.label === 'Alta' ? 'rose' : item.label === 'Media' ? 'amber' : 'slate'}
+                        class="text-[9px] font-extrabold px-1.5 py-0.5 hidden sm:inline-flex"
+                        >{item.label} {item.count}</Badge
+                    >
                 {/each}
             </div>
-            <div class="absolute -right-4 -bottom-4 text-amber-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><FileText size={96} /></div>
+            <div
+                class="absolute -right-4 -bottom-4 text-amber-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+            >
+                <FileText size={96} />
+            </div>
         </Card>
 
-        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300 cursor-pointer" onclick={() => goTickets("Responsivas")}>
+        <Card
+            class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
+            interactive
+            onclick={() => goTickets('Responsivas')}
+        >
             <div class="flex items-center gap-3.5">
-                <div class="p-3 bg-violet-50 text-violet-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                <div
+                    class="p-3 bg-violet-50 text-violet-600 rounded-xl group-hover:scale-110 transition-transform duration-300"
+                >
                     <FileSignature size={22} strokeWidth={2} />
                 </div>
                 <div>
-                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">Firmas Pendientes</div>
-                    <div class="text-2xl font-black text-slate-900 tabular-nums">{pendingSignaturesCount}</div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">
+                        Firmas Pendientes
+                    </div>
+                    <div class="text-2xl font-black text-slate-900 tabular-nums">
+                        {pendingSignaturesCount}
+                    </div>
                 </div>
             </div>
-            <div class="absolute -right-4 -bottom-4 text-violet-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><FileSignature size={96} /></div>
+            <div
+                class="absolute -right-4 -bottom-4 text-violet-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+            >
+                <FileSignature size={96} />
+            </div>
         </Card>
 
-        <Card class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300 cursor-pointer" onclick={() => goTickets("General", "Programación")}>
+        <Card
+            class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
+            interactive
+            onclick={() => goTickets('General', 'Programación')}
+        >
             <div class="flex items-center gap-3.5">
-                <div class="p-3 bg-cyan-50 text-cyan-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                <div
+                    class="p-3 bg-cyan-50 text-cyan-600 rounded-xl group-hover:scale-110 transition-transform duration-300"
+                >
                     <Cpu size={22} strokeWidth={2} />
                 </div>
                 <div>
-                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">Programación</div>
-                    <div class="text-2xl font-black text-slate-900 tabular-nums">{pendingProgrammingCount}</div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">
+                        Programación
+                    </div>
+                    <div class="text-2xl font-black text-slate-900 tabular-nums">
+                        {pendingProgrammingCount}
+                    </div>
                 </div>
             </div>
-            <div class="absolute -right-4 -bottom-4 text-cyan-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"><Cpu size={96} /></div>
+            <div
+                class="absolute -right-4 -bottom-4 text-cyan-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+            >
+                <Cpu size={96} />
+            </div>
         </Card>
     </section>
 
@@ -384,31 +491,44 @@
         <!-- ── FILA A: Estados + Cobertura + Calidad ── -->
         <section class="grid lg:grid-cols-3 gap-6">
             <!-- Donut de estados -->
-            <Card class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
+            <Card
+                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+            >
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-blue-50 text-blue-600 rounded-xl"><BarChart3 size={18} strokeWidth={2.5} /></div>
+                        <div class="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                            <BarChart3 size={18} strokeWidth={2.5} />
+                        </div>
                         <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">Por Estado</h2>
-                            <p class="text-[11px] text-slate-400 font-medium">{metrics.totalPersonnel} registrados</p>
+                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
+                                Por Estado
+                            </h2>
+                            <p class="text-[11px] text-slate-400 font-medium">
+                                {metrics.totalPersonnel} registrados
+                            </p>
                         </div>
                     </div>
                 </div>
                 <div class="p-6">
-                <div class="relative h-40 w-40 sm:h-44 sm:w-44 mx-auto">
-                    <canvas bind:this={stateCanvas}></canvas>
-                </div>
+                    <div class="relative h-40 w-40 sm:h-44 sm:w-44 mx-auto">
+                        <canvas bind:this={stateCanvas}></canvas>
+                    </div>
                     <div class="mt-5 grid grid-cols-2 gap-2">
                         {#each statusConfig as item}
-                            {@const count = metrics.statusCounts[item.key as keyof typeof metrics.statusCounts]}
+                            {@const count =
+                                metrics.statusCounts[item.key as keyof typeof metrics.statusCounts]}
                             {@const percentage = pct(count, metrics.totalPersonnel)}
                             {#if count > 0}
                                 <div class="flex items-center justify-between gap-2">
                                     <div class="flex items-center gap-1.5 min-w-0">
-                                        <div class="w-2.5 h-2.5 rounded-full {item.color} shrink-0"></div>
-                                        <span class="text-[11px] font-bold text-slate-600 truncate">{item.label}</span>
+                                        <div class="w-2.5 h-2.5 rounded-full {item.dot} shrink-0"></div>
+                                        <span class="text-[11px] font-bold text-slate-600 truncate"
+                                            >{item.label}</span
+                                        >
                                     </div>
-                                    <span class="text-[11px] font-black text-slate-800 tabular-nums shrink-0">{count} ({percentage}%)</span>
+                                    <span class="text-[11px] font-black text-slate-800 tabular-nums shrink-0"
+                                        >{count} ({percentage}%)</span
+                                    >
                                 </div>
                             {/if}
                         {/each}
@@ -417,13 +537,21 @@
             </Card>
 
             <!-- Cobertura tarjetas + stock -->
-            <Card class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
+            <Card
+                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+            >
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-amber-50 text-amber-600 rounded-xl"><Shield size={18} strokeWidth={2.5} /></div>
+                        <div class="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                            <Shield size={18} strokeWidth={2.5} />
+                        </div>
                         <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">Cobertura Tarjetas</h2>
-                            <p class="text-[11px] text-slate-400 font-medium">{metrics.operativos} operativos</p>
+                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
+                                Cobertura Tarjetas
+                            </h2>
+                            <p class="text-[11px] text-slate-400 font-medium">
+                                {metrics.operativos} operativos
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -432,15 +560,24 @@
                         {@const cls = mediaTypeBarClasses(cov.name)}
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
-                                <span class="text-[12px] font-extrabold {cls.text} flex items-center gap-1.5"><CreditCard size={14} /> {cov.name}</span>
-                                <span class="text-[10px] font-bold {cls.badge} px-2 py-0.5 rounded-lg">{pct(cov.con, metrics.operativos)}%</span>
+                                <span class="text-[12px] font-extrabold {cls.text} flex items-center gap-1.5"
+                                    ><CreditCard size={14} /> {cov.name}</span
+                                >
+                                <span class="text-[10px] font-bold {cls.badge} px-2 py-0.5 rounded-lg"
+                                    >{pct(cov.con, metrics.operativos)}%</span
+                                >
                             </div>
                             <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-1.5">
-                                <div class="{cls.bar} h-full rounded-full transition-all duration-700" style="width: {pct(cov.con, metrics.operativos)}%"></div>
+                                <div
+                                    class="{cls.bar} h-full rounded-full transition-all duration-700"
+                                    style="width: {pct(cov.con, metrics.operativos)}%"
+                                ></div>
                             </div>
                             <div class="flex justify-between text-[10px] font-bold">
                                 <span class="text-emerald-600">✓ {cov.con}</span>
-                                <span class={cov.sin > 0 ? "text-rose-500" : "text-emerald-600"}>{cov.sin > 0 ? "✗" : "✓"} {cov.sin} sin tarjeta</span>
+                                <span class={cov.sin > 0 ? 'text-rose-500' : 'text-emerald-600'}
+                                    >{cov.sin > 0 ? '✗' : '✓'} {cov.sin} sin tarjeta</span
+                                >
                             </div>
                         </div>
                     {/each}
@@ -449,7 +586,11 @@
                             {#each mediaStock as s}
                                 {@const cls = mediaTypeStockClasses(s.name)}
                                 <div class="{cls.wrap} rounded-xl p-3 text-center min-w-0">
-                                    <div class="text-[10px] font-extrabold {cls.label} uppercase tracking-wider mb-0.5 truncate">Stock {s.name}</div>
+                                    <div
+                                        class="text-[10px] font-extrabold {cls.label} uppercase tracking-wider mb-0.5 truncate"
+                                    >
+                                        Stock {s.name}
+                                    </div>
                                     <div class="text-xl font-black {cls.value} tabular-nums">{s.stock}</div>
                                 </div>
                             {/each}
@@ -459,12 +600,18 @@
             </Card>
 
             <!-- Calidad de datos -->
-            <Card class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
+            <Card
+                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+            >
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-rose-50 text-rose-600 rounded-xl"><AlertTriangle size={18} strokeWidth={2.5} /></div>
+                        <div class="p-2 bg-rose-50 text-rose-600 rounded-xl">
+                            <AlertTriangle size={18} strokeWidth={2.5} />
+                        </div>
                         <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">Calidad de Datos</h2>
+                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
+                                Calidad de Datos
+                            </h2>
                             <p class="text-[11px] text-slate-400 font-medium">Campos incompletos</p>
                         </div>
                     </div>
@@ -475,7 +622,15 @@
                             <canvas bind:this={qualityCanvas}></canvas>
                         </div>
                         <div>
-                            <div class="text-3xl font-black tabular-nums {overallPct >= 90 ? 'text-emerald-600' : overallPct >= 70 ? 'text-amber-600' : 'text-rose-600'}">{overallPct}%</div>
+                            <div
+                                class="text-3xl font-black tabular-nums {overallPct >= 90
+                                    ? 'text-emerald-600'
+                                    : overallPct >= 70
+                                      ? 'text-amber-600'
+                                      : 'text-rose-600'}"
+                            >
+                                {overallPct}%
+                            </div>
                             <div class="text-[11px] font-bold text-slate-400 mt-0.5">Completitud</div>
                         </div>
                     </div>
@@ -483,15 +638,29 @@
                         {#each qualityItems as item}
                             {@const completePct = 100 - pct(item.missing, metrics.dataQuality.total)}
                             <div class="flex items-center justify-between gap-2">
-                                <span class="text-[12px] font-bold text-slate-700 flex items-center gap-1.5"><span class="text-sm">{item.icon}</span> {item.label}</span>
+                                <span class="text-[12px] font-bold text-slate-700 flex items-center gap-1.5"
+                                    ><span class="text-sm">{item.icon}</span> {item.label}</span
+                                >
                                 {#if item.missing === 0}
-                                    <Badge variant="emerald" class="text-[9px] font-extrabold px-1.5 py-0.5">100%</Badge>
+                                    <Badge variant="emerald" class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                        >100%</Badge
+                                    >
                                 {:else}
-                                    <span class="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">{item.missing} sin dato</span>
+                                    <span
+                                        class="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded"
+                                        >{item.missing} sin dato</span
+                                    >
                                 {/if}
                             </div>
                             <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                <div class="{completePct >= 90 ? 'bg-emerald-500' : completePct >= 70 ? 'bg-amber-500' : 'bg-rose-500'} h-full rounded-full transition-all duration-700" style="width: {completePct}%"></div>
+                                <div
+                                    class="{completePct >= 90
+                                        ? 'bg-emerald-500'
+                                        : completePct >= 70
+                                          ? 'bg-amber-500'
+                                          : 'bg-rose-500'} h-full rounded-full transition-all duration-700"
+                                    style="width: {completePct}%"
+                                ></div>
                             </div>
                         {/each}
                     </div>
@@ -501,13 +670,21 @@
 
         <!-- ── FILA B: Dependencias + Edificios ── -->
         <section class="grid lg:grid-cols-3 gap-6">
-            <Card class="lg:col-span-1 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
+            <Card
+                class="lg:col-span-1 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+            >
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-violet-50 text-violet-600 rounded-xl"><Building2 size={18} strokeWidth={2.5} /></div>
+                        <div class="p-2 bg-violet-50 text-violet-600 rounded-xl">
+                            <Building2 size={18} strokeWidth={2.5} />
+                        </div>
                         <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">Dependencias</h2>
-                            <p class="text-[11px] text-slate-400 font-medium">{metrics.topDependencies.length} registradas</p>
+                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
+                                Dependencias
+                            </h2>
+                            <p class="text-[11px] text-slate-400 font-medium">
+                                {metrics.topDependencies.length} registradas
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -516,31 +693,56 @@
                         {@const barWidth = pct(dep.total, metrics.totalPersonnel)}
                         {@const activePct = pct(dep.activos, dep.total)}
                         <div class="px-6 py-3 hover:bg-blue-50/30 transition-all duration-200 relative">
-                            <div class="absolute inset-y-0 left-0 bg-violet-50/40 transition-all duration-700" style="width: {barWidth}%"></div>
+                            <div
+                                class="absolute inset-y-0 left-0 bg-violet-50/40 transition-all duration-700"
+                                style="width: {barWidth}%"
+                            ></div>
                             <div class="relative flex items-center justify-between">
                                 <div class="flex items-center gap-2.5 min-w-0">
-                                    <span class="text-[10px] font-black text-violet-400 tabular-nums w-5">{i + 1}</span>
-                                    <span class="text-[12px] font-bold text-slate-800 truncate">{dep.name}</span>
+                                    <span class="text-[10px] font-black text-violet-400 tabular-nums w-5"
+                                        >{i + 1}</span
+                                    >
+                                    <span class="text-[12px] font-bold text-slate-800 truncate"
+                                        >{dep.name}</span
+                                    >
                                 </div>
                                 <div class="flex items-center gap-2 shrink-0">
-                                    <Badge variant="slate" class="text-[9px] font-extrabold px-1.5 py-0.5">{dep.total}</Badge>
-                                    <Badge variant={activePct >= 80 ? "emerald" : activePct >= 50 ? "amber" : "rose"} class="text-[9px] font-extrabold px-1.5 py-0.5">{activePct}% op.</Badge>
+                                    <Badge variant="slate" class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                        >{dep.total}</Badge
+                                    >
+                                    <Badge
+                                        variant={activePct >= 80
+                                            ? 'emerald'
+                                            : activePct >= 50
+                                              ? 'amber'
+                                              : 'rose'}
+                                        class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                        >{activePct}% op.</Badge
+                                    >
                                 </div>
                             </div>
                         </div>
                     {:else}
-                        <div class="p-8 text-center text-slate-400 italic text-sm">Sin datos.</div>
+                        {@render dashEmpty('Sin datos')}
                     {/each}
                 </div>
             </Card>
 
-            <Card class="lg:col-span-2 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
+            <Card
+                class="lg:col-span-2 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+            >
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-cyan-50 text-cyan-600 rounded-xl"><Building2 size={18} strokeWidth={2.5} /></div>
+                        <div class="p-2 bg-cyan-50 text-cyan-600 rounded-xl">
+                            <Building2 size={18} strokeWidth={2.5} />
+                        </div>
                         <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">Personas por Piso</h2>
-                            <p class="text-[11px] text-slate-400 font-medium">Radicación: edificio + piso base</p>
+                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
+                                Personas por Piso
+                            </h2>
+                            <p class="text-[11px] text-slate-400 font-medium">
+                                Radicación: edificio + piso base
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -549,29 +751,47 @@
                         {@const bldgTotal = bldg.floors.reduce((s, f) => s + f.people, 0)}
                         <div class="px-6 py-4 relative">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[12px] font-extrabold text-slate-800 flex items-center gap-2">
+                                <span
+                                    class="text-[12px] font-extrabold text-slate-800 flex items-center gap-2"
+                                >
                                     <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
                                     {bldg.name}
                                 </span>
-                                <Badge variant="slate" class="text-[10px] font-extrabold px-2 py-0.5">{bldgTotal} personas</Badge>
+                                <Badge variant="slate" class="text-[10px] font-extrabold px-2 py-0.5"
+                                    >{bldgTotal} personas</Badge
+                                >
                             </div>
                             <div class="space-y-1.5">
                                 {#each bldg.floors as floor}
                                     {@const pisoBarWidth = bldgTotal > 0 ? pct(floor.people, bldgTotal) : 0}
                                     {@const pisoPct = bldgTotal > 0 ? pct(floor.people, bldgTotal) : 0}
                                     <div class="flex items-center gap-2 sm:gap-3">
-                                        <span class="text-[11px] font-bold text-slate-600 w-16 sm:w-24 shrink-0 truncate">{floor.label}</span>
-                                        <div class="flex-1 min-w-0 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                            <div class="bg-cyan-500 h-full rounded-full transition-all duration-700" style="width: {pisoBarWidth}%"></div>
+                                        <span
+                                            class="text-[11px] font-bold text-slate-600 w-16 sm:w-24 shrink-0 truncate"
+                                            >{floor.label}</span
+                                        >
+                                        <div
+                                            class="flex-1 min-w-0 h-2 bg-slate-100 rounded-full overflow-hidden"
+                                        >
+                                            <div
+                                                class="bg-cyan-500 h-full rounded-full transition-all duration-700"
+                                                style="width: {pisoBarWidth}%"
+                                            ></div>
                                         </div>
-                                        <span class="text-[10px] font-black text-slate-700 tabular-nums w-8 shrink-0 text-right">{floor.people}</span>
-                                        <span class="text-[9px] font-bold text-cyan-600 tabular-nums w-10 shrink-0 text-right">{pisoPct}%</span>
+                                        <span
+                                            class="text-[10px] font-black text-slate-700 tabular-nums w-8 shrink-0 text-right"
+                                            >{floor.people}</span
+                                        >
+                                        <span
+                                            class="text-[9px] font-bold text-cyan-600 tabular-nums w-10 shrink-0 text-right"
+                                            >{pisoPct}%</span
+                                        >
                                     </div>
                                 {/each}
                             </div>
                         </div>
                     {:else}
-                        <div class="p-8 text-center text-slate-400 italic text-sm">Sin datos.</div>
+                        {@render dashEmpty('Sin datos')}
                     {/each}
                 </div>
             </Card>
@@ -579,18 +799,32 @@
 
         <!-- ── FILA CRECIMIENTO: Crecimiento de Personal ── -->
         <section class="transition-opacity duration-300" class:opacity-60={growthLoading}>
-            <Card class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
-                <div class="px-6 pt-5 pb-4 border-b border-slate-100/60 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+            <Card
+                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+            >
+                <div
+                    class="px-6 pt-5 pb-4 border-b border-slate-100/60 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4"
+                >
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><TrendingUp size={18} strokeWidth={2.5} /></div>
+                        <div class="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                            <TrendingUp size={18} strokeWidth={2.5} />
+                        </div>
                         <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">Crecimiento de Personal</h2>
-                            <p class="text-[11px] text-slate-400 font-medium">Incremento de plantilla por rango de fechas</p>
+                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
+                                Crecimiento de Personal
+                            </h2>
+                            <p class="text-[11px] text-slate-400 font-medium">
+                                Incremento de plantilla por rango de fechas
+                            </p>
                         </div>
                     </div>
                     <div class="flex items-end gap-2 flex-wrap w-full xl:w-auto">
                         <div class="flex-1 min-w-[140px] sm:w-40 sm:flex-none">
-                            <label for="growth-start" class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1 ml-1"><Calendar size={12} /> Desde</label>
+                            <label
+                                for="growth-start"
+                                class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1 ml-1"
+                                ><Calendar size={12} /> Desde</label
+                            >
                             <Input
                                 id="growth-start"
                                 type="date"
@@ -601,7 +835,11 @@
                             />
                         </div>
                         <div class="flex-1 min-w-[140px] sm:w-40 sm:flex-none">
-                            <label for="growth-end" class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1 ml-1"><Calendar size={12} /> Hasta</label>
+                            <label
+                                for="growth-end"
+                                class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1 ml-1"
+                                ><Calendar size={12} /> Hasta</label
+                            >
                             <Input
                                 id="growth-end"
                                 type="date"
@@ -611,20 +849,33 @@
                                 class="h-9"
                             />
                         </div>
-                        <Button variant="soft-slate" size="sm" onclick={resetGrowthToCreation}>Desde creación</Button>
+                        <Button variant="soft-slate" size="sm" onclick={resetGrowthToCreation}
+                            >Desde creación</Button
+                        >
                     </div>
                 </div>
 
                 <!-- Totales -->
-                <div class="px-6 py-4 flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-slate-100/60">
+                <div
+                    class="px-6 py-4 flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-slate-100/60"
+                >
                     <div>
-                        <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">Total de personal</div>
+                        <div
+                            class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5"
+                        >
+                            Total de personal
+                        </div>
                         <div class="text-3xl font-black text-slate-900 tabular-nums">
                             {growth.totals.final}
-                            <span class="text-sm font-bold text-slate-400">de {growth.totals.initial} inicial</span>
+                            <span class="text-sm font-bold text-slate-400"
+                                >de {growth.totals.initial} inicial</span
+                            >
                         </div>
                     </div>
-                    <Badge variant={growthVariant(growth.totals.percent)} class="text-[11px] font-extrabold px-2.5 py-1">
+                    <Badge
+                        variant={growthVariant(growth.totals.percent)}
+                        class="text-[11px] font-extrabold px-2.5 py-1"
+                    >
                         {growthSign(growth.totals.increment)} · {growthPct(growth.totals.percent)}
                     </Badge>
                 </div>
@@ -634,56 +885,78 @@
                     <Tabs
                         variant="pill"
                         tabs={[
-                            { id: "edificio", label: "Edificio" },
-                            { id: "dependencia", label: "Dependencia" },
-                            { id: "piso", label: "Piso" },
+                            { id: 'edificio', label: 'Edificio' },
+                            { id: 'dependencia', label: 'Dependencia' },
+                            { id: 'piso', label: 'Piso' },
                         ]}
                         active={growthTab}
                         onSelect={(id) => (growthTab = id)}
                     />
                 </div>
                 <div class="divide-y divide-slate-100/60 max-h-[400px] overflow-y-auto">
-                    {#if growthTab === "edificio"}
+                    {#if growthTab === 'edificio'}
                         {#each growth.byBuilding as bldg}
                             <div class="px-6 py-3 flex items-center justify-between gap-3">
                                 <span class="text-[12px] font-bold text-slate-700 truncate">{bldg.name}</span>
                                 <div class="flex items-center gap-2 shrink-0">
-                                    <span class="text-[10px] font-bold text-slate-400 tabular-nums">{bldg.initial} → {bldg.final}</span>
-                                    <Badge variant={growthVariant(bldg.percent)} class="text-[9px] font-extrabold px-1.5 py-0.5">{growthSign(bldg.increment)} · {growthPct(bldg.percent)}</Badge>
+                                    <span class="text-[10px] font-bold text-slate-400 tabular-nums"
+                                        >{bldg.initial} → {bldg.final}</span
+                                    >
+                                    <Badge
+                                        variant={growthVariant(bldg.percent)}
+                                        class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                        >{growthSign(bldg.increment)} · {growthPct(bldg.percent)}</Badge
+                                    >
                                 </div>
                             </div>
                         {:else}
-                            <div class="p-6 text-center text-slate-400 italic text-sm">Sin datos.</div>
+                            {@render dashEmpty('Sin datos')}
                         {/each}
-                    {:else if growthTab === "dependencia"}
+                    {:else if growthTab === 'dependencia'}
                         {#each growth.byDependency as dep}
                             <div class="px-6 py-3 flex items-center justify-between gap-3">
                                 <span class="text-[12px] font-bold text-slate-700 truncate">{dep.name}</span>
                                 <div class="flex items-center gap-2 shrink-0">
-                                    <span class="text-[10px] font-bold text-slate-400 tabular-nums">{dep.initial} → {dep.final}</span>
-                                    <Badge variant={growthVariant(dep.percent)} class="text-[9px] font-extrabold px-1.5 py-0.5">{growthSign(dep.increment)} · {growthPct(dep.percent)}</Badge>
+                                    <span class="text-[10px] font-bold text-slate-400 tabular-nums"
+                                        >{dep.initial} → {dep.final}</span
+                                    >
+                                    <Badge
+                                        variant={growthVariant(dep.percent)}
+                                        class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                        >{growthSign(dep.increment)} · {growthPct(dep.percent)}</Badge
+                                    >
                                 </div>
                             </div>
                         {:else}
-                            <div class="p-6 text-center text-slate-400 italic text-sm">Sin datos.</div>
+                            {@render dashEmpty('Sin datos')}
                         {/each}
                     {:else}
                         {#each growth.byFloor as floor, i}
                             {#if i === 0 || growth.byFloor[i - 1].buildingId !== floor.buildingId}
                                 <div class="px-6 pt-3 pb-1 flex items-center gap-2">
                                     <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
-                                    <span class="text-[11px] font-extrabold text-slate-600">{floor.buildingName}</span>
+                                    <span class="text-[11px] font-extrabold text-slate-600"
+                                        >{floor.buildingName}</span
+                                    >
                                 </div>
                             {/if}
                             <div class="px-6 py-3 flex items-center justify-between gap-3">
-                                <span class="text-[12px] font-bold text-slate-600 truncate pl-4">{floor.label}</span>
+                                <span class="text-[12px] font-bold text-slate-600 truncate pl-4"
+                                    >{floor.label}</span
+                                >
                                 <div class="flex items-center gap-2 shrink-0">
-                                    <span class="text-[10px] font-bold text-slate-400 tabular-nums">{floor.initial} → {floor.final}</span>
-                                    <Badge variant={growthVariant(floor.percent)} class="text-[9px] font-extrabold px-1.5 py-0.5">{growthSign(floor.increment)} · {growthPct(floor.percent)}</Badge>
+                                    <span class="text-[10px] font-bold text-slate-400 tabular-nums"
+                                        >{floor.initial} → {floor.final}</span
+                                    >
+                                    <Badge
+                                        variant={growthVariant(floor.percent)}
+                                        class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                        >{growthSign(floor.increment)} · {growthPct(floor.percent)}</Badge
+                                    >
                                 </div>
                             </div>
                         {:else}
-                            <div class="p-6 text-center text-slate-400 italic text-sm">Sin datos.</div>
+                            {@render dashEmpty('Sin datos')}
                         {/each}
                     {/if}
                 </div>
@@ -692,12 +965,18 @@
 
         <!-- ── FILA C: Actividad reciente + Tickets urgentes ── -->
         <section class="grid lg:grid-cols-3 gap-6">
-            <Card class="lg:col-span-2 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
+            <Card
+                class="lg:col-span-2 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+            >
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-slate-50 text-slate-600 rounded-xl"><Activity size={18} strokeWidth={2.5} /></div>
+                        <div class="p-2 bg-slate-50 text-slate-600 rounded-xl">
+                            <Activity size={18} strokeWidth={2.5} />
+                        </div>
                         <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">Actividad Reciente</h2>
+                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
+                                Actividad Reciente
+                            </h2>
                             <p class="text-[11px] text-slate-400 font-medium">Últimos eventos del sistema</p>
                         </div>
                     </div>
@@ -706,31 +985,51 @@
                     {#each activityFeed as evt}
                         {@const meta = actionMeta(evt.action, evt.entity_type)}
                         <div class="px-6 py-3 flex items-center gap-3 hover:bg-slate-50/60 transition-colors">
-                            <div class="w-8 h-8 rounded-lg {meta.bg} flex items-center justify-center shrink-0">
-                                <span class="text-[11px] font-black {meta.color} uppercase">{meta.icon === "plus" ? "+" : meta.icon === "minus" ? "−" : meta.icon === "swap" ? "↔" : meta.icon === "pen" ? "✎" : "•"}</span>
+                            <div
+                                class="w-8 h-8 rounded-lg {meta.bg} flex items-center justify-center shrink-0"
+                            >
+                                <span class="text-[11px] font-black {meta.color} uppercase"
+                                    >{meta.icon === 'plus'
+                                        ? '+'
+                                        : meta.icon === 'minus'
+                                          ? '−'
+                                          : meta.icon === 'swap'
+                                            ? '↔'
+                                            : meta.icon === 'pen'
+                                              ? '✎'
+                                              : '•'}</span
+                                >
                             </div>
                             <div class="flex-1 min-w-0">
                                 <p class="text-[12px] font-bold text-slate-700 truncate">
                                     {evt.entity_name || evt.entity_type}
                                 </p>
                                 <p class="text-[10px] font-medium text-slate-400 truncate">
-                                    {evt.action.replace(/_/g, " ")} · {evt.performed_by_name || "Sistema"}
+                                    {evt.action.replace(/_/g, ' ')} · {evt.performed_by_name || 'Sistema'}
                                 </p>
                             </div>
-                            <span class="text-[10px] font-medium text-slate-400 shrink-0">{timeAgo(evt.timestamp)}</span>
+                            <span class="text-[10px] font-medium text-slate-400 shrink-0"
+                                >{timeAgo(evt.timestamp)}</span
+                            >
                         </div>
                     {:else}
-                        <div class="p-8 text-center text-slate-400 italic text-sm">Sin actividad reciente.</div>
+                        {@render dashEmpty('Sin actividad reciente')}
                     {/each}
                 </div>
             </Card>
 
-            <Card class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl">
+            <Card
+                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+            >
                 <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-rose-50 text-rose-600 rounded-xl"><Zap size={18} strokeWidth={2.5} /></div>
+                        <div class="p-2 bg-rose-50 text-rose-600 rounded-xl">
+                            <Zap size={18} strokeWidth={2.5} />
+                        </div>
                         <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">Tickets Prioritarios</h2>
+                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
+                                Tickets Prioritarios
+                            </h2>
                             <p class="text-[11px] text-slate-400 font-medium">Urgencia alta</p>
                         </div>
                     </div>
@@ -739,31 +1038,46 @@
                     {#each urgentTickets as tk}
                         <div class="px-6 py-3 flex items-center gap-3 hover:bg-rose-50/30 transition-colors">
                             <div class="flex-1 min-w-0">
-                                <p class="text-[12px] font-bold text-slate-800 truncate">{tk.title || tk.type}</p>
+                                <p class="text-[12px] font-bold text-slate-800 truncate">
+                                    {tk.title || tk.type}
+                                </p>
                                 <p class="text-[10px] font-medium text-slate-400 truncate">
                                     {#if tk.personName || tk.personnel}
-                                        {tk.personName || fullName(tk.personnel?.first_name, tk.personnel?.last_name)}
+                                        {tk.personName ||
+                                            fullName(tk.personnel?.first_name, tk.personnel?.last_name)}
                                     {:else}
                                         {tk.cardFolio || tk.type}
                                     {/if}
                                 </p>
                             </div>
-                            <span class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded uppercase shrink-0">{tk.type}</span>
+                            <span
+                                class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded uppercase shrink-0"
+                                >{tk.type}</span
+                            >
                         </div>
                     {:else}
-                        <div class="p-8 text-center text-slate-400 italic text-sm">Sin tickets prioritarios.</div>
+                        {@render dashEmpty('Sin tickets prioritarios')}
                     {/each}
                 </div>
                 {#if operationalTickets.length > 0}
-                    <a href="/tickets" class="flex items-center justify-center gap-1 py-3 text-[11px] font-bold text-sky-600 hover:text-sky-800 transition-colors border-t border-slate-100/60">
+                    <a
+                        href="/tickets"
+                        class="flex items-center justify-center gap-1 py-3 text-[11px] font-bold text-sky-600 hover:text-sky-800 transition-colors border-t border-slate-100/60"
+                    >
                         Ver todos los tickets <ChevronRight size={13} />
                     </a>
                 {/if}
             </Card>
         </section>
     {:else}
-        <Card class="p-12 text-center border border-slate-200/50 bg-white/50 backdrop-blur-md rounded-2xl">
-            <div class="text-slate-400 italic">Cargando métricas...</div>
+        <Card class="p-2 border border-slate-200/50 bg-white/50 backdrop-blur-md rounded-2xl">
+            <EmptyState
+                icon={Users}
+                title="Sin personal registrado"
+                description="Registra a la primera persona para ver las métricas del dashboard."
+            >
+                <Button variant="primary" onclick={() => push('/personal')}>Ir a Personal</Button>
+            </EmptyState>
         </Card>
     {/if}
 </div>

@@ -1,6 +1,6 @@
 <script lang="ts">
-    import CatalogSelect from "./CatalogSelect.svelte";
-    import { catalogState } from "../stores";
+    import CatalogSelect from './CatalogSelect.svelte';
+    import { catalogState } from '../stores';
 
     /**
      * DependencySelect — Select de dependencias conectado al store global.
@@ -24,9 +24,9 @@
 
     let {
         value = $bindable(),
-        placeholder = "Seleccionar...",
+        placeholder = 'Seleccionar...',
         disabled = false,
-        class: className = "",
+        class: className = '',
         id,
         onchange,
     }: Props = $props();
@@ -34,12 +34,4 @@
     let dependencies = $derived(catalogState.dependencies);
 </script>
 
-<CatalogSelect
-    catalog={dependencies}
-    bind:value
-    {placeholder}
-    {disabled}
-    class={className}
-    {id}
-    {onchange}
-/>
+<CatalogSelect catalog={dependencies} bind:value {placeholder} {disabled} class={className} {id} {onchange} />

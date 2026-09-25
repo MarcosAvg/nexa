@@ -1,10 +1,10 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import Modal from "./Modal.svelte";
-    import Button from "./Button.svelte";
-    import ResponsivaTemplate from "./ResponsivaTemplate.svelte";
-    import SignatureModal from "./modals/SignatureModal.svelte";
-    import { generateResponsivaPdf, handleError, generateLegalHash } from "../utils";
+    import { onMount } from 'svelte';
+    import Modal from './Modal.svelte';
+    import Button from './Button.svelte';
+    import ResponsivaTemplate from './ResponsivaTemplate.svelte';
+    import SignatureModal from './modals/SignatureModal.svelte';
+    import { handleError, generateLegalHash } from '../utils';
     import {
         FileSignature,
         Download,
@@ -14,14 +14,14 @@
         Mail,
         FileText,
         FileType,
-    } from "lucide-svelte";
-    import { toast } from "svelte-sonner";
+    } from 'lucide-svelte';
+    import { toast } from 'svelte-sonner';
 
-    import { responsivaService, fetchLegalText } from "../services/responsiva";
-    import { supabase } from "../supabase";
-    import { mediaState } from "../stores";
+    import { responsivaService, fetchLegalText } from '../services/responsiva';
+    import { supabase } from '../supabase';
+    import { mediaState } from '../stores';
 
-    import bgImage from "../../assets/responsiva_bg.png";
+    import bgImage from '../../assets/responsiva_bg.webp';
 
     /**
      * ResponsivaPreviewModal — Modal de previsualización y firma de Carta Responsiva.
@@ -49,23 +49,13 @@
         onClose: () => void;
     };
 
-    let {
-        isOpen = $bindable(),
-        data,
-        person,
-        card,
-        signature = "",
-        onSign,
-        onClose,
-    }: Props = $props();
+    let { isOpen = $bindable(), data, person, card, signature = '', onSign, onClose }: Props = $props();
 
     let isSigning = $state(false);
     let isDownloading = $state(false);
     let showSignatureModal = $state(false);
-    let signatureBase64 = $state("");
-    let verificationStatus = $state<"loading" | "valid" | "invalid" | "none">(
-        "none",
-    );
+    let signatureBase64 = $state('');
+    let verificationStatus = $state<'loading' | 'valid' | 'invalid' | 'none'>('none');
     let isTextMode = $state(false);
 
     // Texto legal del tipo de medio (desde document_templates.content).
@@ -73,7 +63,7 @@
 
     // Estado de captura de correo
     let showEmailPrompt = $state(false);
-    let tempEmail = $state("");
+    let tempEmail = $state('');
     let saveEmailPermanently = $state(true);
     let isSavingEmail = $state(false);
 
@@ -86,15 +76,15 @@
                 signatureBase64 = signature;
             }
             showEmailPrompt = false;
-            tempEmail = person?.email || "";
+            tempEmail = person?.email || '';
             if (signatureBase64 && data.legal_hash) {
                 verifyIntegrity();
             } else {
-                verificationStatus = "none";
+                verificationStatus = 'none';
             }
 
             // Texto legal desde el catálogo de plantillas (data-driven)
-            fetchLegalText(card?.type ?? "").then((t) => (legalTexts = t));
+            fetchLegalText(card?.type ?? '').then((t) => (legalTexts = t));
 
             // Activar modo texto automático en pantallas pequeñas (reactivo a rotación)
             if (mediaState.isPhone.matches) {
@@ -105,22 +95,17 @@
 
     async function verifyIntegrity() {
         if (!data.legal_hash || !signature || !data.legal_snapshot) {
-            verificationStatus = "none";
+            verificationStatus = 'none';
             return;
         }
 
-        verificationStatus = "loading";
+        verificationStatus = 'loading';
         try {
-            const computed = await generateLegalHash(
-                data,
-                signature,
-                data.legal_snapshot,
-            );
-            verificationStatus =
-                computed === data.legal_hash ? "valid" : "invalid";
+            const computed = await generateLegalHash(data, signature, data.legal_snapshot);
+            verificationStatus = computed === data.legal_hash ? 'valid' : 'invalid';
         } catch (e) {
-            handleError(e, "Verificar Integridad");
-            verificationStatus = "none";
+            handleError(e, 'Verificar Integridad');
+            verificationStatus = 'none';
         }
     }
 
@@ -139,7 +124,7 @@
         if (!data) return;
         isDownloading = true;
         try {
-            const typeLabel = card?.type ? ` ${card.type}` : "";
+            const typeLabel = card?.type ? ` ${card.type}` : '';
             // Formato: "Apellido Paterno Apellido materno - [Dependencia]- Folio"
             let fileName = `Responsiva${typeLabel}_${data.numEmpleado}_${data.folio}.pdf`;
 
@@ -150,22 +135,15 @@
                 fileName = `Responsiva${typeLabel} - ${data.nombre} - [${data.dependencia}] - ${data.folio}.pdf`;
             }
 
-            const snapshot = data.legal_snapshot || "";
-            const paragraphs = snapshot
-                ? snapshot.split("\n")
-                : legalTexts;
+            const snapshot = data.legal_snapshot || '';
+            const paragraphs = snapshot ? snapshot.split('\n') : legalTexts;
 
             const bgBase64 = (await getBase64Image(bgImage)) as string;
-            await generateResponsivaPdf(
-                data,
-                signatureBase64,
-                bgBase64,
-                fileName,
-                paragraphs,
-            );
-            toast.success("Descarga completada");
+            const { generateResponsivaPdf } = await import('../utils/pdfGenerator');
+            await generateResponsivaPdf(data, signatureBase64, bgBase64, fileName, paragraphs);
+            toast.success('Descarga completada');
         } catch (error) {
-            handleError(error, "Generar PDF Responsiva");
+            handleError(error, 'Generar PDF Responsiva');
         } finally {
             isDownloading = false;
         }
@@ -177,7 +155,7 @@
 
     async function handleSaveSignature(signature: string) {
         if (!card || !person || !data) {
-            toast.error("Error: Información incompleta para firmar");
+            toast.error('Error: Información incompleta para firmar');
             return;
         }
         isSigning = true;
@@ -192,13 +170,9 @@
                         .replace(/{dependencia}/g, `**${data.dependencia}**`)
                         .replace(/{folio}/g, `**${data.folio}**`),
                 )
-                .join("\n");
+                .join('\n');
 
-            const legalHash = await generateLegalHash(
-                data,
-                signature,
-                legalSnapshot,
-            );
+            const legalHash = await generateLegalHash(data, signature, legalSnapshot);
 
             // 2. Guardar en BD con campos de integridad legal
             await responsivaService.save({
@@ -219,9 +193,9 @@
             signatureBase64 = signature;
             showSignatureModal = false;
 
-            toast.success("Responsiva firmada y sellada digitalmente");
+            toast.success('Responsiva firmada y sellada digitalmente');
         } catch (error) {
-            handleError(error, "Firmar Responsiva");
+            handleError(error, 'Firmar Responsiva');
         } finally {
             isSigning = false;
         }
@@ -236,13 +210,13 @@
         }
 
         if (!email && showEmailPrompt) {
-            toast.error("Por favor ingrese un correo válido");
+            toast.error('Por favor ingrese un correo válido');
             return;
         }
 
         const subject = `Responsiva de Acceso - Folio ${data.folio} - ${data.nombre}`;
 
-        const cardDescription = card?.type || "Acceso Electrónico";
+        const cardDescription = card?.type || 'Acceso Electrónico';
 
         const body = `Estimado/a ${data.nombre},
 
@@ -254,7 +228,7 @@ Detalles del documento:
 • No. Empleado: ${data.numEmpleado}
 • Dependencia: ${data.dependencia}
 • Fecha de emisión: ${data.fecha}
-${data.legal_hash ? `• ID Transacción: ${data.legal_hash.toUpperCase()}` : ""}
+${data.legal_hash ? `• ID Transacción: ${data.legal_hash.toUpperCase()}` : ''}
 
 Por favor, conserve este documento para sus registros. Este archivo cuenta con una firma digital y sello de integridad para su validación legal.
 
@@ -264,7 +238,7 @@ Control de Accesos - Nexa`;
         // Generar PDF para compartir (independientemente de share vs mailto)
         let pdfFile: File | null = null;
         try {
-            const typeLabel = card?.type ? ` ${card.type}` : "";
+            const typeLabel = card?.type ? ` ${card.type}` : '';
             // Formato: "Apellido Paterno Apellido materno - [Dependencia]- Folio"
             let fileName = `Responsiva${typeLabel}_${data.numEmpleado}_${data.folio}.pdf`;
 
@@ -274,13 +248,12 @@ Control de Accesos - Nexa`;
                 // Fallback usando nombre completo si faltan partes
                 fileName = `Responsiva${typeLabel} - ${data.nombre} - [${data.dependencia}] - ${data.folio}.pdf`;
             }
-            const snapshot = data.legal_snapshot || "";
-            const paragraphs = snapshot
-                ? snapshot.split("\n")
-                : legalTexts;
+            const snapshot = data.legal_snapshot || '';
+            const paragraphs = snapshot ? snapshot.split('\n') : legalTexts;
 
             const bgBase64 = (await getBase64Image(bgImage)) as string;
 
+            const { generateResponsivaPdf } = await import('../utils/pdfGenerator');
             const doc = await generateResponsivaPdf(
                 data,
                 signatureBase64,
@@ -292,23 +265,18 @@ Control de Accesos - Nexa`;
 
             // AUTO-DOWNLOAD: descargar siempre para que el usuario lo tenga listo
             doc.save(fileName);
-            toast.success("Descargando responsiva para adjuntar...");
+            toast.success('Descargando responsiva para adjuntar...');
 
-            const pdfBlob = doc.output("blob");
+            const pdfBlob = doc.output('blob');
             pdfFile = new File([pdfBlob], fileName, {
-                type: "application/pdf",
+                type: 'application/pdf',
             });
         } catch (e) {
-            handleError(e, "Preparar PDF para Email");
+            handleError(e, 'Preparar PDF para Email');
         }
 
         // 1. Intentar Web Share API con archivos (prioritario para móvil)
-        if (
-            navigator.share &&
-            pdfFile &&
-            navigator.canShare &&
-            navigator.canShare({ files: [pdfFile] })
-        ) {
+        if (navigator.share && pdfFile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
             try {
                 await navigator.share({
                     title: subject,
@@ -318,27 +286,22 @@ Control de Accesos - Nexa`;
                 showEmailPrompt = false;
                 return;
             } catch (e) {
-                console.warn("Share failed, falling back:", e);
+                console.warn('Share failed, falling back:', e);
             }
         }
 
         // 2. Fallback: guardar correo si se confirmó en el prompt (solo si llegamos aquí)
-        if (
-            showEmailPrompt &&
-            tempEmail &&
-            saveEmailPermanently &&
-            person?.id
-        ) {
+        if (showEmailPrompt && tempEmail && saveEmailPermanently && person?.id) {
             isSavingEmail = true;
             try {
                 const { error } = await supabase
-                    .from("personnel")
+                    .from('personnel')
                     .update({ email: tempEmail })
-                    .eq("id", person.id);
+                    .eq('id', person.id);
 
                 if (error) throw error;
             } catch (e) {
-                handleError(e, "Guardar Correo");
+                handleError(e, 'Guardar Correo');
             } finally {
                 isSavingEmail = false;
             }
@@ -352,17 +315,12 @@ Control de Accesos - Nexa`;
 
     function reset() {
         showSignatureModal = false;
-        signatureBase64 = "";
+        signatureBase64 = '';
         onClose();
     }
 </script>
 
-<Modal
-    bind:isOpen
-    title="Previsualización de Responsiva"
-    size="xl"
-    onclose={reset}
->
+<Modal bind:isOpen title="Previsualización de Responsiva" size="xl" onclose={reset}>
     <!-- Vista estándar -->
     <div
         class="bg-slate-100 rounded-lg overflow-x-hidden overflow-y-auto flex flex-col items-center p-2 sm:p-4 max-h-[70vh]"
@@ -377,9 +335,7 @@ Control de Accesos - Nexa`;
                     </div>
                     <div>
                         <h3 class="text-sm font-bold">Enviar por Correo</h3>
-                        <p class="text-[11px] text-slate-500">
-                            Ingresa el correo para enviar el documento
-                        </p>
+                        <p class="text-[11px] text-slate-500">Ingresa el correo para enviar el documento</p>
                     </div>
                 </div>
 
@@ -393,19 +349,17 @@ Control de Accesos - Nexa`;
                         <input
                             id="temp-email"
                             type="email"
-                            class="w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                            class="w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium focus-visible:ring-4 focus-visible:ring-blue-500/10 focus-visible:border-blue-500 transition-all"
                             placeholder="ejemplo@correo.com"
                             bind:value={tempEmail}
                         />
                     </div>
 
-                    <div
-                        class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                    >
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input
                                 type="checkbox"
-                                class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                class="w-4 h-4 rounded border-slate-300 text-blue-600 focus-visible:ring-blue-500"
                                 bind:checked={saveEmailPermanently}
                             />
                             <span class="text-xs text-slate-600 font-medium"
@@ -413,12 +367,7 @@ Control de Accesos - Nexa`;
                             >
                         </label>
 
-                        <Button
-                            variant="primary"
-                            size="sm"
-                            onclick={handleSendEmail}
-                            loading={isSavingEmail}
-                        >
+                        <Button variant="primary" size="sm" onclick={handleSendEmail} loading={isSavingEmail}>
                             Confirmar y Enviar
                         </Button>
                     </div>
@@ -441,7 +390,7 @@ Control de Accesos - Nexa`;
             </Button>
         </div>
 
-        {#if verificationStatus !== "none" && !showSignatureModal}
+        {#if verificationStatus !== 'none' && !showSignatureModal}
             <div
                 class="mb-4 w-full max-w-[215.9mm] flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border gap-3 {verificationStatus ===
                 'valid'
@@ -449,35 +398,31 @@ Control de Accesos - Nexa`;
                     : 'bg-rose-50 border-rose-100 text-rose-700'}"
             >
                 <div class="flex items-center gap-3 text-left">
-                    {#if verificationStatus === "loading"}
+                    {#if verificationStatus === 'loading'}
                         <div
                             class="h-4 w-4 border-2 border-current border-t-transparent animate-spin rounded-full"
                         ></div>
                         <span class="text-xs font-bold uppercase tracking-wide"
                             >Verificando integridad...</span
                         >
-                    {:else if verificationStatus === "valid"}
+                    {:else if verificationStatus === 'valid'}
                         <ShieldCheck size={18} />
                         <div class="flex flex-col">
-                            <span
-                                class="text-[10px] font-bold uppercase tracking-wide"
+                            <span class="text-[10px] font-bold uppercase tracking-wide"
                                 >Integridad Verificada</span
                             >
                             <span class="text-[10px] opacity-80"
-                                >Este documento coincide exactamente con el
-                                sello original.</span
+                                >Este documento coincide exactamente con el sello original.</span
                             >
                         </div>
                     {:else}
                         <ShieldAlert size={18} />
                         <div class="flex flex-col">
-                            <span
-                                class="text-[10px] font-bold uppercase tracking-wide"
+                            <span class="text-[10px] font-bold uppercase tracking-wide"
                                 >Aviso de Alteración</span
                             >
                             <span class="text-[10px] opacity-80"
-                                >Los datos actuales no coinciden con la firma
-                                original.</span
+                                >Los datos actuales no coinciden con la firma original.</span
                             >
                         </div>
                     {/if}
@@ -494,18 +439,11 @@ Control de Accesos - Nexa`;
 
         <!-- Contenedor PDF responsivo con escalado -->
         <div class="pdf-preview-wrapper relative">
-            <div
-                class={isTextMode
-                    ? ""
-                    : "pdf-scaler transition-transform duration-300 origin-top"}
-            >
-                <div
-                    class="shadow-2xl bg-white"
-                    id="responsiva-preview-content"
-                >
+            <div class={isTextMode ? '' : 'pdf-scaler transition-transform duration-300 origin-top'}>
+                <div class="shadow-2xl bg-white" id="responsiva-preview-content">
                     <ResponsivaTemplate
                         {data}
-                        mode={isTextMode ? "text" : "preview"}
+                        mode={isTextMode ? 'text' : 'preview'}
                         signature={signatureBase64}
                         legalSnapshot={data.legal_snapshot}
                         cardType={card?.type}
@@ -529,9 +467,7 @@ Control de Accesos - Nexa`;
                 </Button>
             </div>
 
-            <div
-                class="grid grid-cols-2 sm:flex sm:flex-row gap-2 order-1 sm:order-2"
-            >
+            <div class="grid grid-cols-2 sm:flex sm:flex-row gap-2 order-1 sm:order-2">
                 {#if signatureBase64}
                     <Button
                         variant="outline"
@@ -545,17 +481,17 @@ Control de Accesos - Nexa`;
                 {/if}
 
                 <Button
-                    variant={signatureBase64 ? "primary" : "outline"}
+                    variant={signatureBase64 ? 'primary' : 'outline'}
                     onclick={handleDownload}
                     class="w-full sm:w-auto"
                     loading={isDownloading}
                     disabled={isSigning}
                 >
                     <Download size={18} class="hidden sm:inline-block mr-2" />
-                    {signatureBase64 ? "Final" : "Borrador"}
+                    {signatureBase64 ? 'Final' : 'Borrador'}
                 </Button>
 
-                {#if !signatureBase64 && card?.responsiva_status !== "signed"}
+                {#if !signatureBase64 && card?.responsiva_status !== 'signed'}
                     <Button
                         variant="primary"
                         onclick={handleSign}

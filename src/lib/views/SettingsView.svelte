@@ -1,14 +1,47 @@
 <script lang="ts">
-    import { SectionHeader, Card, BuildingCatalog, DependencyCatalog, AccessCatalog, MediaTypeCatalog, ScheduleCatalog, UserManagementSection, ExportDropdown, PlantillasCatalog, ModulesCatalog, Button, SectionPill } from "../components";
-    import { Building2, Briefcase, Key, Calendar, Users, FileDown, Settings2, RotateCcw, AlertTriangle, FileSignature, CreditCard, FileText, Puzzle } from "lucide-svelte";
-    import { userState, catalogState, settingsState, moduleState } from "../stores";
-    import { networkStore } from "../stores/network.svelte";
-    import { generateMediaTemplate, generateMediosTemplate, generateUsageTemplate, handleError, capitalize } from "../utils";
-    import { toast } from "svelte-sonner";
-    import GeneralSettingsView from "./GeneralSettingsView.svelte";
+    import {
+        SectionHeader,
+        Card,
+        BuildingCatalog,
+        DependencyCatalog,
+        AccessCatalog,
+        MediaTypeCatalog,
+        ScheduleCatalog,
+        UserManagementSection,
+        ExportDropdown,
+        PlantillasCatalog,
+        ModulesCatalog,
+        Button,
+        SectionPill,
+        BottomSheet,
+    } from '../components';
+    import {
+        Building2,
+        Briefcase,
+        Key,
+        Calendar,
+        Users,
+        FileDown,
+        Settings2,
+        RotateCcw,
+        AlertTriangle,
+        FileSignature,
+        CreditCard,
+        FileText,
+        Puzzle,
+        ChevronDown,
+        Check,
+    } from 'lucide-svelte';
+    import { userState, catalogState, settingsState, moduleState } from '../stores';
+    import { networkStore } from '../stores/network.svelte';
+    import { handleError, capitalize } from '../utils';
+    import { toast } from 'svelte-sonner';
+    import GeneralSettingsView from './GeneralSettingsView.svelte';
 
-    let activeTab = $state<"catalogos" | "usuarios" | "general" | "plantillas" | "modulos" | "responsiva">("catalogos");
-    let activeCatalog = $state<"edificios" | "dependencias" | "accesos" | "dias" | "medios">("edificios");
+    let activeTab = $state<'catalogos' | 'usuarios' | 'general' | 'plantillas' | 'modulos' | 'responsiva'>(
+        'catalogos',
+    );
+    let activeCatalog = $state<'edificios' | 'dependencias' | 'accesos' | 'dias' | 'medios'>('edificios');
 
     // Campos editables de configuración de responsiva
     let pickupDaysInput = $state(settingsState.responsivaPickupDays);
@@ -27,20 +60,20 @@
             await settingsState.setResponsivaPickupDays(pickupDaysInput);
             await settingsState.setResponsivaWarnDays(warnDaysInput);
             await settingsState.setCoreTypesRequired(coreTypesInput);
-            toast.success("Configuración de responsiva guardada");
+            toast.success('Configuración de responsiva guardada');
         } catch {
-            handleError(new Error("No se pudo guardar la configuración"), "Guardar Configuración");
+            handleError(new Error('No se pudo guardar la configuración'), 'Guardar Configuración');
         }
     }
 
     async function handleResetResponsivaSettings() {
         await settingsState.resetToDefaults();
         coreTypesInput = settingsState.coreTypesRequired;
-        toast.success("Valores restablecidos");
+        toast.success('Valores restablecidos');
     }
 
-    let currentUser = $derived.by(() =>
-        userState.currentUser ?? { name: "", email: "", avatar: null, role: "viewer" },
+    let currentUser = $derived.by(
+        () => userState.currentUser ?? { name: '', email: '', avatar: null, role: 'viewer' },
     );
 
     let buildings = $derived(catalogState.buildings);
@@ -50,7 +83,7 @@
     let mediaTypes = $derived(catalogState.mediaTypes);
 
     let canEdit = $derived(
-        (currentUser.role === "admin" || currentUser.role === "operator") && networkStore.isOnline,
+        (currentUser.role === 'admin' || currentUser.role === 'operator') && networkStore.isOnline,
     );
 
     let isGeneratingTemplate = $state(false);
@@ -72,14 +105,21 @@
 
     async function handleGenerateTemplate() {
         isGeneratingTemplate = true;
-        const loadingToast = toast.loading("Generando plantilla...");
+        const loadingToast = toast.loading('Generando plantilla...');
         try {
             const selected = mediaTypes.filter((m) => selectedMediaKeys.includes(m.key));
-            await generateMediaTemplate({ buildings: buildings as any[], dependencies: dependencies as any[], specialAccesses: specialAccesses as any[], schedules: schedules as any[], mediaTypes: selected as any[] });
-            toast.success("Plantilla generada correctamente", { id: loadingToast });
+            const { generateMediaTemplate } = await import('../utils/xlsxTemplate');
+            await generateMediaTemplate({
+                buildings: buildings as any[],
+                dependencies: dependencies as any[],
+                specialAccesses: specialAccesses as any[],
+                schedules: schedules as any[],
+                mediaTypes: selected as any[],
+            });
+            toast.success('Plantilla generada correctamente', { id: loadingToast });
         } catch (e) {
             toast.dismiss(loadingToast);
-            handleError(e, "Generar Plantilla de Solicitudes");
+            handleError(e, 'Generar Plantilla de Solicitudes');
         } finally {
             isGeneratingTemplate = false;
         }
@@ -87,15 +127,16 @@
 
     async function handleGenerateKoneTemplate() {
         isGeneratingKoneTemplate = true;
-        const loadingToast = toast.loading("Generando plantilla de conteo...");
+        const loadingToast = toast.loading('Generando plantilla de conteo...');
         try {
-            const cfg = moduleState.config("conteo_uso");
-            const label = cfg.mediaKey ? capitalize(cfg.mediaKey) : "Uso de tarjetas";
+            const cfg = moduleState.config('conteo_uso');
+            const label = cfg.mediaKey ? capitalize(cfg.mediaKey) : 'Uso de tarjetas';
+            const { generateUsageTemplate } = await import('../utils/xlsxTemplate');
             await generateUsageTemplate(label);
-            toast.success("Plantilla generada correctamente", { id: loadingToast });
+            toast.success('Plantilla generada correctamente', { id: loadingToast });
         } catch (e) {
             toast.dismiss(loadingToast);
-            handleError(e, "Generar Plantilla de Conteo");
+            handleError(e, 'Generar Plantilla de Conteo');
         } finally {
             isGeneratingKoneTemplate = false;
         }
@@ -103,8 +144,9 @@
 
     async function handleGenerateMediosTemplate() {
         isGeneratingMediosTemplate = true;
-        const loadingToast = toast.loading("Generando plantilla de medios...");
+        const loadingToast = toast.loading('Generando plantilla de medios...');
         try {
+            const { generateMediosTemplate } = await import('../utils/xlsxTemplate');
             await generateMediosTemplate({
                 buildings: buildings as any[],
                 dependencies: dependencies as any[],
@@ -112,72 +154,133 @@
                 schedules: schedules as any[],
                 mediaTypes: mediaTypes as any[],
             });
-            toast.success("Plantilla generada correctamente", { id: loadingToast });
+            toast.success('Plantilla generada correctamente', { id: loadingToast });
         } catch (e) {
             toast.dismiss(loadingToast);
-            handleError(e, "Generar Plantilla Medios");
+            handleError(e, 'Generar Plantilla Medios');
         } finally {
             isGeneratingMediosTemplate = false;
         }
     }
 
     const catalogTabs = [
-        { id: "edificios", label: "Edificios", icon: Building2 },
-        { id: "dependencias", label: "Dependencias", icon: Briefcase },
-        { id: "accesos", label: "Accesos", icon: Key },
-        { id: "medios", label: "Medios", icon: CreditCard },
-        { id: "dias", label: "Horarios", icon: Calendar },
+        { id: 'edificios', label: 'Edificios', icon: Building2 },
+        { id: 'dependencias', label: 'Dependencias', icon: Briefcase },
+        { id: 'accesos', label: 'Accesos', icon: Key },
+        { id: 'medios', label: 'Medios', icon: CreditCard },
+        { id: 'dias', label: 'Horarios', icon: Calendar },
     ] as const;
+
+    // ─── Navegación móvil (selector en bottom sheet) ────────────────────
+    let showSectionSheet = $state(false);
+    let showCatalogSheet = $state(false);
+
+    const sectionItems = $derived([
+        { id: 'catalogos' as const, label: 'Catálogos', icon: Building2 },
+        ...(currentUser.role === 'admin'
+            ? [{ id: 'usuarios' as const, label: 'Usuarios', icon: Users }]
+            : []),
+        { id: 'general' as const, label: 'General', icon: Settings2 },
+        { id: 'plantillas' as const, label: 'Plantillas', icon: FileText },
+        { id: 'modulos' as const, label: 'Módulos', icon: Puzzle },
+        { id: 'responsiva' as const, label: 'Responsiva', icon: FileSignature },
+    ]);
+
+    const activeSection = $derived(sectionItems.find((s) => s.id === activeTab) ?? sectionItems[0]);
+    const activeCatalogItem = $derived(catalogTabs.find((c) => c.id === activeCatalog) ?? catalogTabs[0]);
 </script>
 
-<div class="space-y-6">
+<div class="space-y-4">
     <SectionHeader title="Configuración del Sistema" />
+
+    <!-- Selector de sección (móvil) -->
+    <button
+        type="button"
+        class="lg:hidden w-full flex items-center gap-3 px-4 h-11 rounded-2xl bg-white border border-slate-200 shadow-sm active:scale-[0.99] transition-all"
+        onclick={() => (showSectionSheet = true)}
+    >
+        <span class="text-slate-400">
+            {#if activeSection}
+                {@const ActiveIcon = activeSection.icon}
+                <ActiveIcon size={18} strokeWidth={2.5} />
+            {/if}
+        </span>
+        <span class="text-sm font-bold text-slate-900">{activeSection?.label}</span>
+        <ChevronDown size={16} class="ml-auto text-slate-400" />
+    </button>
 
     <div class="flex flex-col lg:flex-row gap-6 items-start">
         <!-- Sidebar Navigation (sólida y ancha en desktop, pestañas horizontales en móvil) -->
-        <aside class="w-full lg:w-80 shrink-0 lg:sticky lg:top-6 bg-white border border-slate-200 rounded-3xl shadow-sm">
+        <aside
+            class="hidden lg:block w-full lg:w-80 shrink-0 lg:sticky lg:top-6 bg-white border border-slate-200 rounded-3xl shadow-sm"
+        >
             <div class="px-6 py-5 border-b border-slate-100 rounded-t-3xl">
-                <h3 class="font-extrabold text-slate-900 tracking-tight uppercase text-xs tracking-[0.1em]">Administración</h3>
+                <h3 class="font-extrabold text-slate-900 tracking-tight uppercase text-xs tracking-[0.1em]">
+                    Administración
+                </h3>
                 <p class="text-[11px] font-bold text-slate-400 mt-1">Configura el ecosistema Nexa</p>
             </div>
 
             <nav class="flex lg:flex-col p-3 gap-1.5 overflow-x-auto scrollbar-none">
-                {#each [{ id: "catalogos", label: "Catálogos", icon: Building2 }, ...(currentUser.role === "admin" ? [{ id: "usuarios", label: "Usuarios", icon: Users }] : [])] as item}
+                {#each [{ id: 'catalogos', label: 'Catálogos', icon: Building2 }, ...(currentUser.role === 'admin' ? [{ id: 'usuarios', label: 'Usuarios', icon: Users }] : [])] as item}
                     {@const Icon = item.icon}
                     <button
-                        class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab === item.id ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
+                        class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab ===
+                        item.id
+                            ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10'
+                            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
                         onclick={() => (activeTab = item.id as typeof activeTab)}
                     >
-                        <div class={activeTab === item.id ? "text-white" : "text-slate-400"}><Icon size={18} strokeWidth={2.5} /></div>
+                        <div class={activeTab === item.id ? 'text-white' : 'text-slate-400'}>
+                            <Icon size={18} strokeWidth={2.5} />
+                        </div>
                         {item.label}
                     </button>
                 {/each}
                 <button
-                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab === 'general' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
-                    onclick={() => (activeTab = "general")}
+                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab ===
+                    'general'
+                        ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10'
+                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
+                    onclick={() => (activeTab = 'general')}
                 >
-                    <div class={activeTab === "general" ? "text-white" : "text-slate-400"}><Settings2 size={18} strokeWidth={2.5} /></div>
+                    <div class={activeTab === 'general' ? 'text-white' : 'text-slate-400'}>
+                        <Settings2 size={18} strokeWidth={2.5} />
+                    </div>
                     General
                 </button>
                 <button
-                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab === 'plantillas' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
-                    onclick={() => (activeTab = "plantillas")}
+                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab ===
+                    'plantillas'
+                        ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10'
+                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
+                    onclick={() => (activeTab = 'plantillas')}
                 >
-                    <div class={activeTab === "plantillas" ? "text-white" : "text-slate-400"}><FileText size={18} strokeWidth={2.5} /></div>
+                    <div class={activeTab === 'plantillas' ? 'text-white' : 'text-slate-400'}>
+                        <FileText size={18} strokeWidth={2.5} />
+                    </div>
                     Plantillas
                 </button>
                 <button
-                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab === 'modulos' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
-                    onclick={() => (activeTab = "modulos")}
+                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab ===
+                    'modulos'
+                        ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10'
+                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
+                    onclick={() => (activeTab = 'modulos')}
                 >
-                    <div class={activeTab === "modulos" ? "text-white" : "text-slate-400"}><Puzzle size={18} strokeWidth={2.5} /></div>
+                    <div class={activeTab === 'modulos' ? 'text-white' : 'text-slate-400'}>
+                        <Puzzle size={18} strokeWidth={2.5} />
+                    </div>
                     Módulos
                 </button>
                 <button
-                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab === 'responsiva' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
-                    onclick={() => (activeTab = "responsiva")}
+                    class="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all duration-200 text-left active:scale-[0.98] {activeTab ===
+                    'responsiva'
+                        ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10'
+                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}"
+                    onclick={() => (activeTab = 'responsiva')}
                 >
-                    <div class={activeTab === "responsiva" ? "text-white" : "text-slate-400"}>
+                    <div class={activeTab === 'responsiva' ? 'text-white' : 'text-slate-400'}>
                         <FileSignature size={18} strokeWidth={2.5} />
                     </div>
                     Responsiva
@@ -185,20 +288,26 @@
             </nav>
 
             <div class="px-4 py-4 border-t border-slate-100">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-3">Herramientas</p>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-3">
+                    Herramientas
+                </p>
                 <ExportDropdown
                     icon={FileDown}
-                    label={isGeneratingTemplate ? "Generando..." : "Plantilla de Solicitudes"}
+                    label={isGeneratingTemplate ? 'Generando...' : 'Plantilla de Solicitudes'}
                     disabled={isGeneratingTemplate || !networkStore.isOnline}
                     menuWidth="w-80"
                 >
                     {#snippet items()}
                         <div class="p-3 space-y-1">
-                            <p class="px-1 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            <p
+                                class="px-1 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400"
+                            >
                                 Medios a incluir
                             </p>
                             {#each mediaTypes.filter((m) => m.active !== false) as m}
-                                <label class="flex items-center gap-2.5 px-1 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm font-semibold text-slate-700">
+                                <label
+                                    class="flex items-center gap-2.5 px-1 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm font-semibold text-slate-700"
+                                >
                                     <input
                                         type="checkbox"
                                         class="accent-emerald-600 w-4 h-4"
@@ -228,16 +337,16 @@
                     disabled={isGeneratingMediosTemplate || !networkStore.isOnline}
                 >
                     <CreditCard size={18} strokeWidth={2.5} class="text-violet-500" />
-                    {isGeneratingMediosTemplate ? "Generando..." : "Plantilla de Medios"}
+                    {isGeneratingMediosTemplate ? 'Generando...' : 'Plantilla de Medios'}
                 </button>
-                {#if moduleState.isEnabled("conteo_uso")}
+                {#if moduleState.isEnabled('conteo_uso')}
                     <button
                         class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
                         onclick={handleGenerateKoneTemplate}
                         disabled={isGeneratingKoneTemplate || !networkStore.isOnline}
                     >
                         <FileDown size={18} strokeWidth={2.5} class="text-sky-500" />
-                        {isGeneratingKoneTemplate ? "Generando..." : "Plantilla de Conteo de Uso"}
+                        {isGeneratingKoneTemplate ? 'Generando...' : 'Plantilla de Conteo de Uso'}
                     </button>
                 {/if}
             </div>
@@ -245,56 +354,89 @@
 
         <!-- Content Area -->
         <div class="flex-1 min-w-0 space-y-6">
-            {#if activeTab === "catalogos"}
-                <!-- Catalog sub-tabs -->
-                <div class="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-none">
+            {#if activeTab === 'catalogos'}
+                <!-- Selector de catálogo (móvil) -->
+                <button
+                    type="button"
+                    class="lg:hidden w-full flex items-center gap-3 px-4 h-11 rounded-2xl bg-white border border-slate-200 shadow-sm active:scale-[0.99] transition-all"
+                    onclick={() => (showCatalogSheet = true)}
+                >
+                    <span class="text-slate-400">
+                        {#if activeCatalogItem}
+                            {@const CatalogIcon = activeCatalogItem.icon}
+                            <CatalogIcon size={18} strokeWidth={2.5} />
+                        {/if}
+                    </span>
+                    <span class="text-sm font-bold text-slate-900">{activeCatalogItem?.label}</span>
+                    <ChevronDown size={16} class="ml-auto text-slate-400" />
+                </button>
+
+                <!-- Catalog sub-tabs (desktop) -->
+                <div class="hidden lg:flex items-center gap-3 overflow-x-auto pb-1 scrollbar-none">
                     {#each catalogTabs as item}
                         {@const Icon = item.icon}
                         <button
-                            class="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[13px] font-extrabold whitespace-nowrap transition-all duration-200 active:scale-95 {activeCatalog === item.id ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800'}"
+                            class="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[13px] font-extrabold whitespace-nowrap transition-all duration-200 active:scale-95 {activeCatalog ===
+                            item.id
+                                ? 'bg-slate-900 text-white shadow-md'
+                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800'}"
                             onclick={() => (activeCatalog = item.id)}
                         >
-                            <Icon size={16} strokeWidth={2.5} /> {item.label}
+                            <Icon size={16} strokeWidth={2.5} />
+                            {item.label}
                         </button>
                     {/each}
                 </div>
 
-                {#if activeCatalog === "edificios"}
+                {#if activeCatalog === 'edificios'}
                     <BuildingCatalog {canEdit} />
-                {:else if activeCatalog === "dependencias"}
+                {:else if activeCatalog === 'dependencias'}
                     <DependencyCatalog {canEdit} />
-                {:else if activeCatalog === "accesos"}
+                {:else if activeCatalog === 'accesos'}
                     <AccessCatalog {canEdit} />
-                {:else if activeCatalog === "medios"}
+                {:else if activeCatalog === 'medios'}
                     <MediaTypeCatalog {canEdit} />
-                {:else if activeCatalog === "dias"}
+                {:else if activeCatalog === 'dias'}
                     <ScheduleCatalog {canEdit} />
                 {/if}
-            {:else if activeTab === "usuarios"}
+            {:else if activeTab === 'usuarios'}
                 <UserManagementSection />
-            {:else if activeTab === "general"}
+            {:else if activeTab === 'general'}
                 <GeneralSettingsView />
-            {:else if activeTab === "plantillas"}
+            {:else if activeTab === 'plantillas'}
                 <PlantillasCatalog />
-            {:else if activeTab === "modulos"}
+            {:else if activeTab === 'modulos'}
                 <ModulesCatalog />
-            {:else if activeTab === "responsiva"}
+            {:else if activeTab === 'responsiva'}
                 <!-- Responsiva Settings -->
                 <div class="flex items-center gap-3 pb-4">
-                    <SectionPill icon={FileSignature} label="Configuración de Responsiva" className="bg-slate-100 text-slate-700" />
+                    <SectionPill
+                        icon={FileSignature}
+                        label="Configuración de Responsiva"
+                        className="bg-slate-100 text-slate-700"
+                    />
                 </div>
-                <Card class="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm relative overflow-hidden max-w-3xl">
+                <Card
+                    class="p-5 lg:p-6 bg-white border border-slate-200 rounded-2xl shadow-sm relative overflow-hidden max-w-3xl"
+                >
                     <div class="space-y-6">
                         <!-- Descripción -->
-                        <div class="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                            <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                        <div
+                            class="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100"
+                        >
+                            <div
+                                class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0"
+                            >
                                 <AlertTriangle size={20} strokeWidth={2.5} />
                             </div>
                             <div>
-                                <h4 class="text-sm font-bold text-slate-800 mb-1">Umbrales de Firma Responsiva</h4>
+                                <h4 class="text-sm font-bold text-slate-800 mb-1">
+                                    Umbrales de Firma Responsiva
+                                </h4>
                                 <p class="text-xs font-medium text-slate-500 leading-relaxed">
-                                    Estos valores determinan cuándo se muestran las etiquetas de advertencia en las tarjetas de Firma Responsiva.
-                                    Afectan tanto a la vista de tickets como a la exportación a Excel.
+                                    Estos valores determinan cuándo se muestran las etiquetas de advertencia
+                                    en las tarjetas de Firma Responsiva. Afectan tanto a la vista de tickets
+                                    como a la exportación a Excel.
                                 </p>
                             </div>
                         </div>
@@ -309,10 +451,13 @@
                                             Días para baja de registro
                                         </label>
                                         <p class="text-[11px] font-medium text-slate-400 mt-0.5">
-                                            Si no se recoge tras este plazo, se marca "Baja de Registro" (rojo).
+                                            Si no se recoge tras este plazo, se marca "Baja de Registro"
+                                            (rojo).
                                         </p>
                                     </div>
-                                    <span class="text-xs font-black text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg ml-4 shrink-0">
+                                    <span
+                                        class="text-xs font-black text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg ml-4 shrink-0"
+                                    >
                                         {settingsState.responsivaPickupDays} días
                                     </span>
                                 </div>
@@ -342,7 +487,9 @@
                                             Debe ser menor al plazo de baja.
                                         </p>
                                     </div>
-                                    <span class="text-xs font-black text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg ml-4 shrink-0">
+                                    <span
+                                        class="text-xs font-black text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg ml-4 shrink-0"
+                                    >
                                         {settingsState.responsivaWarnDays} días
                                     </span>
                                 </div>
@@ -368,26 +515,38 @@
                             </h4>
                             <div class="flex flex-wrap items-center gap-3">
                                 <!-- Semáforo por días restantes: verde (recién creado) → ámbar (por vencer) → rojo (vencido) -->
-                                <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                <span
+                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                                >
                                     Restan {pickupDaysInput} días · Pendiente
                                 </span>
-                                <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200/60">
+                                <span
+                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200/60"
+                                >
                                     Restan {Math.max(1, pickupDaysInput - warnDaysInput)} días · Por vencer
                                 </span>
-                                <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200/60">
+                                <span
+                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200/60"
+                                >
                                     Plazo vencido · Baja de Registro
                                 </span>
                             </div>
                         </div>
 
                         <!-- Umbral de tipos core para estado Activo -->
-                        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 pt-3 border-t border-slate-100">
+                        <div
+                            class="flex flex-wrap items-center gap-x-6 gap-y-2 pt-3 border-t border-slate-100"
+                        >
                             <div class="space-y-1">
-                                <label for="core-types-required" class="text-sm font-bold text-slate-800 block">
+                                <label
+                                    for="core-types-required"
+                                    class="text-sm font-bold text-slate-800 block"
+                                >
                                     Tipos de acceso requeridos para "Activo/a"
                                 </label>
                                 <p class="text-[11px] text-slate-500">
-                                    Medios con pisos listos (programados y firmados) que una persona necesita. Aplica al listado, dashboard e historial.
+                                    Medios con pisos listos (programados y firmados) que una persona necesita.
+                                    Aplica al listado, dashboard e historial.
                                 </p>
                             </div>
                             <input
@@ -396,15 +555,15 @@
                                 min="1"
                                 max="10"
                                 bind:value={coreTypesInput}
-                                class="w-24 px-3 py-2 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                class="w-full sm:w-24 px-3 py-2 border border-slate-200 rounded-xl text-sm tabular-nums focus-visible:outline-none focus-visible:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500"
                             />
                         </div>
 
                         <!-- Botones de acción -->
-                        <div class="flex items-center gap-3 pt-2">
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
                             <Button
                                 variant="primary"
-                                class="flex items-center gap-2 px-6 py-2.5 rounded-xl"
+                                class="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl w-full sm:w-auto"
                                 onclick={handleSaveResponsivaSettings}
                                 disabled={!networkStore.isOnline}
                             >
@@ -413,7 +572,7 @@
                             </Button>
                             <Button
                                 variant="secondary"
-                                class="flex items-center gap-2 px-5 py-2.5 rounded-xl"
+                                class="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl w-full sm:w-auto"
                                 onclick={handleResetResponsivaSettings}
                             >
                                 <RotateCcw size={16} strokeWidth={2} />
@@ -425,4 +584,123 @@
             {/if}
         </div>
     </div>
+
+    <!-- Sheet: selector de sección (móvil) -->
+    <BottomSheet bind:isOpen={showSectionSheet} title="Configuración">
+        <div class="flex flex-col gap-1.5">
+            {#each sectionItems as item (item.id)}
+                {@const Icon = item.icon}
+                <button
+                    type="button"
+                    class="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all active:scale-[0.99] {activeTab ===
+                    item.id
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-50 text-slate-700'}"
+                    onclick={() => {
+                        activeTab = item.id;
+                        showSectionSheet = false;
+                    }}
+                >
+                    <Icon
+                        size={18}
+                        strokeWidth={2.5}
+                        class={activeTab === item.id ? 'text-white' : 'text-slate-400'}
+                    />
+                    <span class="text-sm font-bold">{item.label}</span>
+                    {#if activeTab === item.id}
+                        <Check size={16} class="ml-auto" />
+                    {/if}
+                </button>
+            {/each}
+        </div>
+
+        <div class="mt-4 pt-4 border-t border-slate-100">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-3">Herramientas</p>
+            <ExportDropdown
+                icon={FileDown}
+                label={isGeneratingTemplate ? 'Generando...' : 'Plantilla de Solicitudes'}
+                disabled={isGeneratingTemplate || !networkStore.isOnline}
+            >
+                {#snippet items()}
+                    <div class="p-3 space-y-1">
+                        <p class="px-1 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            Medios a incluir
+                        </p>
+                        {#each mediaTypes.filter((m) => m.active !== false) as m}
+                            <label
+                                class="flex items-center gap-2.5 px-1 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm font-semibold text-slate-700"
+                            >
+                                <input
+                                    type="checkbox"
+                                    class="accent-emerald-600 w-4 h-4"
+                                    checked={selectedMediaKeys.includes(m.key)}
+                                    onchange={() => toggleMedia(m.key)}
+                                />
+                                <span>{m.name || m.key}</span>
+                            </label>
+                        {/each}
+                        {#if mediaTypes.filter((m) => m.active !== false).length === 0}
+                            <p class="px-1 py-2 text-xs text-slate-400">No hay medios configurados.</p>
+                        {/if}
+                        <button
+                            class="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                            onclick={handleGenerateTemplate}
+                            disabled={isGeneratingTemplate || selectedMediaKeys.length === 0}
+                        >
+                            <FileDown size={16} />
+                            Descargar plantilla
+                        </button>
+                    </div>
+                {/snippet}
+            </ExportDropdown>
+            <button
+                class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-violet-50 hover:text-violet-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                onclick={handleGenerateMediosTemplate}
+                disabled={isGeneratingMediosTemplate || !networkStore.isOnline}
+            >
+                <CreditCard size={18} strokeWidth={2.5} class="text-violet-500" />
+                {isGeneratingMediosTemplate ? 'Generando...' : 'Plantilla de Medios'}
+            </button>
+            {#if moduleState.isEnabled('conteo_uso')}
+                <button
+                    class="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-sky-50 hover:text-sky-700 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                    onclick={handleGenerateKoneTemplate}
+                    disabled={isGeneratingKoneTemplate || !networkStore.isOnline}
+                >
+                    <FileDown size={18} strokeWidth={2.5} class="text-sky-500" />
+                    {isGeneratingKoneTemplate ? 'Generando...' : 'Plantilla de Conteo de Uso'}
+                </button>
+            {/if}
+        </div>
+    </BottomSheet>
+
+    <!-- Sheet: selector de catálogo (móvil) -->
+    <BottomSheet bind:isOpen={showCatalogSheet} title="Catálogo">
+        <div class="flex flex-col gap-1.5">
+            {#each catalogTabs as item (item.id)}
+                {@const Icon = item.icon}
+                <button
+                    type="button"
+                    class="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all active:scale-[0.99] {activeCatalog ===
+                    item.id
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-50 text-slate-700'}"
+                    onclick={() => {
+                        activeCatalog = item.id;
+                        showCatalogSheet = false;
+                    }}
+                >
+                    <Icon
+                        size={18}
+                        strokeWidth={2.5}
+                        class={activeCatalog === item.id ? 'text-white' : 'text-slate-400'}
+                    />
+                    <span class="text-sm font-bold">{item.label}</span>
+                    {#if activeCatalog === item.id}
+                        <Check size={16} class="ml-auto" />
+                    {/if}
+                </button>
+            {/each}
+        </div>
+    </BottomSheet>
 </div>

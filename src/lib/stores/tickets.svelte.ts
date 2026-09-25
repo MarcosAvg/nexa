@@ -1,5 +1,5 @@
-import type { Ticket } from "../types";
-import { PaginatedListState } from "./paginatedList.svelte";
+import type { Ticket } from '../types';
+import { PaginatedListState } from './paginatedList.svelte';
 
 export type TicketFilters = {
     type: string;
@@ -16,13 +16,13 @@ export class TicketState {
 
     /** Filtros unificados. */
     filters: TicketFilters = $state({
-        type: "Todos",
-        priority: "Todas",
-        search: "",
-        dependencyId: "",
-        buildingId: "",
-        floor: "",
-        section: "General",
+        type: 'Todos',
+        priority: 'Todas',
+        search: '',
+        dependencyId: '',
+        buildingId: '',
+        floor: '',
+        section: 'General',
     });
 
     /**
@@ -40,11 +40,11 @@ export class TicketState {
     }
 
     removeTicket(id: number) {
-        this.pendingItems = this.pendingItems.filter(t => t.id !== id);
+        this.pendingItems = this.pendingItems.filter((t) => t.id !== id);
     }
 
     removeByCard(cardId: string, types?: string[]) {
-        this.pendingItems = this.pendingItems.filter(t => {
+        this.pendingItems = this.pendingItems.filter((t) => {
             if (t.access_media_id !== cardId) return true;
             if (types && types.length > 0) {
                 return !types.includes(t.type);
@@ -54,7 +54,7 @@ export class TicketState {
     }
 
     removeByPerson(personId: string) {
-        this.pendingItems = this.pendingItems.filter(t => t.person_id !== personId);
+        this.pendingItems = this.pendingItems.filter((t) => t.person_id !== personId);
     }
 
     /** Carga la primera página con los filtros actuales. */
@@ -67,18 +67,20 @@ export class TicketState {
     }
 
     async refresh(page?: number) {
-        const { ticketService } = await import("../services/tickets");
+        const { ticketService } = await import('../services/tickets');
         await this.pagination.fetchPage(
-            (p, s) => ticketService.fetchPaginated(
-                p, s,
-                this.filters.type,
-                this.filters.priority,
-                this.filters.search,
-                this.filters.section,
-                this.filters.dependencyId,
-                this.filters.buildingId,
-                this.filters.floor,
-            ),
+            (p, s) =>
+                ticketService.fetchPaginated(
+                    p,
+                    s,
+                    this.filters.type,
+                    this.filters.priority,
+                    this.filters.search,
+                    this.filters.section,
+                    this.filters.dependencyId,
+                    this.filters.buildingId,
+                    this.filters.floor,
+                ),
             page,
         );
     }

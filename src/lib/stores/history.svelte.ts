@@ -1,7 +1,7 @@
-import { HistoryService } from "../services/history";
-import type { HistoryStory } from "../services/history";
-import type { HistoryLog } from "../types";
-import { PaginatedListState } from "./paginatedList.svelte";
+import { HistoryService } from '../services/history';
+import type { HistoryStory } from '../services/history';
+import type { HistoryLog } from '../types';
+import { PaginatedListState } from './paginatedList.svelte';
 
 export type { HistoryStory };
 
@@ -21,12 +21,12 @@ export class HistoryState {
     storiesPagination = new PaginatedListState<HistoryStory>();
 
     filters: HistoryFilters = $state({
-        person: "",
-        cardType: "Todos",
-        folio: "",
-        action: "Todas",
-        startDate: "",
-        endDate: "",
+        person: '',
+        cardType: 'Todos',
+        folio: '',
+        action: 'Todas',
+        startDate: '',
+        endDate: '',
     });
 
     /** Carga la primera página con los filtros actuales. */
@@ -41,17 +41,11 @@ export class HistoryState {
     }
 
     async refresh(page: number = 1) {
-        await this.pagination.fetchPage(
-            (p, s) => HistoryService.fetchAll(p, s, this.filters),
-            page,
-        );
+        await this.pagination.fetchPage((p, s) => HistoryService.fetchAll(p, s, this.filters), page);
     }
 
     async refreshFlows(page: number = 1) {
-        await this.storiesPagination.fetchPage(
-            (p, s) => HistoryService.fetchFlows(p, s, this.filters),
-            page,
-        );
+        await this.storiesPagination.fetchPage((p, s) => HistoryService.fetchFlows(p, s, this.filters), page);
     }
 
     /**
@@ -76,12 +70,12 @@ export class HistoryState {
      */
     clearFilters() {
         this.filters = {
-            person: "",
-            cardType: "Todos",
-            folio: "",
-            action: "Todas",
-            startDate: "",
-            endDate: "",
+            person: '',
+            cardType: 'Todos',
+            folio: '',
+            action: 'Todas',
+            startDate: '',
+            endDate: '',
         };
         this.pagination.currentPage = 1;
         this.storiesPagination.currentPage = 1;

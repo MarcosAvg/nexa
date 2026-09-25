@@ -1,6 +1,9 @@
 // ─── Base UI ───────────────────────────────────────────────
 export { default as Badge } from './Badge.svelte';
 export { default as Button } from './Button.svelte';
+export { default as IconButton } from './IconButton.svelte';
+export { default as StatusBadge } from './StatusBadge.svelte';
+export { default as SwipeActions } from './SwipeActions.svelte';
 export { default as Card } from './Card.svelte';
 export { default as CardItem } from './CardItem.svelte';
 export { default as Input } from './Input.svelte';
@@ -20,12 +23,14 @@ export { default as FilterSelect } from './FilterSelect.svelte';
 export { default as FilterToolbar } from './FilterToolbar.svelte';
 export { default as ToggleGroup } from './ToggleGroup.svelte';
 export { default as SectionHeader } from './SectionHeader.svelte';
+export { default as BottomSheet } from './BottomSheet.svelte';
 export { default as SectionPill } from './SectionPill.svelte';
 export { default as Tabs } from './Tabs.svelte';
 export { default as TicketStateBadge } from './TicketStateBadge.svelte';
 
 // ─── Data Display ──────────────────────────────────────────
 export { default as DataTable } from './DataTable.svelte';
+export { default as DataList } from './DataList.svelte';
 export { default as ExportDropdown } from './ExportDropdown.svelte';
 export { default as ExportMenuItem } from './ExportMenuItem.svelte';
 export { default as ResponsivaProgramBadges } from './ResponsivaProgramBadges.svelte';

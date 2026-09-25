@@ -14,11 +14,7 @@ const info = {
 };
 
 // En dev: escribe en public/ para que Vite lo sirva
-writeFileSync(
-    resolve(__dirname, '../public/build-info.json'),
-    JSON.stringify(info, null, 2) + '\n',
-    'utf-8',
-);
+writeFileSync(resolve(__dirname, '../public/build-info.json'), JSON.stringify(info, null, 2) + '\n', 'utf-8');
 
 // En build: escribe también en dist/ porque `vite build` ya copió public/ cuando postbuild corre
 // En predev: dist/ no existe, así que ignoramos silenciosamente el error

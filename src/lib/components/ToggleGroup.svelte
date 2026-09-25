@@ -18,17 +18,9 @@
         showSelectAll?: boolean;
     };
 
-    let {
-        label,
-        options,
-        value = $bindable([]),
-        onchange,
-        showSelectAll = false,
-    }: Props = $props();
+    let { label, options, value = $bindable([]), onchange, showSelectAll = false }: Props = $props();
 
-    let isAllSelected = $derived(
-        options.length > 0 && value.length === options.length,
-    );
+    let isAllSelected = $derived(options.length > 0 && value.length === options.length);
 
     function toggle(option: string) {
         if (value.includes(option)) {
@@ -51,9 +43,7 @@
 
 <div class="space-y-2">
     <div class="flex items-center justify-between">
-        <span
-            class="text-xs font-bold text-slate-500 uppercase tracking-widest block"
-        >
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest block">
             {label}
         </span>
         {#if showSelectAll && options.length > 0}
@@ -62,7 +52,7 @@
                 class="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
                 onclick={toggleAll}
             >
-                {isAllSelected ? "Ninguno" : "Todos"}
+                {isAllSelected ? 'Ninguno' : 'Todos'}
             </button>
         {/if}
     </div>

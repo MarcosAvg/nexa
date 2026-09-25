@@ -1,28 +1,21 @@
 <script lang="ts">
-    import { supabase } from "../supabase";
-    import { Button, Input, Card } from "../components";
-    import {
-        LogIn,
-        UserPlus,
-        Mail,
-        Lock,
-        AlertCircle,
-        ChevronLeft,
-    } from "lucide-svelte";
+    import { supabase } from '../supabase';
+    import { Button, Input, Card } from '../components';
+    import { LogIn, UserPlus, Mail, Lock, AlertCircle, ChevronLeft } from 'lucide-svelte';
 
-    let email = $state("");
-    let password = $state("");
-    let fullName = $state("");
+    let email = $state('');
+    let password = $state('');
+    let fullName = $state('');
     let isSignUp = $state(false);
     let loading = $state(false);
-    let errorMessage = $state("");
-    let message = $state("");
+    let errorMessage = $state('');
+    let message = $state('');
 
     async function handleLogin(e: Event) {
         e.preventDefault();
         loading = true;
-        errorMessage = "";
-        message = "";
+        errorMessage = '';
+        message = '';
 
         const { error } = await supabase.auth.signInWithPassword({
             email,
@@ -46,11 +39,11 @@
     async function handleSignUp(e: Event) {
         e.preventDefault();
         loading = true;
-        errorMessage = "";
-        message = "";
+        errorMessage = '';
+        message = '';
 
         if (!fullName.trim()) {
-            errorMessage = "El nombre completo es requerido";
+            errorMessage = 'El nombre completo es requerido';
             loading = false;
             return;
         }
@@ -68,18 +61,17 @@
         if (error) {
             errorMessage = error.message;
         } else if (data.user && data.session) {
-            message = "¡Registro exitoso! Iniciando sesión...";
+            message = '¡Registro exitoso! Iniciando sesión...';
         } else {
-            message =
-                "Registro enviado. Por favor, verifica tu correo electrónico para confirmar tu cuenta.";
+            message = 'Registro enviado. Por favor, verifica tu correo electrónico para confirmar tu cuenta.';
         }
         loading = false;
     }
 
     function toggleMode() {
         isSignUp = !isSignUp;
-        errorMessage = "";
-        message = "";
+        errorMessage = '';
+        message = '';
     }
 </script>
 
@@ -92,23 +84,15 @@
             >
                 <LogIn size={32} />
             </div>
-            <h1 class="text-3xl font-bold text-slate-900 tracking-tight">
-                Nexa Control
-            </h1>
-            <p class="text-slate-500 mt-2">
-                Gestión unificada de accesos y personal
-            </p>
+            <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Nexa Control</h1>
+            <p class="text-slate-500 mt-2">Gestión unificada de accesos y personal</p>
         </div>
 
-        <Card
-            class="p-8 shadow-xl border-slate-200/60 bg-white/80 backdrop-blur-sm"
-        >
+        <Card class="p-8 shadow-xl border-slate-200/60 bg-white/80 backdrop-blur-sm">
             <form onsubmit={handleAction} class="space-y-6">
                 <div class="space-y-4">
                     {#if isSignUp}
-                        <div
-                            class="space-y-2 animate-in fade-in slide-in-from-top-2"
-                        >
+                        <div class="space-y-2 animate-in fade-in slide-in-from-top-2">
                             <label
                                 for="fullName"
                                 class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1"
@@ -184,6 +168,8 @@
 
                 {#if errorMessage}
                     <div
+                        role="alert"
+                        aria-live="assertive"
                         class="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2"
                     >
                         <AlertCircle class="text-rose-600 mt-0.5" size={18} />
@@ -195,15 +181,12 @@
 
                 {#if message}
                     <div
+                        role="status"
+                        aria-live="polite"
                         class="p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2"
                     >
                         <div class="text-emerald-600 mt-0.5">
-                            <svg
-                                class="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path
                                     stroke-linecap="round"
                                     stroke-linejoin="round"
@@ -225,9 +208,9 @@
                     type="submit"
                 >
                     {#if loading}
-                        {isSignUp ? "Registrando..." : "Iniciando sesión..."}
+                        {isSignUp ? 'Registrando...' : 'Iniciando sesión...'}
                     {:else}
-                        {isSignUp ? "Crear Cuenta" : "Entrar al Sistema"}
+                        {isSignUp ? 'Crear Cuenta' : 'Entrar al Sistema'}
                     {/if}
                 </Button>
 
@@ -237,9 +220,7 @@
                         onclick={toggleMode}
                         class="w-full min-h-11 px-4 py-3 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-colors active:scale-[0.99]"
                     >
-                        {isSignUp
-                            ? "¿Ya tienes cuenta? Inicia sesión"
-                            : "¿No tienes cuenta? Regístrate"}
+                        {isSignUp ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'}
                     </button>
                 </div>
             </form>

@@ -1,61 +1,59 @@
 <script lang="ts">
+    import { personnelState, catalogState, userState, ticketState, moduleState } from '../stores';
+    import { pullRefresh } from '../stores';
     import {
-        personnelState,
-        catalogState,
-        userState,
-        ticketState,
-        moduleState,
-    } from "../stores";
-    import {
-        SectionHeader, FilterSelect, FilterToolbar, Button, DataTable,
-        Badge, PermissionGuard, FloatingActionButton, Pagination,
-        ContentView, SearchInput, ExportDropdown, ExportMenuItem,
-        UsoTarjetasImportModal, RegistrosImportModal,
-    } from "../components";
-    import {
-        FileSpreadsheet,
-        Plus,
-        Upload,
-        FileStack,
-        FolderArchive,
-        Users,
-        Check,
-    } from "lucide-svelte";
-    import { personnelService } from "../services/personnel";
-    import { cardService } from "../services/cards";
-    import { exportPersonnelToExcel, exportPersonnelAllDependenciesAsZip, handleError, createSimpleDebounce } from "../utils";
-    import { mediaTypeVariant, mediaTypeDotClass } from "../utils/mediaTypeAppearance";
-    import { toast } from "svelte-sonner";
-    import { networkStore } from "../stores/network.svelte";
-    import { getPersonnelStatusVariant } from "../constants/status";
+        SectionHeader,
+        FilterSelect,
+        FilterToolbar,
+        Button,
+        DataTable,
+        Badge,
+        PermissionGuard,
+        FloatingActionButton,
+        Pagination,
+        ContentView,
+        SearchInput,
+        ExportDropdown,
+        ExportMenuItem,
+        UsoTarjetasImportModal,
+        RegistrosImportModal,
+        BulkDeletePersonnelModal,
+        DataList,
+    } from '../components';
+    import { FileSpreadsheet, Plus, Upload, FileStack, FolderArchive, Users, Check } from 'lucide-svelte';
+    import { personnelService } from '../services/personnel';
+    import { cardService } from '../services/cards';
+    import { handleError, createSimpleDebounce, toastWithUndo, haptic } from '../utils';
+    import { confirm } from '../utils/confirmModal.svelte';
+    import { mediaTypeVariant, mediaTypeDotClass } from '../utils/mediaTypeAppearance';
+    import { toast } from 'svelte-sonner';
+    import { networkStore } from '../stores/network.svelte';
+    import { getPersonnelStatusVariant } from '../constants/status';
 
     let personnel = $derived(personnelState.pagination.items);
     let dependencies = $derived(catalogState.dependencies);
     let buildings = $derived(catalogState.buildings);
 
-    let mediaFilter = $state("");
+    let mediaFilter = $state('');
     let dependencyNames = $derived(dependencies.map((d) => d.name));
-    let buildingNames = $derived([
-        ...buildings.map((b) => b.name),
-        "Sin Edificio",
-    ]);
+    let buildingNames = $derived([...buildings.map((b) => b.name), 'Sin Edificio']);
     let mediaTypeOptions = $derived.by(() => {
         const options: { value: string; label: string }[] = [];
         const seen = new Set<string>();
         for (const media of catalogState.mediaTypes) {
             if ((media as any).active === false) continue;
-            const id = String(media.id ?? "");
-            const label = media.name ?? "";
+            const id = String(media.id ?? '');
+            const label = media.name ?? '';
             if (!id || !label || seen.has(id)) continue;
             seen.add(id);
             options.push({ value: id, label });
         }
-        return [...options, { value: "__none__", label: "Sin tarjeta" }];
+        return [...options, { value: '__none__', label: 'Sin tarjeta' }];
     });
     let mediaTypeName = $derived(
-        mediaFilter === "__none__"
-            ? "Sin tarjeta"
-            : catalogState.mediaTypes.find((media) => String(media.id) === mediaFilter)?.name ?? "",
+        mediaFilter === '__none__'
+            ? 'Sin tarjeta'
+            : (catalogState.mediaTypes.find((media) => String(media.id) === mediaFilter)?.name ?? ''),
     );
 
     // Tipos de acceso (medios) para las columnas/KPIs de la exportación Excel.
@@ -78,42 +76,48 @@
             : [...exportCardTypes, type];
     }
 
-    let dependencyFilter = $state("");
-    let buildingFilter = $state("");
-    let floorFilter = $state("");
+    let dependencyFilter = $state('');
+    let buildingFilter = $state('');
+    let floorFilter = $state('');
 
     // Pisos canónicos del edificio seleccionado (dependencia directa del filtro de edificio).
     let selectedBuildingFloors = $derived.by(() => {
-        if (buildingFilter === "" || buildingFilter === "Sin Edificio") return [] as string[];
+        if (buildingFilter === '' || buildingFilter === 'Sin Edificio') return [] as string[];
         const building = buildings.find((b) => b.name === buildingFilter);
         const floors = (building as { floors?: unknown } | undefined)?.floors;
         if (!Array.isArray(floors)) return [] as string[];
-        return floors.filter((floor): floor is string => typeof floor === "string");
+        return floors.filter((floor): floor is string => typeof floor === 'string');
     });
     let floorOptions = $derived([
         ...selectedBuildingFloors.map((floor) => ({ value: floor, label: floor })),
-        { value: "__none__", label: "Sin piso base" },
+        { value: '__none__', label: 'Sin piso base' },
     ]);
-    let isFloorFilterEnabled = $derived(buildingFilter !== "" && buildingFilter !== "Sin Edificio");
-    let floorFilterLabel = $derived(floorFilter === "__none__" ? "Sin piso base" : floorFilter);
+    let isFloorFilterEnabled = $derived(buildingFilter !== '' && buildingFilter !== 'Sin Edificio');
+    let floorFilterLabel = $derived(floorFilter === '__none__' ? 'Sin piso base' : floorFilter);
     let floorPlaceholder = $derived(
-        buildingFilter === ""
-            ? "Selecciona un edificio"
-            : buildingFilter === "Sin Edificio"
-              ? "No aplica sin edificio"
+        buildingFilter === ''
+            ? 'Selecciona un edificio'
+            : buildingFilter === 'Sin Edificio'
+              ? 'No aplica sin edificio'
               : selectedBuildingFloors.length > 0
-                ? "Todos los pisos"
-                : "Sin pisos",
+                ? 'Todos los pisos'
+                : 'Sin pisos',
     );
 
     // Sincronizar los filtros de nombre → ID con el store
     $effect(() => {
-        const bldgId = buildingFilter === "Sin Edificio"
-            ? "__none__"
-            : buildings.find((b) => b.name === buildingFilter)?.id || "";
+        const bldgId =
+            buildingFilter === 'Sin Edificio'
+                ? '__none__'
+                : buildings.find((b) => b.name === buildingFilter)?.id || '';
         personnelState.filters.buildingId = bldgId;
-        if ((!bldgId || bldgId === "__none__" || (floorFilter !== "__none__" && !selectedBuildingFloors.includes(floorFilter))) && floorFilter !== "") {
-            floorFilter = "";
+        if (
+            (!bldgId ||
+                bldgId === '__none__' ||
+                (floorFilter !== '__none__' && !selectedBuildingFloors.includes(floorFilter))) &&
+            floorFilter !== ''
+        ) {
+            floorFilter = '';
         }
     });
     $effect(() => {
@@ -121,42 +125,58 @@
     });
     $effect(() => {
         const media = catalogState.mediaTypes.find((item) => String(item.id) === mediaFilter);
-        if (mediaFilter && mediaFilter !== "__none__" && !media) {
-            mediaFilter = "";
+        if (mediaFilter && mediaFilter !== '__none__' && !media) {
+            mediaFilter = '';
         }
         personnelState.filters.mediaTypeId = mediaFilter;
     });
     $effect(() => {
-        const depId = dependencies.find((d) => d.name === dependencyFilter)?.id || "";
+        const depId = dependencies.find((d) => d.name === dependencyFilter)?.id || '';
         personnelState.filters.dependencyId = depId;
     });
 
     function clearPersonnelFilters() {
-        personnelState.filters.status = "Todos";
-        personnelState.filters.search = "";
-        dependencyFilter = "";
-        buildingFilter = "";
-        floorFilter = "";
-        mediaFilter = "";
+        personnelState.filters.status = 'Todos';
+        personnelState.filters.search = '';
+        dependencyFilter = '';
+        buildingFilter = '';
+        floorFilter = '';
+        mediaFilter = '';
     }
 
     // Chips de filtros activos para el toolbar.
     let personnelChips = $derived.by(() => {
         const chips: { label: string; value: string; onClear: () => void }[] = [];
-        if (personnelState.filters.status !== "Todos") {
-            chips.push({ label: "Estado", value: personnelState.filters.status, onClear: () => (personnelState.filters.status = "Todos") });
+        if (personnelState.filters.status !== 'Todos') {
+            chips.push({
+                label: 'Estado',
+                value: personnelState.filters.status,
+                onClear: () => (personnelState.filters.status = 'Todos'),
+            });
         }
         if (dependencyFilter) {
-            chips.push({ label: "Dependencia", value: dependencyFilter, onClear: () => (dependencyFilter = "") });
+            chips.push({
+                label: 'Dependencia',
+                value: dependencyFilter,
+                onClear: () => (dependencyFilter = ''),
+            });
         }
         if (buildingFilter) {
-            chips.push({ label: "Edificio", value: buildingFilter, onClear: () => (buildingFilter = "") });
+            chips.push({ label: 'Edificio', value: buildingFilter, onClear: () => (buildingFilter = '') });
         }
         if (floorFilter) {
-            chips.push({ label: "Piso", value: floorFilterLabel || floorFilter, onClear: () => (floorFilter = "") });
+            chips.push({
+                label: 'Piso',
+                value: floorFilterLabel || floorFilter,
+                onClear: () => (floorFilter = ''),
+            });
         }
         if (mediaFilter) {
-            chips.push({ label: "Tarjeta", value: mediaTypeName || mediaFilter, onClear: () => (mediaFilter = "") });
+            chips.push({
+                label: 'Tarjeta',
+                value: mediaTypeName || mediaFilter,
+                onClear: () => (mediaFilter = ''),
+            });
         }
         return chips;
     });
@@ -164,9 +184,7 @@
     // Estado del modal
     let isDetailsOpen = $derived(personnelState.isDetailsOpen);
     let selectedPersonId = $derived(personnelState.selectedPersonId);
-    let selectedPerson = $derived(
-        personnel.find((p) => p.id === selectedPersonId) || null,
-    );
+    let selectedPerson = $derived(personnel.find((p) => p.id === selectedPersonId) || null);
 
     const FILTER_DEBOUNCE_MS = 300;
     let filterDebounce: ReturnType<typeof setTimeout>;
@@ -201,19 +219,63 @@
         personnelState.openEditModal(person);
     }
 
+    /** Bloquea/reactiva una persona desde la fila (swipe) con confirmación. */
+    function togglePersonBlock(person: any) {
+        haptic('medium');
+        const reactivating = person.status_raw === 'blocked';
+        confirm.open({
+            title: reactivating ? '¿Reactivar persona?' : '¿Bloquear persona?',
+            description: reactivating
+                ? 'Volverá a tener acceso según sus tarjetas activas.'
+                : 'Se denegará el acceso a todas las instalaciones.',
+            variant: reactivating ? 'info' : 'warning',
+            confirmText: reactivating ? 'Reactivar' : 'Bloquear',
+            onConfirm: async () => {
+                const previous = person.status_raw;
+                await personnelService.updateStatus(person.id, reactivating ? 'active' : 'blocked');
+                toastWithUndo({
+                    message: reactivating ? 'Persona reactivada' : 'Persona bloqueada',
+                    onUndo: async () => {
+                        await personnelService.updateStatus(person.id, previous);
+                        await personnelState.refresh(1);
+                    },
+                });
+                await personnelState.refresh(1);
+            },
+        });
+    }
+
+    /** Acciones al deslizar una tarjeta de personal en móvil. */
+    function personActionsFor(
+        row: any,
+    ): { label: string; tone: 'emerald' | 'amber' | 'blue'; onAction: () => void }[] {
+        const reactivating = row.status_raw === 'blocked';
+        return [
+            {
+                label: reactivating ? 'Reactivar' : 'Bloquear',
+                tone: reactivating ? 'emerald' : 'amber',
+                onAction: () => togglePersonBlock(row),
+            },
+            {
+                label: 'Detalles',
+                tone: 'blue',
+                onAction: () => onOpenDetails(row),
+            },
+        ];
+    }
+
     let showKoneUsageModal = $state(false);
     let showRegistrosImport = $state(false);
     let isZipExporting = $state(false);
 
     async function handleExportExcel(splitByDependency: boolean = false) {
-        const loadingToast = toast.loading("Preparando exportación...");
+        const loadingToast = toast.loading('Preparando exportación...');
         try {
-            const depId =
-                dependencies.find((d) => d.name === dependencyFilter)?.id || "";
+            const depId = dependencies.find((d) => d.name === dependencyFilter)?.id || '';
             const bldgId =
-                buildingFilter === "Sin Edificio"
-                    ? "__none__"
-                    : buildings.find((b) => b.name === buildingFilter)?.id || "";
+                buildingFilter === 'Sin Edificio'
+                    ? '__none__'
+                    : buildings.find((b) => b.name === buildingFilter)?.id || '';
             const data = await personnelService.fetchForExport(
                 personnelState.filters.search,
                 personnelState.filters.status,
@@ -223,6 +285,7 @@
                 personnelState.filters.mediaTypeId,
             );
 
+            const { exportPersonnelToExcel } = await import('../utils/xlsxExport');
             exportPersonnelToExcel(data as any[], {
                 filters: {
                     status: personnelState.filters.status,
@@ -236,25 +299,26 @@
                 cardTypes: exportCardTypes,
                 mediaTypes: catalogState.mediaTypes,
             });
-            toast.success("Exportación completada", { id: loadingToast });
+            toast.success('Exportación completada', { id: loadingToast });
         } catch (error) {
             toast.dismiss(loadingToast);
-            handleError(error, "Exportar Personal");
+            handleError(error, 'Exportar Personal');
         }
     }
 
     async function handleExportAllDepsZip() {
         if (dependencies.length === 0) {
-            toast.error("No hay dependencias registradas");
+            toast.error('No hay dependencias registradas');
             return;
         }
         const zipBldgId =
-            buildingFilter === "Sin Edificio"
-                ? "__none__"
-                : buildings.find((b) => b.name === buildingFilter)?.id || "";
+            buildingFilter === 'Sin Edificio'
+                ? '__none__'
+                : buildings.find((b) => b.name === buildingFilter)?.id || '';
         isZipExporting = true;
-        const loadingToast = toast.loading("Preparando ZIP...");
+        const loadingToast = toast.loading('Preparando ZIP...');
         try {
+            const { exportPersonnelAllDependenciesAsZip } = await import('../utils/zipExport');
             await exportPersonnelAllDependenciesAsZip(
                 dependencies,
                 {
@@ -273,23 +337,208 @@
                 exportCardTypes,
                 catalogState.mediaTypes,
             );
-            toast.success("ZIP descargado", { id: loadingToast });
+            toast.success('ZIP descargado', { id: loadingToast });
         } catch (error) {
             toast.dismiss(loadingToast);
-            handleError(error, "Exportar ZIP Personal");
+            handleError(error, 'Exportar ZIP Personal');
         } finally {
             isZipExporting = false;
+        }
+    }
+
+    // ─── Selección múltiple y acciones masivas ───────────────────────────
+    let selectedPeople = $state<any[]>([]);
+
+    $effect(() => pullRefresh.register(() => personnelState.refresh(1)));
+
+    function clearPeopleSelection() {
+        selectedPeople = [];
+    }
+
+    function bulkSetStatus(status: 'blocked' | 'active' | 'inactive') {
+        if (!networkStore.isOnline) {
+            toast.error('Sin conexión: no se puede modificar personal.');
+            return;
+        }
+        const targets = selectedPeople.filter((p) => {
+            if (status === 'blocked') return p.status_raw !== 'blocked';
+            if (status === 'active') return p.status_raw === 'blocked' || p.status_raw === 'inactive';
+            return p.status_raw !== 'inactive'; // inactive
+        });
+        if (targets.length === 0) {
+            toast.info('No hay personas que actualizar en la selección.');
+            return;
+        }
+        const previous = targets.map((p) => ({ id: p.id, status_raw: p.status_raw }));
+        const config = {
+            blocked: {
+                title: `¿Bloquear ${targets.length} persona(s)?`,
+                description: 'Se denegará el acceso a las personas seleccionadas.',
+                variant: 'warning' as const,
+                confirmText: 'Bloquear',
+                message: `${targets.length} persona(s) bloqueada(s)`,
+            },
+            active: {
+                title: `¿Reactivar ${targets.length} persona(s)?`,
+                description: 'Las personas seleccionadas volverán a tener acceso.',
+                variant: 'info' as const,
+                confirmText: 'Reactivar',
+                message: `${targets.length} persona(s) reactivada(s)`,
+            },
+            inactive: {
+                title: `¿Dar de baja ${targets.length} persona(s)?`,
+                description:
+                    'Las personas seleccionadas quedarán en BAJA (reversible). Sus tarjetas se liberan al inventario, se revocan asignaciones y se cancelan tickets pendientes.',
+                variant: 'danger' as const,
+                confirmText: 'Dar de baja',
+                message: `${targets.length} persona(s) dada(s) de baja`,
+            },
+        }[status];
+
+        confirm.open({
+            title: config.title,
+            description: config.description,
+            variant: config.variant,
+            confirmText: config.confirmText,
+            onConfirm: async () => {
+                try {
+                    await Promise.all(targets.map((p) => personnelService.updateStatus(p.id, status)));
+                    toastWithUndo({
+                        message: config.message,
+                        onUndo: async () => {
+                            await Promise.all(
+                                previous.map((p) => personnelService.updateStatus(p.id, p.status_raw)),
+                            );
+                            await personnelState.refresh(1);
+                        },
+                    });
+                    clearPeopleSelection();
+                    await personnelState.refresh(1);
+                } catch (e) {
+                    handleError(e, 'Actualizar estado de personal');
+                }
+            },
+        });
+    }
+
+    function bulkUnassignCards() {
+        if (!networkStore.isOnline) {
+            toast.error('Sin conexión: no se pueden desvincular tarjetas.');
+            return;
+        }
+        const targets = selectedPeople.filter((p) =>
+            (p.cards || []).some((c: any) => c.status !== 'inactive'),
+        );
+        if (targets.length === 0) {
+            toast.info('No hay tarjetas asignadas para desvincular.');
+            return;
+        }
+        const count = targets.reduce(
+            (n, p) => n + (p.cards || []).filter((c: any) => c.status !== 'inactive').length,
+            0,
+        );
+        confirm.open({
+            title: `¿Desvincular ${count} tarjeta(s)?`,
+            description:
+                'Las tarjetas volverán al inventario como disponibles. Las personas permanecen activas.',
+            variant: 'warning',
+            confirmText: 'Desvincular',
+            onConfirm: async () => {
+                try {
+                    for (const p of targets) {
+                        for (const c of p.cards || []) {
+                            if (c.status !== 'inactive') await cardService.unassign(c.id);
+                        }
+                    }
+                    toast.success(`${count} tarjeta(s) desvinculada(s)`);
+                    clearPeopleSelection();
+                    await personnelState.refresh(1);
+                } catch (e) {
+                    handleError(e, 'Desvincular tarjetas');
+                }
+            },
+        });
+    }
+
+    let bulkDeleteState = $state<{ isOpen: boolean; people: any[] }>({
+        isOpen: false,
+        people: [],
+    });
+
+    function openBulkDelete() {
+        if (selectedPeople.length === 0) return;
+        bulkDeleteState = { isOpen: true, people: [...selectedPeople] };
+    }
+
+    async function handleBulkDelete(action: 'keep' | 'delete') {
+        const people = bulkDeleteState.people;
+        if (people.length === 0) return;
+        const results = await Promise.allSettled(
+            people.map((p) => {
+                const cardActionMap: Record<string, 'delete' | 'keep'> = {};
+                for (const c of p.cards || []) cardActionMap[c.id] = action;
+                return personnelService.delete(p.id, cardActionMap);
+            }),
+        );
+        const failed = results.filter((r) => r.status === 'rejected').length;
+        const ok = results.length - failed;
+        if (failed > 0) {
+            toast.error(`${ok} persona(s) eliminada(s), ${failed} con error`);
+        } else {
+            toast.success(`${ok} persona(s) eliminada(s)`);
+        }
+        clearPeopleSelection();
+        await personnelState.refresh(1);
+    }
+
+    async function bulkExportSelected() {
+        const ids = new Set(selectedPeople.map((p) => p.id));
+        if (ids.size === 0) return;
+        const loadingToast = toast.loading('Preparando exportación...');
+        try {
+            const depId = dependencies.find((d) => d.name === dependencyFilter)?.id || '';
+            const bldgId =
+                buildingFilter === 'Sin Edificio'
+                    ? '__none__'
+                    : buildings.find((b) => b.name === buildingFilter)?.id || '';
+            const all = await personnelService.fetchForExport(
+                personnelState.filters.search,
+                personnelState.filters.status,
+                depId,
+                bldgId,
+                floorFilter,
+                personnelState.filters.mediaTypeId,
+            );
+            const selected = all.filter((p) => ids.has(p.id));
+            const { exportPersonnelToExcel } = await import('../utils/xlsxExport');
+            exportPersonnelToExcel(selected as any[], {
+                filters: {
+                    status: personnelState.filters.status,
+                    dependency: dependencyFilter,
+                    building: buildingFilter,
+                    floor: floorFilterLabel,
+                    mediaType: mediaTypeName,
+                    search: personnelState.filters.search,
+                },
+                cardTypes: exportCardTypes,
+                mediaTypes: catalogState.mediaTypes,
+            });
+            toast.success(`Exportación completada (${selected.length})`, {
+                id: loadingToast,
+            });
+        } catch (error) {
+            toast.dismiss(loadingToast);
+            handleError(error, 'Exportar Personal Seleccionado');
         }
     }
 </script>
 
 {#snippet renderName(row: any)}
     {@const hasPendingModification = ticketState.pendingItems?.some(
-        (t: any) =>
-            t.person_id === row.id && t.type === "Modificación de Datos",
+        (t: any) => t.person_id === row.id && t.type === 'Modificación de Datos',
     )}
     <div class="flex items-center gap-2">
-        <span class="font-bold text-slate-900">{row.name}</span>
+        <span class="font-semibold lg:font-bold text-slate-900">{row.name}</span>
         {#if hasPendingModification}
             <Badge
                 variant="amber"
@@ -299,7 +548,8 @@
                 MODIFICACIÓN PENDIENTE
             </Badge>
         {/if}
-    </div>    {/snippet}
+    </div>
+{/snippet}
 
 {#snippet renderStatus(row: any)}
     <div class="flex items-center gap-2">
@@ -319,69 +569,68 @@
 {#snippet renderCards(row: any)}
     <div class="flex flex-wrap gap-1">
         {#each row.cards || [] as card}
-            <Badge
-                variant={mediaTypeVariant(card.type)}
-                class="px-1.5 py-0"
-            >
+            <Badge variant={mediaTypeVariant(card.type)} class="px-1.5 py-0">
                 {card.type}
             </Badge>
         {/each}
     </div>
 {/snippet}
 
-{#snippet mobilePersonnelCard(row: any)}
-    <article
-        class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+{#snippet mobileList(rows: any[])}
+    <DataList
+        items={rows}
+        key={(r: any) => r.id}
+        selectable={userState.isAdmin}
+        bind:selectedRows={selectedPeople}
+        onOpen={onOpenDetails}
+        actions={personActionsFor}
     >
-        <div class="p-4 space-y-3">
-            <div class="flex justify-between items-start">
-                {@render renderName(row)}
-                {@render renderStatus(row)}
-            </div>
-            <div class="text-sm text-slate-500">ID: {row.employee_no}</div>
-            {@render renderDependency(row)}
-            <div>
-                <div
-                    class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1"
-                >
-                    Tarjetas
-                </div>
-                {@render renderCards(row)}
-            </div>
-        </div>
-        <div
-            class="px-4 py-3 bg-slate-50/50 border-t border-slate-100 flex justify-end"
-        >
-            <Button
-                variant="soft-blue"
-                size="sm"
-                class="h-9 px-4 rounded-xl"
-                onclick={() => onOpenDetails(row)}
+        {#snippet leading(r: any)}
+            <div
+                class="h-8 w-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-[10px] font-bold"
             >
-                Ver detalles
-            </Button>
-        </div>
-    </article>
+                {(r.name || '?')
+                    .split(' ')
+                    .map((w: string) => w[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase()}
+            </div>
+        {/snippet}
+        {#snippet title(r: any)}
+            {@render renderName(r)}
+        {/snippet}
+        {#snippet subtitle(r: any)}
+            <span>{r.employee_no} · {r.dependency}</span>
+        {/snippet}
+        {#snippet trailing(r: any)}
+            {@render renderStatus(r)}
+        {/snippet}
+    </DataList>
 {/snippet}
 
-<div class="space-y-6">
-    <SectionHeader title="Directorio de Personal">
+<div class="space-y-4">
+    <SectionHeader
+        title="Directorio de Personal"
+        filtersCount={personnelChips.length}
+        onClearFilters={clearPersonnelFilters}
+    >
         {#snippet filters()}
             <FilterToolbar chips={personnelChips} onClearAll={clearPersonnelFilters}>
                 {#snippet primary()}
                     <FilterSelect
                         label="Estado"
                         options={[
-                            "Todos",
-                            "Activo/a",
-                            "No Activos",
-                            "Parcial",
-                            "En proceso",
-                            "Media de otro edificio",
-                            "Otro edificio en proceso",
-                            "Sin Acceso",
-                            "Bloqueado/a",
-                            "Baja",
+                            'Todos',
+                            'Activo/a',
+                            'No Activos',
+                            'Parcial',
+                            'En proceso',
+                            'Media de otro edificio',
+                            'Otro edificio en proceso',
+                            'Sin Acceso',
+                            'Bloqueado/a',
+                            'Baja',
                         ]}
                         bind:value={personnelState.filters.status}
                     />
@@ -392,7 +641,10 @@
                         bind:value={buildingFilter}
                     />
                     <div class="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-[200px] w-full">
-                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
+                        <span
+                            class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap"
+                            >Buscar</span
+                        >
                         <SearchInput
                             placeholder="Nombre, No. Empleado..."
                             bind:value={personnelState.filters.search}
@@ -426,7 +678,7 @@
         {/snippet}
 
         {#snippet actions()}
-            {#if moduleState.isEnabled("conteo_uso")}
+            {#if moduleState.isEnabled('conteo_uso')}
                 <PermissionGuard requireEdit>
                     <Button
                         variant="soft-blue"
@@ -434,11 +686,7 @@
                         class="flex items-center gap-2.5 h-11 sm:h-10 px-5"
                         disabled={!networkStore.isOnline}
                     >
-                        <Upload
-                            size={18}
-                            strokeWidth={2.5}
-                            class="text-blue-600/80"
-                        />
+                        <Upload size={18} strokeWidth={2.5} class="text-blue-600/80" />
                         Importar Conteo de Uso
                     </Button>
                 </PermissionGuard>
@@ -484,13 +732,17 @@
                             {#each mediaTypeNames as t}
                                 <button
                                     type="button"
-                                    class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[12px] font-bold transition-colors {exportCardTypes.includes(t)
+                                    class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[12px] font-bold transition-colors {exportCardTypes.includes(
+                                        t,
+                                    )
                                         ? 'bg-slate-50 text-slate-800'
                                         : 'text-slate-400 hover:text-slate-600'}"
                                     onclick={() => toggleExportCardType(t)}
                                 >
                                     <span
-                                        class="w-4 h-4 rounded flex items-center justify-center border transition-colors {exportCardTypes.includes(t)
+                                        class="w-4 h-4 rounded flex items-center justify-center border transition-colors {exportCardTypes.includes(
+                                            t,
+                                        )
                                             ? 'bg-blue-600 border-blue-600 text-white'
                                             : 'border-slate-300 text-transparent'}"
                                     >
@@ -533,9 +785,75 @@
 
     <!-- Top Pagination removed per request -->
 
+    {#if userState.isAdmin && selectedPeople.length > 0}
+        <div
+            class="flex flex-wrap items-center gap-3 p-3 rounded-2xl border border-blue-200 bg-blue-50/95 backdrop-blur max-lg:fixed max-lg:inset-x-3 max-lg:bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] max-lg:z-40 max-lg:shadow-2xl"
+        >
+            <span class="text-sm font-extrabold text-blue-800">
+                {selectedPeople.length} persona(s) seleccionada(s)
+            </span>
+            <div class="flex flex-wrap items-center gap-2 ml-auto">
+                <Button variant="soft-slate" size="sm" onclick={clearPeopleSelection}>Limpiar</Button>
+                <PermissionGuard requireEdit>
+                    <Button
+                        variant="amber"
+                        size="sm"
+                        disabled={!networkStore.isOnline}
+                        onclick={() => bulkSetStatus('blocked')}
+                    >
+                        Bloquear
+                    </Button>
+                    <Button
+                        variant="soft-emerald"
+                        size="sm"
+                        disabled={!networkStore.isOnline}
+                        onclick={() => bulkSetStatus('active')}
+                    >
+                        Reactivar
+                    </Button>
+                    <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={!networkStore.isOnline}
+                        onclick={() => bulkSetStatus('inactive')}
+                    >
+                        Dar de baja
+                    </Button>
+                    <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={!networkStore.isOnline}
+                        onclick={openBulkDelete}
+                    >
+                        Eliminar
+                    </Button>
+                    <Button
+                        variant="soft-slate"
+                        size="sm"
+                        disabled={!networkStore.isOnline}
+                        onclick={bulkUnassignCards}
+                    >
+                        Desvincular tarjetas
+                    </Button>
+                </PermissionGuard>
+                <Button
+                    variant="soft-blue"
+                    size="sm"
+                    disabled={!networkStore.isOnline}
+                    onclick={bulkExportSelected}
+                >
+                    <FileSpreadsheet size={15} class="mr-1.5" />
+                    Exportar selección
+                </Button>
+            </div>
+        </div>
+    {/if}
+
     <ContentView
         isLoading={personnelState.pagination.isLoading}
         data={personnel}
+        error={personnelState.pagination.error}
+        onRetry={() => personnelState.refresh(1)}
         emptyTitle="Aún no hay personal registrado"
         emptyDescription="Comienza registrando la primera persona en el sistema."
         emptyIcon={Users}
@@ -551,33 +869,35 @@
                 actionsWidth="130px"
                 columns={[
                     {
-                        key: "name",
-                        label: "Nombre completo",
+                        key: 'name',
+                        label: 'Nombre completo',
                         render: renderName,
-                        width: "220px",
+                        width: '220px',
                     },
-                    { key: "employee_no", label: "No. Empleado", width: "100px" },
+                    { key: 'employee_no', label: 'No. Empleado', width: '100px' },
                     {
-                        key: "dependency",
-                        label: "Dependencia / Edificio",
+                        key: 'dependency',
+                        label: 'Dependencia / Edificio',
                         render: renderDependency,
-                        width: "250px",
+                        width: '250px',
                     },
                     {
-                        key: "cards",
-                        label: "Tarjetas",
+                        key: 'cards',
+                        label: 'Tarjetas',
                         render: renderCards,
                         sortable: false,
-                        width: "140px",
+                        width: '140px',
                     },
                     {
-                        key: "status",
-                        label: "Estado",
+                        key: 'status',
+                        label: 'Estado',
                         render: renderStatus,
-                        width: "120px",
+                        width: '120px',
                     },
                 ]}
-                mobileCard={mobilePersonnelCard}
+                {mobileList}
+                selectable={userState.isAdmin}
+                bind:selectedRows={selectedPeople}
             >
                 {#snippet actions(row: any)}
                     <Button
@@ -611,3 +931,10 @@
 <UsoTarjetasImportModal bind:isOpen={showKoneUsageModal} />
 
 <RegistrosImportModal bind:isOpen={showRegistrosImport} onComplete={() => personnelState.refresh(1)} />
+
+<BulkDeletePersonnelModal
+    bind:isOpen={bulkDeleteState.isOpen}
+    people={bulkDeleteState.people}
+    onConfirm={handleBulkDelete}
+    onCancel={() => (bulkDeleteState = { ...bulkDeleteState, people: [] })}
+/>

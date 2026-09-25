@@ -1,5 +1,5 @@
-import { supabase } from "../supabase";
-import { BUILT_MODULES } from "../modules/generated";
+import { supabase } from '../supabase';
+import { BUILT_MODULES } from '../modules/generated';
 
 /**
  * ModuleState — Estado de módulos de la plataforma (conteo de uso, registro sin
@@ -20,8 +20,8 @@ export type ModuleConfig = {
 export type ModuleId = (typeof BUILT_MODULES)[number];
 
 const DEFAULTS: Record<string, ModuleConfig> = {
-    conteo_uso: { mediaKey: "kone", usageThreshold: 10 },
-    registro_sin_tarjeta: { mediaKey: "kone" },
+    conteo_uso: { mediaKey: 'kone', usageThreshold: 10 },
+    registro_sin_tarjeta: { mediaKey: 'kone' },
 };
 
 export class ModuleState {
@@ -49,9 +49,9 @@ export class ModuleState {
         if (this.#loaded) return;
         try {
             const { data, error } = await supabase
-                .from("app_settings")
-                .select("value")
-                .eq("key", "modules")
+                .from('app_settings')
+                .select('value')
+                .eq('key', 'modules')
                 .maybeSingle();
             if (error) throw error;
             const parsed = data?.value as Record<string, ModuleConfig> | null;
@@ -67,16 +67,16 @@ export class ModuleState {
         const next = { ...(this.state[id] ?? DEFAULTS[id] ?? {}), ...patch };
         this.state = { ...this.state, [id]: next };
         const { error } = await supabase
-            .from("app_settings")
-            .upsert({ key: "modules", value: this.state }, { onConflict: "key" });
+            .from('app_settings')
+            .upsert({ key: 'modules', value: this.state }, { onConflict: 'key' });
         if (error) throw error;
     }
 
     async reset() {
         this.state = {};
         const { error } = await supabase
-            .from("app_settings")
-            .upsert({ key: "modules", value: this.state }, { onConflict: "key" });
+            .from('app_settings')
+            .upsert({ key: 'modules', value: this.state }, { onConflict: 'key' });
         if (error) throw error;
     }
 }

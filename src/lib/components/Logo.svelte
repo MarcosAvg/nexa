@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Hexagon } from "lucide-svelte";
+    import { Hexagon } from 'lucide-svelte';
 
     /**
      * Logo — Logotipo Nexa (hexágono + texto).
@@ -7,7 +7,7 @@
      * @example
      * <Logo showText={true} class="scale-110" />
      */
-    let { class: className = "", showText = true } = $props();
+    let { class: className = '', showText = true } = $props();
 </script>
 
 <div class="flex items-center gap-3 {className}">
@@ -17,8 +17,6 @@
         <Hexagon size={20} strokeWidth={2.5} class="drop-shadow-sm" />
     </div>
     {#if showText}
-        <span class="text-xl font-extrabold tracking-tighter text-white"
-            >Nexa</span
-        >
+        <span class="text-xl font-extrabold tracking-tighter text-white">Nexa</span>
     {/if}
 </div>

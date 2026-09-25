@@ -1,4 +1,24 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+/* ─── Design tokens ─────────────────────────────────────────────────────
+ * Fuente única de verdad para color primario, radios, sombras y tipografía.
+ * Generan utilidades Tailwind (p. ej. bg-primary, rounded-card, shadow-overlay).
+ */
+@theme {
+    --color-primary: #0f172a;
+    --color-primary-hover: #020617;
+    --color-primary-foreground: #ffffff;
+
+    --radius-control: 0.75rem; /* rounded-xl  */
+    --radius-card: 1rem; /* rounded-2xl */
+    --radius-overlay: 1.5rem; /* 24px        */
+
+    --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+    --shadow-overlay: 0 20px 50px rgb(15 23 42 / 0.15);
+
+    --text-2xs: 0.625rem; /* 10px */
+    --text-2xs--line-height: 0.875rem;
+}
 
 @layer base {
     html,
@@ -21,11 +41,20 @@
             font-size: 16px;
         }
     }
+
+    /* Con el teclado abierto, oculta la navegación inferior para dar espacio. */
+    body.keyboard-open [data-bottom-nav] {
+        display: none;
+    }
 }
 
 @keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
 }
 
 .animate-shimmer {
@@ -42,4 +71,51 @@
     display: none;
     width: 0;
     height: 0;
+}
+
+/* ─── Animaciones de entrada ────────────────────────────────────────────
+ * Reemplazan las clases `animate-in`, `fade-in`, `zoom-in-*` y
+ * `slide-in-from-*` que antes eran no-ops (no había plugin de animate).
+ * Usan variables CSS para poder combinar (p. ej. fade + slide).
+ */
+@keyframes enter {
+    from {
+        opacity: var(--tw-enter-opacity, 1);
+        transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
+            scale(var(--tw-enter-scale, 1));
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@layer utilities {
+    @media (prefers-reduced-motion: no-preference) {
+        .animate-in {
+            animation: enter 200ms both cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .fade-in {
+            --tw-enter-opacity: 0;
+        }
+
+        .zoom-in-95 {
+            --tw-enter-scale: 0.95;
+        }
+
+        .slide-in-from-top-2,
+        .slide-in-from-top-4,
+        .slide-in-from-top {
+            --tw-enter-translate-y: -0.5rem;
+        }
+
+        .slide-in-from-bottom-2 {
+            --tw-enter-translate-y: 0.5rem;
+        }
+
+        .slide-in-from-left-2 {
+            --tw-enter-translate-x: -0.5rem;
+        }
+    }
 }

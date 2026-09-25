@@ -18,8 +18,8 @@
  * (catálogo de medios), no de un umbral global.
  */
 
-import { settingsState } from "../stores/settings.svelte";
-import { catalogState } from "../stores/catalogs.svelte";
+import { settingsState } from '../stores/settings.svelte';
+import { catalogState } from '../stores/catalogs.svelte';
 
 export interface StatusCardInput {
     type: string;
@@ -31,10 +31,9 @@ export interface StatusCardInput {
 
 function isReady(c: StatusCardInput): boolean {
     return (
-        c.status === "active" &&
-        c.programming_status === "done" &&
-        (c.responsiva_status === "signed" ||
-            c.responsiva_status === "legacy")
+        c.status === 'active' &&
+        c.programming_status === 'done' &&
+        (c.responsiva_status === 'signed' || c.responsiva_status === 'legacy')
     );
 }
 
@@ -43,10 +42,10 @@ export function computePersonStatus(
     allCards: StatusCardInput[],
     buildingId?: string | number | null,
 ): string {
-    if (dbStatus === "blocked") return "Bloqueado/a";
-    if (dbStatus !== "active") return "Baja";
+    if (dbStatus === 'blocked') return 'Bloqueado/a';
+    if (dbStatus !== 'active') return 'Baja';
 
-    if (buildingId != null && buildingId !== "") {
+    if (buildingId != null && buildingId !== '') {
         // Medio requerido por el edificio de radicación (desde el catálogo).
         const reqNames = new Set<string>(
             catalogState.mediaTypes
@@ -66,48 +65,41 @@ export function computePersonStatus(
             allCards.filter((c) => reqNames.has(c.type) && isReady(c)).map((c) => c.type),
         );
         const hasAnyCard = allCards.length > 0;
-        const hasOtherReady = allCards.some(
-            (c) => !reqNames.has(c.type) && isReady(c),
-        );
+        const hasOtherReady = allCards.some((c) => !reqNames.has(c.type) && isReady(c));
 
         if (reqNames.size === 0) {
-            if (!hasAnyCard) return "Sin Acceso";
-            if (hasOtherReady) return "Media de otro edificio";
-            return "Otro edificio en proceso";
+            if (!hasAnyCard) return 'Sin Acceso';
+            if (hasOtherReady) return 'Media de otro edificio';
+            return 'Otro edificio en proceso';
         }
 
-        if (readyRequired.size >= reqNames.size) return "Activo/a";
-        if (readyRequired.size > 0) return "Parcial";
-        if (hasRequiredCard) return "En proceso";
-        if (hasOtherReady) return "Media de otro edificio";
-        if (hasAnyCard) return "Otro edificio en proceso";
-        return "Sin Acceso";
+        if (readyRequired.size >= reqNames.size) return 'Activo/a';
+        if (readyRequired.size > 0) return 'Parcial';
+        if (hasRequiredCard) return 'En proceso';
+        if (hasOtherReady) return 'Media de otro edificio';
+        if (hasAnyCard) return 'Otro edificio en proceso';
+        return 'Sin Acceso';
     }
 
     // Respaldo (sin edificio): comportamiento anterior con el umbral global.
     const coreRequired = settingsState.coreTypesRequired || 2;
-    const activeCards = allCards.filter((c) => c.status === "active");
+    const activeCards = allCards.filter((c) => c.status === 'active');
     const readyCards = activeCards.filter(
         (c) =>
-            c.programming_status === "done" &&
-            (c.responsiva_status === "signed" ||
-                c.responsiva_status === "legacy"),
+            c.programming_status === 'done' &&
+            (c.responsiva_status === 'signed' || c.responsiva_status === 'legacy'),
     );
 
-    const coreReadyTypes = new Set(
-        readyCards.filter((c) => c.has_floors).map((c) => c.type),
-    );
+    const coreReadyTypes = new Set(readyCards.filter((c) => c.has_floors).map((c) => c.type));
 
     const hasCoreCards = allCards.some((c) => c.has_floors);
-    const hasActiveNonCore = allCards.some(
-        (c) => !c.has_floors && c.status === "active",
-    );
+    const hasActiveNonCore = allCards.some((c) => !c.has_floors && c.status === 'active');
 
-    if (dbStatus === "active") {
-        if (coreReadyTypes.size >= coreRequired) return "Activo/a";
-        if (coreReadyTypes.size > 0) return "Parcial";
-        if (!hasCoreCards && hasActiveNonCore) return "Activo/a";
-        return "Sin Acceso";
+    if (dbStatus === 'active') {
+        if (coreReadyTypes.size >= coreRequired) return 'Activo/a';
+        if (coreReadyTypes.size > 0) return 'Parcial';
+        if (!hasCoreCards && hasActiveNonCore) return 'Activo/a';
+        return 'Sin Acceso';
     }
-    return "Baja";
+    return 'Baja';
 }

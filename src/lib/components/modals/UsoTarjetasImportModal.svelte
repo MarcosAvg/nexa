@@ -1,9 +1,9 @@
 <script lang="ts">
-    import Modal from "../Modal.svelte";
-    import Button from "../Button.svelte";
-    import Badge from "../Badge.svelte";
-    import { toast } from "svelte-sonner";
-    import { handleError, parseUsageFile, matchUsageToPersonnel, findDuplicateFolios, getDuplicateFoliosSummary, exportUsageToExcel, exportUsageAllDependenciesAsZip, capitalize } from "../../utils";
+    import Modal from '../Modal.svelte';
+    import Button from '../Button.svelte';
+    import Badge from '../Badge.svelte';
+    import { toast } from 'svelte-sonner';
+    import { handleError, capitalize } from '../../utils';
     import {
         Upload,
         FileSpreadsheet,
@@ -14,9 +14,9 @@
         AlertTriangle,
         FolderArchive,
         ChevronDown,
-    } from "lucide-svelte";
-    import type { UsageMatchResult, DuplicateFolioInfo } from "../../utils";
-    import { moduleState, catalogState } from "../../stores";
+    } from 'lucide-svelte';
+    import type { UsageMatchResult, DuplicateFolioInfo } from '../../utils';
+    import { moduleState, catalogState } from '../../stores';
 
     type Props = {
         isOpen: boolean;
@@ -31,20 +31,18 @@
     let { isOpen = $bindable() }: Props = $props();
 
     // Medio configurado para el módulo "conteo_uso" (agnóstico al tipo).
-    let mediaKey = $derived(moduleState.config("conteo_uso").mediaKey || "kone");
+    let mediaKey = $derived(moduleState.config('conteo_uso').mediaKey || 'kone');
     // Label real del medio desde el catálogo (cae a la key capitalizada si no se encuentra).
     let mediaLabel = $derived.by(() => {
         const found = catalogState.mediaTypes.find((m) => m.key === mediaKey);
-        return found?.name || (mediaKey ? capitalize(mediaKey) : "tarjetas");
+        return found?.name || (mediaKey ? capitalize(mediaKey) : 'tarjetas');
     });
     // ¿El mediaKey configurado está inactivo en el catálogo?
     let mediaActive = $derived(
-        !catalogState.mediaTypes.some(
-            (m) => m.key === mediaKey && (m as any).active === false,
-        ),
+        !catalogState.mediaTypes.some((m) => m.key === mediaKey && (m as any).active === false),
     );
 
-    let step = $state<"idle" | "parsing" | "matching" | "results">("idle");
+    let step = $state<'idle' | 'parsing' | 'matching' | 'results'>('idle');
     let matchResult = $state<UsageMatchResult | null>(null);
     let rawEntries = $state<any[]>([]);
     let totalRowsRaw = $state(0);
@@ -55,19 +53,19 @@
     let showExportMenu = $state(false);
     // Umbral: se sincroniza desde la config del módulo hasta que el usuario lo edite.
     let thresholdOverridden = $state(false);
-    let usageThreshold = $state(moduleState.config("conteo_uso").usageThreshold ?? 10);
+    let usageThreshold = $state(moduleState.config('conteo_uso').usageThreshold ?? 10);
     $effect(() => {
         if (!thresholdOverridden) {
-            usageThreshold = moduleState.config("conteo_uso").usageThreshold ?? 10;
+            usageThreshold = moduleState.config('conteo_uso').usageThreshold ?? 10;
         }
     });
-    let creationLimitDate = $state<string>("");
-    let inactivityLimitDate = $state<string>("");
+    let creationLimitDate = $state<string>('');
+    let inactivityLimitDate = $state<string>('');
     let fileInput = $state<HTMLInputElement>();
     let selectedDependency = $state<string>('');
 
     function reset() {
-        step = "idle";
+        step = 'idle';
         matchResult = null;
         rawEntries = [];
         totalRowsRaw = 0;
@@ -91,29 +89,27 @@
 
         if (!mediaActive) {
             toast.error(
-                "El medio configurado para el conteo de uso ya no está activo. Revise la configuración del módulo.",
+                'El medio configurado para el conteo de uso ya no está activo. Revise la configuración del módulo.',
             );
-            if (input) input.value = "";
+            if (input) input.value = '';
             return;
         }
 
-        step = "parsing";
+        step = 'parsing';
         try {
-            const { entries, totalRows } = await parseUsageFile(
-                file,
-                creationLimitDate,
-                inactivityLimitDate,
-            );
+            const { parseUsageFile, matchUsageToPersonnel, findDuplicateFolios } =
+                await import('../../utils/xlsxUsage');
+            const { entries, totalRows } = await parseUsageFile(file, creationLimitDate, inactivityLimitDate);
             totalRowsRaw = totalRows;
 
             if (entries.length === 0) {
                 rawEntries = [];
                 duplicates = [];
                 toast.error(
-                    "No se encontraron datos de folio y conteo en el archivo. Verifique las columnas " +
-                        "(Folio, Conteo) y que estén llenas.",
+                    'No se encontraron datos de folio y conteo en el archivo. Verifique las columnas ' +
+                        '(Folio, Conteo) y que estén llenas.',
                 );
-                step = "idle";
+                step = 'idle';
                 return;
             }
 
@@ -122,17 +118,17 @@
             rawEntries = entries;
             duplicates = foundDuplicates;
 
-            step = "matching";
+            step = 'matching';
             const result = await matchUsageToPersonnel(entries, mediaKey);
             matchResult = result;
-            step = "results";
+            step = 'results';
         } catch (err) {
-            handleError(err, "Importar Conteo de uso");
-            step = "idle";
+            handleError(err, 'Importar Conteo de uso');
+            step = 'idle';
         }
 
         // Reiniciar input de archivo para re-subida
-        if (input) input.value = "";
+        if (input) input.value = '';
     }
 
     async function handleExport() {
@@ -140,10 +136,17 @@
         showExportMenu = false;
         isExporting = true;
         try {
-            await exportUsageToExcel(filteredResult, usageThreshold, selectedDependency || undefined, undefined, mediaLabel);
-            toast.success("Exportación completada");
+            const { exportUsageToExcel } = await import('../../utils/xlsxExport');
+            await exportUsageToExcel(
+                filteredResult,
+                usageThreshold,
+                selectedDependency || undefined,
+                undefined,
+                mediaLabel,
+            );
+            toast.success('Exportación completada');
         } catch (err) {
-            handleError(err, "Exportar Conteo de uso");
+            handleError(err, 'Exportar Conteo de uso');
         } finally {
             isExporting = false;
         }
@@ -153,8 +156,9 @@
         if (!matchResult) return;
         showExportMenu = false;
         isZipExporting = true;
-        const loadingToast = toast.loading("Preparando ZIP...");
+        const loadingToast = toast.loading('Preparando ZIP...');
         try {
+            const { exportUsageAllDependenciesAsZip } = await import('../../utils/zipExport');
             await exportUsageAllDependenciesAsZip(
                 matchResult,
                 usageThreshold,
@@ -163,10 +167,10 @@
                 },
                 mediaLabel,
             );
-            toast.success("ZIP descargado", { id: loadingToast });
+            toast.success('ZIP descargado', { id: loadingToast });
         } catch (err) {
             toast.dismiss(loadingToast);
-            handleError(err, "Exportar ZIP Conteo de uso");
+            handleError(err, 'Exportar ZIP Conteo de uso');
         } finally {
             isZipExporting = false;
         }
@@ -175,7 +179,7 @@
     // Dependencias únicas derivadas de resultados coincidentes
     let availableDependencies = $derived.by(() => {
         if (!matchResult) return [];
-        const deps = new Set(matchResult.matched.map(m => m.person.dependency || 'Sin Dependencia'));
+        const deps = new Set(matchResult.matched.map((m) => m.person.dependency || 'Sin Dependencia'));
         return Array.from(deps).sort();
     });
 
@@ -185,7 +189,7 @@
         if (!selectedDependency) return matchResult;
 
         const filteredMatched = matchResult.matched.filter(
-            m => (m.person.dependency || 'Sin Dependencia') === selectedDependency
+            (m) => (m.person.dependency || 'Sin Dependencia') === selectedDependency,
         );
         return {
             matched: filteredMatched,
@@ -197,34 +201,21 @@
     // Estadísticas derivadas (usa datos filtrados)
     let stats = $derived.by(() => {
         if (!filteredResult) return null;
-        const totalUsos = filteredResult.matched.reduce(
-            (sum, m) => sum + m.conteo,
-            0,
-        );
+        const totalUsos = filteredResult.matched.reduce((sum, m) => sum + m.conteo, 0);
         const promedio =
-            filteredResult.matched.length > 0
-                ? (totalUsos / filteredResult.matched.length).toFixed(1)
-                : "0";
+            filteredResult.matched.length > 0 ? (totalUsos / filteredResult.matched.length).toFixed(1) : '0';
         return {
             totalImported: filteredResult.totalImported,
             found: filteredResult.matched.length,
             notFound: filteredResult.unmatched.length,
             pctMatch:
                 matchResult && matchResult.totalImported > 0
-                    ? (
-                          (matchResult.matched.length /
-                              matchResult.totalImported) *
-                          100
-                      ).toFixed(1)
-                    : "0",
+                    ? ((matchResult.matched.length / matchResult.totalImported) * 100).toFixed(1)
+                    : '0',
             pctFiltered:
                 matchResult && matchResult.totalImported > 0
-                    ? (
-                          (filteredResult.matched.length /
-                              matchResult.totalImported) *
-                          100
-                      ).toFixed(1)
-                    : "0",
+                    ? ((filteredResult.matched.length / matchResult.totalImported) * 100).toFixed(1)
+                    : '0',
             totalUsos,
             promedio,
         };
@@ -240,64 +231,46 @@
 >
     <div class="space-y-5">
         <!-- ── STEP: IDLE ── -->
-        {#if step === "idle"}
+        {#if step === 'idle'}
             <div
                 class="flex flex-col items-center justify-center gap-4 py-8 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50"
             >
-                <div
-                    class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full px-8 pb-2"
-                >
-                    <div
-                        class="text-left bg-white p-3 rounded-lg border border-slate-200 shadow-sm"
-                    >
-                        <label
-                            class="block text-xs font-bold text-slate-700 mb-1"
-                            for="usage-inactivity-date"
-                        >Inactividad (Fecha Límite)</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full px-8 pb-2">
+                    <div class="text-left bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                        <label class="block text-xs font-bold text-slate-700 mb-1" for="usage-inactivity-date"
+                            >Inactividad (Fecha Límite)</label
+                        >
                         <input
                             id="usage-inactivity-date"
                             type="date"
                             bind:value={inactivityLimitDate}
-                            class="w-full h-9 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 text-sm outline-none bg-slate-50"
+                            class="w-full h-9 px-3 border border-slate-200 rounded-lg focus-visible:ring-2 focus-visible:ring-sky-500 text-sm outline-none bg-slate-50"
                         />
-                        <p
-                            class="text-[10px] text-slate-500 mt-1.5 leading-tight"
-                        >
-                            Días de inactividad respecto al último registro de
-                            uso. Opcional.
+                        <p class="text-[10px] text-slate-500 mt-1.5 leading-tight">
+                            Días de inactividad respecto al último registro de uso. Opcional.
                         </p>
                     </div>
-                    <div
-                        class="text-left bg-white p-3 rounded-lg border border-slate-200 shadow-sm"
-                    >
-                        <label
-                            class="block text-xs font-bold text-slate-700 mb-1"
-                            for="usage-creation-date"
-                        >Cortesía (Límite Creación)</label>
+                    <div class="text-left bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                        <label class="block text-xs font-bold text-slate-700 mb-1" for="usage-creation-date"
+                            >Cortesía (Límite Creación)</label
+                        >
                         <input
                             id="usage-creation-date"
                             type="date"
                             bind:value={creationLimitDate}
-                            class="w-full h-9 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 text-sm outline-none bg-slate-50"
+                            class="w-full h-9 px-3 border border-slate-200 rounded-lg focus-visible:ring-2 focus-visible:ring-sky-500 text-sm outline-none bg-slate-50"
                         />
-                        <p
-                            class="text-[10px] text-slate-500 mt-1.5 leading-tight"
-                        >
-                            Ignorar tarjetas creadas/modificadas después de esta
-                            fecha. Opcional.
+                        <p class="text-[10px] text-slate-500 mt-1.5 leading-tight">
+                            Ignorar tarjetas creadas/modificadas después de esta fecha. Opcional.
                         </p>
                     </div>
                 </div>
 
-                <div
-                    class="w-16 h-16 rounded-2xl bg-sky-50 flex items-center justify-center"
-                >
+                <div class="w-16 h-16 rounded-2xl bg-sky-50 flex items-center justify-center">
                     <Upload size={28} class="text-sky-500" />
                 </div>
                 <div class="text-center">
-                    <p class="text-sm font-bold text-slate-700">
-                        Seleccione el archivo de conteo
-                    </p>
+                    <p class="text-sm font-bold text-slate-700">Seleccione el archivo de conteo</p>
                     <p class="text-xs text-slate-400 mt-1">
                         El archivo debe contener columnas <strong>Folio</strong>
                         y <strong>Conteo</strong> (.xlsx)
@@ -309,7 +282,7 @@
                     onclick={() => {
                         if (!mediaActive) {
                             toast.error(
-                                "El medio configurado para el conteo de uso ya no está activo. Revise la configuración del módulo.",
+                                'El medio configurado para el conteo de uso ya no está activo. Revise la configuración del módulo.',
                             );
                             return;
                         }
@@ -330,43 +303,33 @@
         {/if}
 
         <!-- ── STEP: PARSING / MATCHING ── -->
-        {#if step === "parsing" || step === "matching"}
-            <div
-                class="flex flex-col items-center justify-center gap-4 py-14 rounded-xl bg-slate-50"
-            >
+        {#if step === 'parsing' || step === 'matching'}
+            <div class="flex flex-col items-center justify-center gap-4 py-14 rounded-xl bg-slate-50">
                 <div class="animate-spin">
                     <Loader2 size={32} class="text-sky-500" />
                 </div>
                 <div class="text-center">
                     <p class="text-sm font-bold text-slate-700">
-                        {step === "parsing"
-                            ? "Leyendo archivo..."
-                            : "Buscando coincidencias en la base de datos..."}
+                        {step === 'parsing'
+                            ? 'Leyendo archivo...'
+                            : 'Buscando coincidencias en la base de datos...'}
                     </p>
-                    <p class="text-xs text-slate-400 mt-1">
-                        Esto puede tardar unos segundos
-                    </p>
+                    <p class="text-xs text-slate-400 mt-1">Esto puede tardar unos segundos</p>
                 </div>
             </div>
         {/if}
- 
+
         <!-- ── STEP: RESULTS ── -->
-        {#if step === "results" && stats}
+        {#if step === 'results' && stats}
             <!-- KPI Cards -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div
-                    class="rounded-xl p-4 bg-slate-50 border border-slate-200 text-center"
-                >
+                <div class="rounded-xl p-4 bg-slate-50 border border-slate-200 text-center">
                     <p class="text-2xl font-bold text-slate-800">
                         {stats.totalImported}
                     </p>
-                    <p class="text-xs font-medium text-slate-400 mt-1">
-                        Folios importados (Total)
-                    </p>
+                    <p class="text-xs font-medium text-slate-400 mt-1">Folios importados (Total)</p>
                 </div>
-                <div
-                    class="rounded-xl p-4 bg-emerald-50 border border-emerald-200 text-center"
-                >
+                <div class="rounded-xl p-4 bg-emerald-50 border border-emerald-200 text-center">
                     <p class="text-2xl font-bold text-emerald-600">
                         {stats.found}
                     </p>
@@ -379,11 +342,7 @@
                         ? 'bg-rose-50 border-rose-200'
                         : 'bg-slate-50 border-slate-200'} border text-center"
                 >
-                    <p
-                        class="text-2xl font-bold {stats.notFound > 0
-                            ? 'text-rose-600'
-                            : 'text-slate-400'}"
-                    >
+                    <p class="text-2xl font-bold {stats.notFound > 0 ? 'text-rose-600' : 'text-slate-400'}">
                         {stats.notFound}
                     </p>
                     <p
@@ -394,15 +353,11 @@
                         No encontrados (Global)
                     </p>
                 </div>
-                <div
-                    class="rounded-xl p-4 bg-sky-50 border border-sky-200 text-center"
-                >
+                <div class="rounded-xl p-4 bg-sky-50 border border-sky-200 text-center">
                     <p class="text-2xl font-bold text-sky-600">
                         {stats.pctMatch}%
                     </p>
-                    <p class="text-xs font-medium text-sky-500 mt-1">
-                        Coincidencia Global
-                    </p>
+                    <p class="text-xs font-medium text-sky-500 mt-1">Coincidencia Global</p>
                     {#if selectedDependency}
                         <p class="text-[9px] font-medium text-sky-400 mt-0.5">
                             Filtro: {stats.pctFiltered}% del total
@@ -410,45 +365,40 @@
                     {/if}
                 </div>
             </div>
- 
+
             <!-- Usage summary -->
-            <div
-                class="flex items-center gap-4 p-4 rounded-xl bg-sky-50/50 border border-sky-100"
-            >
+            <div class="flex items-center gap-4 p-4 rounded-xl bg-sky-50/50 border border-sky-100">
                 <div class="flex-1 text-center">
                     <p class="text-lg font-bold text-sky-700">
                         {stats.totalUsos.toLocaleString()}
                     </p>
-                    <p class="text-[11px] font-medium text-sky-500">
-                        Total de usos
-                    </p>
+                    <p class="text-[11px] font-medium text-sky-500">Total de usos</p>
                 </div>
-                <div
-                    class="w-px h-8 bg-sky-200"
-                    role="separator"
-                    aria-hidden="true"
-                ></div>
+                <div class="w-px h-8 bg-sky-200" role="separator" aria-hidden="true"></div>
                 <div class="flex-1 text-center">
                     <p class="text-lg font-bold text-sky-700">
                         {stats.promedio}
                     </p>
-                    <p class="text-[11px] font-medium text-sky-500">
-                        Promedio por persona
-                    </p>
+                    <p class="text-[11px] font-medium text-sky-500">Promedio por persona</p>
                 </div>
             </div>
 
             <!-- Active Filter Banner -->
             {#if selectedDependency}
-                <div class="flex items-center gap-2.5 p-3.5 rounded-xl bg-sky-50/60 border border-sky-100 text-sky-800 text-xs">
+                <div
+                    class="flex items-center gap-2.5 p-3.5 rounded-xl bg-sky-50/60 border border-sky-100 text-sky-800 text-xs"
+                >
                     <span class="flex h-2 w-2 rounded-full bg-sky-500 shrink-0 animate-pulse"></span>
                     <span class="font-medium">
-                        Filtro activo: mostrando únicamente personal de <strong>{selectedDependency}</strong> ({stats.found} {stats.found === 1 ? 'persona' : 'personas'}).
+                        Filtro activo: mostrando únicamente personal de <strong>{selectedDependency}</strong>
+                        ({stats.found}
+                        {stats.found === 1 ? 'persona' : 'personas'}).
                     </span>
                 </div>
             {/if}
 
-            <!-- Duplicates warning -->         <!-- Duplicates warning -->
+            <!-- Duplicates warning -->
+            <!-- Duplicates warning -->
             {#if duplicates.length > 0}
                 <div class="p-4 rounded-xl bg-amber-50 border border-amber-200">
                     <div class="flex items-center justify-between mb-3">
@@ -463,14 +413,14 @@
                         </Badge>
                     </div>
                     <p class="text-[11px] text-amber-600 mb-3">
-                        Se encontraron {duplicates.reduce((sum, dup) => sum + dup.occurrences - 1, 0)} filas duplicadas. 
+                        Se encontraron {duplicates.reduce((sum, dup) => sum + dup.occurrences - 1, 0)} filas duplicadas.
                         Los conteos fueron sumados automáticamente.
                     </p>
                     <div class="flex items-center gap-3">
                         <Button
                             variant="soft-slate"
                             size="sm"
-                            onclick={() => showDuplicates = !showDuplicates}
+                            onclick={() => (showDuplicates = !showDuplicates)}
                         >
                             {showDuplicates ? 'Ocultar' : 'Ver'} detalles
                         </Button>
@@ -478,9 +428,11 @@
                             Total filas archivo: {totalRowsRaw} → Folios únicos: {stats.totalImported}
                         </div>
                     </div>
-                    
+
                     {#if showDuplicates}
-                        <div class="mt-3 max-h-48 overflow-y-auto border border-amber-200 rounded-lg bg-amber-25/50 p-3">
+                        <div
+                            class="mt-3 max-h-48 overflow-y-auto border border-amber-200 rounded-lg bg-amber-25/50 p-3"
+                        >
                             {#each duplicates as dup}
                                 <div class="mb-3 pb-3 border-b border-amber-200 last:border-0">
                                     <div class="flex items-center justify-between mb-1">
@@ -495,7 +447,10 @@
                                         {#each dup.rows as row, i}
                                             <div class="flex justify-between">
                                                 <span>Fila {i + 1}:</span>
-                                                <span>conteo={row.conteo}, inactividad={row.diasInactividad || 'N/A'}</span>
+                                                <span
+                                                    >conteo={row.conteo}, inactividad={row.diasInactividad ||
+                                                        'N/A'}</span
+                                                >
                                             </div>
                                         {/each}
                                     </div>
@@ -510,15 +465,13 @@
             {#if availableDependencies.length > 1}
                 <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
                     <div class="flex items-center justify-between mb-3">
-                        <p
-                            class="text-xs font-bold text-slate-700 uppercase tracking-wider"
-                        >
+                        <p class="text-xs font-bold text-slate-700 uppercase tracking-wider">
                             Filtrar por dependencia
                         </p>
                         {#if selectedDependency}
                             <button
                                 class="text-[10px] font-medium text-sky-600 hover:text-sky-800 transition-colors"
-                                onclick={() => selectedDependency = ''}
+                                onclick={() => (selectedDependency = '')}
                             >
                                 Mostrar todas
                             </button>
@@ -526,7 +479,7 @@
                     </div>
                     <select
                         bind:value={selectedDependency}
-                        class="w-full h-9 px-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 text-sm outline-none bg-white cursor-pointer"
+                        class="w-full h-9 px-3 border border-slate-200 rounded-lg focus-visible:ring-2 focus-visible:ring-sky-500 text-sm outline-none bg-white cursor-pointer"
                     >
                         <option value="">Todas las dependencias</option>
                         {#each availableDependencies as dep}
@@ -539,18 +492,14 @@
             <!-- Threshold -->
             <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
                 <div class="flex items-center justify-between mb-3">
-                    <p
-                        class="text-xs font-bold text-slate-700 uppercase tracking-wider"
-                    >
+                    <p class="text-xs font-bold text-slate-700 uppercase tracking-wider">
                         Umbral de bajo uso
                     </p>
-                    <Badge variant="blue" class="font-mono"
-                        >{usageThreshold}</Badge
-                    >
+                    <Badge variant="blue" class="font-mono">{usageThreshold}</Badge>
                 </div>
                 <p class="text-[11px] text-slate-400 mb-3">
-                    Define la cantidad de usos (umbral) para clasificar el nivel
-                    de uso y generar la hoja de personal con bajo uso.
+                    Define la cantidad de usos (umbral) para clasificar el nivel de uso y generar la hoja de
+                    personal con bajo uso.
                 </p>
                 <div class="flex items-center gap-3">
                     <input
@@ -567,43 +516,30 @@
                         min="0"
                         bind:value={usageThreshold}
                         oninput={() => (thresholdOverridden = true)}
-                        class="w-16 h-8 text-center text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                        class="w-16 h-8 text-center text-sm border border-slate-200 rounded-lg focus-visible:ring-2 focus-visible:ring-sky-500 outline-none"
                     />
                 </div>
             </div>
 
             <!-- Success message -->
             {#if stats.found > 0}
-                <div
-                    class="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200"
-                >
-                    <CheckCircle2
-                        size={20}
-                        class="text-emerald-500 shrink-0 mt-0.5"
-                    />
+                <div class="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <CheckCircle2 size={20} class="text-emerald-500 shrink-0 mt-0.5" />
                     <div>
-                        <p class="text-sm font-bold text-emerald-800">
-                            ¡Listo para exportar!
-                        </p>
+                        <p class="text-sm font-bold text-emerald-800">¡Listo para exportar!</p>
                         <p class="text-xs text-emerald-600 mt-0.5">
                             Se generará un directorio de personal con {stats.found}
-                            registros incluyendo el conteo de uso de tarjetas
-                            y métricas estadísticas.
+                            registros incluyendo el conteo de uso de tarjetas y métricas estadísticas.
                         </p>
                     </div>
                 </div>
             {:else}
-                <div
-                    class="flex items-start gap-3 p-4 rounded-xl bg-rose-50 border border-rose-200"
-                >
+                <div class="flex items-start gap-3 p-4 rounded-xl bg-rose-50 border border-rose-200">
                     <XCircle size={20} class="text-rose-500 shrink-0 mt-0.5" />
                     <div>
-                        <p class="text-sm font-bold text-rose-800">
-                            Sin coincidencias
-                        </p>
+                        <p class="text-sm font-bold text-rose-800">Sin coincidencias</p>
                         <p class="text-xs text-rose-600 mt-0.5">
-                            Ninguno de los folios importados coincide con
-                            tarjetas asignadas en el sistema.
+                            Ninguno de los folios importados coincide con tarjetas asignadas en el sistema.
                         </p>
                     </div>
                 </div>
@@ -612,11 +548,13 @@
     </div>
 
     {#snippet footer()}
-        {#if step === "results"}
+        {#if step === 'results'}
             <Button
                 variant="soft-blue"
                 class="h-10 px-5"
-                onclick={() => { reset(); }}
+                onclick={() => {
+                    reset();
+                }}
             >
                 Importar otro archivo
             </Button>
@@ -636,7 +574,9 @@
                             Descargar
                             <ChevronDown
                                 size={14}
-                                class="ml-1 opacity-70 transition-transform {showExportMenu ? 'rotate-180' : ''}"
+                                class="ml-1 opacity-70 transition-transform {showExportMenu
+                                    ? 'rotate-180'
+                                    : ''}"
                             />
                         {/if}
                     </Button>
@@ -649,7 +589,9 @@
                                 class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
                                 onclick={handleExport}
                             >
-                                <span class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                <span
+                                    class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600"
+                                >
                                     <FileSpreadsheet size={16} />
                                 </span>
                                 {selectedDependency
@@ -661,7 +603,9 @@
                                 class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors text-left"
                                 onclick={handleExportAllDepsZip}
                             >
-                                <span class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600">
+                                <span
+                                    class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600"
+                                >
                                     <FolderArchive size={16} />
                                 </span>
                                 Todas las Dependencias (ZIP)
@@ -670,10 +614,8 @@
                     {/if}
                 </div>
             {/if}
-        {:else if step === "idle"}
-            <Button variant="soft-blue" class="h-10 px-5" onclick={closeModal}>
-                Cancelar
-            </Button>
+        {:else if step === 'idle'}
+            <Button variant="soft-blue" class="h-10 px-5" onclick={closeModal}>Cancelar</Button>
         {/if}
     {/snippet}
 </Modal>

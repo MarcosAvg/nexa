@@ -5,27 +5,20 @@
      * Adds a "Rechazar" button that rejects the ticket without creating the person.
      * Card types are restricted to what the ticket requested.
      */
-    import PersonModal from "./PersonModal.svelte";
-    import ConfirmationModal from "./ConfirmationModal.svelte";
-    import { ticketService } from "../../services/tickets";
-    import { personnelService } from "../../services/personnel";
-    import { toast } from "svelte-sonner";
-    import { handleError, parseFloors, normalizeEmailText } from "../../utils";
-    import { resolveFloorList } from "../../utils/floorMatch";
-    import { wantsCard } from "../../utils/matchAnalysis";
-    import { activeMediaTypes } from "../../utils/mediaContract";
-    import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
-    import { catalogState } from "../../stores";
-    import Badge from "../Badge.svelte";
-    import {
-        AlertTriangle,
-        CreditCard,
-        Loader2,
-        User,
-        XCircle,
-    } from "lucide-svelte";
-    import Button from "../Button.svelte";
-    
+    import PersonModal from './PersonModal.svelte';
+    import ConfirmationModal from './ConfirmationModal.svelte';
+    import { ticketService } from '../../services/tickets';
+    import { personnelService } from '../../services/personnel';
+    import { toast } from 'svelte-sonner';
+    import { handleError, parseFloors, normalizeEmailText } from '../../utils';
+    import { resolveFloorList } from '../../utils/floorMatch';
+    import { wantsCard } from '../../utils/matchAnalysis';
+    import { activeMediaTypes } from '../../utils/mediaContract';
+    import { mediaTypeVariant } from '../../utils/mediaTypeAppearance';
+    import { catalogState } from '../../stores';
+    import Badge from '../Badge.svelte';
+    import { AlertTriangle, CreditCard, Loader2, User, XCircle } from 'lucide-svelte';
+    import Button from '../Button.svelte';
 
     let {
         /** Controla la visibilidad (two-way bindable). */
@@ -43,7 +36,7 @@
     let isRejecting = $state(false);
     let selectedCandidate = $state<any>(null);
 
-    let p = $derived(ticket?.payload ?? {});            // Construir objeto prefill desde los nombres de campo del payload
+    let p = $derived(ticket?.payload ?? {}); // Construir objeto prefill desde los nombres de campo del payload
     let prefill = $derived.by(() => {
         if (!p) return null;
         // Estructuras dinámicas por clave de medio (contrato genérico).
@@ -72,9 +65,7 @@
             correo: normalizeEmailText(p.correo),
             pisosPorMedio,
             foliosPorMedio,
-            specialAccesses: [p.acceso1, p.acceso2, p.acceso3]
-                .map((s: string) => s?.trim())
-                .filter(Boolean),
+            specialAccesses: [p.acceso1, p.acceso2, p.acceso3].map((s: string) => s?.trim()).filter(Boolean),
         };
     });
 
@@ -104,13 +95,10 @@
         // PersonModal ya creó la persona. Eliminar el ticket.
         if (!ticket) return;
         try {
-            await ticketService.delete(
-                ticket.id,
-                "Alta registrada desde plantilla",
-            );
+            await ticketService.delete(ticket.id, 'Alta registrada desde plantilla');
             onComplete?.();
         } catch (err) {
-            handleError(err, "Eliminar Ticket de Alta");
+            handleError(err, 'Eliminar Ticket de Alta');
         }
     }
 
@@ -132,16 +120,13 @@
     });
 
     async function autoSearch() {
-        const apellidos = p.apellidos ?? "";
-        const nombres = p.nombres ?? "";
+        const apellidos = p.apellidos ?? '';
+        const nombres = p.nombres ?? '';
         if (!apellidos && !nombres) return;
 
         isSearching = true;
         try {
-            const results = await personnelService.searchByName(
-                apellidos,
-                nombres,
-            );
+            const results = await personnelService.searchByName(apellidos, nombres);
             candidates = results;
         } finally {
             isSearching = false;
@@ -152,18 +137,20 @@
         if (!ticket) return;
         isRejecting = true;
         try {
-            await ticketService.reject(ticket.id, "Alta de Persona");
-            toast.info("Solicitud rechazada.");
+            await ticketService.reject(ticket.id, 'Alta de Persona');
+            toast.info('Solicitud rechazada.');
             isRejectOpen = false;
             isOpen = false;
             onComplete?.();
         } catch (err) {
-            handleError(err, "Rechazar Alta");
+            handleError(err, 'Rechazar Alta');
         } finally {
             isRejecting = false;
         }
     }
-</script>                <!-- PersonModal precargado como persona nueva (sin id = insert) -->
+</script>
+
+<!-- PersonModal precargado como persona nueva (sin id = insert) -->
 <PersonModal
     bind:isOpen
     {prefill}
@@ -179,18 +166,12 @@
     {#snippet headerContent()}
         <!-- Requested Cards Badge -->
         {#if allowedCardTypes}
-            <div
-                class="flex items-center gap-2 mb-4 p-3 rounded-lg border border-blue-100 bg-blue-50/50"
-            >
-                <span
-                    class="text-[10px] font-bold text-blue-600 uppercase tracking-widest"
-                    >Solicitando:</span
+            <div class="flex items-center gap-2 mb-4 p-3 rounded-lg border border-blue-100 bg-blue-50/50">
+                <span class="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Solicitando:</span
                 >
                 <div class="flex gap-1.5">
                     {#each allowedCardTypes as type}
-                        <Badge
-                            variant={mediaTypeVariant(type)}>{type}</Badge
-                        >
+                        <Badge variant={mediaTypeVariant(type)}>{type}</Badge>
                     {/each}
                 </div>
             </div>
@@ -204,19 +185,15 @@
                 </div>
             </div>
         {:else if unresolvedFloors.length > 0}
-            <div
-                class="rounded-xl border border-rose-200 bg-rose-50 p-4 mb-4 space-y-2"
-            >
+            <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 mb-4 space-y-2">
                 <div class="flex items-start gap-2 text-rose-800 text-sm">
                     <AlertTriangle size={16} class="mt-0.5 shrink-0" />
                     <div>
                         <p class="font-bold">Pisos no reconocidos</p>
                         <p class="text-xs text-rose-700 mt-1">
-                            Los siguientes pisos de la plantilla no coinciden con
-                            los del edificio seleccionado. Corrígelos en la propia
-                            plantilla o ajústalos en el formulario antes de
-                            guardar, de lo contrario no se podrá completar el
-                            alta.
+                            Los siguientes pisos de la plantilla no coinciden con los del edificio
+                            seleccionado. Corrígelos en la propia plantilla o ajústalos en el formulario antes
+                            de guardar, de lo contrario no se podrá completar el alta.
                         </p>
                     </div>
                 </div>
@@ -227,17 +204,14 @@
                 </div>
             </div>
         {:else if candidates.length > 0}
-            <div
-                class="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-4 space-y-3"
-            >
+            <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-4 space-y-3">
                 <div class="flex items-start gap-2 text-amber-800 text-sm">
                     <AlertTriangle size={16} class="mt-0.5 shrink-0" />
                     <div>
                         <p class="font-bold">Posible duplicado detectado</p>
                         <p class="text-xs text-amber-700 mt-1">
-                            Se encontraron {candidates.length} persona(s) con nombres
-                            similares en el sistema. Asegúrate de que no se trata
-                            de la misma persona antes de continuar con la creación.
+                            Se encontraron {candidates.length} persona(s) con nombres similares en el sistema. Asegúrate
+                            de que no se trata de la misma persona antes de continuar con la creación.
                         </p>
                     </div>
                 </div>
@@ -255,14 +229,10 @@
                                     <User size={14} />
                                 </div>
                                 <div class="min-w-0">
-                                    <p
-                                        class="text-sm font-bold text-slate-800 truncate"
-                                    >
+                                    <p class="text-sm font-bold text-slate-800 truncate">
                                         {c.last_name}, {c.first_name}
                                     </p>
-                                    <p
-                                        class="text-[10px] text-slate-500 truncate"
-                                    >
+                                    <p class="text-[10px] text-slate-500 truncate">
                                         {c.dependency} · {c.building}
                                     </p>
                                 </div>
@@ -278,9 +248,7 @@
         {/if}
 
         {#if selectedCandidate}
-            <div
-                class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 mb-4"
-            >
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 mb-4">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
                         <div
@@ -293,8 +261,7 @@
                                 Vincular a: {selectedCandidate.last_name}, {selectedCandidate.first_name}
                             </p>
                             <p class="text-xs text-emerald-600">
-                                Se añadirán los accesos solicitados a esta
-                                persona.
+                                Se añadirán los accesos solicitados a esta persona.
                             </p>
                             {#if selectedCandidate.cards && selectedCandidate.cards.length > 0}
                                 <div class="mt-2 flex flex-wrap gap-2">
@@ -302,24 +269,14 @@
                                         <div
                                             class="flex items-center gap-1.5 px-2 py-1 bg-white border border-emerald-100 rounded text-[10px] font-medium text-slate-600 shadow-sm"
                                         >
-                                            <CreditCard
-                                                size={10}
-                                                class="text-slate-400"
-                                            />
-                                            <span class="font-bold"
-                                                >{card.type}:</span
-                                            >
+                                            <CreditCard size={10} class="text-slate-400" />
+                                            <span class="font-bold">{card.type}:</span>
                                             <span>{card.folio}</span>
                                             <Badge
-                                                variant={card.status ===
-                                                "active"
-                                                    ? "emerald"
-                                                    : "rose"}
+                                                variant={card.status === 'active' ? 'emerald' : 'rose'}
                                                 class="scale-[0.8] origin-left ml-0.5"
                                             >
-                                                {card.status === "active"
-                                                    ? "Activa"
-                                                    : "Bloqueada"}
+                                                {card.status === 'active' ? 'Activa' : 'Bloqueada'}
                                             </Badge>
                                         </div>
                                     {/each}
@@ -328,8 +285,7 @@
                                 <p
                                     class="text-[10px] text-emerald-500 mt-1 italic italic flex items-center gap-1"
                                 >
-                                    <CreditCard size={10} /> Sin tarjetas asignadas
-                                    actualmente.
+                                    <CreditCard size={10} /> Sin tarjetas asignadas actualmente.
                                 </p>
                             {/if}
                         </div>
@@ -337,8 +293,7 @@
                     <button
                         type="button"
                         class="text-xs font-bold text-slate-400 hover:text-slate-600"
-                        onclick={() => (selectedCandidate = null)}
-                        >Desvincular</button
+                        onclick={() => (selectedCandidate = null)}>Desvincular</button
                     >
                 </div>
             </div>
@@ -356,7 +311,8 @@
             Rechazar
         </Button>
     {/snippet}
-</PersonModal>                <!-- Confirmación de rechazo -->
+</PersonModal>
+<!-- Confirmación de rechazo -->
 <ConfirmationModal
     bind:isOpen={isRejectOpen}
     title="Rechazar solicitud de Alta"

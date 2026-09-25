@@ -16,7 +16,7 @@
  *   });
  */
 
-export type ConfirmVariant = "danger" | "warning" | "info";
+export type ConfirmVariant = 'danger' | 'warning' | 'info';
 
 export interface ConfirmOptions {
     title: string;
@@ -30,20 +30,20 @@ export interface ConfirmOptions {
 
 export class ConfirmModalState {
     isOpen = $state(false);
-    title = $state("");
-    description = $state("");
-    variant = $state<ConfirmVariant>("danger");
-    confirmText = $state("Confirmar");
-    cancelText = $state("Cancelar");
+    title = $state('');
+    description = $state('');
+    variant = $state<ConfirmVariant>('danger');
+    confirmText = $state('Confirmar');
+    cancelText = $state('Cancelar');
     onConfirm = $state<() => void | Promise<void>>(async () => {});
     onCancel = $state<() => void>(() => {});
 
     open(options: ConfirmOptions) {
         this.title = options.title;
         this.description = options.description;
-        this.variant = options.variant ?? "danger";
-        this.confirmText = options.confirmText ?? "Confirmar";
-        this.cancelText = options.cancelText ?? "Cancelar";
+        this.variant = options.variant ?? 'danger';
+        this.confirmText = options.confirmText ?? 'Confirmar';
+        this.cancelText = options.cancelText ?? 'Cancelar';
         this.onConfirm = options.onConfirm;
         this.onCancel = options.onCancel ?? (() => {});
         this.isOpen = true;
@@ -55,11 +55,11 @@ export class ConfirmModalState {
 
     reset() {
         this.isOpen = false;
-        this.title = "";
-        this.description = "";
-        this.variant = "danger";
-        this.confirmText = "Confirmar";
-        this.cancelText = "Cancelar";
+        this.title = '';
+        this.description = '';
+        this.variant = 'danger';
+        this.confirmText = 'Confirmar';
+        this.cancelText = 'Cancelar';
         this.onConfirm = async () => {};
         this.onCancel = () => {};
     }

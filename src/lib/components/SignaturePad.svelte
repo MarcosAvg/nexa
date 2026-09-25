@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { onMount, onDestroy } from "svelte";
-    import { Trash2, Check, Tablet, X } from "lucide-svelte";
-    import Button from "./Button.svelte";
+    import { onMount, onDestroy } from 'svelte';
+    import { Trash2, Check, Tablet, X } from 'lucide-svelte';
+    import Button from './Button.svelte';
 
     /**
      * SignaturePad — Pad de firma digital con canvas.
@@ -70,18 +70,12 @@
         // usar el ancho real evita que la franja derecha del lienzo sea inalcanzable.
         const zoneW = Math.min(ZONE_W, window.innerWidth);
         const zoneH = Math.min(ZONE_H, window.innerHeight);
-    // Offset para que el primer toque se asigne a (1/3 ancho, 2/3 alto) del canvas.
-    // Horizontal: 1/3 desde la izquierda, dejando espacio para firmar hacia la derecha.
-    // Vertical: 2/3 desde arriba (1/3 desde abajo), línea base natural inferior.
+        // Offset para que el primer toque se asigne a (1/3 ancho, 2/3 alto) del canvas.
+        // Horizontal: 1/3 desde la izquierda, dejando espacio para firmar hacia la derecha.
+        // Vertical: 2/3 desde arriba (1/3 desde abajo), línea base natural inferior.
         captureZone = {
-            left: Math.max(
-                0,
-                Math.min(e.clientX - zoneW * 0.25, window.innerWidth - zoneW),
-            ),
-            top: Math.max(
-                0,
-                Math.min(e.clientY - zoneH * 0.75, window.innerHeight - zoneH),
-            ),
+            left: Math.max(0, Math.min(e.clientX - zoneW * 0.25, window.innerWidth - zoneW)),
+            top: Math.max(0, Math.min(e.clientY - zoneH * 0.75, window.innerHeight - zoneH)),
             width: zoneW,
             height: zoneH,
         };
@@ -94,7 +88,7 @@
         setTimeout(initCanvas, 50);
         // Re-inicializa el lienzo cuando cambia su tamaño (rotación/cambio de layout),
         // preservando la firma ya dibujada.
-        if (typeof ResizeObserver !== "undefined" && canvasEl) {
+        if (typeof ResizeObserver !== 'undefined' && canvasEl) {
             resizeObserver = new ResizeObserver(() => {
                 if (!isDrawing) reinitCanvasPreservingSignature();
             });
@@ -120,18 +114,18 @@
         canvasEl.width = Math.round(width * dpr);
         canvasEl.height = Math.round(height * dpr);
 
-        ctx = canvasEl.getContext("2d", { desynchronized: true });
+        ctx = canvasEl.getContext('2d', { desynchronized: true });
         if (!ctx) return;
         // setTransform es idempotente (a diferencia de scale, que se acumularía).
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.strokeStyle = "#000";
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
+        ctx.strokeStyle = '#000';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
     }
 
     function reinitCanvasPreservingSignature() {
         if (!canvasEl) return;
-        const data = hasSignature ? canvasEl.toDataURL("image/png") : null;
+        const data = hasSignature ? canvasEl.toDataURL('image/png') : null;
         initCanvas();
         if (!data || !ctx || !canvasEl) return;
         const dpr = window.devicePixelRatio || 1;
@@ -160,13 +154,7 @@
 
             // Limitar a bordes del canvas (permitir ligero exceso para trazos de borde)
             const pad = 5;
-            if (
-                x < -pad ||
-                y < -pad ||
-                x > rect.width + pad ||
-                y > rect.height + pad
-            )
-                return null;
+            if (x < -pad || y < -pad || x > rect.width + pad || y > rect.height + pad) return null;
             return {
                 x: Math.max(0, Math.min(x, rect.width)),
                 y: Math.max(0, Math.min(y, rect.height)),
@@ -182,19 +170,11 @@
 
     // ─── Stroke width calculation ───────────────────────────────────────
     // Usa presión del lápiz cuando está disponible, si no, usa velocidad
-    function calcWidth(
-        x: number,
-        y: number,
-        pressure: number,
-        now: number,
-    ): number {
+    function calcWidth(x: number, y: number, pressure: number, now: number): number {
         if (pressure > 0 && pressure < 1) {
             // Basado en presión: mapeo directo de presión a ancho
             const targetWidth = MIN_WIDTH + pressure * (MAX_WIDTH - MIN_WIDTH);
-            return (
-                lastWidth * VELOCITY_FILTER_WEIGHT +
-                targetWidth * (1 - VELOCITY_FILTER_WEIGHT)
-            );
+            return lastWidth * VELOCITY_FILTER_WEIGHT + targetWidth * (1 - VELOCITY_FILTER_WEIGHT);
         }
 
         // Fallback basado en velocidad (mouse / touch sin presión)
@@ -202,10 +182,7 @@
         const time = now - lastTime;
         const velocity = dist / (time || 1);
         const targetWidth = Math.max(MIN_WIDTH, MAX_WIDTH - velocity * 1.5);
-        return (
-            lastWidth * VELOCITY_FILTER_WEIGHT +
-            targetWidth * (1 - VELOCITY_FILTER_WEIGHT)
-        );
+        return lastWidth * VELOCITY_FILTER_WEIGHT + targetWidth * (1 - VELOCITY_FILTER_WEIGHT);
     }
 
     // ─── Core drawing handlers (Pointer Events) ────────────────────────
@@ -267,9 +244,7 @@
         if (isDrawing) {
             isDrawing = false;
             ctx?.closePath();
-            (e.currentTarget as HTMLElement)?.releasePointerCapture(
-                e.pointerId,
-            );
+            (e.currentTarget as HTMLElement)?.releasePointerCapture(e.pointerId);
         }
     }
 
@@ -287,7 +262,7 @@
 
     function handleSave() {
         if (!canvasEl || !hasSignature) return;
-        const dataUrl = canvasEl.toDataURL("image/png");
+        const dataUrl = canvasEl.toDataURL('image/png');
         onSave(dataUrl);
     }
 
@@ -305,31 +280,31 @@
         if (overlayEl) return;
 
         // ── Fullscreen invisible overlay ──
-        overlayEl = document.createElement("div");
-        overlayEl.id = "signature-capture-overlay";
+        overlayEl = document.createElement('div');
+        overlayEl.id = 'signature-capture-overlay';
         Object.assign(overlayEl.style, {
-            position: "fixed",
-            inset: "0",
-            zIndex: "9999",
-            touchAction: "none", // Bloquear scroll/zoom/gestos
-            cursor: "crosshair",
-            background: "transparent",
-            userSelect: "none",
-            webkitUserSelect: "none",
+            position: 'fixed',
+            inset: '0',
+            zIndex: '9999',
+            touchAction: 'none', // Bloquear scroll/zoom/gestos
+            cursor: 'crosshair',
+            background: 'transparent',
+            userSelect: 'none',
+            webkitUserSelect: 'none',
         } as Record<string, string>);
 
         // Eventos de puntero en overlay
-        overlayEl.addEventListener("pointerdown", onPointerDown);
-        overlayEl.addEventListener("pointermove", onPointerMove);
-        overlayEl.addEventListener("pointerup", onPointerUp);
-        overlayEl.addEventListener("pointercancel", onPointerUp);
-        overlayEl.addEventListener("contextmenu", (e) => e.preventDefault());
+        overlayEl.addEventListener('pointerdown', onPointerDown);
+        overlayEl.addEventListener('pointermove', onPointerMove);
+        overlayEl.addEventListener('pointerup', onPointerUp);
+        overlayEl.addEventListener('pointercancel', onPointerUp);
+        overlayEl.addEventListener('contextmenu', (e) => e.preventDefault());
 
         document.body.appendChild(overlayEl);
 
         // ── Floating toolbar (above overlay) ──
-        toolbarEl = document.createElement("div");
-        toolbarEl.id = "signature-capture-toolbar";
+        toolbarEl = document.createElement('div');
+        toolbarEl.id = 'signature-capture-toolbar';
         toolbarEl.innerHTML = `
             <div style="
                 position: fixed;
@@ -397,38 +372,32 @@
         document.body.appendChild(toolbarEl);
 
         // Conectar eventos de botones de toolbar (stopPropagation para que overlay no los capture)
-        toolbarEl
-            .querySelector("#sig-overlay-clear")
-            ?.addEventListener("pointerdown", (e) => {
-                e.stopPropagation();
-                clear();
-            });
-        toolbarEl
-            .querySelector("#sig-overlay-confirm")
-            ?.addEventListener("pointerdown", (e) => {
-                e.stopPropagation();
-                handleSave();
-                destroyOverlay();
-                tabletMode = false;
-            });
-        toolbarEl
-            .querySelector("#sig-overlay-close")
-            ?.addEventListener("pointerdown", (e) => {
-                e.stopPropagation();
-                destroyOverlay();
-                tabletMode = false;
-            });
+        toolbarEl.querySelector('#sig-overlay-clear')?.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            clear();
+        });
+        toolbarEl.querySelector('#sig-overlay-confirm')?.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            handleSave();
+            destroyOverlay();
+            tabletMode = false;
+        });
+        toolbarEl.querySelector('#sig-overlay-close')?.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            destroyOverlay();
+            tabletMode = false;
+        });
 
         // Tecla Escape sale del overlay
-        window.addEventListener("keydown", onEscapeKey);
+        window.addEventListener('keydown', onEscapeKey);
     }
 
     function destroyOverlay() {
         if (overlayEl) {
-            overlayEl.removeEventListener("pointerdown", onPointerDown);
-            overlayEl.removeEventListener("pointermove", onPointerMove);
-            overlayEl.removeEventListener("pointerup", onPointerUp);
-            overlayEl.removeEventListener("pointercancel", onPointerUp);
+            overlayEl.removeEventListener('pointerdown', onPointerDown);
+            overlayEl.removeEventListener('pointermove', onPointerMove);
+            overlayEl.removeEventListener('pointerup', onPointerUp);
+            overlayEl.removeEventListener('pointercancel', onPointerUp);
             overlayEl.remove();
             overlayEl = null;
         }
@@ -436,12 +405,12 @@
             toolbarEl.remove();
             toolbarEl = null;
         }
-        window.removeEventListener("keydown", onEscapeKey);
+        window.removeEventListener('keydown', onEscapeKey);
         isDrawing = false;
     }
 
     function onEscapeKey(e: KeyboardEvent) {
-        if (e.key === "Escape") {
+        if (e.key === 'Escape') {
             destroyOverlay();
             tabletMode = false;
         }
@@ -474,30 +443,23 @@
 
     <div class="flex flex-col-reverse sm:flex-row justify-between gap-3 shrink-0 pt-1">
         <div class="flex gap-2 w-full sm:w-auto">
-            <Button variant="ghost" onclick={onCancel} class="w-full sm:w-auto"
-                >Cancelar</Button
-            >
+            <Button variant="ghost" onclick={onCancel} class="w-full sm:w-auto">Cancelar</Button>
             <Button
-                variant={tabletMode ? "primary" : "outline"}
+                variant={tabletMode ? 'primary' : 'outline'}
                 onclick={toggleTabletMode}
                 class="w-full sm:w-auto flex items-center gap-1.5 {tabletMode
                     ? 'ring-2 ring-blue-400/50'
                     : ''}"
                 title={tabletMode
-                    ? "Desactivar modo tableta"
-                    : "Activar modo tableta (captura pantalla completa)"}
+                    ? 'Desactivar modo tableta'
+                    : 'Activar modo tableta (captura pantalla completa)'}
             >
                 <Tablet size={16} />
-                {tabletMode ? "Tableta ON" : "Modo Tableta"}
+                {tabletMode ? 'Tableta ON' : 'Modo Tableta'}
             </Button>
         </div>
         <div class="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
-            <Button
-                variant="outline"
-                onclick={clear}
-                disabled={!hasSignature}
-                class="w-full sm:w-auto"
-            >
+            <Button variant="outline" onclick={clear} disabled={!hasSignature} class="w-full sm:w-auto">
                 <Trash2 size={18} class="mr-2" />
                 Limpiar
             </Button>

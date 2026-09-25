@@ -1,4 +1,4 @@
-import type { UserProfile } from "../types";
+import type { UserProfile } from '../types';
 
 export class UserState {
     profile = $state<UserProfile | null>(null);
@@ -15,7 +15,7 @@ export class UserState {
     currentUser = $derived.by(() => {
         if (!this.profile) return null;
         return {
-            name: this.profile.full_name || "Usuario",
+            name: this.profile.full_name || 'Usuario',
             email: this.profile.email,
             avatar: this.profile.avatar_url,
             role: this.profile.role,

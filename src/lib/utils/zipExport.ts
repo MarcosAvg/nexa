@@ -26,10 +26,7 @@ function safeName(dep: string): string {
     return dep.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ ]/g, '').replace(/\s+/g, '_');
 }
 
-async function buildZip(
-    files: { buffer: ArrayBuffer; filename: string }[],
-    zipName: string
-): Promise<void> {
+async function buildZip(files: { buffer: ArrayBuffer; filename: string }[], zipName: string): Promise<void> {
     const JSZip = (await import('jszip')).default;
     const { saveAs } = await import('file-saver');
 
@@ -50,10 +47,19 @@ async function buildZip(
  */
 export async function exportPersonnelAllDependenciesAsZip(
     dependencies: { id: string; name: string }[],
-    globalFilters: { status?: string; search?: string; buildingId?: string; buildingName?: string; floor?: string; floorName?: string; mediaTypeId?: string; mediaTypeName?: string } = {},
+    globalFilters: {
+        status?: string;
+        search?: string;
+        buildingId?: string;
+        buildingName?: string;
+        floor?: string;
+        floorName?: string;
+        mediaTypeId?: string;
+        mediaTypeName?: string;
+    } = {},
     onProgress?: ZipProgressCallback,
     cardTypes?: CardType[],
-    mediaTypes?: any[]
+    mediaTypes?: any[],
 ): Promise<void> {
     const dateStr = new Date().toISOString().split('T')[0];
     const files: { buffer: ArrayBuffer; filename: string }[] = [];
@@ -106,7 +112,7 @@ export async function exportPersonnelAllDependenciesAsZip(
  */
 export async function exportResponsivasAllDependenciesAsZip(
     dependencies: { id: string; name: string }[],
-    onProgress?: ZipProgressCallback
+    onProgress?: ZipProgressCallback,
 ): Promise<void> {
     const dateStr = new Date().toISOString().split('T')[0];
     const files: { buffer: ArrayBuffer; filename: string }[] = [];
@@ -143,7 +149,7 @@ export async function exportCardlessRegistryAllDependenciesAsZip(
         reason?: string;
         search?: string;
     } = {},
-    onProgress?: ZipProgressCallback
+    onProgress?: ZipProgressCallback,
 ): Promise<void> {
     const dateStr = new Date().toISOString().split('T')[0];
     const files: { buffer: ArrayBuffer; filename: string }[] = [];
@@ -186,14 +192,12 @@ export async function exportUsageAllDependenciesAsZip(
     matchResult: UsageMatchResult,
     usageThreshold: number = 10,
     onProgress?: ZipProgressCallback,
-    mediaLabel: string = 'tarjetas'
+    mediaLabel: string = 'tarjetas',
 ): Promise<void> {
     const dateStr = new Date().toISOString().split('T')[0];
 
     // Collect unique dependencies from the matched data
-    const depSet = new Set(
-        matchResult.matched.map((m) => m.person.dependency || 'Sin Dependencia')
-    );
+    const depSet = new Set(matchResult.matched.map((m) => m.person.dependency || 'Sin Dependencia'));
     const depList = Array.from(depSet).sort();
 
     const files: { buffer: ArrayBuffer; filename: string }[] = [];
@@ -206,22 +210,14 @@ export async function exportUsageAllDependenciesAsZip(
         // Filtrar resultados para esta dependencia. Los folios no encontrados
         // no pertenecen a ninguna dependencia, así que se omiten por archivo.
         const filteredResult: UsageMatchResult = {
-            matched: matchResult.matched.filter(
-                (m) => (m.person.dependency || 'Sin Dependencia') === dep
-            ),
+            matched: matchResult.matched.filter((m) => (m.person.dependency || 'Sin Dependencia') === dep),
             unmatched: [],
             totalImported: matchResult.totalImported,
         };
 
         if (filteredResult.matched.length === 0) continue;
 
-        const result = await exportUsageToExcel(
-            filteredResult,
-            usageThreshold,
-            dep,
-            true,
-            mediaLabel,
-        );
+        const result = await exportUsageToExcel(filteredResult, usageThreshold, dep, true, mediaLabel);
         files.push(result);
     }
 

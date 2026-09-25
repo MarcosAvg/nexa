@@ -1,7 +1,7 @@
-import { cardService } from "../services/cards";
-import { accessMediaService } from "../services/accessMedia";
-import type { Card } from "../types";
-import { PaginatedListState } from "./paginatedList.svelte";
+import { cardService } from '../services/cards';
+import { accessMediaService } from '../services/accessMedia';
+import type { Card } from '../types';
+import { PaginatedListState } from './paginatedList.svelte';
 
 export type CardFilters = {
     type: string;
@@ -15,10 +15,10 @@ export class CardState {
 
     /** Filtros unificados. */
     filters: CardFilters = $state({
-        type: "Todos",
-        status: "Todas",
-        search: "",
-        dependencyId: "",
+        type: 'Todos',
+        status: 'Todas',
+        search: '',
+        dependencyId: '',
     });
 
     /** Carga la primera página con los filtros actuales. */
@@ -32,10 +32,7 @@ export class CardState {
     }
 
     async refresh(page?: number) {
-        await this.pagination.fetchPage(
-            (p, s) => this.fetch(p, s),
-            page,
-        );
+        await this.pagination.fetchPage((p, s) => this.fetch(p, s), page);
     }
 
     /**
@@ -57,8 +54,8 @@ export class CardState {
                 // Las acciones de la vista operan sobre access_media.id.
                 id: m.id as string,
                 access_media_id: m.id,
-                type: m.access_media_types?.name ?? "",
-                folio: m.identifier ?? "",
+                type: m.access_media_types?.name ?? '',
+                folio: m.identifier ?? '',
             })) as unknown as Card[];
             return { data, count: res.count };
         } catch {
@@ -73,7 +70,7 @@ export class CardState {
         }
     }
 
-    setFilters(type: string, status: string, depId: string = "") {
+    setFilters(type: string, status: string, depId: string = '') {
         this.filters.type = type;
         this.filters.status = status;
         this.filters.dependencyId = depId;

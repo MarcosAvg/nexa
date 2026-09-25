@@ -1,4 +1,3 @@
-
 export interface Enlace {
     id: string;
     person_id: string;
@@ -71,9 +70,9 @@ export interface Ticket {
     id: number;
     title: string;
     description: string;
-    type: "Programación" | "Firma Responsiva" | "Cobro" | "Bloqueo" | "Otro" | string;
-    priority: "Alta" | "Media" | "Baja" | string;
-    status: "Pendiente" | "En Proceso" | "Completado" | "pending" | "completed";
+    type: 'Programación' | 'Firma Responsiva' | 'Cobro' | 'Bloqueo' | 'Otro' | string;
+    priority: 'Alta' | 'Media' | 'Baja' | string;
+    status: 'Pendiente' | 'En Proceso' | 'Completado' | 'pending' | 'completed';
     created_at: string;
     person_id: string | null;
     access_media_id: string | null;
@@ -318,18 +317,18 @@ export interface AccessAssignmentPermission {
 
 /** Campos personales que pueden actualizarse explícitamente al vincular un registro. */
 export type LinkablePersonnelField =
-    | "first_name"
-    | "last_name"
-    | "employee_no"
-    | "dependency_id"
-    | "building_id"
-    | "floor"
-    | "area"
-    | "position"
-    | "schedule_id"
-    | "entry_time"
-    | "exit_time"
-    | "email";
+    | 'first_name'
+    | 'last_name'
+    | 'employee_no'
+    | 'dependency_id'
+    | 'building_id'
+    | 'floor'
+    | 'area'
+    | 'position'
+    | 'schedule_id'
+    | 'entry_time'
+    | 'exit_time'
+    | 'email';
 
 /** Valores del Excel para los campos personales seleccionados en un vínculo. */
 export type LinkPersonalUpdates = Partial<Record<LinkablePersonnelField, string>>;
@@ -351,7 +350,7 @@ export interface ImportedFolioRequest {
 }
 
 /** Estado conocido de un folio solicitado durante la importación. */
-export type ImportedFolioStatus = "nuevo" | "disponible" | "ya_asignado" | "ocupado" | "duplicado_interno";
+export type ImportedFolioStatus = 'nuevo' | 'disponible' | 'ya_asignado' | 'ocupado' | 'duplicado_interno';
 
 /** Propiedad actual de un folio solicitado. */
 export interface ImportedFolioOwnership {
@@ -367,7 +366,7 @@ export interface ImportedFolioOwnership {
 }
 
 /** Resolución elegida para un folio ocupado por otra persona. */
-export type ImportedFolioResolution = "omitir" | "ticket";
+export type ImportedFolioResolution = 'omitir' | 'ticket';
 
 export interface Floor {
     id: number;

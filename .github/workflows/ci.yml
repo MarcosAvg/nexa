@@ -1,31 +1,56 @@
 name: CI
 
 on:
-  push:
-    branches: [main, dev]
-  pull_request:
+    push:
+        branches: [main, dev]
+    pull_request:
 
 jobs:
-  checks:
-    name: Typecheck, format y build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    checks:
+        name: Formato, lint, typecheck, tests y build
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
 
-      - name: Instalar dependencias
-        run: npm ci
+            - name: Instalar dependencias
+              run: npm ci
 
-      # Nota: `npm run format:check` se habilitará cuando el repo esté
-      # estandarizado con Prettier. Por ahora se aplica formato manualmente
-      # en los archivos nuevos (npm run format).
+            - name: Formato (Prettier)
+              run: npm run format:check
 
-      - name: Typecheck (svelte-check + tsc)
-        run: npm run check
+            - name: Lint (ESLint)
+              run: npm run lint
 
-      - name: Build de producción
-        run: npm run build
+            - name: Typecheck (svelte-check + tsc)
+              run: npm run check
+
+            - name: Tests unitarios (Vitest)
+              run: npm run test:unit
+
+            - name: Build de producción
+              run: npm run build
+
+    e2e:
+        name: E2E y accesibilidad (Playwright)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+
+            - name: Instalar dependencias
+              run: npm ci
+
+            - name: Instalar navegador de Playwright
+              run: npx playwright install --with-deps chromium
+
+            - name: Tests E2E + axe
+              run: npm run test

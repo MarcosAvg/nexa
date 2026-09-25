@@ -152,12 +152,12 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     // ════════════════════════════════════════════════
     const wsResumen = workbook.addWorksheet('Resumen');
     wsResumen.columns = [
-        { width: 4 },   // A
-        { width: 32 },  // B
-        { width: 18 },  // C
-        { width: 16 },  // D
-        { width: 16 },  // E
-        { width: 18 },  // F
+        { width: 4 }, // A
+        { width: 32 }, // B
+        { width: 18 }, // C
+        { width: 16 }, // D
+        { width: 16 }, // E
+        { width: 18 }, // F
     ];
     const LAST_R = 'F';
 
@@ -172,38 +172,88 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     let row = 4;
 
     // ── KPIs ──
-    row = addSectionTitle(wsResumen, row, '📊  INDICADORES CLAVE', LAST_R, { sectionHead: C.sectionHead, separator: C.separator });
+    row = addSectionTitle(wsResumen, row, '📊  INDICADORES CLAVE', LAST_R, {
+        sectionHead: C.sectionHead,
+        separator: C.separator,
+    });
     addKpiCard(wsResumen, row, 'B', 'FILAS TOTALES', totalRows, C.sky);
     addKpiCard(wsResumen, row, 'E', 'SELECCIONADOS', input.totalSelected, C.blue);
     row++;
 
-    addKpiCard(wsResumen, row, 'B', 'CON COINCIDENCIA', totalMatched, C.emerald, calcPct(totalMatched, input.totalSelected));
-    addKpiCard(wsResumen, row, 'E', 'SIN COINCIDENCIA', totalNoMatch, C.amber, calcPct(totalNoMatch, input.totalSelected));
+    addKpiCard(
+        wsResumen,
+        row,
+        'B',
+        'CON COINCIDENCIA',
+        totalMatched,
+        C.emerald,
+        calcPct(totalMatched, input.totalSelected),
+    );
+    addKpiCard(
+        wsResumen,
+        row,
+        'E',
+        'SIN COINCIDENCIA',
+        totalNoMatch,
+        C.amber,
+        calcPct(totalNoMatch, input.totalSelected),
+    );
     row++;
 
-    addKpiCard(wsResumen, row, 'B', 'CONFLICTOS DETECTADOS', totalConflicts, totalConflicts > 0 ? C.rose : C.emerald, calcPct(totalConflicts, totalMatched));
-    addKpiCard(wsResumen, row, 'E', 'RESOLUCIONES PENDIENTES', resolutionsMap.pending, resolutionsMap.pending > 0 ? C.amber : C.emerald);
+    addKpiCard(
+        wsResumen,
+        row,
+        'B',
+        'CONFLICTOS DETECTADOS',
+        totalConflicts,
+        totalConflicts > 0 ? C.rose : C.emerald,
+        calcPct(totalConflicts, totalMatched),
+    );
+    addKpiCard(
+        wsResumen,
+        row,
+        'E',
+        'RESOLUCIONES PENDIENTES',
+        resolutionsMap.pending,
+        resolutionsMap.pending > 0 ? C.amber : C.emerald,
+    );
     row++;
     row++;
 
     // ── Resumen por tipo de hoja ──
-    row = addSectionTitle(wsResumen, row, '📋  DESGLOSE POR TIPO DE TICKET', LAST_R, { sectionHead: C.sectionHead, separator: C.separator });
-    addTableHeader(wsResumen, row, [
-        { col: 'B', label: 'TIPO' },
-        { col: 'C', label: 'FILAS' },
-        { col: 'D', label: 'CONFLICTOS' },
-        { col: 'E', label: 'SELECCIONADOS' },
-    ], C.indigo, C.white);
+    row = addSectionTitle(wsResumen, row, '📋  DESGLOSE POR TIPO DE TICKET', LAST_R, {
+        sectionHead: C.sectionHead,
+        separator: C.separator,
+    });
+    addTableHeader(
+        wsResumen,
+        row,
+        [
+            { col: 'B', label: 'TIPO' },
+            { col: 'C', label: 'FILAS' },
+            { col: 'D', label: 'CONFLICTOS' },
+            { col: 'E', label: 'SELECCIONADOS' },
+        ],
+        C.indigo,
+        C.white,
+    );
     row++;
 
     const sheetSummary = buildSheetSummary(input);
     sheetSummary.forEach((s, i) => {
-        addTableRow(wsResumen, row, [
-            { col: 'B', value: s.label },
-            { col: 'C', value: s.total },
-            { col: 'D', value: s.conflicts },
-            { col: 'E', value: s.selected },
-        ], i % 2 === 0 ? C.indigo : C.slate, C.sectionHead, C.white);
+        addTableRow(
+            wsResumen,
+            row,
+            [
+                { col: 'B', value: s.label },
+                { col: 'C', value: s.total },
+                { col: 'D', value: s.conflicts },
+                { col: 'E', value: s.selected },
+            ],
+            i % 2 === 0 ? C.indigo : C.slate,
+            C.sectionHead,
+            C.white,
+        );
         row++;
     });
 
@@ -216,14 +266,14 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     const detailCol = mediaStartCol + medias.length * 3;
     const wsAltas = workbook.addWorksheet('ALTAS - Conflictos');
     wsAltas.columns = [
-        { width: 5 },   // A: #
-        { width: 24 },  // B: Persona
-        { width: 22 },  // C: Dependencia
-        { width: 22 },  // D: Edificio
+        { width: 5 }, // A: #
+        { width: 24 }, // B: Persona
+        { width: 22 }, // C: Dependencia
+        { width: 22 }, // D: Edificio
         ...medias.map(() => ({ width: 14 })), // SOLICITÓ
         ...medias.map(() => ({ width: 18 })), // TIENE
         ...medias.map(() => ({ width: 14 })), // CONFLICTO
-        { width: 24 },  // DETALLE
+        { width: 24 }, // DETALLE
     ];
     const LAST_A = colKey(detailCol);
     const altaMediaBaseIdx = 2; // índice del primer grupo de medio en ALTA_GROUPS
@@ -239,7 +289,12 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 endCol: start + 2,
             };
         }),
-        { label: 'DETALLE', range: `${colKey(detailCol)}4:${colKey(detailCol)}4`, colors: C.altasGroup, endCol: detailCol },
+        {
+            label: 'DETALLE',
+            range: `${colKey(detailCol)}4:${colKey(detailCol)}4`,
+            colors: C.altasGroup,
+            endCol: detailCol,
+        },
     ];
     const ALTA_GROUP_END_COLS = new Set(ALTA_GROUPS.map((g) => g.endCol));
     const altaDetailGroup = ALTA_GROUPS[ALTA_GROUPS.length - 1];
@@ -249,7 +304,9 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
         workbook,
         title: 'ALTAS — CONFLICTOS POR PERSONA',
         lastCol: LAST_A,
-        metaLines: ['Cada fila representa una persona. Se muestran las tarjetas solicitadas vs. las que ya tiene.'],
+        metaLines: [
+            'Cada fila representa una persona. Se muestran las tarjetas solicitadas vs. las que ya tiene.',
+        ],
     });
 
     // Row 4: Super-headers
@@ -324,7 +381,9 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
             // Datos básicos de la persona
             r.getCell(1).value = altaCounter;
-            r.getCell(2).value = person ? `${person.last_name}, ${person.first_name}` : (rowData.fields.apellidos + ', ' + rowData.fields.nombres);
+            r.getCell(2).value = person
+                ? `${person.last_name}, ${person.first_name}`
+                : rowData.fields.apellidos + ', ' + rowData.fields.nombres;
             r.getCell(3).value = person?.dependency || rowData.fields.dependencia || '';
             r.getCell(4).value = person?.building || rowData.fields.edificio || '';
 
@@ -382,25 +441,51 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
             }
 
             // Badges para celdas de conflicto
-            const altaConflictStatus = analysis?.hasConflicts
-                ? 'conflict' : (!analysis ? 'new-person' : 'ok');
+            const altaConflictStatus = analysis?.hasConflicts ? 'conflict' : !analysis ? 'new-person' : 'ok';
             if (altaConflictStatus === 'conflict') {
                 // badge de conflicto por medio (columna CONFLICTO de cada medio)
                 medias.forEach((m, i) => {
                     const conflict = analysis!.conflicts.find((x) => x.mediaName === m.name && x.conflict);
                     if (conflict) {
                         const badgeCol = mediaStartCol + i * 3 + 2;
-                        r.getCell(badgeCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
-                        r.getCell(badgeCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
+                        r.getCell(badgeCol).font = {
+                            name: 'Arial',
+                            size: 9,
+                            bold: true,
+                            color: { argb: C.roseFill.fg },
+                        };
+                        r.getCell(badgeCol).fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: C.roseFill.fill },
+                        };
                     }
                 });
-                r.getCell(detailCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
-                r.getCell(detailCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
+                r.getCell(detailCol).font = {
+                    name: 'Arial',
+                    size: 9,
+                    bold: true,
+                    color: { argb: C.roseFill.fg },
+                };
+                r.getCell(detailCol).fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: C.roseFill.fill },
+                };
             }
             if (altaConflictStatus === 'new-person') {
                 r.getCell(detailCol).value = 'Persona nueva — sin conflictos';
-                r.getCell(detailCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.emeraldFill.fg } };
-                r.getCell(detailCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.emeraldFill.fill } };
+                r.getCell(detailCol).font = {
+                    name: 'Arial',
+                    size: 9,
+                    bold: true,
+                    color: { argb: C.emeraldFill.fg },
+                };
+                r.getCell(detailCol).fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: C.emeraldFill.fill },
+                };
             }
 
             autoRowHeight(wsAltas, altaRowIdx, 22);
@@ -419,31 +504,41 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     const modTotalCol = modAccesosCol + 1;
     const LAST_M = colKey(modTotalCol);
     wsMod.columns = [
-        { width: 5 },   // A: #
-        { width: 24 },  // B: Persona
-        { width: 22 },  // C: Dependencia
-        { width: 20 },  // D: Edificio
-        { width: 18 },  // E: Apellidos (Actual)
-        { width: 18 },  // F: Nombres (Actual)
-        { width: 18 },  // G: Área (Actual)
-        { width: 20 },  // H: Puesto (Actual)
-        { width: 14 },  // I: Horario (Actual)
-        { width: 18 },  // J: Apellidos (Nuevo)
-        { width: 18 },  // K: Nombres (Nuevo)
-        { width: 18 },  // L: Área (Nuevo)
-        { width: 20 },  // M: Puesto (Nuevo)
-        { width: 14 },  // N: Horario (Nuevo)
+        { width: 5 }, // A: #
+        { width: 24 }, // B: Persona
+        { width: 22 }, // C: Dependencia
+        { width: 20 }, // D: Edificio
+        { width: 18 }, // E: Apellidos (Actual)
+        { width: 18 }, // F: Nombres (Actual)
+        { width: 18 }, // G: Área (Actual)
+        { width: 20 }, // H: Puesto (Actual)
+        { width: 14 }, // I: Horario (Actual)
+        { width: 18 }, // J: Apellidos (Nuevo)
+        { width: 18 }, // K: Nombres (Nuevo)
+        { width: 18 }, // L: Área (Nuevo)
+        { width: 20 }, // M: Puesto (Nuevo)
+        { width: 14 }, // N: Horario (Nuevo)
         ...mediasConPisos.map(() => ({ width: 18 })), // pisos por medio (+/-/=)
-        { width: 18 },  // Accesos (+/-/=)
-        { width: 10 },  // Cambios
+        { width: 18 }, // Accesos (+/-/=)
+        { width: 10 }, // Cambios
     ];
     const MOD_GROUPS: { label: string; range: string; colors: GroupColor; endCol: number }[] = [
         { label: '#', range: 'A4:A4', colors: C.modGroup, endCol: 1 },
         { label: 'PERSONA', range: 'B4:D4', colors: C.modGroup, endCol: 4 },
         { label: 'DATOS ACTUALES', range: 'E4:I4', colors: C.actualGroup, endCol: 9 },
         { label: 'DATOS NUEVOS', range: 'J4:N4', colors: C.nuevoGroup, endCol: 14 },
-        { label: 'PISOS', range: `${colKey(modFloorStart)}4:${colKey(modAccesosCol)}4`, colors: C.pisosGroup, endCol: modAccesosCol },
-        { label: 'CAMBIOS', range: `${colKey(modTotalCol)}4:${colKey(modTotalCol)}4`, colors: C.modGroup, endCol: modTotalCol },
+        {
+            label: 'PISOS',
+            range: `${colKey(modFloorStart)}4:${colKey(modAccesosCol)}4`,
+            colors: C.pisosGroup,
+            endCol: modAccesosCol,
+        },
+        {
+            label: 'CAMBIOS',
+            range: `${colKey(modTotalCol)}4:${colKey(modTotalCol)}4`,
+            colors: C.modGroup,
+            endCol: modTotalCol,
+        },
     ];
     const MOD_GROUP_END_COLS = new Set(MOD_GROUPS.map((g) => g.endCol));
 
@@ -452,7 +547,9 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
         workbook,
         title: 'MODIFICACIONES — CAMBIOS POR PERSONA',
         lastCol: LAST_M,
-        metaLines: ['Cada fila representa una persona. Los campos se comparan entre datos actuales del sistema y los nuevos propuestos.'],
+        metaLines: [
+            'Cada fila representa una persona. Los campos se comparan entre datos actuales del sistema y los nuevos propuestos.',
+        ],
     });
 
     // Row 4: Super-headers
@@ -540,7 +637,9 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
             // Basic info
             r.getCell(1).value = modCounter;
-            r.getCell(2).value = person ? `${person.last_name}, ${person.first_name}` : `${rowData.fields.apellidos}, ${rowData.fields.nombres}`;
+            r.getCell(2).value = person
+                ? `${person.last_name}, ${person.first_name}`
+                : `${rowData.fields.apellidos}, ${rowData.fields.nombres}`;
             r.getCell(3).value = person?.dependency || rowData.fields.dependencia || '';
             r.getCell(4).value = person?.building || rowData.fields.edificio || '';
 
@@ -564,7 +663,8 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 // Horario nuevo: from hora_entrada/hora_salida
                 const newEntry = rowData.fields.hora_entrada?.trim();
                 const newExit = rowData.fields.hora_salida?.trim();
-                r.getCell(14).value = newEntry && newExit ? `${newEntry} - ${newExit}` : (newEntry || newExit || '—');
+                r.getCell(14).value =
+                    newEntry && newExit ? `${newEntry} - ${newExit}` : newEntry || newExit || '—';
 
                 // Floor changes: por medio con pisos + accesos especiales
                 const fc = analysis.floorChanges;
@@ -597,7 +697,8 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 if (fc) {
                     for (const [key, change] of Object.entries(fc)) {
                         if (key === 'accesses') continue;
-                        if ((change as FloorChange).added.length || (change as FloorChange).removed.length) changedCount++;
+                        if ((change as FloorChange).added.length || (change as FloorChange).removed.length)
+                            changedCount++;
                     }
                     if (fc.accesses?.added.length || fc.accesses?.removed.length) changedCount++;
                 }
@@ -640,8 +741,17 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
             // Badges para cambios detectados
             if (changedCount > 0) {
-                r.getCell(modTotalCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
-                r.getCell(modTotalCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
+                r.getCell(modTotalCol).font = {
+                    name: 'Arial',
+                    size: 9,
+                    bold: true,
+                    color: { argb: C.roseFill.fg },
+                };
+                r.getCell(modTotalCol).fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: C.roseFill.fill },
+                };
 
                 if (analysis) {
                     analysis.changes.forEach((ch) => {
@@ -650,18 +760,27 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                             if (cols) {
                                 // Actual: tachado + ámbar
                                 r.getCell(cols.actualCol).font = {
-                                    name: 'Arial', size: 9, color: { argb: C.amberFill.fg },
+                                    name: 'Arial',
+                                    size: 9,
+                                    color: { argb: C.amberFill.fg },
                                     strike: true,
                                 };
                                 r.getCell(cols.actualCol).fill = {
-                                    type: 'pattern', pattern: 'solid', fgColor: { argb: C.amberFill.fill },
+                                    type: 'pattern',
+                                    pattern: 'solid',
+                                    fgColor: { argb: C.amberFill.fill },
                                 };
                                 // Nuevo: negrita + rosa
                                 r.getCell(cols.nuevoCol).font = {
-                                    name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg },
+                                    name: 'Arial',
+                                    size: 9,
+                                    bold: true,
+                                    color: { argb: C.roseFill.fg },
                                 };
                                 r.getCell(cols.nuevoCol).fill = {
-                                    type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill },
+                                    type: 'pattern',
+                                    pattern: 'solid',
+                                    fgColor: { argb: C.roseFill.fill },
                                 };
                             }
                         }
@@ -669,8 +788,17 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 }
             }
             if (!person) {
-                r.getCell(modTotalCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
-                r.getCell(modTotalCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
+                r.getCell(modTotalCol).font = {
+                    name: 'Arial',
+                    size: 9,
+                    bold: true,
+                    color: { argb: C.roseFill.fg },
+                };
+                r.getCell(modTotalCol).fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: C.roseFill.fill },
+                };
             }
 
             autoRowHeight(wsMod, modRowIdx, 22);
@@ -683,14 +811,14 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     // ════════════════════════════════════════════════
     const wsBaja = workbook.addWorksheet('Baja de Persona');
     wsBaja.columns = [
-        { width: 5 },   // A: #
-        { width: 24 },  // B: Persona
-        { width: 22 },  // C: Dependencia
-        { width: 22 },  // D: Edificio
-        { width: 16 },  // E: Tipo Baja
-        { width: 28 },  // F: Motivo
-        { width: 24 },  // G: Observaciones
-        { width: 14 },  // H: Match
+        { width: 5 }, // A: #
+        { width: 24 }, // B: Persona
+        { width: 22 }, // C: Dependencia
+        { width: 22 }, // D: Edificio
+        { width: 16 }, // E: Tipo Baja
+        { width: 28 }, // F: Motivo
+        { width: 24 }, // G: Observaciones
+        { width: 14 }, // H: Match
     ];
     const LAST_BA = 'H';
     const BAJA_GROUPS = [
@@ -753,16 +881,21 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     });
     wsBaja.autoFilter = `A5:${LAST_BA}5`;
 
-    let bajaRowIdx = 6, bajaCt = 0;
+    let bajaRowIdx = 6,
+        bajaCt = 0;
     for (const sheet of input.parseResult.sheets) {
         if (sheet.key !== 'baja_persona') continue;
         for (const rd of sheet.rows) {
             if (!rd.isValid) continue;
             const rk = `${sheet.key}-${rd.rowNumber}`;
             if (!input.selectedRows.has(rk)) continue;
-            bajaCt++; const person = getFirstMatch(input, rk); const r = wsBaja.getRow(bajaRowIdx);
+            bajaCt++;
+            const person = getFirstMatch(input, rk);
+            const r = wsBaja.getRow(bajaRowIdx);
             r.getCell(1).value = bajaCt;
-            r.getCell(2).value = person ? `${person.last_name}, ${person.first_name}` : `${rd.fields.apellidos}, ${rd.fields.nombres}`;
+            r.getCell(2).value = person
+                ? `${person.last_name}, ${person.first_name}`
+                : `${rd.fields.apellidos}, ${rd.fields.nombres}`;
             r.getCell(3).value = person?.dependency || rd.fields.dependencia || '';
             r.getCell(4).value = person?.building || '';
             r.getCell(5).value = rd.fields.tipo_baja || '—';
@@ -772,11 +905,15 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
             for (let c = 1; c <= 8; c++) {
                 const cell = r.getCell(c);
-                const se = bajaSubHeaders.find(s => s.col === c);
+                const se = bajaSubHeaders.find((s) => s.col === c);
                 const g = se?.group ?? BAJA_GROUPS[0];
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: g.colors.fill } };
                 cell.font = { name: 'Arial', size: 9, color: { argb: C.black } };
-                cell.alignment = { vertical: 'middle', horizontal: [1, 8].includes(c) ? 'center' : 'left', wrapText: true };
+                cell.alignment = {
+                    vertical: 'middle',
+                    horizontal: [1, 8].includes(c) ? 'center' : 'left',
+                    wrapText: true,
+                };
                 cell.border = {
                     bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
                     right: {
@@ -790,9 +927,14 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 r.getCell(8).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
             } else {
                 r.getCell(8).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.emeraldFill.fg } };
-                r.getCell(8).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.emeraldFill.fill } };
+                r.getCell(8).fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: C.emeraldFill.fill },
+                };
             }
-            autoRowHeight(wsBaja, bajaRowIdx, 22); bajaRowIdx++;
+            autoRowHeight(wsBaja, bajaRowIdx, 22);
+            bajaRowIdx++;
         }
     }
 
@@ -807,24 +949,39 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     const repoMatchCol = repoObsCol + 1;
     const LAST_RE = colKey(repoMatchCol);
     wsRepo.columns = [
-        { width: 5 },   // A: #
-        { width: 24 },  // B: Persona
-        { width: 22 },  // C: Dependencia
-        { width: 22 },  // D: Edificio
+        { width: 5 }, // A: #
+        { width: 24 }, // B: Persona
+        { width: 22 }, // C: Dependencia
+        { width: 22 }, // D: Edificio
         ...medias.flatMap(() => [{ width: 14 }, { width: 18 }]), // ¿Repone? / Folio por medio
-        { width: 22 },  // Motivo
-        { width: 22 },  // Observaciones
-        { width: 14 },  // Match
+        { width: 22 }, // Motivo
+        { width: 22 }, // Observaciones
+        { width: 14 }, // Match
     ];
     const REPO_GROUPS: { label: string; range: string; colors: GroupColor; endCol: number }[] = [
         { label: '#', range: 'A4:A4', colors: C.otrosGroup, endCol: 1 },
         { label: 'PERSONA', range: 'B4:D4', colors: C.otrosGroup, endCol: 4 },
         ...medias.map((m, i) => {
             const start = repoMediaStart + i * 2;
-            return { label: m.name.toUpperCase(), range: `${colKey(start)}4:${colKey(start + 1)}4`, colors: MEDIA_GROUP_COLORS[i % MEDIA_GROUP_COLORS.length], endCol: start + 1 };
+            return {
+                label: m.name.toUpperCase(),
+                range: `${colKey(start)}4:${colKey(start + 1)}4`,
+                colors: MEDIA_GROUP_COLORS[i % MEDIA_GROUP_COLORS.length],
+                endCol: start + 1,
+            };
         }),
-        { label: 'REPOSICIÓN', range: `${colKey(repoMotivoCol)}4:${colKey(repoObsCol)}4`, colors: C.repoGroup, endCol: repoObsCol },
-        { label: 'ESTADO', range: `${colKey(repoMatchCol)}4:${colKey(repoMatchCol)}4`, colors: C.otrosGroup, endCol: repoMatchCol },
+        {
+            label: 'REPOSICIÓN',
+            range: `${colKey(repoMotivoCol)}4:${colKey(repoObsCol)}4`,
+            colors: C.repoGroup,
+            endCol: repoObsCol,
+        },
+        {
+            label: 'ESTADO',
+            range: `${colKey(repoMatchCol)}4:${colKey(repoMatchCol)}4`,
+            colors: C.otrosGroup,
+            endCol: repoMatchCol,
+        },
     ];
     const REPO_GROUP_END_COLS = new Set(REPO_GROUPS.map((g) => g.endCol));
 
@@ -833,7 +990,9 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
         workbook,
         title: 'REPOSICIÓN DE TARJETA',
         lastCol: LAST_RE,
-        metaLines: ['Solicitudes de reposición de tarjetas. Cada medio activo se muestra en dos columnas (¿Repone? / Folio).'],
+        metaLines: [
+            'Solicitudes de reposición de tarjetas. Cada medio activo se muestra en dos columnas (¿Repone? / Folio).',
+        ],
     });
 
     REPO_GROUPS.forEach((group) => {
@@ -887,16 +1046,21 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     });
     wsRepo.autoFilter = `A5:${LAST_RE}5`;
 
-    let repoRowIdx = 6, repoCt = 0;
+    let repoRowIdx = 6,
+        repoCt = 0;
     for (const sheet of input.parseResult.sheets) {
         if (sheet.key !== 'reposicion') continue;
         for (const rd of sheet.rows) {
             if (!rd.isValid) continue;
             const rk = `${sheet.key}-${rd.rowNumber}`;
             if (!input.selectedRows.has(rk)) continue;
-            repoCt++; const person = getFirstMatch(input, rk); const r = wsRepo.getRow(repoRowIdx);
+            repoCt++;
+            const person = getFirstMatch(input, rk);
+            const r = wsRepo.getRow(repoRowIdx);
             r.getCell(1).value = repoCt;
-            r.getCell(2).value = person ? `${person.last_name}, ${person.first_name}` : `${rd.fields.apellidos}, ${rd.fields.nombres}`;
+            r.getCell(2).value = person
+                ? `${person.last_name}, ${person.first_name}`
+                : `${rd.fields.apellidos}, ${rd.fields.nombres}`;
             r.getCell(3).value = person?.dependency || rd.fields.dependencia || '';
             r.getCell(4).value = person?.building || '';
             // Columnas de medio dinámicas derivadas de `medias` (reponer_<key> / folio_<key>).
@@ -912,11 +1076,15 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
             for (let c = 1; c <= repoMatchCol; c++) {
                 const cell = r.getCell(c);
-                const se = repoSubHeaders.find(s => s.col === c);
+                const se = repoSubHeaders.find((s) => s.col === c);
                 const g = se?.group ?? REPO_GROUPS[0];
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: g.colors.fill } };
                 cell.font = { name: 'Arial', size: 9, color: { argb: C.black } };
-                cell.alignment = { vertical: 'middle', horizontal: [1, 5, 6, 7, 8, 11].includes(c) ? 'center' : 'left', wrapText: true };
+                cell.alignment = {
+                    vertical: 'middle',
+                    horizontal: [1, 5, 6, 7, 8, 11].includes(c) ? 'center' : 'left',
+                    wrapText: true,
+                };
                 cell.border = {
                     bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
                     right: {
@@ -926,13 +1094,32 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
                 };
             }
             if (!person) {
-                r.getCell(repoMatchCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
-                r.getCell(repoMatchCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
+                r.getCell(repoMatchCol).font = {
+                    name: 'Arial',
+                    size: 9,
+                    bold: true,
+                    color: { argb: C.roseFill.fg },
+                };
+                r.getCell(repoMatchCol).fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: C.roseFill.fill },
+                };
             } else {
-                r.getCell(repoMatchCol).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.emeraldFill.fg } };
-                r.getCell(repoMatchCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.emeraldFill.fill } };
+                r.getCell(repoMatchCol).font = {
+                    name: 'Arial',
+                    size: 9,
+                    bold: true,
+                    color: { argb: C.emeraldFill.fg },
+                };
+                r.getCell(repoMatchCol).fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: C.emeraldFill.fill },
+                };
             }
-            autoRowHeight(wsRepo, repoRowIdx, 22); repoRowIdx++;
+            autoRowHeight(wsRepo, repoRowIdx, 22);
+            repoRowIdx++;
         }
     }
 
@@ -941,17 +1128,17 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     // ════════════════════════════════════════════════
     const wsFalla = workbook.addWorksheet('Reporte de Falla');
     wsFalla.columns = [
-        { width: 5 },   // A: #
-        { width: 24 },  // B: Persona
-        { width: 22 },  // C: Dependencia
-        { width: 22 },  // D: Edificio
-        { width: 14 },  // E: Tipo Tarjeta
-        { width: 16 },  // F: Folio
-        { width: 28 },  // G: Descripción
-        { width: 16 },  // H: Desde Cuándo
-        { width: 14 },  // I: Urgencia
-        { width: 22 },  // J: Observaciones
-        { width: 14 },  // K: Match
+        { width: 5 }, // A: #
+        { width: 24 }, // B: Persona
+        { width: 22 }, // C: Dependencia
+        { width: 22 }, // D: Edificio
+        { width: 14 }, // E: Tipo Tarjeta
+        { width: 16 }, // F: Folio
+        { width: 28 }, // G: Descripción
+        { width: 16 }, // H: Desde Cuándo
+        { width: 14 }, // I: Urgencia
+        { width: 22 }, // J: Observaciones
+        { width: 14 }, // K: Match
     ];
     const LAST_F = 'K';
     const FALLA_GROUPS = [
@@ -1019,16 +1206,21 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
     });
     wsFalla.autoFilter = `A5:${LAST_F}5`;
 
-    let fallaRowIdx = 6, fallaCt = 0;
+    let fallaRowIdx = 6,
+        fallaCt = 0;
     for (const sheet of input.parseResult.sheets) {
         if (sheet.key !== 'reporte_falla') continue;
         for (const rd of sheet.rows) {
             if (!rd.isValid) continue;
             const rk = `${sheet.key}-${rd.rowNumber}`;
             if (!input.selectedRows.has(rk)) continue;
-            fallaCt++; const person = getFirstMatch(input, rk); const r = wsFalla.getRow(fallaRowIdx);
+            fallaCt++;
+            const person = getFirstMatch(input, rk);
+            const r = wsFalla.getRow(fallaRowIdx);
             r.getCell(1).value = fallaCt;
-            r.getCell(2).value = person ? `${person.last_name}, ${person.first_name}` : `${rd.fields.apellidos}, ${rd.fields.nombres}`;
+            r.getCell(2).value = person
+                ? `${person.last_name}, ${person.first_name}`
+                : `${rd.fields.apellidos}, ${rd.fields.nombres}`;
             r.getCell(3).value = person?.dependency || rd.fields.dependencia || '';
             r.getCell(4).value = rd.fields.ubicacion || person?.building || '';
             r.getCell(5).value = rd.fields.tipo_tarjeta || '—';
@@ -1041,11 +1233,15 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
 
             for (let c = 1; c <= 11; c++) {
                 const cell = r.getCell(c);
-                const se = fallaSubHeaders.find(s => s.col === c);
+                const se = fallaSubHeaders.find((s) => s.col === c);
                 const g = se?.group ?? FALLA_GROUPS[0];
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: g.colors.fill } };
                 cell.font = { name: 'Arial', size: 9, color: { argb: C.black } };
-                cell.alignment = { vertical: 'middle', horizontal: [1, 5, 6, 9, 11].includes(c) ? 'center' : 'left', wrapText: true };
+                cell.alignment = {
+                    vertical: 'middle',
+                    horizontal: [1, 5, 6, 9, 11].includes(c) ? 'center' : 'left',
+                    wrapText: true,
+                };
                 cell.border = {
                     bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
                     right: {
@@ -1056,12 +1252,26 @@ export async function exportConflictReportToExcel(input: ConflictReportInput): P
             }
             if (!person) {
                 r.getCell(11).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.roseFill.fg } };
-                r.getCell(11).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.roseFill.fill } };
+                r.getCell(11).fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: C.roseFill.fill },
+                };
             } else {
-                r.getCell(11).font = { name: 'Arial', size: 9, bold: true, color: { argb: C.emeraldFill.fg } };
-                r.getCell(11).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.emeraldFill.fill } };
+                r.getCell(11).font = {
+                    name: 'Arial',
+                    size: 9,
+                    bold: true,
+                    color: { argb: C.emeraldFill.fg },
+                };
+                r.getCell(11).fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: C.emeraldFill.fill },
+                };
             }
-            autoRowHeight(wsFalla, fallaRowIdx, 22); fallaRowIdx++;
+            autoRowHeight(wsFalla, fallaRowIdx, 22);
+            fallaRowIdx++;
         }
     }
 
@@ -1096,7 +1306,9 @@ function getFirstMatch(input: ConflictReportInput, rowKey: string): PersonSimpli
     return null;
 }
 
-function buildSheetSummary(input: ConflictReportInput): { label: string; total: number; conflicts: number; selected: number }[] {
+function buildSheetSummary(
+    input: ConflictReportInput,
+): { label: string; total: number; conflicts: number; selected: number }[] {
     const result: { label: string; total: number; conflicts: number; selected: number }[] = [];
 
     for (const sheet of input.parseResult.sheets) {

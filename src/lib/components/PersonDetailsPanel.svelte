@@ -1,9 +1,10 @@
 <script lang="ts">
-    import SidePanel from "./SidePanel.svelte";
-    import Button from "./Button.svelte";
-    import Badge from "./Badge.svelte";
-    import CardItem from "./CardItem.svelte";
-    import PermissionGuard from "./PermissionGuard.svelte";
+    import SidePanel from './SidePanel.svelte';
+    import Button from './Button.svelte';
+    import Badge from './Badge.svelte';
+    import IconButton from './IconButton.svelte';
+    import CardItem from './CardItem.svelte';
+    import PermissionGuard from './PermissionGuard.svelte';
     import {
         Edit,
         Lock,
@@ -17,19 +18,21 @@
         FileText,
         Trash2 as TrashIcon,
         Eye,
-    } from "lucide-svelte";
-    import { generateResponsivaPdf, generateCardPdf, handleError } from "../utils";
-    import { getPersonnelStatusVariant } from "../constants/status";
-    import ResponsivaTemplate from "./ResponsivaTemplate.svelte";
-    import ResponsivaPreviewModal from "./ResponsivaPreviewModal.svelte";
-    import { toast } from "svelte-sonner";
+    } from 'lucide-svelte';
+    import { handleError } from '../utils';
+    import { confirm } from '../utils/confirmModal.svelte';
+    import { getPersonnelStatusVariant } from '../constants/status';
+    import ResponsivaTemplate from './ResponsivaTemplate.svelte';
+    import ResponsivaPreviewModal from './ResponsivaPreviewModal.svelte';
+    import { toast } from 'svelte-sonner';
 
-    import { cardService } from "../services/cards";
-    import { responsivaService } from "../services/responsiva";
-    import { accessAssignmentService } from "../services/accessAssignments";
-    import { personnelState, catalogState } from "../stores";
-    import { uiState } from "../stores/ui.svelte";
-    import type { Person, FloorGroup } from "../types";
+    import { cardService } from '../services/cards';
+    import { responsivaService } from '../services/responsiva';
+    import { accessAssignmentService } from '../services/accessAssignments';
+    import { personnelState, catalogState } from '../stores';
+    import { networkStore } from '../stores/network.svelte';
+    import { uiState } from '../stores/ui.svelte';
+    import type { Person, FloorGroup } from '../types';
 
     /**
      * PersonDetailsPanel — Panel lateral con detalles completos de una persona.
@@ -98,76 +101,62 @@
     });
 
     // Contexto activo de baja
-    let isBajaContext = $derived(
-        person?.id != null && personnelState.bajaContextPersonId === person.id,
-    );
+    let isBajaContext = $derived(person?.id != null && personnelState.bajaContextPersonId === person.id);
 
     let responsivaData = $state<any>(null);
     let selectedShowCard = $state<any>(null);
     let isPreviewModalOpen = $state(false);
     let signedResponsivas = $state<any[]>([]);
-    let selectedSignature = $state("");
+    let selectedSignature = $state('');
 
-// Pisos leídos del modelo nuevo (access_assignment_permissions), agrupados por
-// edificio y por tipo de medio concreto.
-/** Accesos especiales agrupados por edificio (resueltos desde el catálogo). */
-let specialAccessGroups = $derived.by(() => {
-    const map = new Map<string, string[]>();
-    for (const access of person?.specialAccesses || []) {
-        const sp = catalogState.specialAccesses.find((s) => s.name === access);
-        const bName =
-            catalogState.buildings.find((b) => Number(b.id) === Number(sp?.building_id))?.name ?? "Otros";
-        if (!map.has(bName)) map.set(bName, []);
-        map.get(bName)!.push(access);
-    }
-    return Array.from(map.entries());
-});
-
-let floorsByBuilding = $state<
-    Record<number, FloorGroup[]>
->({});
-
-$effect(() => {
-    if (isOpen && person?.id) {
-        loadResponsivas();
-        loadFloors();
-    }
-});
-
-async function loadFloors() {
-    if (!person?.id) return;
-    const fallbackGroups = person.floors || [];
-    const hasFallback = fallbackGroups.some((g) => g.floors.length > 0);
-    const bid =
-        Number(
-            catalogState.buildings.find((b) => b.name === person.building)
-                ?.id,
-        ) || undefined;
-    try {
-        const access =
-            await accessAssignmentService.fetchPersonAccess(person.id);
-        const merged = { ...access.floorsByBuilding };
-        const hasBase =
-            !!bid &&
-            (merged[bid] || []).some((g) => g.floors.length > 0);
-        if (bid && !hasBase && hasFallback) {
-            merged[bid] = [...fallbackGroups];
+    // Pisos leídos del modelo nuevo (access_assignment_permissions), agrupados por
+    // edificio y por tipo de medio concreto.
+    /** Accesos especiales agrupados por edificio (resueltos desde el catálogo). */
+    let specialAccessGroups = $derived.by(() => {
+        const map = new Map<string, string[]>();
+        for (const access of person?.specialAccesses || []) {
+            const sp = catalogState.specialAccesses.find((s) => s.name === access);
+            const bName =
+                catalogState.buildings.find((b) => Number(b.id) === Number(sp?.building_id))?.name ?? 'Otros';
+            if (!map.has(bName)) map.set(bName, []);
+            map.get(bName)!.push(access);
         }
-        floorsByBuilding = merged;
-    } catch {
-        floorsByBuilding =
-            bid && hasFallback ? { [bid]: [...fallbackGroups] } : {};
+        return Array.from(map.entries());
+    });
+
+    let floorsByBuilding = $state<Record<number, FloorGroup[]>>({});
+
+    $effect(() => {
+        if (isOpen && person?.id) {
+            loadResponsivas();
+            loadFloors();
+        }
+    });
+
+    async function loadFloors() {
+        if (!person?.id) return;
+        const fallbackGroups = person.floors || [];
+        const hasFallback = fallbackGroups.some((g) => g.floors.length > 0);
+        const bid = Number(catalogState.buildings.find((b) => b.name === person.building)?.id) || undefined;
+        try {
+            const access = await accessAssignmentService.fetchPersonAccess(person.id);
+            const merged = { ...access.floorsByBuilding };
+            const hasBase = !!bid && (merged[bid] || []).some((g) => g.floors.length > 0);
+            if (bid && !hasBase && hasFallback) {
+                merged[bid] = [...fallbackGroups];
+            }
+            floorsByBuilding = merged;
+        } catch {
+            floorsByBuilding = bid && hasFallback ? { [bid]: [...fallbackGroups] } : {};
+        }
     }
-}
 
     async function loadResponsivas() {
         if (!person?.id) return;
         try {
-            signedResponsivas = await responsivaService.fetchByPerson(
-                person.id.toString(),
-            );
+            signedResponsivas = await responsivaService.fetchByPerson(person.id.toString());
         } catch (error) {
-            handleError(error, "Cargar Responsivas");
+            handleError(error, 'Cargar Responsivas');
         }
     }
 
@@ -175,34 +164,30 @@ async function loadFloors() {
         if (!person) return;
 
         // Verificación de seguridad: no se puede generar responsiva si no está programada
-        if (card.programming_status !== "done") {
-            toast.error(
-                "La tarjeta debe estar programada antes de generar la responsiva.",
-            );
+        if (card.programming_status !== 'done') {
+            toast.error('La tarjeta debe estar programada antes de generar la responsiva.');
             return;
         }
 
         const date = new Date();
         const months = [
-            "Enero",
-            "Febrero",
-            "Marzo",
-            "Abril",
-            "Mayo",
-            "Junio",
-            "Julio",
-            "Agosto",
-            "Septiembre",
-            "Octubre",
-            "Noviembre",
-            "Diciembre",
+            'Enero',
+            'Febrero',
+            'Marzo',
+            'Abril',
+            'Mayo',
+            'Junio',
+            'Julio',
+            'Agosto',
+            'Septiembre',
+            'Octubre',
+            'Noviembre',
+            'Diciembre',
         ];
         const dateStr = `${date.getDate()} de ${months[date.getMonth()]} de ${date.getFullYear()}`;
 
         // Apertura inteligente: verificar si existe versión firmada de este folio en historial
-        let existingResp = signedResponsivas.find(
-            (r) => r.folio === card.folio && r.card_type === card.type,
-        );
+        let existingResp = signedResponsivas.find((r) => r.folio === card.folio && r.card_type === card.type);
 
         // Obtener datos actualizados si pudieran estar desactualizados
         if (existingResp) {
@@ -212,7 +197,7 @@ async function loadFloors() {
                     (r) => r.folio === card.folio && r.card_type === card.type,
                 );
             } catch (e) {
-                handleError(e, "Refrescar Responsivas");
+                handleError(e, 'Refrescar Responsivas');
             }
         }
 
@@ -227,67 +212,72 @@ async function loadFloors() {
                   nombre: person.name,
                   numEmpleado: person.employee_no,
                   dependencia: person.dependency,
-                  usuarioEntrega: "Admin Sistema",
+                  usuarioEntrega: 'Admin Sistema',
                   fecha: dateStr,
               };
 
-        selectedSignature = existingResp ? existingResp.signature : "";
+        selectedSignature = existingResp ? existingResp.signature : '';
         selectedShowCard = card;
         isPreviewModalOpen = true;
     }
 
     async function handleSignCard(card: any, signature?: string) {
+        if (!networkStore.isOnline) {
+            toast.error('Sin conexión: no se puede firmar en modo solo lectura.');
+            return;
+        }
         try {
-            await cardService.updateResponsivaStatus(card.id, "signed");
+            await cardService.updateResponsivaStatus(card.id, 'signed');
             if (signature) {
                 selectedSignature = signature;
             }
             if (onRefresh) await onRefresh();
             await loadResponsivas();
         } catch (error) {
-            handleError(error, "Firmar Tarjeta");
+            handleError(error, 'Firmar Tarjeta');
             throw error;
         }
     }
 
-    async function handleDeleteResponsiva(id: string) {
-        if (!person?.id || !confirm("¿Eliminar este registro de responsiva?"))
-            return;
+    function handleDeleteResponsiva(id: string) {
+        if (!person?.id) return;
 
-        // Buscar el registro para verificar el folio antes de eliminar
-        const respToDelete = signedResponsivas.find((r) => r.id === id);
+        confirm.open({
+            title: 'Eliminar responsiva',
+            description: '¿Eliminar este registro de responsiva? Esta acción no se puede deshacer.',
+            variant: 'danger',
+            confirmText: 'Eliminar',
+            onConfirm: async () => {
+                // Buscar el registro para verificar el folio antes de eliminar
+                const respToDelete = signedResponsivas.find((r) => r.id === id);
 
-        try {
-            await responsivaService.delete(id, person.id.toString());
+                try {
+                    await responsivaService.delete(id, person!.id.toString());
 
-            // Reversión de estado: si este folio está asignado, marcarlo como no firmado
-            if (respToDelete) {
-                const affectedCard = person.cards?.find(
-                    (c) =>
-                        c.folio === respToDelete.folio &&
-                        c.type === respToDelete.card_type,
-                );
-                if (affectedCard) {
-                    await cardService.updateResponsivaStatus(
-                        affectedCard.id,
-                        "unsigned",
-                    );
-                    if (onRefresh) await onRefresh();
+                    // Reversión de estado: si este folio está asignado, marcarlo como no firmado
+                    if (respToDelete) {
+                        const affectedCard = person!.cards?.find(
+                            (c) => c.folio === respToDelete.folio && c.type === respToDelete.card_type,
+                        );
+                        if (affectedCard) {
+                            await cardService.updateResponsivaStatus(affectedCard.id, 'unsigned');
+                            if (onRefresh) await onRefresh();
+                        }
+                    }
+
+                    toast.success('Responsiva eliminada y estado actualizado');
+                    await loadResponsivas();
+                } catch (error) {
+                    handleError(error, 'Eliminar Responsiva');
                 }
-            }
-
-            toast.success("Responsiva eliminada y estado actualizado");
-            await loadResponsivas();
-        } catch (error) {
-            handleError(error, "Eliminar Responsiva");
-        }
+            },
+        });
     }
 
     async function handleViewHistory(resp: any) {
         try {
             await loadResponsivas();
-            const freshResp =
-                signedResponsivas.find((r) => r.id === resp.id) || resp;
+            const freshResp = signedResponsivas.find((r) => r.id === resp.id) || resp;
             responsivaData = {
                 ...freshResp.data,
                 legal_snapshot: freshResp.legal_snapshot,
@@ -295,16 +285,14 @@ async function loadFloors() {
             };
             selectedSignature = freshResp.signature;
             // Construir objeto de contexto para el modal
-            selectedShowCard = person?.cards?.find(
-                (c) => c.folio === freshResp.folio,
-            ) || {
+            selectedShowCard = person?.cards?.find((c) => c.folio === freshResp.folio) || {
                 folio: freshResp.folio,
                 type: freshResp.card_type,
-                responsiva_status: "signed",
+                responsiva_status: 'signed',
             };
             isPreviewModalOpen = true;
         } catch (e) {
-            handleError(e, "Ver Historial de Responsiva");
+            handleError(e, 'Ver Historial de Responsiva');
         }
     }
     async function copyToClipboard(text: string, label: string) {
@@ -313,86 +301,89 @@ async function loadFloors() {
             await navigator.clipboard.writeText(text);
             toast.success(`${label} copiado`);
         } catch (err) {
-            toast.error("Error al copiar");
+            toast.error('Error al copiar');
         }
     }
 
     async function handlePrintCard(card: any) {
         try {
+            const { generateCardPdf } = await import('../utils/pdfGenerator');
             await generateCardPdf(card.folio, card.type);
-            toast.success("PDF generado para impresión");
+            toast.success('PDF generado para impresión');
         } catch (error) {
-            handleError(error, "Generar PDF de Tarjeta");
+            handleError(error, 'Generar PDF de Tarjeta');
         }
     }
 
     async function handleDirectCardStatusChange(
         card: any,
-        field: "responsiva_status" | "programming_status",
-        value: string | null
+        field: 'responsiva_status' | 'programming_status',
+        value: string | null,
     ) {
         try {
-            const { supabase } = await import("../supabase");
+            const { supabase } = await import('../supabase');
             const { error } = await supabase
-                .from("access_media")
+                .from('access_media')
                 .update({ [field]: value })
-                .eq("id", card.id);
+                .eq('id', card.id);
             if (error) throw error;
 
-            const fieldLabel = field === "responsiva_status" ? "Responsiva" : "Programación";
-            const valueLabel = field === "responsiva_status"
-                ? (value === "signed" ? "Firmada" : value === "legacy" ? "Legacy" : "Sin Firmar")
-                : (value === "done" ? "Programada" : "Sin Programar");
+            const fieldLabel = field === 'responsiva_status' ? 'Responsiva' : 'Programación';
+            const valueLabel =
+                field === 'responsiva_status'
+                    ? value === 'signed'
+                        ? 'Firmada'
+                        : value === 'legacy'
+                          ? 'Legacy'
+                          : 'Sin Firmar'
+                    : value === 'done'
+                      ? 'Programada'
+                      : 'Sin Programar';
             toast.success(`${fieldLabel} → ${valueLabel}`);
             await onRefresh?.();
         } catch (e) {
-            handleError(e, "Actualizar Estado de Tarjeta");
+            handleError(e, 'Actualizar Estado de Tarjeta');
         }
     }
 </script>
 
-<SidePanel
-    bind:isOpen
-    title="Detalles de la Persona"
-    subtitle={person?.name}
-    {onclose}
->
+<SidePanel bind:isOpen title="Detalles de la Persona" subtitle={person?.name} {onclose}>
     {#if person}
         <div class="space-y-6">
             <!-- Tarjeta de información -->
-            <section
-                class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
-            >
-                <h3
-                    class="text-xs font-bold text-slate-400 uppercase tracking-widest"
-                >
+            <section class="space-y-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">
                     Información General
                 </h3>
 
                 <div class="grid gap-3">
-                    <button 
+                    <button
                         type="button"
                         class="flex justify-between items-start w-full text-left gap-4 group transition-colors cursor-pointer"
                         onclick={() => copyToClipboard(person?.first_name || '', 'Nombres')}
                         title={person.first_name || 'Copiar nombres'}
                     >
-                        <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
+                        <span
+                            class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
                             >Nombres</span
                         >
-                        <span class="text-sm font-bold text-slate-800 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
+                        <span
+                            class="text-sm font-bold text-slate-800 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                             >{person.first_name}</span
                         >
                     </button>
-                    <button 
+                    <button
                         type="button"
                         class="flex justify-between items-start w-full text-left gap-4 group transition-colors cursor-pointer"
                         onclick={() => copyToClipboard(person?.last_name || '', 'Apellidos')}
                         title={person.last_name || 'Copiar apellidos'}
                     >
-                        <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
+                        <span
+                            class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
                             >Apellidos</span
                         >
-                        <span class="text-sm font-bold text-slate-800 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
+                        <span
+                            class="text-sm font-bold text-slate-800 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                             >{person.last_name}</span
                         >
                     </button>
@@ -402,8 +393,12 @@ async function loadFloors() {
                         onclick={() => copyToClipboard(person?.employee_no || '', 'No. Empleado')}
                         title={person.employee_no ? `Copiar: ${person.employee_no}` : 'Copiar No. Empleado'}
                     >
-                        <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors">No. Empleado</span>
-                        <span class="text-sm font-bold text-slate-800 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
+                        <span
+                            class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
+                            >No. Empleado</span
+                        >
+                        <span
+                            class="text-sm font-bold text-slate-800 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                             >{person.employee_no}</span
                         >
                     </button>
@@ -413,8 +408,12 @@ async function loadFloors() {
                         onclick={() => copyToClipboard(person?.dependency || '', 'Dependencia')}
                         title={person.dependency ? `Copiar: ${person.dependency}` : 'Copiar dependencia'}
                     >
-                        <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors">Dependencia</span>
-                        <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
+                        <span
+                            class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
+                            >Dependencia</span
+                        >
+                        <span
+                            class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                             >{person.dependency}</span
                         >
                     </button>
@@ -425,8 +424,12 @@ async function loadFloors() {
                             onclick={() => copyToClipboard(person?.email || '', 'Correo')}
                             title={person.email ? `Copiar: ${person.email}` : 'Copiar correo'}
                         >
-                            <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors">Correo</span>
-                            <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
+                            <span
+                                class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
+                                >Correo</span
+                            >
+                            <span
+                                class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                                 >{person.email}</span
                             >
                         </button>
@@ -438,10 +441,12 @@ async function loadFloors() {
                             onclick={() => copyToClipboard(person?.area || '', 'Área / Equipo')}
                             title={person.area ? `Copiar: ${person.area}` : 'Copiar área'}
                         >
-                            <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
+                            <span
+                                class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
                                 >Área / Equipo</span
                             >
-                            <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
+                            <span
+                                class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                                 >{person.area}</span
                             >
                         </button>
@@ -453,10 +458,12 @@ async function loadFloors() {
                             onclick={() => copyToClipboard(person?.position || '', 'Puesto / Función')}
                             title={person.position ? `Copiar: ${person.position}` : 'Copiar puesto'}
                         >
-                            <span class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
+                            <span
+                                class="text-xs text-slate-500 flex-shrink-0 pt-0.5 group-hover:text-blue-500 transition-colors"
                                 >Puesto / Función</span
                             >
-                            <span class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
+                            <span
+                                class="text-sm font-medium text-slate-700 text-right break-words max-w-[60%] group-hover:text-blue-600 transition-colors"
                                 >{person.position}</span
                             >
                         </button>
@@ -467,17 +474,23 @@ async function loadFloors() {
                 <div class="pt-3 border-t border-slate-200">
                     <div class="flex items-center gap-2 text-slate-600 mb-2">
                         <Building2 size={14} />
-                        <span class="text-xs font-bold uppercase tracking-wider"
-                            >Ubicación</span
-                        >
+                        <span class="text-xs font-bold uppercase tracking-wider">Ubicación</span>
                     </div>
                     <button
                         type="button"
                         class="w-full text-left group transition-colors cursor-pointer"
-                        onclick={() => copyToClipboard(`${person?.building || ''} - ${person?.floor || ''}`, 'Ubicación')}
-                        title={person.building ? `Copiar: ${person.building} - ${person.floor || ''}` : 'Copiar ubicación'}
+                        onclick={() =>
+                            copyToClipboard(
+                                `${person?.building || ''} - ${person?.floor || ''}`,
+                                'Ubicación',
+                            )}
+                        title={person.building
+                            ? `Copiar: ${person.building} - ${person.floor || ''}`
+                            : 'Copiar ubicación'}
                     >
-                        <p class="text-sm font-medium text-slate-700 group-hover:text-blue-600 transition-colors">
+                        <p
+                            class="text-sm font-medium text-slate-700 group-hover:text-blue-600 transition-colors"
+                        >
                             {person.building} - {person.floor}
                         </p>
                     </button>
@@ -486,17 +499,14 @@ async function loadFloors() {
                 <!-- Pisos Asignados -->
                 {#if Object.keys(floorsByBuilding).length > 0}
                     <div class="pt-3 border-t border-slate-200 space-y-3">
-                        <span
-                            class="text-xs font-bold text-slate-500 uppercase tracking-wider block"
-                        >
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                             Pisos Asignados
                         </span>
 
                         {#each Object.entries(floorsByBuilding) as [bid, groups]}
                             {@const buildingName =
-                                catalogState.buildings.find(
-                                    (b) => Number(b.id) === Number(bid),
-                                )?.name ?? "Edificio"}
+                                catalogState.buildings.find((b) => Number(b.id) === Number(bid))?.name ??
+                                'Edificio'}
                             {@const hasAny = groups.some((g) => g.floors.length > 0)}
                             {#if hasAny}
                                 <div class="space-y-1">
@@ -507,7 +517,10 @@ async function loadFloors() {
                                     {#each groups as group}
                                         {#if group.floors.length > 0}
                                             <div class="flex flex-wrap gap-1.5 items-center">
-                                                <span class="text-[9px] font-extrabold text-slate-400 uppercase">{group.mediaName || group.mediaKey}</span>
+                                                <span
+                                                    class="text-[9px] font-extrabold text-slate-400 uppercase"
+                                                    >{group.mediaName || group.mediaKey}</span
+                                                >
                                                 {#each group.floors as flr}
                                                     <Badge variant="blue">{flr}</Badge>
                                                 {/each}
@@ -523,19 +536,16 @@ async function loadFloors() {
                 <!-- Accesos Especiales -->
                 {#if person.specialAccesses && person.specialAccesses.length > 0}
                     <div class="pt-3 border-t border-slate-200">
-                        <div
-                            class="flex items-center gap-2 text-slate-600 mb-2"
-                        >
+                        <div class="flex items-center gap-2 text-slate-600 mb-2">
                             <Shield size={14} />
-                            <span
-                                class="text-xs font-bold uppercase tracking-wider"
-                                >Accesos Especiales</span
-                            >
+                            <span class="text-xs font-bold uppercase tracking-wider">Accesos Especiales</span>
                         </div>
                         <div class="space-y-1.5">
                             {#each specialAccessGroups as [bName, names]}
                                 <div class="flex flex-wrap gap-1.5 items-center">
-                                    <span class="text-[9px] font-extrabold text-slate-400 uppercase">{bName}</span>
+                                    <span class="text-[9px] font-extrabold text-slate-400 uppercase"
+                                        >{bName}</span
+                                    >
                                     {#each names as access}
                                         <Badge variant="violet">{access}</Badge>
                                     {/each}
@@ -548,24 +558,26 @@ async function loadFloors() {
                 <!-- Horario -->
                 {#if person.schedule}
                     <div class="pt-3 border-t border-slate-200">
-                        <div
-                            class="flex items-center gap-2 text-slate-600 mb-2"
-                        >
+                        <div class="flex items-center gap-2 text-slate-600 mb-2">
                             <Clock size={14} />
-                            <span
-                                class="text-xs font-bold uppercase tracking-wider"
-                                >Horario</span
-                            >
+                            <span class="text-xs font-bold uppercase tracking-wider">Horario</span>
                         </div>
                         <button
                             type="button"
                             class="w-full text-left group transition-colors cursor-pointer"
-                            onclick={() => copyToClipboard(`${person?.schedule?.days || ''}: ${person?.schedule?.entry || ''} - ${person?.schedule?.exit || ''}`, 'Horario')}
-                            title={person.schedule ? `Copiar: ${person.schedule.days}: ${person.schedule.entry} - ${person.schedule.exit}` : 'Copiar horario'}
+                            onclick={() =>
+                                copyToClipboard(
+                                    `${person?.schedule?.days || ''}: ${person?.schedule?.entry || ''} - ${person?.schedule?.exit || ''}`,
+                                    'Horario',
+                                )}
+                            title={person.schedule
+                                ? `Copiar: ${person.schedule.days}: ${person.schedule.entry} - ${person.schedule.exit}`
+                                : 'Copiar horario'}
                         >
-                            <p class="text-sm font-medium text-slate-700 group-hover:text-blue-600 transition-colors">
-                                {person.schedule.days}: {person.schedule.entry} - {person
-                                    .schedule.exit}
+                            <p
+                                class="text-sm font-medium text-slate-700 group-hover:text-blue-600 transition-colors"
+                            >
+                                {person.schedule.days}: {person.schedule.entry} - {person.schedule.exit}
                             </p>
                         </button>
                     </div>
@@ -585,16 +597,12 @@ async function loadFloors() {
             <!-- Botones de acción -->
             <section class="space-y-3">
                 <div class="flex items-center justify-between">
-                    <h3
-                        class="text-xs font-bold text-slate-400 uppercase tracking-widest"
-                    >
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">
                         Acciones Rápidas
                     </h3>
                 </div>
-                <div
-                    class="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-100"
-                >
-                    {#if person.status_raw === "inactive" || person.status === "Baja"}
+                <div class="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    {#if person.status_raw === 'inactive' || person.status === 'Baja'}
                         <PermissionGuard requireEdit disabledOnly>
                             {#snippet children({ disabled })}
                                 <button
@@ -604,10 +612,7 @@ async function loadFloors() {
                                     {disabled}
                                 >
                                     <Lock size={20} />
-                                    <span
-                                        class="text-[10px] font-bold uppercase"
-                                        >Reactivar</span
-                                    >
+                                    <span class="text-[10px] font-bold uppercase">Reactivar</span>
                                 </button>
                             {/snippet}
                         </PermissionGuard>
@@ -620,10 +625,7 @@ async function loadFloors() {
                                     {disabled}
                                 >
                                     <Trash2 size={20} />
-                                    <span
-                                        class="text-[10px] font-bold uppercase"
-                                        >Eliminar</span
-                                    >
+                                    <span class="text-[10px] font-bold uppercase">Eliminar</span>
                                 </button>
                             {/snippet}
                         </PermissionGuard>
@@ -637,10 +639,7 @@ async function loadFloors() {
                                     {disabled}
                                 >
                                     <Edit size={20} />
-                                    <span
-                                        class="text-[10px] font-bold uppercase"
-                                        >Editar</span
-                                    >
+                                    <span class="text-[10px] font-bold uppercase">Editar</span>
                                 </button>
                                 <button
                                     type="button"
@@ -649,17 +648,14 @@ async function loadFloors() {
                                         ? 'text-emerald-600'
                                         : 'text-slate-500 hover:text-amber-600'} hover:bg-white transition-all active:scale-95 disabled:opacity-50"
                                     onclick={() =>
-                                        person.status === "Bloqueado/a"
+                                        person.status === 'Bloqueado/a'
                                             ? onReactivate?.(person)
                                             : onBlock?.(person)}
                                     {disabled}
                                 >
                                     <Lock size={20} />
-                                    <span
-                                        class="text-[10px] font-bold uppercase"
-                                        >{person.status === "Bloqueado/a"
-                                            ? "Activar"
-                                            : "Bloquear"}</span
+                                    <span class="text-[10px] font-bold uppercase"
+                                        >{person.status === 'Bloqueado/a' ? 'Activar' : 'Bloquear'}</span
                                     >
                                 </button>
                                 <button
@@ -671,10 +667,7 @@ async function loadFloors() {
                                     {disabled}
                                 >
                                     <UserX size={20} />
-                                    <span
-                                        class="text-[10px] font-bold uppercase"
-                                        >Baja</span
-                                    >
+                                    <span class="text-[10px] font-bold uppercase">Baja</span>
                                 </button>
                             {/snippet}
                         </PermissionGuard>
@@ -685,12 +678,10 @@ async function loadFloors() {
             <!-- Tarjetas Asignadas -->
             <section class="space-y-3">
                 <div class="flex items-center justify-between">
-                    <h3
-                        class="text-xs font-bold text-slate-400 uppercase tracking-widest"
-                    >
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">
                         Tarjetas Asignadas
                     </h3>
-                    {#if person.status !== "Baja" && person.status_raw !== "inactive"}
+                    {#if person.status !== 'Baja' && person.status_raw !== 'inactive'}
                         <PermissionGuard requireEdit>
                             <Button
                                 variant="soft-blue"
@@ -712,10 +703,8 @@ async function loadFloors() {
                                 status={card.status as any}
                                 responsiva_status={card.responsiva_status as any}
                                 programming_status={card.programming_status as any}
-                                isHighlighted={personnelState.highlightedCardId ===
-                                    card.id}
-                                onGenerateResponsiva={() =>
-                                    handleGenerateResponsiva(card)}
+                                isHighlighted={personnelState.highlightedCardId === card.id}
+                                onGenerateResponsiva={() => handleGenerateResponsiva(card)}
                                 onBlock={() => onCardBlock?.(card)}
                                 onUnassign={() => onCardUnassign?.(card)}
                                 onReplace={() => onCardReplace?.(card)}
@@ -731,9 +720,7 @@ async function loadFloors() {
                     <div
                         class="p-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-center"
                     >
-                        <p class="text-sm text-slate-500">
-                            No hay tarjetas asignadas
-                        </p>
+                        <p class="text-sm text-slate-500">No hay tarjetas asignadas</p>
                     </div>
                 {/if}
             </section>
@@ -742,9 +729,7 @@ async function loadFloors() {
             <section class="space-y-3 pt-6 border-t border-slate-200">
                 <div class="flex items-center gap-2 text-slate-400">
                     <HistoryIcon size={14} />
-                    <h3 class="text-xs font-bold uppercase tracking-widest">
-                        Historial de Responsivas
-                    </h3>
+                    <h3 class="text-xs font-bold uppercase tracking-widest">Historial de Responsivas</h3>
                 </div>
 
                 {#if signedResponsivas.length > 0}
@@ -754,44 +739,37 @@ async function loadFloors() {
                                 class="flex items-center justify-between p-3 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-blue-200 transition-colors group"
                             >
                                 <div class="flex items-center gap-3">
-                                    <div
-                                        class="p-2 rounded-lg bg-blue-50 text-blue-600"
-                                    >
+                                    <div class="p-2 rounded-lg bg-blue-50 text-blue-600">
                                         <FileText size={18} />
                                     </div>
                                     <div class="flex flex-col">
-                                        <span
-                                            class="text-sm font-bold text-slate-800"
+                                        <span class="text-sm font-bold text-slate-800"
                                             >Folio: {resp.folio}</span
                                         >
-                                        <span
-                                            class="text-[10px] text-slate-500 font-medium"
-                                        >
-                                            {new Date(
-                                                resp.created_at,
-                                            ).toLocaleDateString()} • {resp.card_type}
+                                        <span class="text-[10px] text-slate-500 font-medium">
+                                            {new Date(resp.created_at).toLocaleDateString()} • {resp.card_type}
                                         </span>
                                     </div>
                                 </div>
                                 <div
                                     class="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                                 >
-                                    <button
-                                        class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                        onclick={() => handleViewHistory(resp)}
+                                    <IconButton
+                                        icon={Eye}
+                                        label="Ver responsiva"
                                         title="Ver Responsiva"
-                                    >
-                                        <Eye size={16} />
-                                    </button>
+                                        tone="blue"
+                                        size="sm"
+                                        onclick={() => handleViewHistory(resp)}
+                                    />
                                     <PermissionGuard requireAdmin>
-                                        <button
-                                            class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                            onclick={() =>
-                                                handleDeleteResponsiva(resp.id)}
-                                            title="Eliminar registro"
-                                        >
-                                            <TrashIcon size={16} />
-                                        </button>
+                                        <IconButton
+                                            icon={TrashIcon}
+                                            label="Eliminar registro"
+                                            tone="rose"
+                                            size="sm"
+                                            onclick={() => handleDeleteResponsiva(resp.id)}
+                                        />
                                     </PermissionGuard>
                                 </div>
                             </div>
@@ -801,9 +779,7 @@ async function loadFloors() {
                     <div
                         class="p-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-center"
                     >
-                        <p class="text-xs text-slate-400">
-                            No hay responsivas firmadas registradas
-                        </p>
+                        <p class="text-xs text-slate-400">No hay responsivas firmadas registradas</p>
                     </div>
                 {/if}
             </section>

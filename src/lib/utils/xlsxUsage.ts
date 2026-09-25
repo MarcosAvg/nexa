@@ -58,7 +58,7 @@ function parseExcelDate(value: any): Date | null {
         const utcValue = utcDays * 86400;
         return new Date(utcValue * 1000);
     }
-    
+
     let strValue = '';
     if (typeof value === 'string') {
         strValue = value;
@@ -70,7 +70,7 @@ function parseExcelDate(value: any): Date | null {
         } else {
             strValue = String(value);
         }
-    } else {
+    } else if (value !== undefined && value !== null) {
         strValue = String(value);
     }
 
@@ -81,7 +81,7 @@ function parseExcelDate(value: any): Date | null {
     if (!isNaN(parsed.getTime())) return parsed;
 
     // Divide por /, :, -, ., espacio
-    const parts = strValue.split(/[/: .\-]/).filter(Boolean);
+    const parts = strValue.split(/[/: .-]/).filter(Boolean);
     if (parts.length >= 3) {
         let d = parseInt(parts[0], 10);
         let m = parseInt(parts[1], 10);
@@ -106,7 +106,7 @@ function parseExcelDate(value: any): Date | null {
 export async function parseUsageFile(
     file: File,
     creationLimitDate: string,
-    inactivityLimitDate: string
+    inactivityLimitDate: string,
 ): Promise<UsageParseResult> {
     let workbook: ExcelJS.Workbook;
     try {
@@ -120,7 +120,8 @@ export async function parseUsageFile(
     }
 
     const normalize = (s: string) =>
-        s.normalize('NFD')
+        s
+            .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
             .replace(/\s*\*\s*$/, '') // columnas obligatorias de la plantilla llevan '*'
             .toLowerCase();
@@ -198,9 +199,7 @@ export async function parseUsageFile(
 
         const conteoRaw = conteoCell.value;
         const conteo =
-            typeof conteoRaw === 'number'
-                ? conteoRaw
-                : parseInt(String(conteoRaw ?? '0').trim(), 10);
+            typeof conteoRaw === 'number' ? conteoRaw : parseInt(String(conteoRaw ?? '0').trim(), 10);
 
         if (!folio || isNaN(conteo)) return;
 
@@ -216,9 +215,7 @@ export async function parseUsageFile(
             ultimoRegDate = parseExcelDate(row.getCell(ultimoRegCol).value);
         }
 
-        const parsedCreationLimit = creationLimitDate
-            ? new Date(creationLimitDate + 'T00:00:00')
-            : null;
+        const parsedCreationLimit = creationLimitDate ? new Date(creationLimitDate + 'T00:00:00') : null;
         const parsedInactivityLimit = inactivityLimitDate
             ? new Date(inactivityLimitDate + 'T00:00:00')
             : null;
@@ -251,7 +248,7 @@ export async function parseUsageFile(
  */
 export function findDuplicateFolios(entries: UsageEntry[]): DuplicateFolioInfo[] {
     const folioMap = new Map<string, { conteo: number; diasInactividad: number | null }[]>();
-    
+
     // Agrupar todas las entradas por folio
     for (const entry of entries) {
         const existing = folioMap.get(entry.folio);
@@ -261,7 +258,7 @@ export function findDuplicateFolios(entries: UsageEntry[]): DuplicateFolioInfo[]
             folioMap.set(entry.folio, [{ conteo: entry.conteo, diasInactividad: entry.diasInactividad }]);
         }
     }
-    
+
     // Encontrar folios con múltiples ocurrencias (duplicados)
     const duplicates: DuplicateFolioInfo[] = [];
     for (const [folio, rows] of folioMap.entries()) {
@@ -271,14 +268,14 @@ export function findDuplicateFolios(entries: UsageEntry[]): DuplicateFolioInfo[]
                 folio,
                 occurrences: rows.length,
                 totalConteo,
-                rows
+                rows,
             });
         }
     }
-    
+
     // Ordenar por ocurrencias totales descendente
     duplicates.sort((a, b) => b.occurrences - a.occurrences);
-    
+
     return duplicates;
 }
 
@@ -289,13 +286,13 @@ export function getDuplicateFoliosSummary(duplicates: DuplicateFolioInfo[]): str
     if (duplicates.length === 0) {
         return 'No se encontraron folios duplicados.';
     }
-    
+
     const totalDuplicates = duplicates.reduce((sum, dup) => sum + dup.occurrences, 0);
     const uniqueDuplicates = duplicates.length;
     const totalDuplicateRows = totalDuplicates - uniqueDuplicates;
-    
+
     let summary = `Se encontraron ${uniqueDuplicates} folios duplicados (${totalDuplicateRows} filas extra):\n\n`;
-    
+
     duplicates.forEach((dup, index) => {
         summary += `${index + 1}. Folio "${dup.folio}" aparece ${dup.occurrences} veces:\n`;
         dup.rows.forEach((row, i) => {
@@ -303,7 +300,7 @@ export function getDuplicateFoliosSummary(duplicates: DuplicateFolioInfo[]): str
         });
         summary += `   - Total conteo: ${dup.totalConteo}\n\n`;
     });
-    
+
     return summary;
 }
 
@@ -318,12 +315,12 @@ export function getDuplicateFoliosSummary(duplicates: DuplicateFolioInfo[]): str
  */
 export async function matchUsageToPersonnel(
     entries: UsageEntry[],
-    mediaKey: string = 'kone'
+    mediaKey: string = 'kone',
 ): Promise<UsageMatchResult> {
     if (entries.length === 0) {
         return { matched: [], unmatched: [], totalImported: 0 };
-    }        // Construir folio→Map info (en caso de duplicados, ¿conservar el más nuevo o sumar? Sumamos conteos y preservamos inactividad mínima)
-    const conteoMap = new Map<string, { conteo: number, diasInactividad: number | null }>();
+    } // Construir folio→Map info (en caso de duplicados, ¿conservar el más nuevo o sumar? Sumamos conteos y preservamos inactividad mínima)
+    const conteoMap = new Map<string, { conteo: number; diasInactividad: number | null }>();
     for (const entry of entries) {
         const existing = conteoMap.get(entry.folio);
         if (existing) {
@@ -339,16 +336,16 @@ export async function matchUsageToPersonnel(
     }
 
     const folios = Array.from(conteoMap.keys());
-    const allMatchingCards: any[] = [];        // Fragmentar para evitar consultas extremadamente largas y manejar paginación
+    const allMatchingCards: any[] = []; // Fragmentar para evitar consultas extremadamente largas y manejar paginación
     const CHUNK_SIZE = 500;
     for (let i = 0; i < folios.length; i += CHUNK_SIZE) {
         const chunk = folios.slice(i, i + CHUNK_SIZE);
         try {
-            const cards = await batchPaginate<any>(
-                async (from, to) => {
-                    const { data, error } = await supabase
-                        .from('access_media')
-                        .select(`
+            const cards = await batchPaginate<any>(async (from, to) => {
+                const { data, error } = await supabase
+                    .from('access_media')
+                    .select(
+                        `
                             id, identifier, status, person_id, access_media_types ( name, key ),
                             personnel (
                                 id, first_name, last_name, employee_no, email, area, position, floor, status, building_id,
@@ -359,19 +356,18 @@ export async function matchUsageToPersonnel(
                                 access_assignments ( media_type_id, access_media_types ( id, key, name ), access_assignment_permissions ( resource_type, floors ( label ), special_accesses ( name ) ) ),
                                 entry_time, exit_time
                             )
-                        `)
-                        .eq('access_media_types.key', mediaKey)
-                        .in('identifier', chunk)
-                        .range(from, to);
-                    return { data, error };
-                },
-                1000
-            );
+                        `,
+                    )
+                    .eq('access_media_types.key', mediaKey)
+                    .in('identifier', chunk)
+                    .range(from, to);
+                return { data, error };
+            }, 1000);
             allMatchingCards.push(...cards);
         } catch (error: any) {
-            throw new Error(`Error al buscar tarjetas (chunk ${i}): ${error.message}`);
+            throw new Error(`Error al buscar tarjetas (chunk ${i}): ${error.message}`, { cause: error });
         }
-    }        // Construir búsqueda: folio → datos de tarjeta
+    } // Construir búsqueda: folio → datos de tarjeta
     const cardByFolio = new Map<string, any>();
     for (const card of allMatchingCards) {
         if (card.personnel) {
@@ -415,11 +411,13 @@ export async function matchUsageToPersonnel(
                 floors: access.floors,
                 status: displayStatus,
                 specialAccesses: access.specialAccesses,
-                schedule: p.schedules ? {
-                    days: p.schedules.name,
-                    entry: p.entry_time || p.schedules.default_entry || '09:00',
-                    exit: p.exit_time || p.schedules.default_exit || '18:00'
-                } : null,
+                schedule: p.schedules
+                    ? {
+                          days: p.schedules.name,
+                          entry: p.entry_time || p.schedules.default_entry || '09:00',
+                          exit: p.exit_time || p.schedules.default_exit || '18:00',
+                      }
+                    : null,
                 email: p.email,
                 cards: allCards
                     .filter((c: any) => c.key === mediaKey)

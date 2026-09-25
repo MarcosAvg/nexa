@@ -7,36 +7,19 @@
  * por xlsxUsage.ts para evitar dependencia circular.
  */
 
-export type {
-    ExportPersonnelData,
-    ExportOptions,
-    CardType,
-} from './xlsxPersonnel';
+export type { ExportPersonnelData, ExportOptions, CardType } from './xlsxPersonnel';
 
-export {
-    exportPersonnelToExcel,
-} from './xlsxPersonnel';
+export { exportPersonnelToExcel } from './xlsxPersonnel';
 
-export {
-    exportResponsivasToExcel,
-} from './xlsxResponsivas';
+export { exportResponsivasToExcel } from './xlsxResponsivas';
 
-export {
-    exportCardsToExcel,
-} from './xlsxCards';
+export { exportCardsToExcel } from './xlsxCards';
 
-export {
-    exportHistoryToExcel,
-} from './xlsxHistory';
+export { exportHistoryToExcel } from './xlsxHistory';
 
-export type {
-    CardlessRegistryExportRow,
-    CardlessRegistryExportFilters,
-} from './xlsxRegistry';
+export type { CardlessRegistryExportRow, CardlessRegistryExportFilters } from './xlsxRegistry';
 
-export {
-    exportCardlessRegistryToExcel,
-} from './xlsxRegistry';
+export { exportCardlessRegistryToExcel } from './xlsxRegistry';
 
 // ─── Usage Export (stays here — used by xlsxUsage.ts) ────────
 
@@ -70,7 +53,7 @@ async function addUsageSummarySheet(
     sheetName: string,
     title: string,
     usageThreshold: number,
-    mediaLabel: string = 'tarjetas'
+    mediaLabel: string = 'tarjetas',
 ) {
     const ws = workbook.addWorksheet(sheetName);
 
@@ -104,9 +87,9 @@ async function addUsageSummarySheet(
     let row = 1;
 
     const total = matchedData.length;
-    const conteos = matchedData.map(m => m.conteo);
+    const conteos = matchedData.map((m) => m.conteo);
     const totalUsos = conteos.reduce((sum, c) => sum + c, 0);
-    const promedio = total > 0 ? (totalUsos / total) : 0;
+    const promedio = total > 0 ? totalUsos / total : 0;
     const mediana = (() => {
         if (total === 0) return 0;
         const sorted = [...conteos].sort((a, b) => a - b);
@@ -122,11 +105,11 @@ async function addUsageSummarySheet(
         { label: '101+ usos', filter: (c: number) => c > 100 },
     ];
 
-    const noUtilizadas = matchedData.filter(m => m.conteo === 0);
-    const bajoUsoData = matchedData.filter(m => m.conteo > 0 && m.conteo < usageThreshold);
+    const noUtilizadas = matchedData.filter((m) => m.conteo === 0);
+    const bajoUsoData = matchedData.filter((m) => m.conteo > 0 && m.conteo < usageThreshold);
 
     const depMap: Record<string, { count: number; totalUsos: number }> = {};
-    matchedData.forEach(m => {
+    matchedData.forEach((m) => {
         const dep = m.person.dependency || 'Sin Dependencia';
         if (!depMap[dep]) depMap[dep] = { count: 0, totalUsos: 0 };
         depMap[dep].count++;
@@ -135,7 +118,7 @@ async function addUsageSummarySheet(
     const depEntries = Object.entries(depMap).sort((a, b) => b[1].totalUsos - a[1].totalUsos);
 
     const buildMap: Record<string, { count: number; totalUsos: number }> = {};
-    matchedData.forEach(m => {
+    matchedData.forEach((m) => {
         const bld = m.person.building || 'Sin Edificio';
         if (!buildMap[bld]) buildMap[bld] = { count: 0, totalUsos: 0 };
         buildMap[bld].count++;
@@ -155,14 +138,19 @@ async function addUsageSummarySheet(
     ws.mergeCells('A2:G2');
     const metaCell = ws.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
-        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
     });
     metaCell.value = `Reporte generado: ${dateStr}  |  Personal en esta hoja: ${total}`;
     metaCell.font = { name: 'Arial', size: 9, color: { argb: C.meta } };
     metaCell.alignment = { vertical: 'middle', horizontal: 'left' };
     ws.getRow(2).height = 20;
 
-    row = 4;    row = addSectionTitle(ws, row, '📊  INDICADORES CLAVE DE USO', 'G', C);
+    row = 4;
+    row = addSectionTitle(ws, row, '📊  INDICADORES CLAVE DE USO', 'G', C);
     ws.getRow(row).height = 32;
     addKpiCard(ws, row, 'B', 'PERSONAL REGISTRADO', total, C.blue);
     addKpiCard(ws, row, 'E', 'TOTAL DE USOS', totalUsos, C.sky);
@@ -174,80 +162,136 @@ async function addUsageSummarySheet(
     row++;
 
     ws.getRow(row).height = 28;
-    addKpiCard(ws, row, 'B', 'Tarjetas No Utilizadas', noUtilizadas.length, noUtilizadas.length > 0 ? C.rose : C.emerald, calcPct(noUtilizadas.length, total));
-    addKpiCard(ws, row, 'E', 'Personal bajo uso', bajoUsoData.length, bajoUsoData.length > 0 ? C.amber : C.emerald, calcPct(bajoUsoData.length, total));
-    row++; row++;
-
-    row = addSectionTitle(ws, row, '📈  DISTRIBUCIÓN POR RANGO DE USO', 'G', C);
-    addTableHeader(ws, row, [
-        { col: 'B', label: 'RANGO' },
-        { col: 'C', label: 'PERSONAS' },
-        { col: 'D', label: '% DEL TOTAL' },
-        { col: 'E', label: 'USOS EN RANGO' },
-        { col: 'F', label: '% DE USOS' },
-    ], C.cyan, C.white);
+    addKpiCard(
+        ws,
+        row,
+        'B',
+        'Tarjetas No Utilizadas',
+        noUtilizadas.length,
+        noUtilizadas.length > 0 ? C.rose : C.emerald,
+        calcPct(noUtilizadas.length, total),
+    );
+    addKpiCard(
+        ws,
+        row,
+        'E',
+        'Personal bajo uso',
+        bajoUsoData.length,
+        bajoUsoData.length > 0 ? C.amber : C.emerald,
+        calcPct(bajoUsoData.length, total),
+    );
+    row++;
     row++;
 
-    ranges.forEach(range => {
-        const personas = matchedData.filter(m => range.filter(m.conteo));
+    row = addSectionTitle(ws, row, '📈  DISTRIBUCIÓN POR RANGO DE USO', 'G', C);
+    addTableHeader(
+        ws,
+        row,
+        [
+            { col: 'B', label: 'RANGO' },
+            { col: 'C', label: 'PERSONAS' },
+            { col: 'D', label: '% DEL TOTAL' },
+            { col: 'E', label: 'USOS EN RANGO' },
+            { col: 'F', label: '% DE USOS' },
+        ],
+        C.cyan,
+        C.white,
+    );
+    row++;
+
+    ranges.forEach((range) => {
+        const personas = matchedData.filter((m) => range.filter(m.conteo));
         const usosEnRango = personas.reduce((sum, m) => sum + m.conteo, 0);
-        addTableRow(ws, row, [
-            { col: 'B', value: range.label },
-            { col: 'C', value: personas.length },
-            { col: 'D', value: calcPct(personas.length, total) },
-            { col: 'E', value: usosEnRango },
-            { col: 'F', value: calcPct(usosEnRango, totalUsos) },
-        ], C.cyan, C.sectionHead, C.white);
+        addTableRow(
+            ws,
+            row,
+            [
+                { col: 'B', value: range.label },
+                { col: 'C', value: personas.length },
+                { col: 'D', value: calcPct(personas.length, total) },
+                { col: 'E', value: usosEnRango },
+                { col: 'F', value: calcPct(usosEnRango, totalUsos) },
+            ],
+            C.cyan,
+            C.sectionHead,
+            C.white,
+        );
         row++;
     });
 
     row = addSectionTitle(ws, row, '🏢  DISTRIBUCIÓN POR DEPENDENCIAS', 'G', C);
-    addTableHeader(ws, row, [
-        { col: 'B', label: 'DEPENDENCIA' },
-        { col: 'C', label: 'PERSONAS' },
-        { col: 'D', label: 'TOTAL USOS' },
-        { col: 'E', label: 'PROMEDIO USOS' },
-        { col: 'F', label: '% DEL TOTAL' },
-    ], C.violet, C.white);
+    addTableHeader(
+        ws,
+        row,
+        [
+            { col: 'B', label: 'DEPENDENCIA' },
+            { col: 'C', label: 'PERSONAS' },
+            { col: 'D', label: 'TOTAL USOS' },
+            { col: 'E', label: 'PROMEDIO USOS' },
+            { col: 'F', label: '% DEL TOTAL' },
+        ],
+        C.violet,
+        C.white,
+    );
     row++;
 
     depEntries.forEach(([dep, stats], i) => {
         const avgUsos = stats.count > 0 ? (stats.totalUsos / stats.count).toFixed(1) : '0';
-        addTableRow(ws, row, [
-            { col: 'B', value: dep },
-            { col: 'C', value: stats.count },
-            { col: 'D', value: stats.totalUsos },
-            { col: 'E', value: avgUsos },
-            { col: 'F', value: calcPct(stats.totalUsos, totalUsos) },
-        ], i % 2 === 0 ? C.violet : C.slate, C.sectionHead, C.white);
+        addTableRow(
+            ws,
+            row,
+            [
+                { col: 'B', value: dep },
+                { col: 'C', value: stats.count },
+                { col: 'D', value: stats.totalUsos },
+                { col: 'E', value: avgUsos },
+                { col: 'F', value: calcPct(stats.totalUsos, totalUsos) },
+            ],
+            i % 2 === 0 ? C.violet : C.slate,
+            C.sectionHead,
+            C.white,
+        );
         row++;
     });
 
     if (buildEntries.length > 0) {
         row = addSectionTitle(ws, row, '🏗️  DISTRIBUCIÓN POR EDIFICIO', 'G', C);
-        addTableHeader(ws, row, [
-            { col: 'B', label: 'EDIFICIO' },
-            { col: 'C', label: 'PERSONAS' },
-            { col: 'D', label: 'USOS TOTALES' },
-            { col: 'E', label: 'PROMEDIO' },
-            { col: 'F', label: '% DE USOS' },
-        ], C.sky, C.white);
+        addTableHeader(
+            ws,
+            row,
+            [
+                { col: 'B', label: 'EDIFICIO' },
+                { col: 'C', label: 'PERSONAS' },
+                { col: 'D', label: 'USOS TOTALES' },
+                { col: 'E', label: 'PROMEDIO' },
+                { col: 'F', label: '% DE USOS' },
+            ],
+            C.sky,
+            C.white,
+        );
         row++;
 
         buildEntries.forEach(([bld, stats]) => {
-            addTableRow(ws, row, [
-                { col: 'B', value: bld },
-                { col: 'C', value: stats.count },
-                { col: 'D', value: stats.totalUsos },
-                { col: 'E', value: (stats.totalUsos / stats.count).toFixed(1) },
-                { col: 'F', value: calcPct(stats.totalUsos, totalUsos) },
-            ], C.sky, C.sectionHead, C.white);
+            addTableRow(
+                ws,
+                row,
+                [
+                    { col: 'B', value: bld },
+                    { col: 'C', value: stats.count },
+                    { col: 'D', value: stats.totalUsos },
+                    { col: 'E', value: (stats.totalUsos / stats.count).toFixed(1) },
+                    { col: 'F', value: calcPct(stats.totalUsos, totalUsos) },
+                ],
+                C.sky,
+                C.sectionHead,
+                C.white,
+            );
             row++;
         });
     }
 
     const statusMap: Record<string, { count: number; totalUsos: number; noUtilizadas: number }> = {};
-    matchedData.forEach(m => {
+    matchedData.forEach((m) => {
         const st = m.person.status || 'Sin Estado';
         if (!statusMap[st]) statusMap[st] = { count: 0, totalUsos: 0, noUtilizadas: 0 };
         statusMap[st].count++;
@@ -258,24 +302,37 @@ async function addUsageSummarySheet(
 
     if (statusEntries.length > 0) {
         row = addSectionTitle(ws, row, '👤  USO POR ESTADO DEL PERSONAL', 'G', C);
-        addTableHeader(ws, row, [
-            { col: 'B', label: 'ESTADO' },
-            { col: 'C', label: 'PERSONAS' },
-            { col: 'D', label: 'TOTAL USOS' },
-            { col: 'E', label: 'PROMEDIO' },
-            { col: 'F', label: 'NO UTILIZADAS' },
-        ], C.amber, C.white);
+        addTableHeader(
+            ws,
+            row,
+            [
+                { col: 'B', label: 'ESTADO' },
+                { col: 'C', label: 'PERSONAS' },
+                { col: 'D', label: 'TOTAL USOS' },
+                { col: 'E', label: 'PROMEDIO' },
+                { col: 'F', label: 'NO UTILIZADAS' },
+            ],
+            C.amber,
+            C.white,
+        );
         row++;
 
         statusEntries.forEach(([status, stats]) => {
             const avg = stats.count > 0 ? (stats.totalUsos / stats.count).toFixed(1) : '0';
-            addTableRow(ws, row, [
-                { col: 'B', value: status },
-                { col: 'C', value: stats.count },
-                { col: 'D', value: stats.totalUsos },
-                { col: 'E', value: avg },
-                { col: 'F', value: stats.noUtilizadas },
-            ], C.amber, C.sectionHead, C.white);
+            addTableRow(
+                ws,
+                row,
+                [
+                    { col: 'B', value: status },
+                    { col: 'C', value: stats.count },
+                    { col: 'D', value: stats.totalUsos },
+                    { col: 'E', value: avg },
+                    { col: 'F', value: stats.noUtilizadas },
+                ],
+                C.amber,
+                C.sectionHead,
+                C.white,
+            );
             row++;
         });
     }
@@ -290,20 +347,33 @@ async function addUsageSummarySheet(
     ];
 
     row = addSectionTitle(ws, row, '🕐  DISTRIBUCIÓN POR DÍAS SIN USO', 'G', C);
-    addTableHeader(ws, row, [
-        { col: 'B', label: 'RANGO INACTIVIDAD' },
-        { col: 'C', label: 'PERSONAS' },
-        { col: 'D', label: '% DEL TOTAL' },
-    ], C.rose, C.white);
+    addTableHeader(
+        ws,
+        row,
+        [
+            { col: 'B', label: 'RANGO INACTIVIDAD' },
+            { col: 'C', label: 'PERSONAS' },
+            { col: 'D', label: '% DEL TOTAL' },
+        ],
+        C.rose,
+        C.white,
+    );
     row++;
 
-    inactivityRanges.forEach(range => {
-        const personas = matchedData.filter(m => range.filter(m.diasInactividad));
-        addTableRow(ws, row, [
-            { col: 'B', value: range.label },
-            { col: 'C', value: personas.length },
-            { col: 'D', value: calcPct(personas.length, total) },
-        ], C.rose, C.sectionHead, C.white);
+    inactivityRanges.forEach((range) => {
+        const personas = matchedData.filter((m) => range.filter(m.diasInactividad));
+        addTableRow(
+            ws,
+            row,
+            [
+                { col: 'B', value: range.label },
+                { col: 'C', value: personas.length },
+                { col: 'D', value: calcPct(personas.length, total) },
+            ],
+            C.rose,
+            C.sectionHead,
+            C.white,
+        );
         row++;
     });
 
@@ -316,25 +386,25 @@ export async function exportUsageToExcel(
     usageThreshold?: number,
     dependencyFilter?: string,
     returnBuffer?: false,
-    mediaLabel?: string
+    mediaLabel?: string,
 ): Promise<void>;
 export async function exportUsageToExcel(
     matchResult: UsageMatchResult,
     usageThreshold: number | undefined,
     dependencyFilter: string | undefined,
     returnBuffer: true,
-    mediaLabel?: string
+    mediaLabel?: string,
 ): Promise<{ buffer: ArrayBuffer; filename: string }>;
 export async function exportUsageToExcel(
     matchResult: UsageMatchResult,
     usageThreshold: number = 10,
     dependencyFilter?: string,
     returnBuffer?: boolean,
-    mediaLabel: string = 'tarjetas'
+    mediaLabel: string = 'tarjetas',
 ): Promise<void | { buffer: ArrayBuffer; filename: string }> {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
-        import('file-saver')
+        import('file-saver'),
     ]);
     const workbook = new (ExcelJSModule.default || ExcelJSModule).Workbook();
     const worksheet = workbook.addWorksheet('Guía');
@@ -360,9 +430,7 @@ export async function exportUsageToExcel(
     let filterSuffix = '';
 
     if (dependencyFilter && dependencyFilter !== 'Todas') {
-        filteredMatched = matchResult.matched.filter(
-            m => m.person.dependency === dependencyFilter
-        );
+        filteredMatched = matchResult.matched.filter((m) => m.person.dependency === dependencyFilter);
         filterSuffix = ` — ${dependencyFilter}`;
     }
 
@@ -399,7 +467,11 @@ export async function exportUsageToExcel(
     worksheet.mergeCells(`A2:${LAST_COL}2`);
     const metaCell = worksheet.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
-        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
     });
     metaCell.value = [
         `Reporte generado: ${dateStr}`,
@@ -549,15 +621,30 @@ export async function exportUsageToExcel(
 
             // Columna de estado (14) — badge
             if (colNumber === 14) {
-                let stColors = COLORS.slate;
+                let stColors;
                 switch (entry.person.status) {
-                    case 'Activo/a': stColors = COLORS.emerald; break;
-                    case 'Parcial': stColors = COLORS.amber; break;
-                    case 'En proceso': stColors = COLORS.sky; break;
-                    case 'Media de otro edificio': case 'Otro edificio en proceso': stColors = COLORS.violet; break;
-                    case 'Sin Acceso': case 'Baja': stColors = COLORS.slate; break;
-                    case 'Bloqueado/a': stColors = COLORS.rose; break;
-                    default: stColors = COLORS.slate;
+                    case 'Activo/a':
+                        stColors = COLORS.emerald;
+                        break;
+                    case 'Parcial':
+                        stColors = COLORS.amber;
+                        break;
+                    case 'En proceso':
+                        stColors = COLORS.sky;
+                        break;
+                    case 'Media de otro edificio':
+                    case 'Otro edificio en proceso':
+                        stColors = COLORS.violet;
+                        break;
+                    case 'Sin Acceso':
+                    case 'Baja':
+                        stColors = COLORS.slate;
+                        break;
+                    case 'Bloqueado/a':
+                        stColors = COLORS.rose;
+                        break;
+                    default:
+                        stColors = COLORS.slate;
                 }
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: stColors.head } };
                 cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: stColors.sub } };
@@ -573,10 +660,21 @@ export async function exportUsageToExcel(
     const summaryRow = worksheet.getRow(summaryIdx);
     summaryRow.height = 28;
     const summaryData: (string | number)[] = [
-        '', 'TOTAL', '', `${filteredMatched.length}`,
-        '', '', '', '', '',
-        '', filteredMatched.reduce((sum, m) => sum + m.conteo, 0),
-        '', '', '', '',
+        '',
+        'TOTAL',
+        '',
+        `${filteredMatched.length}`,
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        filteredMatched.reduce((sum, m) => sum + m.conteo, 0),
+        '',
+        '',
+        '',
+        '',
     ];
     summaryData.forEach((value, i) => {
         const cell = summaryRow.getCell(i + 1);
@@ -594,7 +692,14 @@ export async function exportUsageToExcel(
     worksheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1 };
 
     // ─── Summary sheet ───
-    await addUsageSummarySheet(workbook, filteredMatched, `Resumen — Uso ${mediaLabel}`, `RESUMEN DE USO — ${mediaLabel.toUpperCase()}${filterSuffix}`, usageThreshold, mediaLabel);
+    await addUsageSummarySheet(
+        workbook,
+        filteredMatched,
+        `Resumen — Uso ${mediaLabel}`,
+        `RESUMEN DE USO — ${mediaLabel.toUpperCase()}${filterSuffix}`,
+        usageThreshold,
+        mediaLabel,
+    );
 
     // ─── "Directorio con Conteo" sheet ───
     const ws2 = workbook.addWorksheet('Directorio con Conteo');
@@ -704,8 +809,8 @@ export async function exportUsageToExcel(
     filteredMatched.forEach((entry, idx) => {
         const usageLevel = usageLevelOf(entry.conteo, usageThreshold);
 
-        const usageColors = entry.conteo === 0 ? COLORS.rose :
-            entry.conteo < usageThreshold ? COLORS.amber : COLORS.emerald;
+        const usageColors =
+            entry.conteo === 0 ? COLORS.rose : entry.conteo < usageThreshold ? COLORS.amber : COLORS.emerald;
 
         const rowData = {
             num: idx + 1,
@@ -760,15 +865,30 @@ export async function exportUsageToExcel(
             }
 
             if (colNumber === 14) {
-                let stColors = COLORS.slate;
+                let stColors;
                 switch (entry.person.status) {
-                    case 'Activo/a': stColors = COLORS.emerald; break;
-                    case 'Parcial': stColors = COLORS.amber; break;
-                    case 'En proceso': stColors = COLORS.sky; break;
-                    case 'Media de otro edificio': case 'Otro edificio en proceso': stColors = COLORS.violet; break;
-                    case 'Sin Acceso': case 'Baja': stColors = COLORS.slate; break;
-                    case 'Bloqueado/a': stColors = COLORS.rose; break;
-                    default: stColors = COLORS.slate;
+                    case 'Activo/a':
+                        stColors = COLORS.emerald;
+                        break;
+                    case 'Parcial':
+                        stColors = COLORS.amber;
+                        break;
+                    case 'En proceso':
+                        stColors = COLORS.sky;
+                        break;
+                    case 'Media de otro edificio':
+                    case 'Otro edificio en proceso':
+                        stColors = COLORS.violet;
+                        break;
+                    case 'Sin Acceso':
+                    case 'Baja':
+                        stColors = COLORS.slate;
+                        break;
+                    case 'Bloqueado/a':
+                        stColors = COLORS.rose;
+                        break;
+                    default:
+                        stColors = COLORS.slate;
                 }
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: stColors.head } };
                 cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: stColors.sub } };
@@ -783,10 +903,21 @@ export async function exportUsageToExcel(
     const summaryRow2 = ws2.getRow(summaryIdx2);
     summaryRow2.height = 28;
     const summaryData2: (string | number)[] = [
-        '', 'TOTAL', '', `${filteredMatched.length}`,
-        '', '', '', '', '',
-        '', filteredMatched.reduce((sum, m) => sum + m.conteo, 0),
-        '', '', '', '',
+        '',
+        'TOTAL',
+        '',
+        `${filteredMatched.length}`,
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        filteredMatched.reduce((sum, m) => sum + m.conteo, 0),
+        '',
+        '',
+        '',
+        '',
     ];
     summaryData2.forEach((value, i) => {
         const cell = summaryRow2.getCell(i + 1);
@@ -839,8 +970,16 @@ export async function exportUsageToExcel(
         wsUso.getRow(2).height = 20;
 
         const uHeaders = [
-            'NO.', 'APELLIDOS', 'NOMBRES', 'DEPENDENCIA', 'EDIFICIO',
-            `FOLIO ${mediaLabel.toUpperCase()}`, 'CONTEO', 'INACTIVIDAD', 'NIVEL DE USO', 'ESTADO',
+            'NO.',
+            'APELLIDOS',
+            'NOMBRES',
+            'DEPENDENCIA',
+            'EDIFICIO',
+            `FOLIO ${mediaLabel.toUpperCase()}`,
+            'CONTEO',
+            'INACTIVIDAD',
+            'NIVEL DE USO',
+            'ESTADO',
         ];
         const uRow3 = wsUso.getRow(3);
         uHeaders.forEach((label, i) => {
@@ -870,12 +1009,16 @@ export async function exportUsageToExcel(
             });
 
             row.eachCell((cell, colNumber) => {
-                const uColors = entry.conteo === 0 ? COLORS.rose :
-                    entry.conteo < usageThreshold ? COLORS.amber : COLORS.emerald;
+                const uColors =
+                    entry.conteo === 0
+                        ? COLORS.rose
+                        : entry.conteo < usageThreshold
+                          ? COLORS.amber
+                          : COLORS.emerald;
                 cell.font = { name: 'Arial', size: 9, color: { argb: 'FF111827' } };
                 cell.alignment = {
                     vertical: 'middle',
-                    horizontal: (colNumber === 1 || colNumber >= 6) ? 'center' : 'left',
+                    horizontal: colNumber === 1 || colNumber >= 6 ? 'center' : 'left',
                     wrapText: true,
                 };
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.slate.fill } };
@@ -892,15 +1035,30 @@ export async function exportUsageToExcel(
                     cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: uColors.sub } };
                 }
                 if (colNumber === 10) {
-                    let stColors = COLORS.slate;
+                    let stColors;
                     switch (entry.person.status) {
-                        case 'Activo/a': stColors = COLORS.emerald; break;
-                        case 'Parcial': stColors = COLORS.amber; break;
-                        case 'En proceso': stColors = COLORS.sky; break;
-                        case 'Media de otro edificio': case 'Otro edificio en proceso': stColors = COLORS.violet; break;
-                        case 'Sin Acceso': case 'Baja': stColors = COLORS.slate; break;
-                        case 'Bloqueado/a': stColors = COLORS.rose; break;
-                        default: stColors = COLORS.slate;
+                        case 'Activo/a':
+                            stColors = COLORS.emerald;
+                            break;
+                        case 'Parcial':
+                            stColors = COLORS.amber;
+                            break;
+                        case 'En proceso':
+                            stColors = COLORS.sky;
+                            break;
+                        case 'Media de otro edificio':
+                        case 'Otro edificio en proceso':
+                            stColors = COLORS.violet;
+                            break;
+                        case 'Sin Acceso':
+                        case 'Baja':
+                            stColors = COLORS.slate;
+                            break;
+                        case 'Bloqueado/a':
+                            stColors = COLORS.rose;
+                            break;
+                        default:
+                            stColors = COLORS.slate;
                     }
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: stColors.head } };
                     cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: stColors.sub } };
@@ -954,13 +1112,14 @@ export async function exportUsageToExcel(
             unmatchedSheet.addRow({
                 folio: entry.folio,
                 conteo: entry.conteo,
-                diasInactividad: entry.diasInactividad !== null ? `${entry.diasInactividad} días` : 'Sin datos',
+                diasInactividad:
+                    entry.diasInactividad !== null ? `${entry.diasInactividad} días` : 'Sin datos',
             });
         });
     }
 
     // ── Save ──
-    let fileNameParts = [`Reporte_Uso_${mediaLabel.replace(/\s+/g, '_')}`];
+    const fileNameParts = [`Reporte_Uso_${mediaLabel.replace(/\s+/g, '_')}`];
     if (dependencyFilter && dependencyFilter !== 'Todas') {
         fileNameParts.push(dependencyFilter.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ ]/g, '').replace(/ /g, '_'));
     }

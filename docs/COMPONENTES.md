@@ -5,6 +5,29 @@
 
 ---
 
+## Design system y adiciones recientes
+
+**Tokens de diseño** (`src/app.css`, bloque `@theme`):
+
+| Token | Uso |
+|---|---|
+| `bg-primary` / `text-primary-foreground` | Color primario (slate-900) |
+| `rounded-control` / `rounded-card` / `rounded-overlay` | Radios por nivel |
+| `shadow-card` / `shadow-overlay` | Sombras por nivel |
+| `text-2xs` | Microtipografía (10px) |
+
+**Componentes nuevos:**
+
+- **`IconButton`** — botón de solo icono con `aria-label` obligatorio y objetivo táctil (44px en móvil). Úsalo para acciones de fila/icono.
+- **`StatusBadge`** — badge de estado unificado (`domain="personnel|card|ticket|followup"`), apoyado en `src/lib/constants/status.ts`.
+- **`RouteFallback`** — placeholder de carga para rutas lazy.
+
+**Utilidades nuevas:** `scrollLock` (bloqueo de scroll con refcount), `overlayStack` (Escape solo del overlay superior), `mediaState` (matchMedia reactivo: `isMobile`, `isPhone`, `isDesktop`).
+
+**Utilidades ligeras de plantillas:** `src/lib/utils/xlsxFields.ts` (tipos, `FIELD_LABELS`, `SHEET_TO_TICKET_TYPE`, `parseFloors`, `normalizeEmailText`) sin cargar ExcelJS. Los exportadores/importadores pesados se cargan con `await import()` en el handler.
+
+---
+
 ## Sistema de Barrels (Importación)
 
 Todos los componentes se exportan a través de **barrel files** para centralizar las importaciones.

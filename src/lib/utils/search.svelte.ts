@@ -22,5 +22,3 @@ export function createSimpleDebounce<T extends (...args: any[]) => any>(
         }, delay);
     };
 }
-
-

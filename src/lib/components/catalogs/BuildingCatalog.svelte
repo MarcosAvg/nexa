@@ -1,13 +1,14 @@
 <script lang="ts">
-    import { toast } from "svelte-sonner";
-    import { catalogService } from "../../services";
-    import { catalogState } from "../../stores";
-    import Button from "../Button.svelte";
-    import Input from "../Input.svelte";
-    import Modal from "../Modal.svelte";
-    import DeleteConfirmTypedModal from "../DeleteConfirmTypedModal.svelte";
-    import CatalogSectionHeader from "./CatalogSectionHeader.svelte";
-    import { Plus, Edit2, Trash2, Building2, GripVertical, X, ArrowUp, ArrowDown } from "lucide-svelte";
+    import { toast } from 'svelte-sonner';
+    import { catalogService } from '../../services';
+    import { catalogState } from '../../stores';
+    import Button from '../Button.svelte';
+    import IconButton from '../IconButton.svelte';
+    import Input from '../Input.svelte';
+    import Modal from '../Modal.svelte';
+    import DeleteConfirmTypedModal from '../DeleteConfirmTypedModal.svelte';
+    import CatalogSectionHeader from './CatalogSectionHeader.svelte';
+    import { Plus, Edit2, Trash2, Building2, GripVertical, X, ArrowUp, ArrowDown } from 'lucide-svelte';
 
     /**
      * BuildingCatalog — Gestión de edificios con pisos (CRUD).
@@ -31,14 +32,13 @@
     let draggingIndex = $state<number | null>(null);
     let dragOverIndex = $state<number | null>(null);
 
-
     // Add/Edit modal state
     let isModalOpen = $state(false);
     let editingId = $state<number | null>(null);
-    let buildingName = $state("");
+    let buildingName = $state('');
     /** Pisos ordenados del edificio (el orden define sort_order). */
     let floorItems = $state<string[]>([]);
-    let newFloorInput = $state("");
+    let newFloorInput = $state('');
     // Generador de secuencia
     let seqLevels = $state(10);
     let seqIncludePB = $state(true);
@@ -51,7 +51,7 @@
         const label = newFloorInput.trim();
         if (!label) return;
         if (label.length > 40) {
-            toast.error("El identificador del piso no puede exceder 40 caracteres");
+            toast.error('El identificador del piso no puede exceder 40 caracteres');
             return;
         }
         if (floorItems.some((f) => f.toLowerCase() === label.toLowerCase())) {
@@ -59,7 +59,7 @@
             return;
         }
         floorItems = [...floorItems, label];
-        newFloorInput = "";
+        newFloorInput = '';
     }
 
     function removeFloor(index: number) {
@@ -78,11 +78,11 @@
     function generateSequence() {
         const levels = Math.floor(Number(seqLevels));
         if (!Number.isFinite(levels) || levels < 1 || levels > 200) {
-            toast.error("Los niveles deben ser un número entre 1 y 200");
+            toast.error('Los niveles deben ser un número entre 1 y 200');
             return;
         }
         const generated: string[] = [];
-        if (seqIncludePB) generated.push("PB");
+        if (seqIncludePB) generated.push('PB');
         for (let n = 1; n <= levels; n++) generated.push(String(n));
 
         const existing = new Set(floorItems.map((f) => f.toLowerCase()));
@@ -94,11 +94,11 @@
             }
         }
         if (added.length === 0) {
-            toast.info("No hay pisos nuevos que agregar");
+            toast.info('No hay pisos nuevos que agregar');
             return;
         }
         floorItems = [...floorItems, ...added];
-        newFloorInput = "";
+        newFloorInput = '';
     }
 
     async function fetchBuildings() {
@@ -115,10 +115,10 @@
         // Actualización optimista: los desplegables reflejan el nuevo orden al instante
         catalogState.setBuildings(next);
         try {
-            await catalogService.reorderCatalog("buildings", next);
-            toast.success("Orden actualizado");
+            await catalogService.reorderCatalog('buildings', next);
+            toast.success('Orden actualizado');
         } catch {
-            toast.error("Error al actualizar el orden");
+            toast.error('Error al actualizar el orden');
             await fetchBuildings();
         } finally {
             isReordering = false;
@@ -127,8 +127,8 @@
 
     function buildingDragStart(e: DragEvent, index: number) {
         if (isReordering) return;
-        e.dataTransfer!.effectAllowed = "move";
-        e.dataTransfer!.setData("text/plain", String(index));
+        e.dataTransfer!.effectAllowed = 'move';
+        e.dataTransfer!.setData('text/plain', String(index));
         draggingIndex = index;
         dragOverIndex = null;
     }
@@ -136,14 +136,15 @@
     function buildingDragOver(e: DragEvent, index: number) {
         if (draggingIndex === null || draggingIndex === index) return;
         e.preventDefault();
-        e.dataTransfer!.dropEffect = "move";
+        e.dataTransfer!.dropEffect = 'move';
         if (dragOverIndex !== index) dragOverIndex = index;
     }
 
     function buildingDragLeave(e: DragEvent, index: number) {
         // No limpiar si el puntero se mueve a un hijo de la tarjeta (evita parpadeo)
         const related = e.relatedTarget;
-        if (related instanceof Node && e.currentTarget instanceof Node && e.currentTarget.contains(related)) return;
+        if (related instanceof Node && e.currentTarget instanceof Node && e.currentTarget.contains(related))
+            return;
         if (dragOverIndex === index) dragOverIndex = null;
     }
 
@@ -167,9 +168,9 @@
             floorItems = [...(building.floors || [])];
         } else {
             editingId = null;
-            buildingName = "";
+            buildingName = '';
             floorItems = [];
-            newFloorInput = "";
+            newFloorInput = '';
             seqLevels = 10;
             seqIncludePB = true;
         }
@@ -178,7 +179,7 @@
 
     async function saveBuilding() {
         if (!buildingName.trim()) {
-            toast.error("El nombre del edificio es requerido");
+            toast.error('El nombre del edificio es requerido');
             return;
         }
         // Red de seguridad anti-duplicados (case-insensitive) antes de enviar.
@@ -193,7 +194,7 @@
             floors.push(label);
         }
         if (floors.length === 0) {
-            toast.error("Debes agregar al menos un piso");
+            toast.error('Debes agregar al menos un piso');
             return;
         }
 
@@ -204,25 +205,25 @@
             });
             await fetchBuildings();
             isModalOpen = false;
-            toast.success(editingId ? "Edificio actualizado" : "Edificio creado");
+            toast.success(editingId ? 'Edificio actualizado' : 'Edificio creado');
         } catch {
-            toast.error("Error al guardar el edificio");
+            toast.error('Error al guardar el edificio');
         }
     }
 
     function openDeleteModal(building: any) {
-        deleteTarget = { ...building, type: "building" };
+        deleteTarget = { ...building, type: 'building' };
         isDeleteModalOpen = true;
     }
 
     async function confirmDelete() {
         if (!deleteTarget) return;
         try {
-            await catalogService.deleteCatalogItem("buildings", deleteTarget.id, deleteTarget.name);
+            await catalogService.deleteCatalogItem('buildings', deleteTarget.id, deleteTarget.name);
             await fetchBuildings();
             toast.success(`"${deleteTarget.name}" eliminado correctamente`);
         } catch {
-            toast.error("Error al eliminar el edificio");
+            toast.error('Error al eliminar el edificio');
         }
         isDeleteModalOpen = false;
         deleteTarget = null;
@@ -239,11 +240,18 @@
         onNew={() => openModal()}
     />
 
-    <div class="grid sm:grid-cols-2 lg:grid-cols-2 gap-6" role="list">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6" role="list">
         {#each buildings as building, i}
             <div
                 role="listitem"
-                class="group p-6 border border-slate-200/50 rounded-2xl bg-white/40 hover:bg-white transition-all duration-500 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden {canEdit && !isReordering ? 'cursor-grab active:cursor-grabbing' : ''} {draggingIndex === i ? 'opacity-40' : ''} {draggingIndex !== null && dragOverIndex === i && draggingIndex !== i ? 'ring-2 ring-blue-400 border-blue-200 scale-[1.02]' : ''}"
+                class="group p-6 border border-slate-200/50 rounded-2xl bg-white/40 hover:bg-white transition-all duration-500 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden {canEdit &&
+                !isReordering
+                    ? 'cursor-grab active:cursor-grabbing'
+                    : ''} {draggingIndex === i ? 'opacity-40' : ''} {draggingIndex !== null &&
+                dragOverIndex === i &&
+                draggingIndex !== i
+                    ? 'ring-2 ring-blue-400 border-blue-200 scale-[1.02]'
+                    : ''}"
                 draggable={canEdit && !isReordering}
                 ondragstart={(e) => buildingDragStart(e, i)}
                 ondragover={(e) => buildingDragOver(e, i)}
@@ -253,34 +261,56 @@
             >
                 <div class="flex justify-between items-start mb-5 relative z-10">
                     <div>
-                        <h4 class="font-extrabold text-slate-900 text-[16px] tracking-tight group-hover:text-blue-600 transition-colors">{building.name}</h4>
-                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-1.5 flex items-center gap-2">
+                        <h4
+                            class="font-extrabold text-slate-900 text-[16px] tracking-tight group-hover:text-blue-600 transition-colors"
+                        >
+                            {building.name}
+                        </h4>
+                        <p
+                            class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-1.5 flex items-center gap-2"
+                        >
                             <span class="w-1.5 h-1.5 rounded-full bg-blue-500/40"></span>
                             {building.floors.length} pisos configurados
                         </p>
                     </div>
                     {#if canEdit}
                         <div class="flex gap-1.5">
-                            <span class="p-2.5 text-slate-300 group-hover:text-slate-400 cursor-grab transition-colors" title="Arrastrar para reordenar" aria-hidden="true">
+                            <span
+                                class="p-2.5 text-slate-300 group-hover:text-slate-400 cursor-grab transition-colors"
+                                title="Arrastrar para reordenar"
+                                aria-hidden="true"
+                            >
                                 <GripVertical size={16} strokeWidth={2.5} />
                             </span>
-                            <button class="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50/80 rounded-xl transition-all active:scale-95" onclick={() => openModal(building)}>
-                                <Edit2 size={16} strokeWidth={2.5} />
-                            </button>
-                            <button class="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50/80 rounded-xl transition-all active:scale-95" onclick={() => openDeleteModal(building)}>
-                                <Trash2 size={16} strokeWidth={2.5} />
-                            </button>
+                            <IconButton
+                                icon={Edit2}
+                                label="Editar edificio"
+                                tone="blue"
+                                size="sm"
+                                onclick={() => openModal(building)}
+                            />
+                            <IconButton
+                                icon={Trash2}
+                                label="Eliminar edificio"
+                                tone="rose"
+                                size="sm"
+                                onclick={() => openDeleteModal(building)}
+                            />
                         </div>
                     {/if}
                 </div>
                 <div class="flex flex-wrap gap-2 relative z-10">
                     {#each building.floors as floor}
-                        <span class="px-3.5 py-1.5 bg-white border border-slate-100 rounded-xl text-xs font-bold text-slate-600 shadow-sm group-hover:border-blue-100 transition-colors">
+                        <span
+                            class="px-3.5 py-1.5 bg-white border border-slate-100 rounded-xl text-xs font-bold text-slate-600 shadow-sm group-hover:border-blue-100 transition-colors"
+                        >
                             {floor}
                         </span>
                     {/each}
                 </div>
-                <div class="absolute -right-6 -bottom-6 text-slate-400/5 group-hover:text-blue-500/8 rotate-12 transition-all duration-700 pointer-events-none">
+                <div
+                    class="absolute -right-6 -bottom-6 text-slate-400/5 group-hover:text-blue-500/8 rotate-12 transition-all duration-700 pointer-events-none"
+                >
                     <Building2 size={100} />
                 </div>
             </div>
@@ -289,10 +319,16 @@
 </div>
 
 <!-- Add/Edit Building Modal -->
-<Modal bind:isOpen={isModalOpen} title={editingId ? "Editar Edificio" : "Nuevo Edificio"} description="Registra un nuevo edificio y sus pisos correspondientes.">
+<Modal
+    bind:isOpen={isModalOpen}
+    title={editingId ? 'Editar Edificio' : 'Nuevo Edificio'}
+    description="Registra un nuevo edificio y sus pisos correspondientes."
+>
     <div class="space-y-4">
         <div>
-            <label for="building-name" class="block text-sm font-medium text-slate-700 mb-1">Nombre del Edificio</label>
+            <label for="building-name" class="block text-sm font-medium text-slate-700 mb-1"
+                >Nombre del Edificio</label
+            >
             <Input id="building-name" placeholder="Ej. Torre Administrativa" bind:value={buildingName} />
         </div>
         <div>
@@ -343,7 +379,9 @@
                     {/each}
                 </div>
             {:else}
-                <p class="text-xs text-slate-400 mb-3 italic">Sin pisos aún — agrega uno o genera una secuencia.</p>
+                <p class="text-xs text-slate-400 mb-3 italic">
+                    Sin pisos aún — agrega uno o genera una secuencia.
+                </p>
             {/if}
 
             {#if canEdit}
@@ -360,7 +398,7 @@
                         bind:value={newFloorInput}
                         placeholder="Ej. PB, 1, 2, Mezzanine…"
                         maxlength={40}
-                        class="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                        class="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm focus-visible:outline-none focus-visible:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500 transition-colors"
                         aria-label="Nuevo piso"
                     />
                     <Button type="submit" variant="secondary" size="sm" class="h-10 shrink-0">
@@ -370,10 +408,18 @@
 
                 <!-- Generador de secuencia -->
                 <div class="mt-3 p-3 rounded-xl border border-dashed border-slate-200 bg-white">
-                    <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-2">Generador de secuencia</p>
+                    <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+                        Generador de secuencia
+                    </p>
                     <div class="flex items-center gap-3 flex-wrap">
-                        <label class="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer">
-                            <input type="checkbox" bind:checked={seqIncludePB} class="w-4 h-4 accent-blue-600" />
+                        <label
+                            class="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer"
+                        >
+                            <input
+                                type="checkbox"
+                                bind:checked={seqIncludePB}
+                                class="w-4 h-4 accent-blue-600"
+                            />
                             Incluir Planta Baja
                         </label>
                         <label class="flex items-center gap-1.5 text-xs font-bold text-slate-600">
@@ -383,21 +429,23 @@
                                 min={1}
                                 max={200}
                                 bind:value={seqLevels}
-                                class="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-sm tabular-nums focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                class="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-sm tabular-nums focus-visible:outline-none focus-visible:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500"
                             />
                         </label>
-                        <Button variant="secondary" size="sm" onclick={generateSequence}>
-                            Generar
-                        </Button>
+                        <Button variant="secondary" size="sm" onclick={generateSequence}>Generar</Button>
                     </div>
-                    <p class="text-[10px] text-slate-400 mt-2">Anexa "PB" (opcional) y los niveles 1…N, sin duplicar los ya agregados.</p>
+                    <p class="text-[10px] text-slate-400 mt-2">
+                        Anexa "PB" (opcional) y los niveles 1…N, sin duplicar los ya agregados.
+                    </p>
                 </div>
             {/if}
         </div>
     </div>
     {#snippet footer()}
         <Button variant="secondary" onclick={() => (isModalOpen = false)}>Cancelar</Button>
-        <Button variant="primary" onclick={saveBuilding}>{editingId ? "Actualizar" : "Guardar"} Edificio</Button>
+        <Button variant="primary" onclick={saveBuilding}
+            >{editingId ? 'Actualizar' : 'Guardar'} Edificio</Button
+        >
     {/snippet}
 </Modal>
 
@@ -405,7 +453,7 @@
 <DeleteConfirmTypedModal
     bind:isOpen={isDeleteModalOpen}
     title="Eliminar Edificio"
-    targetName={deleteTarget?.name ?? ""}
+    targetName={deleteTarget?.name ?? ''}
     confirmText="Eliminar permanentemente"
     onConfirm={confirmDelete}
     onCancel={() => (isDeleteModalOpen = false)}

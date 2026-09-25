@@ -1,9 +1,21 @@
 <script lang="ts">
-    import { twMerge } from "tailwind-merge";
+    import { twMerge } from 'tailwind-merge';
 
     /** Atributos nativos del elemento <input>. */
     type NativeInputAttrs = {
-        type?: "text" | "email" | "password" | "number" | "tel" | "url" | "search" | "date" | "time" | "datetime-local" | "file" | "hidden";
+        type?:
+            | 'text'
+            | 'email'
+            | 'password'
+            | 'number'
+            | 'tel'
+            | 'url'
+            | 'search'
+            | 'date'
+            | 'time'
+            | 'datetime-local'
+            | 'file'
+            | 'hidden';
         name?: string;
         placeholder?: string;
         readonly?: boolean;
@@ -23,8 +35,8 @@
         id?: string;
         title?: string;
         style?: string;
-        "aria-label"?: string;
-        "aria-describedby"?: string;
+        'aria-label'?: string;
+        'aria-describedby'?: string;
     };
 
     /**
@@ -48,13 +60,13 @@
 
     let {
         value = $bindable(),
-        class: className = "",
+        class: className = '',
         oninput,
         onchange,
         onfocus,
         onblur,
         onkeydown,
-        type = "text",
+        type = 'text',
         name,
         placeholder,
         readonly = false,
@@ -74,12 +86,12 @@
         id,
         title,
         style,
-        "aria-label": ariaLabel,
-        "aria-describedby": ariaDescribedby,
+        'aria-label': ariaLabel,
+        'aria-describedby': ariaDescribedby,
     }: Props = $props();
 
     const baseStyles =
-        "flex h-10 w-full rounded-xl border border-slate-200 bg-white/50 backdrop-blur-sm px-4 py-2 text-[14px] font-medium text-slate-700 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-300";
+        'flex h-10 w-full rounded-xl border border-slate-200 bg-white/50 backdrop-blur-sm px-4 py-2 text-[14px] font-medium text-slate-700 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-300';
 
     let computedClass = $derived(twMerge(baseStyles, className));
 </script>

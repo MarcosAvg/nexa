@@ -7,10 +7,13 @@ import {
     ACTION_NAMES,
 } from './historyFormat';
 
-export async function exportHistoryToExcel(data: any[], options?: { filters?: { status?: string; dependency?: string; search?: string } }) {
+export async function exportHistoryToExcel(
+    data: any[],
+    options?: { filters?: { status?: string; dependency?: string; search?: string } },
+) {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
-        import('file-saver')
+        import('file-saver'),
     ]);
     const workbook = new (ExcelJSModule.default || ExcelJSModule).Workbook();
     const worksheet = workbook.addWorksheet('Historial');
@@ -25,7 +28,7 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
         emerald: { head: 'FFD1FAE5', sub: 'FF065F46', fill: 'FFF0FDF4' },
         rose: { head: 'FFFEE2E2', sub: 'FF991B1B', fill: 'FFFFF1F2' },
         violet: { head: 'FFEDE9FE', sub: 'FF5B21B6', fill: 'FFFAF5FF' },
-        slate: { head: 'FFF1F5F9', sub: 'FF334155', fill: 'FFF8FAFC' }
+        slate: { head: 'FFF1F5F9', sub: 'FF334155', fill: 'FFF8FAFC' },
     };
 
     const actionNames = ACTION_NAMES;
@@ -50,7 +53,11 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
     worksheet.mergeCells('A2:E2');
     const metaCell = worksheet.getCell('A2');
     const dateStr = new Date().toLocaleDateString('es-MX', {
-        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
     });
     metaCell.value = `Reporte generado: ${dateStr}  |  Registros: ${data.length}`;
     metaCell.font = { name: 'Arial', size: 9, color: { argb: COLORS.meta } };
@@ -62,10 +69,10 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
         { label: 'AUDITORÍA', range: 'B3:B3', colors: COLORS.personal },
         { label: 'MOVIMIENTO', range: 'C3:C3', colors: COLORS.amber },
         { label: 'USUARIO', range: 'D3:D3', colors: COLORS.personal },
-        { label: 'DETALLES DE LA ACCIÓN', range: 'E3:E3', colors: COLORS.violet }
+        { label: 'DETALLES DE LA ACCIÓN', range: 'E3:E3', colors: COLORS.violet },
     ];
 
-    groups.forEach(group => {
+    groups.forEach((group) => {
         worksheet.mergeCells(group.range);
         const cell = worksheet.getCell(group.range.split(':')[0]);
         cell.value = group.label;
@@ -76,7 +83,7 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
             top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
             left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
             bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-            right: { style: 'medium', color: { argb: COLORS.separator } }
+            right: { style: 'medium', color: { argb: COLORS.separator } },
         };
     });
 
@@ -86,18 +93,19 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
     headerLabels.forEach((label, i) => {
         const cell = headerRow.getCell(i + 1);
         cell.value = label;
-        const group = groups.find(g => {
-            const col = String.fromCharCode(65 + i);
-            const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
-            return col >= (start || 'A') && col <= (end || start || 'A');
-        }) || groups[0];
+        const group =
+            groups.find((g) => {
+                const col = String.fromCharCode(65 + i);
+                const [start, end] = g.range.replace(/[0-9]/g, '').split(':');
+                return col >= (start || 'A') && col <= (end || start || 'A');
+            }) || groups[0];
 
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: group.colors.sub } };
         cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 8 };
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         cell.border = {
             bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
-            right: { style: 'medium', color: { argb: COLORS.separator } }
+            right: { style: 'medium', color: { argb: COLORS.separator } },
         };
     });
 
@@ -112,17 +120,18 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
             entity: displayName,
             actionLabel: actionNames[log.action] || log.action,
             user: log.performed_by_name || '—',
-            description: desc
+            description: desc,
         };
 
         const row = worksheet.addRow(rowData);
 
         row.eachCell((cell, colNumber) => {
             const colLetter = String.fromCharCode(64 + colNumber);
-            const group = groups.find(g => {
-                const parts = g.range.replace(/[0-9]/g, '').split(':');
-                return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
-            }) || groups[0];
+            const group =
+                groups.find((g) => {
+                    const parts = g.range.replace(/[0-9]/g, '').split(':');
+                    return colLetter >= parts[0] && colLetter <= (parts[1] || parts[0]);
+                }) || groups[0];
 
             cell.font = { name: 'Arial', size: 9 };
             cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
@@ -130,7 +139,7 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
 
             cell.border = {
                 bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-                right: { style: 'medium', color: { argb: COLORS.separator } }
+                right: { style: 'medium', color: { argb: COLORS.separator } },
             };
 
             if (colNumber === 3) {
@@ -141,10 +150,35 @@ export async function exportHistoryToExcel(data: any[], options?: { filters?: { 
                 if (['CREATE', 'ACTIVATE', 'APPLY_MODIFICATION'].includes(action)) {
                     bgColor = COLORS.emerald.head;
                     textColor = COLORS.emerald.sub;
-                } else if (['DELETE', 'BLOCK', 'DEACTIVATE', 'UNASSIGN', 'UNASSIGN_CARD', 'DELETE_RESPONSIVA', 'REPLACE_OLD', 'DELETE_TICKET_CASCADE', 'REJECT_MODIFICATION', 'REJECT', 'REJECT_ALTA', 'REJECT_TICKET', 'CANCEL'].includes(action)) {
+                } else if (
+                    [
+                        'DELETE',
+                        'BLOCK',
+                        'DEACTIVATE',
+                        'UNASSIGN',
+                        'UNASSIGN_CARD',
+                        'DELETE_RESPONSIVA',
+                        'REPLACE_OLD',
+                        'DELETE_TICKET_CASCADE',
+                        'REJECT_MODIFICATION',
+                        'REJECT',
+                        'REJECT_ALTA',
+                        'REJECT_TICKET',
+                        'CANCEL',
+                    ].includes(action)
+                ) {
                     bgColor = COLORS.rose.head;
                     textColor = COLORS.rose.sub;
-                } else if (['ASSIGN_CARD', 'REPLACE_CARD', 'SIGN_RESPONSIVA', 'COMPLETE_TICKET', 'TICKET', 'CREATE_TICKET'].includes(action)) {
+                } else if (
+                    [
+                        'ASSIGN_CARD',
+                        'REPLACE_CARD',
+                        'SIGN_RESPONSIVA',
+                        'COMPLETE_TICKET',
+                        'TICKET',
+                        'CREATE_TICKET',
+                    ].includes(action)
+                ) {
                     bgColor = COLORS.violet.head;
                     textColor = COLORS.violet.sub;
                 }

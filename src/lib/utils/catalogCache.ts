@@ -50,7 +50,7 @@ export const catalogCache = {
 
     invalidateAll(): void {
         Object.keys(localStorage)
-            .filter(k => k.startsWith(CACHE_KEY_PREFIX))
-            .forEach(k => localStorage.removeItem(k));
+            .filter((k) => k.startsWith(CACHE_KEY_PREFIX))
+            .forEach((k) => localStorage.removeItem(k));
     },
 };

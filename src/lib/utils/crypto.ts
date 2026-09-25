@@ -6,19 +6,19 @@ export async function generateLegalHash(data: any, signature: string, legalSnipp
         nombre: data.nombre,
         numEmpleado: data.numEmpleado,
         dependencia: data.dependencia,
-        fecha: data.fecha
+        fecha: data.fecha,
     };
 
     const content = JSON.stringify({
         data: stableData,
         signature,
-        legalSnippet
+        legalSnippet,
     });
 
     const msgUint8 = new TextEncoder().encode(content);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 
     return hashHex;
 }

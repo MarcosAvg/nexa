@@ -1,7 +1,7 @@
-import { supabase } from "../supabase";
-import { withErrorHandlingSafe, withErrorHandling } from "../utils";
-import { buildFloorResolver } from "../utils/floorMatch";
-import type { AccessAssignment, AccessAssignmentPermission, FloorGroup } from "../types";
+import { supabase } from '../supabase';
+import { withErrorHandlingSafe, withErrorHandling } from '../utils';
+import { buildFloorResolver } from '../utils/floorMatch';
+import type { AccessAssignment, AccessAssignmentPermission, FloorGroup } from '../types';
 
 /** Mapa de pisos por id de tipo de medio (entrada de savePersonAccess). */
 export type FloorGroups = Record<string, string[]>;
@@ -26,14 +26,14 @@ export function deriveAccessFromAssignments(assignments: any[] | null | undefine
         const mediaTypeId = a.media_type_id;
         if (!mediaTypeId) continue;
         for (const p of a.access_assignment_permissions || []) {
-            if (p.resource_type === "floor") {
-                const label = p.floors?.label ?? "";
+            if (p.resource_type === 'floor') {
+                const label = p.floors?.label ?? '';
                 if (!label) continue;
                 if (!byType.has(mediaTypeId)) {
                     byType.set(mediaTypeId, {
                         mediaTypeId,
-                        mediaKey: a.access_media_types?.key ?? "",
-                        mediaName: a.access_media_types?.name ?? "",
+                        mediaKey: a.access_media_types?.key ?? '',
+                        mediaName: a.access_media_types?.name ?? '',
                         floors: [],
                     });
                 }
@@ -41,8 +41,8 @@ export function deriveAccessFromAssignments(assignments: any[] | null | undefine
                 if (!group.floors.includes(label)) {
                     group.floors.push(label);
                 }
-            } else if (p.resource_type === "special_access") {
-                const name = p.special_accesses?.name ?? "";
+            } else if (p.resource_type === 'special_access') {
+                const name = p.special_accesses?.name ?? '';
                 if (name) specialSet.add(name);
             }
         }
@@ -83,12 +83,8 @@ async function applyBaseFloor(
     // Si no se está solicitando acceso en el edificio de radicación, no se inyecta.
     if (!floorsByBuilding[bid]) return floorsByBuilding;
 
-    const { data: types } = await supabase
-        .from("access_media_types")
-        .select("id, has_floors");
-    const hasFloors = new Set<string>(
-        (types || []).filter((m: any) => m.has_floors).map((m: any) => m.id),
-    );
+    const { data: types } = await supabase.from('access_media_types').select('id, has_floors');
+    const hasFloors = new Set<string>((types || []).filter((m: any) => m.has_floors).map((m: any) => m.id));
     const floorLabel = base.floor;
     const next = { ...floorsByBuilding };
     const floorsForBid = { ...next[bid] };
@@ -106,26 +102,34 @@ async function applyBaseFloor(
 
 export const accessAssignmentService = {
     async fetchForPerson(personId: string): Promise<AccessAssignment[]> {
-        return withErrorHandlingSafe(async () => {
-            const { data, error } = await supabase
-                .from("access_assignments")
-                .select("*, access_media_types(*)")
-                .eq("person_id", personId)
-                .eq("status", "active");
-            if (error) throw error;
-            return (data || []) as AccessAssignment[];
-        }, "Fetch Person Access Assignments", []);
+        return withErrorHandlingSafe(
+            async () => {
+                const { data, error } = await supabase
+                    .from('access_assignments')
+                    .select('*, access_media_types(*)')
+                    .eq('person_id', personId)
+                    .eq('status', 'active');
+                if (error) throw error;
+                return (data || []) as AccessAssignment[];
+            },
+            'Fetch Person Access Assignments',
+            [],
+        );
     },
 
     async fetchPermissions(assignmentId: string): Promise<AccessAssignmentPermission[]> {
-        return withErrorHandlingSafe(async () => {
-            const { data, error } = await supabase
-                .from("access_assignment_permissions")
-                .select("*")
-                .eq("assignment_id", assignmentId);
-            if (error) throw error;
-            return (data || []) as AccessAssignmentPermission[];
-        }, "Fetch Access Assignment Permissions", []);
+        return withErrorHandlingSafe(
+            async () => {
+                const { data, error } = await supabase
+                    .from('access_assignment_permissions')
+                    .select('*')
+                    .eq('assignment_id', assignmentId);
+                if (error) throw error;
+                return (data || []) as AccessAssignmentPermission[];
+            },
+            'Fetch Access Assignment Permissions',
+            [],
+        );
     },
 
     /**
@@ -133,59 +137,63 @@ export const accessAssignmentService = {
      * (agrupados por edificio). Fuente: el nuevo modelo de permisos.
      */
     async fetchPersonAccess(personId: string): Promise<PersonAccessData> {
-        return withErrorHandlingSafe(async () => {
-            const { data, error } = await supabase
-                .from("access_assignments")
-                .select(
-                    "id, media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name), building_id)"
-                )
-                .eq("person_id", personId)
-                .eq("status", "active");
-            if (error) throw error;
+        return withErrorHandlingSafe(
+            async () => {
+                const { data, error } = await supabase
+                    .from('access_assignments')
+                    .select(
+                        'id, media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name), building_id)',
+                    )
+                    .eq('person_id', personId)
+                    .eq('status', 'active');
+                if (error) throw error;
 
-            const byBuilding = new Map<number, Map<string, FloorGroup>>();
-            const specialSet = new Set<string>();
+                const byBuilding = new Map<number, Map<string, FloorGroup>>();
+                const specialSet = new Set<string>();
 
-            for (const assignment of (data || []) as any[]) {
-                const mediaTypeId = assignment.media_type_id;
-                if (!mediaTypeId) continue;
-                for (const p of (assignment.access_assignment_permissions || []) as any[]) {
-                    if (p.resource_type === "floor") {
-                        const bid = p.building_id;
-                        if (!bid) continue;
-                        const label = p.floors?.label ?? "";
-                        if (!label) continue;
-                        if (!byBuilding.has(bid)) byBuilding.set(bid, new Map());
-                        const typesMap = byBuilding.get(bid)!;
-                        if (!typesMap.has(mediaTypeId)) {
-                            typesMap.set(mediaTypeId, {
-                                mediaTypeId,
-                                mediaKey: assignment.access_media_types?.key ?? "",
-                                mediaName: assignment.access_media_types?.name ?? "",
-                                floors: [],
-                            });
+                for (const assignment of (data || []) as any[]) {
+                    const mediaTypeId = assignment.media_type_id;
+                    if (!mediaTypeId) continue;
+                    for (const p of (assignment.access_assignment_permissions || []) as any[]) {
+                        if (p.resource_type === 'floor') {
+                            const bid = p.building_id;
+                            if (!bid) continue;
+                            const label = p.floors?.label ?? '';
+                            if (!label) continue;
+                            if (!byBuilding.has(bid)) byBuilding.set(bid, new Map());
+                            const typesMap = byBuilding.get(bid)!;
+                            if (!typesMap.has(mediaTypeId)) {
+                                typesMap.set(mediaTypeId, {
+                                    mediaTypeId,
+                                    mediaKey: assignment.access_media_types?.key ?? '',
+                                    mediaName: assignment.access_media_types?.name ?? '',
+                                    floors: [],
+                                });
+                            }
+                            const group = typesMap.get(mediaTypeId)!;
+                            if (!group.floors.includes(label)) {
+                                group.floors.push(label);
+                            }
+                        } else if (p.resource_type === 'special_access') {
+                            const name = p.special_accesses?.name ?? '';
+                            if (name) specialSet.add(name);
                         }
-                        const group = typesMap.get(mediaTypeId)!;
-                        if (!group.floors.includes(label)) {
-                            group.floors.push(label);
-                        }
-                    } else if (p.resource_type === "special_access") {
-                        const name = p.special_accesses?.name ?? "";
-                        if (name) specialSet.add(name);
                     }
                 }
-            }
 
-            const floorsByBuilding: Record<number, FloorGroup[]> = {};
-            for (const [bid, typesMap] of byBuilding) {
-                floorsByBuilding[bid] = Array.from(typesMap.values());
-            }
+                const floorsByBuilding: Record<number, FloorGroup[]> = {};
+                for (const [bid, typesMap] of byBuilding) {
+                    floorsByBuilding[bid] = Array.from(typesMap.values());
+                }
 
-            return {
-                floorsByBuilding,
-                specialAccesses: Array.from(specialSet),
-            };
-        }, "Fetch Person Access", { floorsByBuilding: {}, specialAccesses: [] });
+                return {
+                    floorsByBuilding,
+                    specialAccesses: Array.from(specialSet),
+                };
+            },
+            'Fetch Person Access',
+            { floorsByBuilding: {}, specialAccesses: [] },
+        );
     },
 
     /**
@@ -202,24 +210,20 @@ export const accessAssignmentService = {
     ): Promise<void> {
         return withErrorHandling(async () => {
             // Resolver referencias estables por edificio.
-            const { data: allFloors } = await supabase
-                .from("floors")
-                .select("id, label, building_id");
+            const { data: allFloors } = await supabase.from('floors').select('id, label, building_id');
             const resolveFloorId = buildFloorResolver(
                 (allFloors || []) as { id: number; label: string; building_id: number }[],
             );
 
-            const { data: specials } = await supabase
-                .from("special_accesses")
-                .select("id, building_id");
+            const { data: specials } = await supabase.from('special_accesses').select('id, building_id');
             const specialById = new Map<number, number | null>(
                 (specials || []).map((s) => [s.id, s.building_id]),
             );
 
             // Relaciones medio-edificio: un medio solo aplica en los edificios asignados.
             const { data: mediaBuildings } = await supabase
-                .from("access_media_type_buildings")
-                .select("media_type_id, building_id");
+                .from('access_media_type_buildings')
+                .select('media_type_id, building_id');
             const mediaBuildingsSet = new Set<string>(
                 (mediaBuildings || []).map((r) => `${r.media_type_id}:${r.building_id}`),
             );
@@ -263,7 +267,7 @@ export const accessAssignmentService = {
                         seenFloors.add(dedupeKey);
                         allRows.push({
                             assignment_id: assignment.id,
-                            resource_type: "floor",
+                            resource_type: 'floor',
                             building_id: bid,
                             floor_id: floorId,
                         });
@@ -279,7 +283,7 @@ export const accessAssignmentService = {
                     if (buildingId === undefined) continue; // acceso no catalogado: omitir
                     allRows.push({
                         assignment_id: assignment.id,
-                        resource_type: "special_access",
+                        resource_type: 'special_access',
                         building_id: buildingId ?? 0,
                         special_access_id: id,
                     });
@@ -287,12 +291,12 @@ export const accessAssignmentService = {
             }
 
             // Escritura atómica: delete + insert en un solo RPC transaccional.
-            const { error } = await supabase.rpc("set_person_access_permissions", {
+            const { error } = await supabase.rpc('set_person_access_permissions', {
                 p_person_id: personId,
                 p_rows: allRows,
             });
             if (error) throw error;
-        }, "Save Person Access");
+        }, 'Save Person Access');
     },
 
     /**
@@ -302,21 +306,19 @@ export const accessAssignmentService = {
      */
     async assignMedia(personId: string, mediaTypeId: string, accessMediaId: string): Promise<void> {
         return withErrorHandling(async () => {
-            const { error } = await supabase
-                .from("access_assignments")
-                .upsert(
-                    {
-                        person_id: personId,
-                        media_type_id: mediaTypeId,
-                        access_media_id: accessMediaId,
-                        assigned_at: new Date().toISOString(),
-                        revoked_at: null,
-                        status: "active",
-                    },
-                    { onConflict: "access_media_id" },
-                );
+            const { error } = await supabase.from('access_assignments').upsert(
+                {
+                    person_id: personId,
+                    media_type_id: mediaTypeId,
+                    access_media_id: accessMediaId,
+                    assigned_at: new Date().toISOString(),
+                    revoked_at: null,
+                    status: 'active',
+                },
+                { onConflict: 'access_media_id' },
+            );
             if (error) throw error;
-        }, "Assign Access Media");
+        }, 'Assign Access Media');
     },
 
     /**
@@ -327,12 +329,12 @@ export const accessAssignmentService = {
     async revokeByMedia(accessMediaId: string): Promise<void> {
         return withErrorHandling(async () => {
             const { error } = await supabase
-                .from("access_assignments")
-                .update({ revoked_at: new Date().toISOString(), status: "revoked" })
-                .eq("access_media_id", accessMediaId)
-                .eq("status", "active");
+                .from('access_assignments')
+                .update({ revoked_at: new Date().toISOString(), status: 'revoked' })
+                .eq('access_media_id', accessMediaId)
+                .eq('status', 'active');
             if (error) throw error;
-        }, "Revoke Access Media");
+        }, 'Revoke Access Media');
     },
 
     /**
@@ -347,20 +349,16 @@ export const accessAssignmentService = {
             idKeyed[Number(bid)] = floorGroupsToIdMap(groups);
         }
         // access.specialAccesses son nombres; resolver a ids del catálogo.
-        const { data: specials } = await supabase
-            .from("special_accesses")
-            .select("id, name");
-        const idByName = new Map<string, number>(
-            (specials || []).map((s: any) => [s.name, s.id]),
-        );
+        const { data: specials } = await supabase.from('special_accesses').select('id, name');
+        const idByName = new Map<string, number>((specials || []).map((s: any) => [s.name, s.id]));
         const specialIds = access.specialAccesses
             .map((n) => idByName.get(n))
             .filter((id): id is number => id !== undefined);
         // Base de radicación de la persona (para inyectar el piso base si aplica).
         const { data: person } = await supabase
-            .from("personnel")
-            .select("building_id, floor")
-            .eq("id", personId)
+            .from('personnel')
+            .select('building_id, floor')
+            .eq('id', personId)
             .maybeSingle();
         const base: BaseFloorInput = {
             buildingId: person?.building_id ?? null,
@@ -382,35 +380,30 @@ export async function buildPermissionPlan(
     floorsByBuilding: Record<number, FloorGroups>,
     specialAccessIds: number[],
     base?: BaseFloorInput,
-): Promise<{
-    assignment_index: number;
-    resource_type: string;
-    building_id: number;
-    floor_id?: number | null;
-    special_access_id?: number | null;
-}[]> {
-    const { data: allFloors } = await supabase
-        .from("floors")
-        .select("id, label, building_id");
+): Promise<
+    {
+        assignment_index: number;
+        resource_type: string;
+        building_id: number;
+        floor_id?: number | null;
+        special_access_id?: number | null;
+    }[]
+> {
+    const { data: allFloors } = await supabase.from('floors').select('id, label, building_id');
     const resolveFloorId = buildFloorResolver(
         (allFloors || []) as { id: number; label: string; building_id: number }[],
     );
 
-    const { data: specials } = await supabase
-        .from("special_accesses")
-        .select("id, building_id");
-    const specialById = new Map<number, number | null>(
-        (specials || []).map((s) => [s.id, s.building_id]),
-    );
+    const { data: specials } = await supabase.from('special_accesses').select('id, building_id');
+    const specialById = new Map<number, number | null>((specials || []).map((s) => [s.id, s.building_id]));
 
     const { data: mediaBuildings } = await supabase
-        .from("access_media_type_buildings")
-        .select("media_type_id, building_id");
+        .from('access_media_type_buildings')
+        .select('media_type_id, building_id');
     const mediaBuildingsSet = new Set<string>(
         (mediaBuildings || []).map((r) => `${r.media_type_id}:${r.building_id}`),
     );
-    const mediaApplies = (mediaTypeId: string, bid: number) =>
-        mediaBuildingsSet.has(`${mediaTypeId}:${bid}`);
+    const mediaApplies = (mediaTypeId: string, bid: number) => mediaBuildingsSet.has(`${mediaTypeId}:${bid}`);
 
     // Regla de negocio: inyectar el piso base a los pisos del edificio de radicación.
     floorsByBuilding = await applyBaseFloor(floorsByBuilding, base, mediaApplies);
@@ -445,7 +438,7 @@ export async function buildPermissionPlan(
                 seenFloors.add(dedupeKey);
                 rows.push({
                     assignment_index: index,
-                    resource_type: "floor",
+                    resource_type: 'floor',
                     building_id: bid,
                     floor_id: floorId,
                 });
@@ -459,7 +452,7 @@ export async function buildPermissionPlan(
             if (buildingId === undefined) continue;
             rows.push({
                 assignment_index: index,
-                resource_type: "special_access",
+                resource_type: 'special_access',
                 building_id: buildingId ?? 0,
                 special_access_id: id,
             });

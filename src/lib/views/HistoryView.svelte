@@ -1,11 +1,19 @@
 <script lang="ts">
-    import { historyState } from "../stores";
-    import type { HistoryLog } from "../types";
-    import type { HistoryStory } from "../stores/history.svelte";
+    import { historyState } from '../stores';
+    import { pullRefresh } from '../stores';
+    import type { HistoryLog } from '../types';
+    import type { HistoryStory } from '../stores/history.svelte';
     import {
-        SectionHeader, DataTable, Badge, Button, HistoryFilters,
-        FilterToolbar, Pagination, ContentView,
-    } from "../components";
+        SectionHeader,
+        DataTable,
+        DataList,
+        Badge,
+        Button,
+        HistoryFilters,
+        FilterToolbar,
+        Pagination,
+        ContentView,
+    } from '../components';
     import {
         FileSpreadsheet,
         RotateCw,
@@ -15,18 +23,18 @@
         ChevronDown,
         ChevronUp,
         User,
-    } from "lucide-svelte";
-    import { toast } from "svelte-sonner";
-    import { handleError, formatDateTime } from "../utils";
-    import { HistoryService } from "../services/history";
-    import { networkStore } from "../stores/network.svelte";
+    } from 'lucide-svelte';
+    import { toast } from 'svelte-sonner';
+    import { handleError, formatDateTime } from '../utils';
+    import { HistoryService } from '../services/history';
+    import { networkStore } from '../stores/network.svelte';
     import {
         ACTION_NAMES as actionNames,
         ACTION_COLORS as actionColors,
         entityTypeLabel,
         displayEntityName,
         cleanMessage,
-    } from "../utils/historyFormat";
+    } from '../utils/historyFormat';
 
     // ── Debounce para filtros con tecleo ──
     let filterDebounce: ReturnType<typeof setTimeout>;
@@ -44,7 +52,7 @@
 
         clearTimeout(filterDebounce);
         filterDebounce = setTimeout(() => {
-            if (viewMode === "flow") historyState.refreshFlows(1);
+            if (viewMode === 'flow') historyState.refreshFlows(1);
             else historyState.refresh(1);
         }, 400);
 
@@ -61,22 +69,38 @@
         const chips: { label: string; value: string; onClear: () => void }[] = [];
         const f = historyState.filters;
         if (f.person) {
-            chips.push({ label: "Persona", value: f.person, onClear: () => historyState.setFilters({ person: "" }) });
+            chips.push({
+                label: 'Persona',
+                value: f.person,
+                onClear: () => historyState.setFilters({ person: '' }),
+            });
         }
-        if (f.cardType !== "Todos") {
-            chips.push({ label: "Tarjeta", value: f.cardType, onClear: () => historyState.setFilters({ cardType: "Todos" }) });
+        if (f.cardType !== 'Todos') {
+            chips.push({
+                label: 'Tarjeta',
+                value: f.cardType,
+                onClear: () => historyState.setFilters({ cardType: 'Todos' }),
+            });
         }
         if (f.folio) {
-            chips.push({ label: "Folio", value: f.folio, onClear: () => historyState.setFilters({ folio: "" }) });
+            chips.push({
+                label: 'Folio',
+                value: f.folio,
+                onClear: () => historyState.setFilters({ folio: '' }),
+            });
         }
-        if (f.action !== "Todas") {
-            chips.push({ label: "Acción", value: f.action, onClear: () => historyState.setFilters({ action: "Todas" }) });
+        if (f.action !== 'Todas') {
+            chips.push({
+                label: 'Acción',
+                value: f.action,
+                onClear: () => historyState.setFilters({ action: 'Todas' }),
+            });
         }
         if (f.startDate || f.endDate) {
             chips.push({
-                label: "Fechas",
-                value: [f.startDate || "…", f.endDate || "…"].join(" → "),
-                onClear: () => historyState.setFilters({ startDate: "", endDate: "" }),
+                label: 'Fechas',
+                value: [f.startDate || '…', f.endDate || '…'].join(' → '),
+                onClear: () => historyState.setFilters({ startDate: '', endDate: '' }),
             });
         }
         return chips;
@@ -95,32 +119,44 @@
     let storiesLoading = $derived(historyState.storiesPagination.isLoading);
 
     // Vista: individual (por fila) o por flujo (historias).
-    let viewMode = $state<"individual" | "flow">("flow");
+    let viewMode = $state<'individual' | 'flow'>('flow');
+
+    $effect(() =>
+        pullRefresh.register(() =>
+            viewMode === 'flow' ? historyState.refreshFlows(1) : historyState.refresh(1),
+        ),
+    );
     let expandedStory = $state<string | null>(null);
 
     // Color de punto por acción (Tailwind literales).
     const DOT_CLASS_BY_COLOR: Record<string, string> = {
-        rose: "bg-rose-400",
-        emerald: "bg-emerald-400",
-        violet: "bg-violet-400",
-        amber: "bg-amber-400",
-        blue: "bg-sky-400",
-        slate: "bg-slate-400",
-        orange: "bg-orange-400",
-        red: "bg-red-400",
+        rose: 'bg-rose-400',
+        emerald: 'bg-emerald-400',
+        violet: 'bg-violet-400',
+        amber: 'bg-amber-400',
+        blue: 'bg-sky-400',
+        slate: 'bg-slate-400',
+        orange: 'bg-orange-400',
+        red: 'bg-red-400',
     };
     function actionDot(action: string): string {
-        return DOT_CLASS_BY_COLOR[(actionColors as any)[action]] || "bg-slate-400";
+        return DOT_CLASS_BY_COLOR[(actionColors as any)[action]] || 'bg-slate-400';
     }
     function actionIconBg(action: string): string {
         const c = (actionColors as any)[action];
-        return c === "rose" ? "bg-rose-50 text-rose-600"
-            : c === "emerald" ? "bg-emerald-50 text-emerald-600"
-            : c === "violet" ? "bg-violet-50 text-violet-600"
-            : c === "amber" ? "bg-amber-50 text-amber-600"
-            : c === "orange" ? "bg-orange-50 text-orange-600"
-            : c === "blue" ? "bg-sky-50 text-sky-600"
-            : "bg-slate-100 text-slate-600";
+        return c === 'rose'
+            ? 'bg-rose-50 text-rose-600'
+            : c === 'emerald'
+              ? 'bg-emerald-50 text-emerald-600'
+              : c === 'violet'
+                ? 'bg-violet-50 text-violet-600'
+                : c === 'amber'
+                  ? 'bg-amber-50 text-amber-600'
+                  : c === 'orange'
+                    ? 'bg-orange-50 text-orange-600'
+                    : c === 'blue'
+                      ? 'bg-sky-50 text-sky-600'
+                      : 'bg-slate-100 text-slate-600';
     }
 </script>
 
@@ -146,7 +182,7 @@
 
 {#snippet renderUser(row: HistoryLog)}
     <span class="text-slate-700 text-sm whitespace-nowrap">
-        {row.performed_by_name || "—"}
+        {row.performed_by_name || '—'}
     </span>
 {/snippet}
 
@@ -157,41 +193,79 @@
 {/snippet}
 
 {#snippet renderHistoryAction(row: HistoryLog)}
-    <Badge variant={(actionColors[row.action] as any) || "slate"}>
+    <Badge variant={(actionColors[row.action] as any) || 'slate'}>
         {actionNames[row.action] || row.action}
     </Badge>
 {/snippet}
 
-{#snippet mobileHistoryCard(row: HistoryLog)}
-    <article class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-4 space-y-2.5">
-        <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-                {@render renderEntity(row)}
-            </div>
-            <div class="shrink-0">
-                {@render renderHistoryAction(row)}
-            </div>
-        </div>
-        <p class="text-sm text-slate-600 break-words">
-            {cleanMessage(row)}
-        </p>
-        <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-            <span class="inline-flex items-center gap-1 min-w-0">
-                <User size={11} class="text-slate-400 shrink-0" />
-                <span class="truncate">{row.performed_by_name || "—"}</span>
+{#snippet mobileList(rows: HistoryLog[])}
+    <DataList
+        items={rows}
+        key={(r: HistoryLog) => r.id}
+        sheetTitle={(r: HistoryLog) => displayEntityName(r)}
+        sheetSubtitle={(r: HistoryLog) => actionNames[r.action] || r.action}
+    >
+        {#snippet leading(r: HistoryLog)}
+            <span class="w-8 h-8 rounded-xl {actionIconBg(r.action)} flex items-center justify-center">
+                <Layers size={14} strokeWidth={2.5} />
             </span>
-            <span class="whitespace-nowrap">{formatDateTime(row.timestamp)}</span>
-        </div>
-    </article>
+        {/snippet}
+        {#snippet title(r: HistoryLog)}
+            <span class="break-words">{displayEntityName(r)}</span>
+        {/snippet}
+        {#snippet subtitle(r: HistoryLog)}
+            <span>{cleanMessage(r)}</span>
+        {/snippet}
+        {#snippet trailing(r: HistoryLog)}
+            {@render renderHistoryAction(r)}
+        {/snippet}
+        {#snippet details(r: HistoryLog)}
+            <div class="space-y-3 text-sm">
+                <div>
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                        Acción
+                    </div>
+                    {@render renderHistoryAction(r)}
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                        Entidad
+                    </div>
+                    {@render renderEntity(r)}
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                        Descripción
+                    </div>
+                    <div class="break-words">{@render renderDetails(r)}</div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Usuario</span>
+                    {@render renderUser(r)}
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Fecha</span>
+                    {@render renderDate(r)}
+                </div>
+            </div>
+        {/snippet}
+    </DataList>
 {/snippet}
 
 {#snippet renderStoryStep(step: HistoryLog, isLast: boolean)}
     <div class="relative flex gap-3 pl-10 pr-5 py-3">
         <!-- Punto de la línea de tiempo (alineado con la línea continua) -->
-        <span class="absolute left-4 top-1.5 -translate-x-1/2 z-10 w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm {actionDot(step.action)}"></span>
+        <span
+            class="absolute left-4 top-1.5 -translate-x-1/2 z-10 w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm {actionDot(
+                step.action,
+            )}"
+        ></span>
         <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <Badge variant={(actionColors[step.action] as any) || "slate"} class="text-[9px] px-1.5 py-0.5">
+                <Badge
+                    variant={(actionColors[step.action] as any) || 'slate'}
+                    class="text-[9px] px-1.5 py-0.5"
+                >
                     {actionNames[step.action] || step.action}
                 </Badge>
                 <span class="text-[10px] tracking-wider uppercase text-slate-400 font-bold">
@@ -206,7 +280,8 @@
             </div>
             <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
                 <span class="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
-                    <User size={10} class="text-slate-400" /> {step.performed_by_name || "—"}
+                    <User size={10} class="text-slate-400" />
+                    {step.performed_by_name || '—'}
                 </span>
                 <span class="text-[10px] text-slate-400 whitespace-nowrap">
                     {formatDateTime(step.timestamp)}
@@ -226,12 +301,19 @@
             class="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50/70 transition-colors text-left"
             onclick={() => (expandedStory = isExpanded ? null : story.flowId)}
         >
-            <span class="w-9 h-9 rounded-xl {actionIconBg(story.latest.action)} flex items-center justify-center shrink-0">
+            <span
+                class="w-9 h-9 rounded-xl {actionIconBg(
+                    story.latest.action,
+                )} flex items-center justify-center shrink-0"
+            >
                 <Layers size={16} strokeWidth={2.5} />
             </span>
             <div class="flex-1 min-w-0">
                 <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <Badge variant={(actionColors[story.latest.action] as any) || "slate"} class="text-[9px] px-1.5 py-0.5">
+                    <Badge
+                        variant={(actionColors[story.latest.action] as any) || 'slate'}
+                        class="text-[9px] px-1.5 py-0.5"
+                    >
                         {actionNames[story.latest.action] || story.latest.action}
                     </Badge>
                     <span class="text-[10px] tracking-wider uppercase text-slate-400 font-bold">
@@ -243,11 +325,12 @@
                 </div>
                 <div class="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
                     <span class="inline-flex items-center gap-1 font-medium">
-                        <User size={10} class="text-slate-400" /> {story.latest.performed_by_name || "—"}
+                        <User size={10} class="text-slate-400" />
+                        {story.latest.performed_by_name || '—'}
                     </span>
-                    <span>{story.steps.length} paso{story.steps.length !== 1 ? "s" : ""}</span>
+                    <span>{story.steps.length} paso{story.steps.length !== 1 ? 's' : ''}</span>
                     <span class="text-[10px] text-slate-400">
-                        {firstTs && lastTs ? `${formatDateTime(firstTs)} → ${formatDateTime(lastTs)}` : ""}
+                        {firstTs && lastTs ? `${formatDateTime(firstTs)} → ${formatDateTime(lastTs)}` : ''}
                     </span>
                 </div>
             </div>
@@ -271,8 +354,12 @@
     </div>
 {/snippet}
 
-<div class="space-y-6">
-    <SectionHeader title="Historial de acciones">
+<div class="space-y-4">
+    <SectionHeader
+        title="Historial de acciones"
+        filtersCount={historyChips.length}
+        onClearFilters={() => historyState.clearFilters()}
+    >
         {#snippet filters()}
             <FilterToolbar chips={historyChips} onClearAll={() => historyState.clearFilters()}>
                 {#snippet primary()}
@@ -292,15 +379,21 @@
             <div class="flex items-center gap-1 p-1 rounded-xl bg-slate-100/80">
                 <button
                     type="button"
-                    class="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-[11px] font-extrabold uppercase tracking-wider transition-colors {viewMode === 'flow' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}"
-                    onclick={() => (viewMode = "flow")}
+                    class="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-[11px] font-extrabold uppercase tracking-wider transition-colors {viewMode ===
+                    'flow'
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-600'}"
+                    onclick={() => (viewMode = 'flow')}
                 >
                     <Layers size={13} /> Por flujo
                 </button>
                 <button
                     type="button"
-                    class="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-[11px] font-extrabold uppercase tracking-wider transition-colors {viewMode === 'individual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}"
-                    onclick={() => (viewMode = "individual")}
+                    class="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-[11px] font-extrabold uppercase tracking-wider transition-colors {viewMode ===
+                    'individual'
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-600'}"
+                    onclick={() => (viewMode = 'individual')}
                 >
                     <List size={13} /> Individual
                 </button>
@@ -309,16 +402,16 @@
             <Button
                 variant="outline"
                 class="flex items-center gap-2.5 h-11 sm:h-10 px-4 group"
-                disabled={viewMode === "flow" ? storiesLoading : historyState.pagination.isLoading}
-                onclick={() => (viewMode === "flow" ? historyState.refreshFlows(1) : historyState.refresh(1))}
+                disabled={viewMode === 'flow' ? storiesLoading : historyState.pagination.isLoading}
+                onclick={() => (viewMode === 'flow' ? historyState.refreshFlows(1) : historyState.refresh(1))}
             >
                 <RotateCw
                     size={16}
                     class="text-slate-500 transition-transform duration-700 {viewMode === 'flow'
                         ? storiesLoading
                         : historyState.pagination.isLoading
-                            ? 'animate-spin'
-                            : 'group-hover:rotate-180'}"
+                          ? 'animate-spin'
+                          : 'group-hover:rotate-180'}"
                 />
                 <span class="text-slate-600">Actualizar</span>
             </Button>
@@ -328,37 +421,31 @@
                 class="flex items-center gap-2.5 h-11 sm:h-10 px-6"
                 disabled={!networkStore.isOnline}
                 onclick={async () => {
-                    const loadingToast = toast.loading(
-                        "Preparando exportación...",
-                    );
+                    const loadingToast = toast.loading('Preparando exportación...');
                     try {
-                        const data = await HistoryService.fetchForExport(
-                            historyState.filters,
-                        );
-                        const m = await import("../utils/xlsxExport");
+                        const data = await HistoryService.fetchForExport(historyState.filters);
+                        const m = await import('../utils/xlsxExport');
                         m.exportHistoryToExcel(data);
-                        toast.success("Exportación completada", {
+                        toast.success('Exportación completada', {
                             id: loadingToast,
                         });
                     } catch (e) {
                         toast.dismiss(loadingToast);
-                        handleError(e, "Exportar Historial");
+                        handleError(e, 'Exportar Historial');
                     }
                 }}
             >
-                <FileSpreadsheet
-                    size={18}
-                    strokeWidth={2.5}
-                    class="text-emerald-600/80"
-                />
+                <FileSpreadsheet size={18} strokeWidth={2.5} class="text-emerald-600/80" />
                 Exportar Excel
             </Button>
         {/snippet}
     </SectionHeader>
 
     <ContentView
-        isLoading={viewMode === "flow" ? storiesLoading : historyState.pagination.isLoading}
-        data={viewMode === "flow" ? stories : historyLogs}
+        isLoading={viewMode === 'flow' ? storiesLoading : historyState.pagination.isLoading}
+        data={viewMode === 'flow' ? stories : historyLogs}
+        error={viewMode === 'flow' ? historyState.storiesPagination.error : historyState.pagination.error}
+        onRetry={() => (viewMode === 'flow' ? historyState.refreshFlows(1) : historyState.refresh(1))}
         emptyTitle="No hay registros de historial"
         emptyDescription="Los cambios realizados en el personal, tarjetas y tickets aparecerán aquí."
         emptyIcon={History}
@@ -368,7 +455,7 @@
         cardClass="overflow-hidden"
     >
         {#snippet children()}
-            {#if viewMode === "flow"}
+            {#if viewMode === 'flow'}
                 <div class="divide-y divide-slate-100/60">
                     {#each stories as story}
                         {@render renderStory(story)}
@@ -379,43 +466,43 @@
                     data={historyLogs}
                     columns={[
                         {
-                            key: "timestamp",
-                            label: "Fecha / Hora",
+                            key: 'timestamp',
+                            label: 'Fecha / Hora',
                             render: renderDate,
-                            width: "160px",
+                            width: '160px',
                         },
                         {
-                            key: "entity",
-                            label: "Entidad Afectada",
+                            key: 'entity',
+                            label: 'Entidad Afectada',
                             render: renderEntity,
-                            width: "250px",
+                            width: '250px',
                         },
                         {
-                            key: "action",
-                            label: "Acción",
+                            key: 'action',
+                            label: 'Acción',
                             render: renderHistoryAction,
-                            width: "140px",
+                            width: '140px',
                         },
                         {
-                            key: "user",
-                            label: "Usuario",
+                            key: 'user',
+                            label: 'Usuario',
                             render: renderUser,
-                            width: "150px",
+                            width: '150px',
                         },
                         {
-                            key: "details",
-                            label: "Descripción",
+                            key: 'details',
+                            label: 'Descripción',
                             render: renderDetails,
-                            width: "350px",
+                            width: '350px',
                         },
                     ]}
-                    mobileCard={mobileHistoryCard}
+                    {mobileList}
                 />
             {/if}
         {/snippet}
     </ContentView>
 
-    {#if viewMode === "flow"}
+    {#if viewMode === 'flow'}
         <Pagination
             currentPage={storiesPage}
             pageSize={storiesPageSize}

@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { push, location } from "svelte-spa-router";
-    import { supabase } from "../supabase";
-    import { uiState, userState, moduleState } from "../stores";
-    import DashboardLayout from "./DashboardLayout.svelte";
+    import { push, location } from 'svelte-spa-router';
+    import { supabase } from '../supabase';
+    import { uiState, userState, moduleState } from '../stores';
+    import DashboardLayout from './DashboardLayout.svelte';
     import {
         LayoutDashboard,
         Users,
@@ -12,34 +12,34 @@
         Settings,
         Contact,
         FileX,
-    } from "lucide-svelte";
-    import { onMount } from "svelte";
+    } from 'lucide-svelte';
+    import { onMount } from 'svelte';
 
     // Elementos de navegación filtrados por rol
     const sidebarItems = $derived.by(() => {
         const items = [
-            { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-            { label: "Personal", href: "/personal", icon: Users },
-            { label: "Tarjetas", href: "/cards", icon: CreditCard },
-            { label: "Pendientes", href: "/tickets", icon: ClipboardList },
-            { label: "Enlaces", href: "/enlaces", icon: Contact },
-            { label: "Historial", href: "/history", icon: History },
+            { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+            { label: 'Personal', href: '/personal', icon: Users },
+            { label: 'Tarjetas', href: '/cards', icon: CreditCard },
+            { label: 'Pendientes', href: '/tickets', icon: ClipboardList },
+            { label: 'Enlaces', href: '/enlaces', icon: Contact },
+            { label: 'Historial', href: '/history', icon: History },
         ];
 
         // Módulos: "Registro sin tarjeta" solo si está compilado y activo.
-        if (moduleState.isEnabled("registro_sin_tarjeta")) {
-            const idx = items.findIndex((i) => i.href === "/history");
+        if (moduleState.isEnabled('registro_sin_tarjeta')) {
+            const idx = items.findIndex((i) => i.href === '/history');
             items.splice(idx < 0 ? items.length : idx, 0, {
-                label: "Sin Tarjeta",
-                href: "/registro-sin-tarjeta",
+                label: 'Sin Tarjeta',
+                href: '/registro-sin-tarjeta',
                 icon: FileX,
             });
         }
 
         if (userState.isAdmin) {
             items.push({
-                label: "Configuración",
-                href: "/settings",
+                label: 'Configuración',
+                href: '/settings',
                 icon: Settings,
             });
         }
@@ -64,7 +64,7 @@
     const currentUser = $derived.by(() => {
         if (!userState.profile) return undefined;
         return {
-            name: userState.profile.full_name || "Usuario",
+            name: userState.profile.full_name || 'Usuario',
             email: userState.profile.email,
             avatar: userState.profile.avatar_url,
         };
@@ -73,19 +73,35 @@
     // Sincronizar página activa con ruta para el título del encabezado
     $effect(() => {
         const path = $location;
-        if (path.includes("dashboard")) uiState.setActivePage("Dashboard");
-        else if (path.includes("personal")) uiState.setActivePage("Personal");
-        else if (path.includes("cards")) uiState.setActivePage("Tarjetas");
-        else if (path.includes("tickets")) uiState.setActivePage("Pendientes");
-        else if (path.includes("enlaces")) uiState.setActivePage("Enlaces");
-        else if (path.includes("registro-sin-tarjeta")) uiState.setActivePage("Sin Tarjeta");
-        else if (path.includes("history")) uiState.setActivePage("Historial");
-        else if (path.includes("settings"))
-            uiState.setActivePage("Configuración");
+        if (path.includes('dashboard')) uiState.setActivePage('Dashboard');
+        else if (path.includes('personal')) uiState.setActivePage('Personal');
+        else if (path.includes('cards')) uiState.setActivePage('Tarjetas');
+        else if (path.includes('tickets')) uiState.setActivePage('Pendientes');
+        else if (path.includes('enlaces')) uiState.setActivePage('Enlaces');
+        else if (path.includes('registro-sin-tarjeta')) uiState.setActivePage('Sin Tarjeta');
+        else if (path.includes('history')) uiState.setActivePage('Historial');
+        else if (path.includes('settings')) uiState.setActivePage('Configuración');
     });
-    import CommandPalette from "./CommandPalette.svelte";
-    import { networkStore } from "../stores/network.svelte";
-    import { WifiOff } from "lucide-svelte";
+
+    // ─── Scroll por ruta: reset al entrar y restauración al volver ───────
+    const scrollPositions = new Map<string, number>();
+    let prevPath = $location;
+    $effect(() => {
+        const path = $location;
+        if (path === prevPath) return;
+        const el = document.getElementById('main');
+        if (!el) return;
+        // Guarda la posición de la ruta que se abandona.
+        scrollPositions.set(prevPath, el.scrollTop);
+        prevPath = path;
+        // Restaura la posición destino (0 si es nueva).
+        requestAnimationFrame(() => {
+            el.scrollTop = scrollPositions.get(path) ?? 0;
+        });
+    });
+    import CommandPalette from './CommandPalette.svelte';
+    import { networkStore } from '../stores/network.svelte';
+    import { WifiOff } from 'lucide-svelte';
 </script>
 
 {#if !networkStore.isOnline}

@@ -1,35 +1,35 @@
 <script lang="ts">
-    import Modal from "../Modal.svelte";
-    import Button from "../Button.svelte";
-    import Badge from "../Badge.svelte";
-    import Input from "../Input.svelte";
-    import ToggleGroup from "../ToggleGroup.svelte";
-    import AddCardModal from "./AddCardModal.svelte";
-    import Select from "../Select.svelte";
-    import { Plus, CreditCard, Trash2, AlertTriangle } from "lucide-svelte";
-    import { untrack } from "svelte";
-    import FormSection from "../FormSection.svelte";
-    import FormField from "../FormField.svelte";
-    import DependencySelect from "../DependencySelect.svelte";
-    import BuildingSelect from "../BuildingSelect.svelte";
-    import ScheduleSelect from "../ScheduleSelect.svelte";
+    import Modal from '../Modal.svelte';
+    import Button from '../Button.svelte';
+    import Badge from '../Badge.svelte';
+    import Input from '../Input.svelte';
+    import ToggleGroup from '../ToggleGroup.svelte';
+    import AddCardModal from './AddCardModal.svelte';
+    import Select from '../Select.svelte';
+    import { Plus, CreditCard, Trash2, AlertTriangle } from 'lucide-svelte';
+    import { untrack } from 'svelte';
+    import FormSection from '../FormSection.svelte';
+    import FormField from '../FormField.svelte';
+    import DependencySelect from '../DependencySelect.svelte';
+    import BuildingSelect from '../BuildingSelect.svelte';
+    import ScheduleSelect from '../ScheduleSelect.svelte';
 
-    import { personnelService, ticketService, accessAssignmentService } from "../../services";
-    import { floorGroupsToIdMap, floorsForKey } from "../../services/accessAssignments";
-    import { personnelState, catalogState, userState } from "../../stores";
-    import PermissionGuard from "../PermissionGuard.svelte";
-    import { toast } from "svelte-sonner";
-    import { handleError, mediaTypeVariant, normalizeEmailText } from "../../utils";
-    import { updateWithLock, fetchCurrentVersion } from "../../utils/optimisticLock";
-    import { resolveFloorList } from "../../utils/floorMatch";
-    import type { Person } from "../../types";
-    import { personnelSchema } from "../../schemas";
+    import { personnelService, ticketService, accessAssignmentService } from '../../services';
+    import { floorGroupsToIdMap, floorsForKey } from '../../services/accessAssignments';
+    import { personnelState, catalogState, userState } from '../../stores';
+    import { networkStore } from '../../stores/network.svelte';
+    import PermissionGuard from '../PermissionGuard.svelte';
+    import { toast } from 'svelte-sonner';
+    import { handleError, mediaTypeVariant, normalizeEmailText } from '../../utils';
+    import { updateWithLock, fetchCurrentVersion } from '../../utils/optimisticLock';
+    import { resolveFloorList } from '../../utils/floorMatch';
+    import type { Person } from '../../types';
+    import { personnelSchema } from '../../schemas';
 
-    import { type Snippet } from "svelte";
+    import { type Snippet } from 'svelte';
 
     /** Mensaje cuando otro usuario modificó la persona mientras se editaba. */
-    const CONFLICT_MSG =
-        "Este registro fue modificado por otra persona. Recarga e inténtalo de nuevo.";
+    const CONFLICT_MSG = 'Este registro fue modificado por otra persona. Recarga e inténtalo de nuevo.';
 
     let {
         isOpen = $bindable(false),
@@ -96,24 +96,24 @@
 
     /** Compara la versión de la lista con la actual en BD y marca si quedó obsoleta. */
     async function checkStale(id: string, loadedVersion: string | null) {
-        const fresh = await fetchCurrentVersion("personnel", id);
+        const fresh = await fetchCurrentVersion('personnel', id);
         isStale = !!fresh && !!loadedVersion && fresh !== loadedVersion;
     }
 
     // Estado del formulario
-    let nombres = $state("");
-    let apellidos = $state("");
-    let noEmpleado = $state("");
-    let dependency = $state("");
-    let areaEquipo = $state("");
-    let puestoFuncion = $state("");
-    let edificio = $state("");
-    let pisoBase = $state("");
+    let nombres = $state('');
+    let apellidos = $state('');
+    let noEmpleado = $state('');
+    let dependency = $state('');
+    let areaEquipo = $state('');
+    let puestoFuncion = $state('');
+    let edificio = $state('');
+    let pisoBase = $state('');
     let floorsByBuilding = $state<Record<number, Record<string, string[]>>>({});
-    let diasHorario = $state("");
-    let horaEntrada = $state("08:00");
-    let horaSalida = $state("17:00");
-    let email = $state("");
+    let diasHorario = $state('');
+    let horaEntrada = $state('08:00');
+    let horaSalida = $state('17:00');
+    let email = $state('');
     let accesosEspeciales = $state<number[]>([]);
     let tarjetasAsignadas = $state<{ type: string; folio: string; id?: string; status?: string }[]>([]);
 
@@ -125,7 +125,7 @@
     // Detección de duplicados
     let potentialDuplicates = $state<any[]>([]);
     let isCheckingDuplicates = $state(false);
-    let lastCheckedName = $state("");
+    let lastCheckedName = $state('');
 
     // Pisos derivados según el edificio seleccionado
     let availableFloors = $derived.by(() => {
@@ -148,7 +148,7 @@
             seen.add(m.key);
             out.push({ id: m.id, key: m.key, name: m.name });
         }
-         return out;
+        return out;
     });
 
     /** Mapa id -> medio, para resolver relaciones medio-edificio al renderizar. */
@@ -198,11 +198,7 @@
         }
     }
 
-    function updateBuildingFloors(
-        buildingId: number,
-        key: string,
-        value: string[],
-    ) {
+    function updateBuildingFloors(buildingId: number, key: string, value: string[]) {
         const current = floorsByBuilding[buildingId] || {};
         floorsByBuilding = {
             ...floorsByBuilding,
@@ -261,7 +257,7 @@
     // se seleccionan por edificio y no dependen del edificio de radicación).
     $effect(() => {
         if (edificio && !editingPerson && !prefill) {
-            pisoBase = "";
+            pisoBase = '';
         }
     });
 
@@ -273,19 +269,12 @@
         // Solo verificar si estamos creando una persona NUEVA o precargando
         if (!disableDuplicateCheck && (!editingPerson || prefill)) {
             const fullName = `${nombres.trim()} ${apellidos.trim()}`.trim();
-            if (
-                nombres.trim().length >= 3 &&
-                apellidos.trim().length >= 2 &&
-                fullName !== lastCheckedName
-            ) {
+            if (nombres.trim().length >= 3 && apellidos.trim().length >= 2 && fullName !== lastCheckedName) {
                 lastCheckedName = fullName;
                 checkDuplicates(nombres.trim(), apellidos.trim());
-            } else if (
-                nombres.trim().length < 3 ||
-                apellidos.trim().length < 2
-            ) {
+            } else if (nombres.trim().length < 3 || apellidos.trim().length < 2) {
                 potentialDuplicates = [];
-                lastCheckedName = "";
+                lastCheckedName = '';
             }
         }
     });
@@ -297,14 +286,14 @@
             const results = await personnelService.searchByName(ape, nom);
             // Filtrar para encontrar coincidencias muy cercanas (insensible a acentos)
             potentialDuplicates = results.filter((p) => {
-                const n1 = (p.first_name + " " + p.last_name)
+                const n1 = (p.first_name + ' ' + p.last_name)
                     .toLowerCase()
-                    .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "");
-                const n2 = (nom + " " + ape)
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '');
+                const n2 = (nom + ' ' + ape)
                     .toLowerCase()
-                    .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "");
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '');
                 return n1.includes(n2) || n2.includes(n1);
             });
         } catch {
@@ -315,25 +304,18 @@
     }
 
     // Poblar formulario
-    let lastLoadedPersonId = $state("");
+    let lastLoadedPersonId = $state('');
 
     // Trae los pisos multi-edificio del nuevo modelo y los mezcla con el
     // fallback derivado (mientras no existan permisos para el edificio base).
     async function refreshPersonAccess(personId: string) {
         try {
-            const access = await accessAssignmentService.fetchPersonAccess(
-                personId,
-            );
+            const access = await accessAssignmentService.fetchPersonAccess(personId);
             const merged: Record<number, Record<string, string[]>> = {};
             for (const [bid, groups] of Object.entries(access.floorsByBuilding)) {
                 merged[Number(bid)] = floorGroupsToIdMap(groups);
             }
-            const bid =
-                        Number(
-                            buildings.find(
-                                (b) => b.name === edificio,
-                            )?.id,
-                        ) || undefined;
+            const bid = Number(buildings.find((b) => b.name === edificio)?.id) || undefined;
             if (bid) {
                 if (!merged[bid]) merged[bid] = {};
                 for (const g of editingPerson?.floors || []) {
@@ -344,10 +326,7 @@
             }
             floorsByBuilding = merged;
             selectedBuildings = [
-                ...new Set([
-                    ...selectedBuildings,
-                    ...Object.keys(access.floorsByBuilding).map(Number),
-                ]),
+                ...new Set([...selectedBuildings, ...Object.keys(access.floorsByBuilding).map(Number)]),
             ];
             if (access.specialAccesses.length > 0) {
                 accesosEspeciales = namesToSpecialIds(access.specialAccesses);
@@ -358,29 +337,18 @@
     }
 
     $effect(() => {
-        if (
-            isOpen &&
-            editingPerson &&
-            lastLoadedPersonId !== editingPerson.id
-        ) {
+        if (isOpen && editingPerson && lastLoadedPersonId !== editingPerson.id) {
             untrack(() => {
-                nombres = editingPerson.first_name || "";
-                apellidos = editingPerson.last_name || "";
+                nombres = editingPerson.first_name || '';
+                apellidos = editingPerson.last_name || '';
                 noEmpleado = editingPerson.employee_no;
                 dependency = editingPerson.dependency;
-                areaEquipo = (editingPerson as any).area || "";
-                puestoFuncion = (editingPerson as any).position || "";
+                areaEquipo = (editingPerson as any).area || '';
+                puestoFuncion = (editingPerson as any).position || '';
                 edificio = editingPerson.building;
-                pisoBase = editingPerson.floor || "";
-                const bid =
-                    Number(
-                        buildings.find(
-                            (b) => b.name === editingPerson.building,
-                        )?.id,
-                    ) || undefined;
-                floorsByBuilding = bid
-                    ? { [bid]: floorGroupsToIdMap(editingPerson.floors) }
-                    : {};
+                pisoBase = editingPerson.floor || '';
+                const bid = Number(buildings.find((b) => b.name === editingPerson.building)?.id) || undefined;
+                floorsByBuilding = bid ? { [bid]: floorGroupsToIdMap(editingPerson.floors) } : {};
 
                 if (editingPerson.schedule) {
                     diasHorario = editingPerson.schedule.days;
@@ -388,7 +356,7 @@
                     horaSalida = editingPerson.schedule.exit;
                 }
 
-                email = editingPerson.email || "";
+                email = editingPerson.email || '';
                 accesosEspeciales = namesToSpecialIds(editingPerson.specialAccesses || []);
                 tarjetasAsignadas = [...(editingPerson.cards || [])];
 
@@ -406,23 +374,15 @@
                     if (prefill) {
                         if (prefill.pisosPorMedio) {
                             const pid =
-                                Number(
-                                    buildings.find(
-                                        (b) => b.name === prefill.edificio,
-                                    )?.id,
-                                ) || undefined;
+                                Number(buildings.find((b) => b.name === prefill.edificio)?.id) || undefined;
                             if (pid) {
                                 const merged = {
                                     ...(floorsByBuilding[pid] ?? {}),
                                 };
                                 for (const fm of floorMediaTypes) {
-                                    const wanted =
-                                        !allowedCardTypes ||
-                                        allowedCardTypes.includes(fm.name);
+                                    const wanted = !allowedCardTypes || allowedCardTypes.includes(fm.name);
                                     if (wanted && prefill.pisosPorMedio[fm.key]) {
-                                        merged[fm.id] = [
-                                            ...prefill.pisosPorMedio[fm.key],
-                                        ];
+                                        merged[fm.id] = [...prefill.pisosPorMedio[fm.key]];
                                     }
                                 }
                                 floorsByBuilding = {
@@ -432,10 +392,7 @@
                             }
                         }
 
-                        if (
-                            prefill.specialAccesses &&
-                            prefill.specialAccesses.length > 0
-                        ) {
+                        if (prefill.specialAccesses && prefill.specialAccesses.length > 0) {
                             accesosEspeciales = namesToSpecialIds(prefill.specialAccesses);
                         } else if (prefill.specialAccesses) {
                             accesosEspeciales = [];
@@ -451,62 +408,41 @@
                             for (const [key, folio] of Object.entries(prefill.foliosPorMedio)) {
                                 if (!folio) continue;
                                 const mediaName =
-                                    catalogState.mediaTypes.find(
-                                        (m: any) => m.key === key,
-                                    )?.name ?? key;
+                                    catalogState.mediaTypes.find((m: any) => m.key === key)?.name ?? key;
                                 if (
-                                    !tarjetasAsignadas.some(
-                                        (c) =>
-                                            c.type === mediaName &&
-                                            c.folio === folio,
-                                    )
+                                    !tarjetasAsignadas.some((c) => c.type === mediaName && c.folio === folio)
                                 ) {
-                                    tarjetasAsignadas = [
-                                        ...tarjetasAsignadas,
-                                        { type: mediaName, folio },
-                                    ];
+                                    tarjetasAsignadas = [...tarjetasAsignadas, { type: mediaName, folio }];
                                 }
                             }
                         }
                     }
                 })();
             });
-        } else if (
-            isOpen &&
-            !editingPerson &&
-            prefill &&
-            lastLoadedPersonId !== "__prefill__"
-        ) {
+        } else if (isOpen && !editingPerson && prefill && lastLoadedPersonId !== '__prefill__') {
             // Precarga para una persona NUEVA desde un ticket importado
             untrack(() => {
                 const cat = catalogState;
-                nombres = prefill.nombres ?? "";
-                apellidos = prefill.apellidos ?? "";
-                noEmpleado = prefill.noEmpleado ?? "";
-                dependency = prefill.dependencia ?? "";
-                edificio = prefill.edificio ?? "";
-                pisoBase = prefill.pisoBase ?? "";
-                areaEquipo = prefill.area ?? "";
-                puestoFuncion = prefill.puesto ?? "";
+                nombres = prefill.nombres ?? '';
+                apellidos = prefill.apellidos ?? '';
+                noEmpleado = prefill.noEmpleado ?? '';
+                dependency = prefill.dependencia ?? '';
+                edificio = prefill.edificio ?? '';
+                pisoBase = prefill.pisoBase ?? '';
+                areaEquipo = prefill.area ?? '';
+                puestoFuncion = prefill.puesto ?? '';
 
-                const schedObj = cat.schedules.find(
-                    (s) => s.name === prefill.horario,
-                );
-                diasHorario = schedObj ? prefill.horario! : "";
-                horaEntrada = prefill.horaEntrada ?? "08:00";
-                horaSalida = prefill.horaSalida ?? "17:00";
+                const schedObj = cat.schedules.find((s) => s.name === prefill.horario);
+                diasHorario = schedObj ? prefill.horario! : '';
+                horaEntrada = prefill.horaEntrada ?? '08:00';
+                horaSalida = prefill.horaSalida ?? '17:00';
                 email = normalizeEmailText(prefill.correo);
                 const prefillBid =
-                    Number(
-                        buildings.find((b) => b.name === prefill.edificio)?.id,
-                    ) || undefined;
+                    Number(buildings.find((b) => b.name === prefill.edificio)?.id) || undefined;
                 floorsByBuilding = prefillBid
                     ? {
                           [prefillBid]: Object.fromEntries(
-                              floorMediaTypes.map((fm) => [
-                                  fm.id,
-                                  prefill.pisosPorMedio?.[fm.key] ?? [],
-                              ]),
+                              floorMediaTypes.map((fm) => [fm.id, prefill.pisosPorMedio?.[fm.key] ?? []]),
                           ),
                       }
                     : {};
@@ -520,26 +456,19 @@
                     for (const [key, folio] of Object.entries(prefill.foliosPorMedio)) {
                         if (!folio) continue;
                         const mediaName =
-                            catalogState.mediaTypes.find(
-                                (m: any) => m.key === key,
-                            )?.name ?? key;
+                            catalogState.mediaTypes.find((m: any) => m.key === key)?.name ?? key;
                         tarjetasAsignadas.push({ type: mediaName, folio });
                     }
                 }
-                lastLoadedPersonId = "__prefill__";
+                lastLoadedPersonId = '__prefill__';
                 editingUpdatedAt = null;
                 isStale = false;
             });
-        } else if (
-            isOpen &&
-            !editingPerson &&
-            !prefill &&
-            lastLoadedPersonId !== "new"
-        ) {
+        } else if (isOpen && !editingPerson && !prefill && lastLoadedPersonId !== 'new') {
             resetForm();
-            lastLoadedPersonId = "new";
+            lastLoadedPersonId = 'new';
         } else if (!isOpen) {
-            lastLoadedPersonId = "";
+            lastLoadedPersonId = '';
         }
     });
 
@@ -588,9 +517,9 @@
             const details = floorCheck.unresolved
                 .slice(0, 6)
                 .map((f) => `"${f}"`)
-                .join(", ");
-            errors.floor = "Hay pisos que no existen en el edificio seleccionado.";
-            toast.error("Pisos no reconocidos", {
+                .join(', ');
+            errors.floor = 'Hay pisos que no existen en el edificio seleccionado.';
+            toast.error('Pisos no reconocidos', {
                 description: `No se guardó la persona. Pisos inválidos: ${details}. Ajusta los pisos en el selector antes de continuar.`,
             });
             return;
@@ -618,13 +547,11 @@
             if (!result.success) {
                 const newErrors: Record<string, string> = {};
                 result.error.issues.forEach((issue) => {
-                    if (issue.path[0])
-                        newErrors[issue.path[0].toString()] = issue.message;
+                    if (issue.path[0]) newErrors[issue.path[0].toString()] = issue.message;
                 });
                 errors = newErrors;
-                toast.error("Error de Validación", {
-                    description:
-                        "Por favor corrija los campos marcados en rojo.",
+                toast.error('Error de Validación', {
+                    description: 'Por favor corrija los campos marcados en rojo.',
                 });
                 return;
             }
@@ -641,8 +568,7 @@
                 areaEquipo,
                 puestoFuncion,
                 dependency,
-                dependency_id: dependencies.find((d) => d.name === dependency)
-                    ?.id,
+                dependency_id: dependencies.find((d) => d.name === dependency)?.id,
                 edificio,
                 building_id: buildings.find((b) => b.name === edificio)?.id,
                 pisoBase,
@@ -687,16 +613,16 @@
                     modified: data,
                 };
                 await ticketService.create({
-                    title: "Modificación de Datos Personales",
+                    title: 'Modificación de Datos Personales',
                     description: `Solicitud de cambio de datos para ${nombres} ${apellidos} (${noEmpleado})`,
-                    type: "Modificación de datos",
-                    priority: "media",
+                    type: 'Modificación de datos',
+                    priority: 'media',
                     person_id: editingPerson.id,
                     payload: ticketPayload,
                 });
 
-                toast.success("Solicitud Enviada", {
-                    description: "Los cambios se han enviado a aprobación.",
+                toast.success('Solicitud Enviada', {
+                    description: 'Los cambios se han enviado a aprobación.',
                 });
             } else {
                 // Optimistic locking: solo en guardado directo (no ticket). Si la
@@ -705,7 +631,7 @@
                     const personRowPayload = {
                         first_name: nombres,
                         last_name: apellidos,
-                        employee_no: (noEmpleado || "").trim() || null,
+                        employee_no: (noEmpleado || '').trim() || null,
                         area: areaEquipo || null,
                         position: puestoFuncion || null,
                         dependency_id: dependencies.find((d) => d.name === dependency)?.id ?? null,
@@ -715,10 +641,10 @@
                         entry_time: horaEntrada || null,
                         exit_time: horaSalida || null,
                         email: normalizeEmailText(email) || null,
-                        status: editingPerson?.status_raw || "active",
+                        status: editingPerson?.status_raw || 'active',
                     };
                     const lock = await updateWithLock(
-                        "personnel",
+                        'personnel',
                         editingPerson.id,
                         personRowPayload,
                         editingUpdatedAt,
@@ -736,13 +662,13 @@
                 }
                 const updated = await personnelService.fetchAll();
                 personnelState.pagination.setItems(updated.data, updated.count);
-                toast.success("Personal Registrado");
+                toast.success('Personal Registrado');
             }
 
             oncomplete?.();
             resetAndClose();
         } catch (e) {
-            handleError(e, "Guardar Personal");
+            handleError(e, 'Guardar Personal');
         } finally {
             isSubmitting = false;
         }
@@ -751,20 +677,20 @@
     function resetForm() {
         editingUpdatedAt = null;
         isStale = false;
-        nombres = "";
-        apellidos = "";
-        noEmpleado = "";
-        dependency = "";
-        areaEquipo = "";
-        puestoFuncion = "";
-        edificio = "";
-        pisoBase = "";
+        nombres = '';
+        apellidos = '';
+        noEmpleado = '';
+        dependency = '';
+        areaEquipo = '';
+        puestoFuncion = '';
+        edificio = '';
+        pisoBase = '';
         floorsByBuilding = {};
         selectedBuildings = [];
-        diasHorario = "";
-        horaEntrada = "08:00";
-        horaSalida = "17:00";
-        email = "";
+        diasHorario = '';
+        horaEntrada = '08:00';
+        horaSalida = '17:00';
+        email = '';
         accesosEspeciales = [];
         tarjetasAsignadas = [];
     }
@@ -781,62 +707,59 @@
     // ── Comparison Logic ──────────────────────────────────
     const comparisonFields = [
         {
-            key: "nombres",
+            key: 'nombres',
             state: () => nombres,
             setter: (v: string) => (nombres = v),
-            label: "Nombres",
+            label: 'Nombres',
         },
         {
-            key: "apellidos",
+            key: 'apellidos',
             state: () => apellidos,
             setter: (v: string) => (apellidos = v),
-            label: "Apellidos",
+            label: 'Apellidos',
         },
         {
-            key: "noEmpleado",
+            key: 'noEmpleado',
             state: () => noEmpleado,
             setter: (v: string) => (noEmpleado = v),
-            label: "No. Empleado",
+            label: 'No. Empleado',
         },
         {
-            key: "dependencia",
+            key: 'dependencia',
             state: () => dependency,
             setter: (v: string) => (dependency = v),
-            label: "Dependencia",
+            label: 'Dependencia',
         },
         {
-            key: "area",
+            key: 'area',
             state: () => areaEquipo,
             setter: (v: string) => (areaEquipo = v),
-            label: "Área/Equipo",
+            label: 'Área/Equipo',
         },
         {
-            key: "puesto",
+            key: 'puesto',
             state: () => puestoFuncion,
             setter: (v: string) => (puestoFuncion = v),
-            label: "Puesto",
+            label: 'Puesto',
         },
         {
-            key: "correo",
+            key: 'correo',
             state: () => email,
             setter: (v: string) => (email = v),
-            label: "Correo",
+            label: 'Correo',
         },
     ];
 
     function getTicketValue(key: string) {
         if (!prefill) return null;
-        return (prefill as any)[key] || "";
+        return (prefill as any)[key] || '';
     }
 
     function isDifferent(field: any) {
         if (!prefill || !editingPerson) return false;
         const ticketVal = getTicketValue(field.key);
         if (!ticketVal) return false;
-        return (
-            String(field.state()).trim().toLowerCase() !==
-            String(ticketVal).trim().toLowerCase()
-        );
+        return String(field.state()).trim().toLowerCase() !== String(ticketVal).trim().toLowerCase();
     }
 </script>
 
@@ -846,15 +769,12 @@
             class="flex items-center justify-between gap-2 p-1.5 px-2 bg-amber-50 border border-amber-200 rounded text-[10px] mt-1 pulse-amber"
         >
             <span class="text-amber-700 font-medium"
-                >Solicitado: <strong class="text-amber-900"
-                    >{getTicketValue(field.key)}</strong
-                ></span
+                >Solicitado: <strong class="text-amber-900">{getTicketValue(field.key)}</strong></span
             >
             <button
                 type="button"
                 class="text-amber-600 font-bold hover:text-amber-800 underline transition-colors"
-                onclick={() => field.setter(getTicketValue(field.key))}
-                >Aplicar</button
+                onclick={() => field.setter(getTicketValue(field.key))}>Aplicar</button
             >
         </div>
     {/if}
@@ -864,15 +784,16 @@
     bind:isOpen
     title={editingPerson
         ? prefill
-            ? "Vincular Alta a Persona"
-            : "Editar Personal"
-        : "Nueva Alta de Personal"}
+            ? 'Vincular Alta a Persona'
+            : 'Editar Personal'
+        : 'Nueva Alta de Personal'}
     description={editingPerson
         ? prefill
-            ? "Se actualizarán los accesos de la persona existente directamente."
-            : "Modifique los datos requeridos. Se generará un ticket."
-        : "Complete la información para registrar una nueva persona."}
+            ? 'Se actualizarán los accesos de la persona existente directamente.'
+            : 'Modifique los datos requeridos. Se generará un ticket.'
+        : 'Complete la información para registrar una nueva persona.'}
     size="xl"
+    mobileFullScreen
     onclose={resetAndClose}
 >
     <form
@@ -886,9 +807,8 @@
             <div
                 class="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3 text-xs font-semibold"
             >
-                ⚠️ Este registro fue modificado por otra persona luego de que lo
-                abriste. Puedes seguir editando; al guardar se validará la
-                versión.
+                ⚠️ Este registro fue modificado por otra persona luego de que lo abriste. Puedes seguir
+                editando; al guardar se validará la versión.
             </div>
         {/if}
 
@@ -913,22 +833,17 @@
                         </p>
                         <div class="mt-1 space-y-1">
                             {#each potentialDuplicates as p}
-                                <div
-                                    class="text-[10px] text-amber-700 flex items-center gap-1"
-                                >
-                                    <span class="font-bold"
-                                        >• {p.last_name}, {p.first_name}</span
-                                    >
+                                <div class="text-[10px] text-amber-700 flex items-center gap-1">
+                                    <span class="font-bold">• {p.last_name}, {p.first_name}</span>
                                     <span class="opacity-70"
-                                        >en {p.dependency || "N/A"} ({p.building ||
-                                            "N/A"})</span
+                                        >en {p.dependency || 'N/A'} ({p.building || 'N/A'})</span
                                     >
                                 </div>
                             {/each}
                         </div>
                         <p class="text-[9px] text-amber-600 mt-2 italic">
-                            Si es la misma persona, considera actualizar su
-                            registro actual en lugar de crear uno nuevo.
+                            Si es la misma persona, considera actualizar su registro actual en lugar de crear
+                            uno nuevo.
                         </p>
                     </div>
                 </div>
@@ -941,8 +856,8 @@
                         bind:value={nombres}
                         placeholder="Juan Carlos"
                         class={isDifferent(comparisonFields[0])
-                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
-                            : ""}
+                            ? 'ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30'
+                            : ''}
                     />
                     {@render DiffIndicator(comparisonFields[0])}
                 </FormField>
@@ -952,8 +867,8 @@
                         bind:value={apellidos}
                         placeholder="Pérez García"
                         class={isDifferent(comparisonFields[1])
-                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
-                            : ""}
+                            ? 'ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30'
+                            : ''}
                     />
                     {@render DiffIndicator(comparisonFields[1])}
                 </FormField>
@@ -966,8 +881,8 @@
                         bind:value={noEmpleado}
                         placeholder="EMP-001"
                         class={isDifferent(comparisonFields[2])
-                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
-                            : ""}
+                            ? 'ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30'
+                            : ''}
                     />
                     {@render DiffIndicator(comparisonFields[2])}
                 </FormField>
@@ -977,8 +892,8 @@
                             id="dependencia"
                             bind:value={dependency}
                             class={isDifferent(comparisonFields[3])
-                                ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
-                                : ""}
+                                ? 'ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30'
+                                : ''}
                         />
                         {@render DiffIndicator(comparisonFields[3])}
                     </FormField>
@@ -992,8 +907,8 @@
                         bind:value={areaEquipo}
                         placeholder="Sistemas"
                         class={isDifferent(comparisonFields[4])
-                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
-                            : ""}
+                            ? 'ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30'
+                            : ''}
                     />
                     {@render DiffIndicator(comparisonFields[4])}
                 </FormField>
@@ -1003,8 +918,8 @@
                         bind:value={puestoFuncion}
                         placeholder="Analista"
                         class={isDifferent(comparisonFields[5])
-                            ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
-                            : ""}
+                            ? 'ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30'
+                            : ''}
                     />
                     {@render DiffIndicator(comparisonFields[5])}
                 </FormField>
@@ -1017,8 +932,8 @@
                     bind:value={email}
                     placeholder="correo@ejemplo.com"
                     class={isDifferent(comparisonFields[6])
-                        ? "ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30"
-                        : ""}
+                        ? 'ring-2 ring-amber-400 ring-offset-1 bg-amber-50/30'
+                        : ''}
                 />
                 {@render DiffIndicator(comparisonFields[6])}
             </FormField>
@@ -1031,7 +946,7 @@
                     <BuildingSelect
                         id="edificio"
                         bind:value={edificio}
-                        class={errors.building ? "border-red-500 ring-red-200" : ""}
+                        class={errors.building ? 'border-red-500 ring-red-200' : ''}
                     />
                 </FormField>
                 <FormField label="Piso Base" for="pisoBase" error={errors.floor}>
@@ -1039,7 +954,7 @@
                         id="pisoBase"
                         bind:value={pisoBase}
                         disabled={!edificio}
-                        class={errors.floor ? "border-red-500 ring-red-200" : ""}
+                        class={errors.floor ? 'border-red-500 ring-red-200' : ''}
                     >
                         {#each availableFloors as f}
                             <option value={f}>{f}</option>
@@ -1052,7 +967,9 @@
                 <div class="space-y-4">
                     <!-- Edificios con acceso: solo se configuran los seleccionados -->
                     <div>
-                        <p class="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">Edificios con acceso</p>
+                        <p class="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">
+                            Edificios con acceso
+                        </p>
                         <div class="flex flex-wrap gap-2">
                             {#each buildings as b}
                                 {#if (b.floors || []).length > 0 || specialOptionsFor(Number(b.id)).length > 0}
@@ -1060,13 +977,17 @@
                                     {@const isBase = bid === baseBuildingId}
                                     <button
                                         type="button"
-                                        class="px-3 py-1.5 rounded-xl text-[11px] font-bold border-2 transition-all active:scale-95 {selectedBuildings.includes(bid)
+                                        class="px-3 py-1.5 rounded-xl text-[11px] font-bold border-2 transition-all active:scale-95 {selectedBuildings.includes(
+                                            bid,
+                                        )
                                             ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
                                             : 'border-slate-200 text-slate-500 hover:border-blue-300'}"
                                         onclick={() => toggleBuilding(bid)}
-                                        title={isBase ? "Edificio de radicación (independiente del acceso; márcalo solo si solicita acceso aquí)" : undefined}
+                                        title={isBase
+                                            ? 'Edificio de radicación (independiente del acceso; márcalo solo si solicita acceso aquí)'
+                                            : undefined}
                                     >
-                                        {b.name}{isBase ? " ★" : ""}
+                                        {b.name}{isBase ? ' ★' : ''}
                                     </button>
                                 {/if}
                             {/each}
@@ -1078,15 +999,12 @@
                         {@const bFloors = b.floors || []}
                         {#if selectedBuildings.includes(bid) && (bFloors.length > 0 || specialOptionsFor(bid).length > 0)}
                             <div
-                                class="rounded-lg border p-3 {bid ===
-                                baseBuildingId
+                                class="rounded-lg border p-3 {bid === baseBuildingId
                                     ? 'border-slate-300 bg-slate-50'
                                     : 'border-slate-200 bg-white'}"
                             >
                                 <div class="flex items-center justify-between mb-2">
-                                    <span
-                                        class="text-xs font-bold text-slate-600 uppercase tracking-widest"
-                                    >
+                                    <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">
                                         {b.name}
                                         {#if bid === baseBuildingId}
                                             <span
@@ -1104,8 +1022,7 @@
                                                 label={`Pisos ${fm.name}`}
                                                 options={bFloors}
                                                 value={floorsByBuilding[bid]?.[fm.id] ?? []}
-                                                onchange={(v) =>
-                                                    updateBuildingFloors(bid, fm.id, v)}
+                                                onchange={(v) => updateBuildingFloors(bid, fm.id, v)}
                                                 showSelectAll={true}
                                             />
                                         {/if}
@@ -1132,7 +1049,7 @@
                 <ScheduleSelect
                     id="dias"
                     bind:value={diasHorario}
-                    class={errors.schedule_days ? "border-red-500 ring-red-200" : ""}
+                    class={errors.schedule_days ? 'border-red-500 ring-red-200' : ''}
                 />
             </FormField>
 
@@ -1156,16 +1073,9 @@
                                 class="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white"
                             >
                                 <div class="flex items-center gap-3">
-                                    <CreditCard
-                                        size={18}
-                                        class="text-slate-400"
-                                    />
-                                    <Badge variant={mediaTypeVariant(card.type)}>{card.type}</Badge
-                                    >
-                                    <span
-                                        class="text-sm font-bold text-slate-700"
-                                        >{card.folio}</span
-                                    >
+                                    <CreditCard size={18} class="text-slate-400" />
+                                    <Badge variant={mediaTypeVariant(card.type)}>{card.type}</Badge>
+                                    <span class="text-sm font-bold text-slate-700">{card.folio}</span>
                                 </div>
                                 <button
                                     type="button"
@@ -1205,18 +1115,19 @@
                 {/if}
             </div>
             <div class="flex items-center gap-2">
-                <Button variant="ghost" onclick={resetAndClose}>Cancelar</Button
-                >
+                <Button variant="ghost" onclick={resetAndClose}>Cancelar</Button>
                 <PermissionGuard requireEdit>
                     <Button
                         variant="primary"
                         onclick={handleSave}
                         loading={isSubmitting}
+                        disabled={!networkStore.isOnline}
+                        title={!networkStore.isOnline ? 'Sin conexión: no se puede guardar' : undefined}
                         >{editingPerson
                             ? forceDirectSave
-                                ? "Vincular Alta a Persona"
-                                : "Actualizar (Ticket)"
-                            : "Guardar Alta"}</Button
+                                ? 'Vincular Alta a Persona'
+                                : 'Actualizar (Ticket)'
+                            : 'Guardar Alta'}</Button
                     >
                 </PermissionGuard>
             </div>
@@ -1224,11 +1135,7 @@
     {/snippet}
 </Modal>
 
-<AddCardModal
-    bind:isOpen={isCardModalOpen}
-    onSave={addCard}
-    {allowedCardTypes}
-/>
+<AddCardModal bind:isOpen={isCardModalOpen} onSave={addCard} {allowedCardTypes} />
 
 <style>
     @keyframes pulse-amber {

@@ -9,17 +9,17 @@
 
 /** Normaliza un label de piso para comparaciones (trim + espacios + acentos + case). */
 export function normalizeFloorLabel(label: string): string {
-    return String(label ?? "")
+    return String(label ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
         .trim()
         .toLowerCase()
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\s+/g, " ");
+        .replace(/\s+/g, ' ');
 }
 
 /** Extrae el número principal de un texto de piso, si lo hay ("piso 3" → "3"). */
 function extractNumeric(raw: string): string | null {
-    const normalized = normalizeFloorLabel(raw)
-        .replace(/(piso|nivel|planta|pb|sotano|sótano)/g, " ");
+    const normalized = normalizeFloorLabel(raw).replace(/(piso|nivel|planta|pb|sotano|sótano)/g, ' ');
     const match = normalized.match(/\d+/);
     return match ? match[0] : null;
 }
@@ -47,26 +47,24 @@ export function resolveFloorLabel(raw: string, canonicalLabels: string[]): strin
     // 2. Numérica ("piso 3" ↔ "3", "3°" ↔ "3", "nivel 4" ↔ "4").
     const wantedNum = extractNumeric(wanted);
     if (wantedNum) {
-        const byNum = canonicalLabels.find(
-            (l) => normalizeFloorLabel(l) === wantedNum,
-        );
+        const byNum = canonicalLabels.find((l) => normalizeFloorLabel(l) === wantedNum);
         if (byNum) return byNum;
     }
 
     // 3. Etiquetas especiales normalizadas (Planta Baja, Sótano, etc.).
     const aliasish = normalizeFloorLabel(wanted)
-        .replace(/(piso|nivel|planta)\s*/g, "")
-        .replace(/[^\p{L}\p{N}]+/gu, " ")
+        .replace(/(piso|nivel|planta)\s*/g, '')
+        .replace(/[^\p{L}\p{N}]+/gu, ' ')
         .trim();
     const specialAliases: Record<string, string> = {
-        "pb": "planta baja",
-        "planta": "planta baja",
-        "planta b": "planta baja",
-        "planta baja": "planta baja",
-        "sotano": "sótano",
-        "sot": "sótano",
-        "subsuelo": "sótano",
-        "soterrano": "sótano",
+        pb: 'planta baja',
+        planta: 'planta baja',
+        'planta b': 'planta baja',
+        'planta baja': 'planta baja',
+        sotano: 'sotano',
+        sot: 'sotano',
+        subsuelo: 'sotano',
+        soterrano: 'sotano',
     };
     const aliasTarget = specialAliases[aliasish];
     const specialMatch = aliasTarget

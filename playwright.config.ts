@@ -11,6 +11,9 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
     testDir: './tests',
+    // Los tests unitarios (Vitest) viven en tests/unit y no deben correr con Playwright.
+    testMatch: '**/*.spec.ts',
+    testIgnore: ['**/unit/**'],
     timeout: 30_000,
     expect: { timeout: 5_000 },
     fullyParallel: false,
@@ -26,6 +29,13 @@ export default defineConfig({
         {
             name: 'chromium',
             use: { ...devices['Desktop Chrome'] },
+            testIgnore: ['**/mobile.spec.ts'],
+        },
+        {
+            name: 'mobile',
+            use: { ...devices['iPhone 13'], browserName: 'chromium' },
+            // Los tests de escritorio no aplican al proyecto móvil.
+            testMatch: ['**/mobile.spec.ts'],
         },
     ],
     webServer: process.env.E2E_WEB_SERVER

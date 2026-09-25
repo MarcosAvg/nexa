@@ -1,4 +1,4 @@
-import type { CatalogItem } from "../types";
+import type { CatalogItem } from '../types';
 
 export class CatalogState {
     dependencies = $state<CatalogItem[]>([]);
@@ -26,7 +26,6 @@ export class CatalogState {
     setMediaTypes(data: CatalogItem[]) {
         this.mediaTypes = data;
     }
-
 
     /** Nombres (distintos) de los medios de acceso activos, para desplegables/filtros. */
     activeMediaTypeNames(): string[] {

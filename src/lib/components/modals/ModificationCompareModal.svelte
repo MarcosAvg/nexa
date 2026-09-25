@@ -1,17 +1,17 @@
 <script lang="ts">
-    import Modal from "../Modal.svelte";
-    import Button from "../Button.svelte";
-    import Badge from "../Badge.svelte";
-    import { personnelService } from "../../services";
-    import { HistoryService } from "../../services/history";
-    import { ticketService } from "../../services/tickets";
-    import { personnelState, ticketState, catalogState } from "../../stores";
-    import { cardService } from "../../services/cards";
-    import { toast } from "svelte-sonner";
-    import { handleError, capitalize, fetchCurrentVersion } from "../../utils";
-    import { mediaTypeVariant } from "../../utils/mediaTypeAppearance";
-    import { ArrowRight, Plus, Minus, User } from "lucide-svelte";
-    import type { Ticket, Person } from "../../types";
+    import Modal from '../Modal.svelte';
+    import Button from '../Button.svelte';
+    import Badge from '../Badge.svelte';
+    import { personnelService } from '../../services';
+    import { HistoryService } from '../../services/history';
+    import { ticketService } from '../../services/tickets';
+    import { personnelState, ticketState, catalogState } from '../../stores';
+    import { cardService } from '../../services/cards';
+    import { toast } from 'svelte-sonner';
+    import { handleError, capitalize, fetchCurrentVersion } from '../../utils';
+    import { mediaTypeVariant } from '../../utils/mediaTypeAppearance';
+    import { ArrowRight, Plus, Minus, User } from 'lucide-svelte';
+    import type { Ticket, Person } from '../../types';
 
     let {
         /** Controla la visibilidad (two-way bindable). */
@@ -35,22 +35,14 @@
         if (!ticket?.person_id) return null;
         // Priorizar datos del store para consistencia, fallback a datos consultados
         return (
-            personnelState.pagination.items.find((p) => p.id === ticket.person_id) ||
-            fetchedPerson ||
-            null
+            personnelState.pagination.items.find((p) => p.id === ticket.person_id) || fetchedPerson || null
         );
     });
 
     $effect(() => {
         if (isOpen && ticket?.person_id) {
-            const inStore = personnelState.pagination.items.find(
-                (p) => p.id === ticket.person_id,
-            );
-            if (
-                !inStore &&
-                !isLoadingPerson &&
-                (!fetchedPerson || fetchedPerson.id !== ticket.person_id)
-            ) {
+            const inStore = personnelState.pagination.items.find((p) => p.id === ticket.person_id);
+            if (!inStore && !isLoadingPerson && (!fetchedPerson || fetchedPerson.id !== ticket.person_id)) {
                 isLoadingPerson = true;
                 personnelService
                     .fetchById(ticket.person_id)
@@ -58,7 +50,7 @@
                         if (p) fetchedPerson = p;
                     })
                     .catch((e) => {
-                        handleError(e, "Cargar Persona para Comparación");
+                        handleError(e, 'Cargar Persona para Comparación');
                     })
                     .finally(() => {
                         isLoadingPerson = false;
@@ -73,78 +65,73 @@
     // Definiciones de campos para comparación
     const fieldDefs = [
         {
-            label: "Nombre(s)",
-            currentKey: "first_name",
-            modifiedKey: "nombres",
-            fallbackKey: "first_name",
+            label: 'Nombre(s)',
+            currentKey: 'first_name',
+            modifiedKey: 'nombres',
+            fallbackKey: 'first_name',
         },
         {
-            label: "Apellidos",
-            currentKey: "last_name",
-            modifiedKey: "apellidos",
-            fallbackKey: "last_name",
+            label: 'Apellidos',
+            currentKey: 'last_name',
+            modifiedKey: 'apellidos',
+            fallbackKey: 'last_name',
         },
         {
-            label: "No. Empleado",
-            currentKey: "employee_no",
-            modifiedKey: "noEmpleado",
-            fallbackKey: "employee_no",
+            label: 'No. Empleado',
+            currentKey: 'employee_no',
+            modifiedKey: 'noEmpleado',
+            fallbackKey: 'employee_no',
         },
         {
-            label: "Dependencia",
-            currentKey: "dependency",
-            modifiedKey: "dependency",
+            label: 'Dependencia',
+            currentKey: 'dependency',
+            modifiedKey: 'dependency',
         },
         {
-            label: "Área / Equipo",
-            currentKey: "area",
-            modifiedKey: "areaEquipo",
-            fallbackKey: "area",
+            label: 'Área / Equipo',
+            currentKey: 'area',
+            modifiedKey: 'areaEquipo',
+            fallbackKey: 'area',
         },
         {
-            label: "Puesto / Función",
-            currentKey: "position",
-            modifiedKey: "puestoFuncion",
-            fallbackKey: "position",
+            label: 'Puesto / Función',
+            currentKey: 'position',
+            modifiedKey: 'puestoFuncion',
+            fallbackKey: 'position',
         },
-        { label: "Edificio", currentKey: "building", modifiedKey: "edificio" },
+        { label: 'Edificio', currentKey: 'building', modifiedKey: 'edificio' },
         {
-            label: "Piso Base",
-            currentKey: "floor",
-            modifiedKey: "pisoBase",
-            fallbackKey: "floor",
+            label: 'Piso Base',
+            currentKey: 'floor',
+            modifiedKey: 'pisoBase',
+            fallbackKey: 'floor',
         },
-        { label: "Email", currentKey: "email", modifiedKey: "email" },
+        { label: 'Email', currentKey: 'email', modifiedKey: 'email' },
     ];
 
     function getValue(obj: any, key: string, fallbackKey?: string): string {
-        if (!obj) return "—";
+        if (!obj) return '—';
         const val = obj[key] ?? (fallbackKey ? obj[fallbackKey] : undefined);
-        if (val === null || val === undefined || val === "") return "—";
+        if (val === null || val === undefined || val === '') return '—';
         return String(val);
     }
 
     function isChanged(currentVal: string, modifiedVal: string): boolean {
-        return currentVal !== modifiedVal && modifiedVal !== "—";
+        return currentVal !== modifiedVal && modifiedVal !== '—';
     }
 
     function normalizeTime(time: string): string {
-        if (!time || time === "—") return "—";
+        if (!time || time === '—') return '—';
         // Si ya tiene el formato HH:MM:SS lo dejamos igual, si es HH:MM le agregamos :00
-        const parts = time.split(":");
+        const parts = time.split(':');
         if (parts.length === 2) return `${time}:00`;
         return time;
     }
 
     // Utilidades de comparación de arrays de pisos
-    function getFloorChanges(
-        currentFloors: string[],
-        modifiedFloors: string[],
-    ) {
+    function getFloorChanges(currentFloors: string[], modifiedFloors: string[]) {
         const added = modifiedFloors.filter((f) => !currentFloors.includes(f));
-        const removed = currentFloors.filter(
-            (f) => !modifiedFloors.includes(f),
-        );
+        const removed = currentFloors.filter((f) => !modifiedFloors.includes(f));
         const kept = modifiedFloors.filter((f) => currentFloors.includes(f));
         return { added, removed, kept };
     }
@@ -158,11 +145,9 @@
         if (!Array.isArray(list)) return [];
         const out: string[] = [];
         for (const item of list) {
-            if (item === null || item === undefined || item === "") continue;
+            if (item === null || item === undefined || item === '') continue;
             const found = catalogState.specialAccesses.find(
-                (s) =>
-                    String(s.id) === String(item) ||
-                    s.name === String(item),
+                (s) => String(s.id) === String(item) || s.name === String(item),
             );
             const name = found?.name ?? String(item);
             if (!out.includes(name)) out.push(name);
@@ -177,29 +162,19 @@
         return group ? group.floors : [];
     }
 
-    function getModifiedFloors(
-        mediaKey: string,
-        modifiedKey?: string,
-        fallbackKey?: string,
-    ): string[] {
+    function getModifiedFloors(mediaKey: string, modifiedKey?: string, fallbackKey?: string): string[] {
         if (!modifiedData) return [];
         // Plantilla importada: pisos<Cap> / floors_<key>.
         const direct =
-            modifiedData[modifiedKey ?? mediaKey] ??
-            (fallbackKey ? modifiedData[fallbackKey] : []);
+            modifiedData[modifiedKey ?? mediaKey] ?? (fallbackKey ? modifiedData[fallbackKey] : []);
         if (Array.isArray(direct)) return direct;
         // Ticket manual: pisosPorMedio indexado por mediaKey.
-        const viaPisosPorMedio = (
-            modifiedData.pisosPorMedio as Record<string, string[]>
-        )?.[mediaKey];
+        const viaPisosPorMedio = (modifiedData.pisosPorMedio as Record<string, string[]>)?.[mediaKey];
         if (Array.isArray(viaPisosPorMedio)) return viaPisosPorMedio;
         // Último recurso: agregar desde floorsByBuilding por mediaTypeId.
         const mediaType = catalogState.mediaTypes.find((m) => m.key === mediaKey);
-        const fbb = modifiedData.floorsByBuilding as Record<
-            number,
-            Record<string, string[]>
-        >;
-        if (mediaType && fbb && typeof fbb === "object") {
+        const fbb = modifiedData.floorsByBuilding as Record<number, Record<string, string[]>>;
+        if (mediaType && fbb && typeof fbb === 'object') {
             const floors: string[] = [];
             for (const typeMap of Object.values(fbb)) {
                 const list = typeMap?.[String(mediaType.id)] || [];
@@ -215,7 +190,13 @@
     // heredando el nombre de campo legado para compatibilidad con la plantilla.
     let floorMediaFields = $derived.by(() => {
         const seen = new Set<string>();
-        const fields: { key: string; label: string; currentKey: string; modifiedKey: string; fallbackKey: string }[] = [];
+        const fields: {
+            key: string;
+            label: string;
+            currentKey: string;
+            modifiedKey: string;
+            fallbackKey: string;
+        }[] = [];
         for (const m of catalogState.mediaTypes) {
             if ((m as any).active === false || !(m as any).has_floors) continue;
             const key = m.key;
@@ -235,32 +216,27 @@
 
     // Comparación de horario
     function getCurrentScheduleEntry(): string {
-        return normalizeTime(currentPerson?.schedule?.entry || "—");
+        return normalizeTime(currentPerson?.schedule?.entry || '—');
     }
     function getCurrentScheduleExit(): string {
-        return normalizeTime(currentPerson?.schedule?.exit || "—");
+        return normalizeTime(currentPerson?.schedule?.exit || '—');
     }
     function getModifiedEntry(): string {
-        const val =
-            modifiedData?.entry_time || modifiedData?.horaEntrada || "—";
+        const val = modifiedData?.entry_time || modifiedData?.horaEntrada || '—';
         return normalizeTime(String(val));
     }
     function getModifiedExit(): string {
-        const val = modifiedData?.exit_time || modifiedData?.horaSalida || "—";
+        const val = modifiedData?.exit_time || modifiedData?.horaSalida || '—';
         return normalizeTime(String(val));
     }
 
     // Estado de comparación de accesos especiales
     let currentAccesses = $derived(currentPerson?.specialAccesses || []);
-    let modifiedAccesses = $derived(resolveSpecialAccessNames(
-        modifiedData?.specialAccesses || modifiedData?.special_accesses || [],
-    ));
-    let accessChanges = $derived(
-        getFloorChanges(currentAccesses, modifiedAccesses),
+    let modifiedAccesses = $derived(
+        resolveSpecialAccessNames(modifiedData?.specialAccesses || modifiedData?.special_accesses || []),
     );
-    let hasAccessChanges = $derived(
-        accessChanges.added.length > 0 || accessChanges.removed.length > 0,
-    );
+    let accessChanges = $derived(getFloorChanges(currentAccesses, modifiedAccesses));
+    let hasAccessChanges = $derived(accessChanges.added.length > 0 || accessChanges.removed.length > 0);
 
     async function handleConfirm() {
         if (isSubmitting || !ticket || !currentPerson) return;
@@ -281,9 +257,7 @@
                 if (Array.isArray(raw) && raw.length > 0) byKey[f.key] = raw;
             }
             const specialAccesses =
-                (modifiedData as any).specialAccesses ??
-                (modifiedData as any).special_accesses ??
-                [];
+                (modifiedData as any).specialAccesses ?? (modifiedData as any).special_accesses ?? [];
             // Convertir accesos especiales (nombres o ids del ticket) a ids del catálogo.
             const specialAccessIds: number[] = [];
             for (const n of specialAccesses as string[]) {
@@ -319,51 +293,40 @@
             };
 
             // Optimistic lock: si la persona cambió desde que se cargó, avisar.
-            const freshVersion = await fetchCurrentVersion("personnel", currentPerson.id);
+            const freshVersion = await fetchCurrentVersion('personnel', currentPerson.id);
             const currentUpdatedAt = (currentPerson as any).updated_at;
             if (freshVersion && currentUpdatedAt && freshVersion !== currentUpdatedAt) {
-                toast.error("Esta persona fue modificada por otra persona. Recarga e inténtalo de nuevo.");
+                toast.error('Esta persona fue modificada por otra persona. Recarga e inténtalo de nuevo.');
                 return;
             }
 
             await personnelService.save(saveData);
 
             // Eliminar el ticket
-            await ticketService.delete(
-                ticket.id,
-                `Modificación aprobada: ${ticket.description}`,
-            );
+            await ticketService.delete(ticket.id, `Modificación aprobada: ${ticket.description}`);
 
             // Registrar la aprobación de modificación
-            await HistoryService.log(
-                "PERSONNEL",
-                currentPerson.id,
-                "APPLY_MODIFICATION",
-                {
-                    message: `Modificación de datos aprobada para ${currentPerson.name}`,
-                    entityName: currentPerson.name,
-                },
-            );
+            await HistoryService.log('PERSONNEL', currentPerson.id, 'APPLY_MODIFICATION', {
+                message: `Modificación de datos aprobada para ${currentPerson.name}`,
+                entityName: currentPerson.name,
+            });
 
             // Actualizar datos
             const [updatedPersonnel, updatedCards] = await Promise.all([
                 personnelService.fetchAll(),
                 cardService.fetchExtra(),
             ]);
-            personnelState.pagination.setItems(
-                updatedPersonnel.data,
-                updatedPersonnel.count,
-            );
+            personnelState.pagination.setItems(updatedPersonnel.data, updatedPersonnel.count);
             personnelState.setCards(updatedCards);
 
-            toast.success("Cambios aplicados", {
-                description: "Los datos de la persona han sido actualizados.",
+            toast.success('Cambios aplicados', {
+                description: 'Los datos de la persona han sido actualizados.',
             });
 
             isOpen = false;
             onComplete?.();
         } catch (e) {
-            handleError(e, "Aplicar Cambios de Modificación");
+            handleError(e, 'Aplicar Cambios de Modificación');
         } finally {
             isSubmitting = false;
         }
@@ -374,14 +337,14 @@
         isSubmitting = true;
 
         try {
-            await ticketService.reject(ticket.id, "Modificación");
-            toast.info("Ticket rechazado", {
-                description: "Los cambios no se aplicaron.",
+            await ticketService.reject(ticket.id, 'Modificación');
+            toast.info('Ticket rechazado', {
+                description: 'Los cambios no se aplicaron.',
             });
             isOpen = false;
             onComplete?.();
         } catch (e) {
-            handleError(e, "Rechazar Modificación");
+            handleError(e, 'Rechazar Modificación');
         } finally {
             isSubmitting = false;
         }
@@ -391,8 +354,7 @@
 <Modal
     bind:isOpen
     title="Revisión de Modificación de Datos"
-    description={ticket?.description ||
-        "Comparación de datos actuales vs. propuestos"}
+    description={ticket?.description || 'Comparación de datos actuales vs. propuestos'}
     size="xl"
 >
     {#if isLoadingPerson}
@@ -400,20 +362,14 @@
             class="p-12 text-center text-slate-500 flex flex-col items-center justify-center gap-4 min-h-[300px]"
         >
             <div class="relative w-12 h-12">
-                <div
-                    class="absolute inset-0 border-4 border-slate-100 rounded-full"
-                ></div>
+                <div class="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
                 <div
                     class="absolute inset-0 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"
                 ></div>
             </div>
             <div class="space-y-1">
-                <p class="text-sm font-bold text-slate-700">
-                    Cargando datos de personal
-                </p>
-                <p class="text-xs text-slate-400">
-                    Obteniendo información para la comparación...
-                </p>
+                <p class="text-sm font-bold text-slate-700">Cargando datos de personal</p>
+                <p class="text-xs text-slate-400">Obteniendo información para la comparación...</p>
             </div>
         </div>
     {:else if currentPerson && modifiedData}
@@ -438,14 +394,22 @@
 
                 {#if currentPerson.cards && currentPerson.cards.length > 0}
                     <div class="flex flex-col gap-1.5 sm:items-end">
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Tarjetas Asignadas</p>
+                        <p
+                            class="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:block"
+                        >
+                            Tarjetas Asignadas
+                        </p>
                         <div class="flex flex-wrap gap-2">
                             {#each currentPerson.cards as card}
-                                <div class="flex items-center gap-1.5 bg-white border border-slate-200 px-1.5 py-1 rounded-md text-xs shadow-sm transition-all hover:shadow-md">
+                                <div
+                                    class="flex items-center gap-1.5 bg-white border border-slate-200 px-1.5 py-1 rounded-md text-xs shadow-sm transition-all hover:shadow-md"
+                                >
                                     <Badge variant={mediaTypeVariant(card.type)} class="px-1.5 py-0.5">
                                         {card.type}
                                     </Badge>
-                                    <span class="text-slate-700 font-mono font-bold text-[11px] px-0.5">{card.folio}</span>
+                                    <span class="text-slate-700 font-mono font-bold text-[11px] px-0.5"
+                                        >{card.folio}</span
+                                    >
                                 </div>
                             {/each}
                         </div>
@@ -454,38 +418,21 @@
             </div>
 
             <!-- Column Headers -->
-            <div
-                class="hidden sm:grid grid-cols-[1fr_auto_1fr] gap-4 items-center"
-            >
+            <div class="hidden sm:grid grid-cols-[1fr_auto_1fr] gap-4 items-center">
                 <div class="text-center">
-                    <p
-                        class="text-xs font-bold text-slate-500 uppercase tracking-widest"
-                    >
-                        Datos Actuales
-                    </p>
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Datos Actuales</p>
                 </div>
                 <div class="w-6"></div>
                 <div class="text-center">
-                    <p
-                        class="text-xs font-bold text-slate-500 uppercase tracking-widest"
-                    >
-                        Datos Propuestos
-                    </p>
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Datos Propuestos</p>
                 </div>
             </div>
 
             <!-- Text Fields Comparison -->
             <div class="space-y-4 sm:space-y-2">
                 {#each fieldDefs as field}
-                    {@const currentVal = getValue(
-                        currentPerson,
-                        field.currentKey,
-                    )}
-                    {@const modifiedVal = getValue(
-                        modifiedData,
-                        field.modifiedKey,
-                        field.fallbackKey,
-                    )}
+                    {@const currentVal = getValue(currentPerson, field.currentKey)}
+                    {@const modifiedVal = getValue(modifiedData, field.modifiedKey, field.fallbackKey)}
                     {@const changed = isChanged(currentVal, modifiedVal)}
 
                     <div
@@ -497,9 +444,7 @@
                                 ? 'border-slate-300 bg-slate-50'
                                 : 'border-slate-200 bg-white'}"
                         >
-                            <p
-                                class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"
-                            >
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                                 {field.label} (Actual)
                             </p>
                             <p class="text-sm text-slate-700 break-words">
@@ -508,24 +453,18 @@
                         </div>
 
                         <!-- Arrow/Indicator -->
-                        <div
-                            class="flex items-center justify-center py-1 sm:py-0"
-                        >
+                        <div class="flex items-center justify-center py-1 sm:py-0">
                             {#if changed}
                                 <div
                                     class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center rotate-90 sm:rotate-0"
                                 >
-                                    <ArrowRight
-                                        size={14}
-                                        class="text-amber-600"
-                                    />
+                                    <ArrowRight size={14} class="text-amber-600" />
                                 </div>
                             {:else}
                                 <div
                                     class="hidden sm:flex w-6 h-6 rounded-full bg-slate-100 items-center justify-center"
                                 >
-                                    <span class="text-slate-300 text-xs">=</span
-                                    >
+                                    <span class="text-slate-300 text-xs">=</span>
                                 </div>
                             {/if}
                         </div>
@@ -557,29 +496,17 @@
 
             <!-- Schedule Comparison -->
             {#if currentPerson && modifiedData}
-                {@const entryChanged = isChanged(
-                    getCurrentScheduleEntry(),
-                    getModifiedEntry(),
-                )}
-                {@const exitChanged = isChanged(
-                    getCurrentScheduleExit(),
-                    getModifiedExit(),
-                )}
+                {@const entryChanged = isChanged(getCurrentScheduleEntry(), getModifiedEntry())}
+                {@const exitChanged = isChanged(getCurrentScheduleExit(), getModifiedExit())}
                 {#if entryChanged || exitChanged}
                     <div class="space-y-2">
-                        <p
-                            class="text-xs font-bold text-slate-500 uppercase tracking-widest px-1"
-                        >
-                            Horario
-                        </p>
+                        <p class="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Horario</p>
 
                         {#if entryChanged}
                             <div
                                 class="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] gap-2 sm:gap-4 items-stretch sm:items-center"
                             >
-                                <div
-                                    class="p-3 rounded-lg border border-slate-300 bg-slate-50"
-                                >
+                                <div class="p-3 rounded-lg border border-slate-300 bg-slate-50">
                                     <p
                                         class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"
                                     >
@@ -593,10 +520,7 @@
                                     <div
                                         class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center rotate-90 sm:rotate-0"
                                     >
-                                        <ArrowRight
-                                            size={14}
-                                            class="text-amber-600"
-                                        />
+                                        <ArrowRight size={14} class="text-amber-600" />
                                     </div>
                                 </div>
                                 <div
@@ -607,9 +531,7 @@
                                     >
                                         Hora Entrada
                                     </p>
-                                    <p
-                                        class="text-sm text-amber-900 font-semibold"
-                                    >
+                                    <p class="text-sm text-amber-900 font-semibold">
                                         {getModifiedEntry()}
                                     </p>
                                 </div>
@@ -620,9 +542,7 @@
                             <div
                                 class="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] gap-2 sm:gap-4 items-stretch sm:items-center"
                             >
-                                <div
-                                    class="p-3 rounded-lg border border-slate-300 bg-slate-50"
-                                >
+                                <div class="p-3 rounded-lg border border-slate-300 bg-slate-50">
                                     <p
                                         class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"
                                     >
@@ -636,10 +556,7 @@
                                     <div
                                         class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center rotate-90 sm:rotate-0"
                                     >
-                                        <ArrowRight
-                                            size={14}
-                                            class="text-amber-600"
-                                        />
+                                        <ArrowRight size={14} class="text-amber-600" />
                                     </div>
                                 </div>
                                 <div
@@ -650,9 +567,7 @@
                                     >
                                         Hora Salida
                                     </p>
-                                    <p
-                                        class="text-sm text-amber-900 font-semibold"
-                                    >
+                                    <p class="text-sm text-amber-900 font-semibold">
                                         {getModifiedExit()}
                                     </p>
                                 </div>
@@ -666,9 +581,7 @@
 
             {#if hasAccessChanges}
                 <div class="space-y-2">
-                    <p
-                        class="text-xs font-bold text-slate-500 uppercase tracking-widest px-1"
-                    >
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">
                         Accesos Especiales
                     </p>
 
@@ -676,16 +589,12 @@
                         class="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] gap-2 sm:gap-4 items-stretch sm:items-start"
                     >
                         <!-- Current Accesses -->
-                        <div
-                            class="p-3 rounded-lg border border-slate-300 bg-slate-50"
-                        >
+                        <div class="p-3 rounded-lg border border-slate-300 bg-slate-50">
                             <div class="flex flex-wrap gap-1.5">
                                 {#each currentAccesses as access}
                                     {#if accessChanges.removed.includes(access)}
                                         <Badge variant="rose">
-                                            <span
-                                                class="flex items-center gap-0.5"
-                                            >
+                                            <span class="flex items-center gap-0.5">
                                                 <Minus size={10} />
                                                 <span>{access}</span>
                                             </span>
@@ -695,9 +604,7 @@
                                     {/if}
                                 {/each}
                                 {#if currentAccesses.length === 0}
-                                    <span class="text-xs text-slate-400"
-                                        >Sin accesos</span
-                                    >
+                                    <span class="text-xs text-slate-400">Sin accesos</span>
                                 {/if}
                             </div>
                         </div>
@@ -712,16 +619,12 @@
                         </div>
 
                         <!-- Modified Accesses -->
-                        <div
-                            class="p-3 rounded-lg border border-amber-300 bg-amber-50 ring-1 ring-amber-200"
-                        >
+                        <div class="p-3 rounded-lg border border-amber-300 bg-amber-50 ring-1 ring-amber-200">
                             <div class="flex flex-wrap gap-1.5">
                                 {#each modifiedAccesses as access}
                                     {#if accessChanges.added.includes(access)}
                                         <Badge variant="emerald">
-                                            <span
-                                                class="flex items-center gap-0.5"
-                                            >
+                                            <span class="flex items-center gap-0.5">
                                                 <Plus size={10} />
                                                 {access}
                                             </span>
@@ -731,9 +634,7 @@
                                     {/if}
                                 {/each}
                                 {#if modifiedAccesses.length === 0}
-                                    <span class="text-xs text-slate-400"
-                                        >Sin accesos</span
-                                    >
+                                    <span class="text-xs text-slate-400">Sin accesos</span>
                                 {/if}
                             </div>
                         </div>
@@ -744,23 +645,13 @@
             <!-- Floor Arrays Comparison -->
             {#each floorMediaFields as field}
                 {@const currentFloors = getCurrentFloors(field.key)}
-                {@const modifiedFloors = getModifiedFloors(
-                    field.key,
-                    field.modifiedKey,
-                    field.fallbackKey,
-                )}
-                {@const changes = getFloorChanges(
-                    currentFloors,
-                    modifiedFloors,
-                )}
-                {@const hasChanges =
-                    changes.added.length > 0 || changes.removed.length > 0}
+                {@const modifiedFloors = getModifiedFloors(field.key, field.modifiedKey, field.fallbackKey)}
+                {@const changes = getFloorChanges(currentFloors, modifiedFloors)}
+                {@const hasChanges = changes.added.length > 0 || changes.removed.length > 0}
 
                 {#if hasChanges}
                     <div class="space-y-2">
-                        <p
-                            class="text-xs font-bold text-slate-500 uppercase tracking-widest px-1"
-                        >
+                        <p class="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">
                             {field.label}
                         </p>
 
@@ -768,30 +659,22 @@
                             class="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] gap-2 sm:gap-4 items-stretch sm:items-start"
                         >
                             <!-- Current Floors -->
-                            <div
-                                class="p-3 rounded-lg border border-slate-300 bg-slate-50"
-                            >
+                            <div class="p-3 rounded-lg border border-slate-300 bg-slate-50">
                                 <div class="flex flex-wrap gap-1.5">
                                     {#each currentFloors as floor}
                                         {#if changes.removed.includes(floor)}
                                             <Badge variant="rose">
-                                                <span
-                                                    class="flex items-center gap-0.5"
-                                                >
+                                                <span class="flex items-center gap-0.5">
                                                     <Minus size={10} />
                                                     <span>{floor}</span>
                                                 </span>
                                             </Badge>
                                         {:else}
-                                            <Badge variant="slate"
-                                                >{floor}</Badge
-                                            >
+                                            <Badge variant="slate">{floor}</Badge>
                                         {/if}
                                     {/each}
                                     {#if currentFloors.length === 0}
-                                        <span class="text-xs text-slate-400"
-                                            >Sin pisos asignados</span
-                                        >
+                                        <span class="text-xs text-slate-400">Sin pisos asignados</span>
                                     {/if}
                                 </div>
                             </div>
@@ -801,10 +684,7 @@
                                 <div
                                     class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center rotate-90 sm:rotate-0"
                                 >
-                                    <ArrowRight
-                                        size={14}
-                                        class="text-amber-600"
-                                    />
+                                    <ArrowRight size={14} class="text-amber-600" />
                                 </div>
                             </div>
 
@@ -816,23 +696,17 @@
                                     {#each modifiedFloors as floor}
                                         {#if changes.added.includes(floor)}
                                             <Badge variant="emerald">
-                                                <span
-                                                    class="flex items-center gap-0.5"
-                                                >
+                                                <span class="flex items-center gap-0.5">
                                                     <Plus size={10} />
                                                     {floor}
                                                 </span>
                                             </Badge>
                                         {:else}
-                                            <Badge variant="slate"
-                                                >{floor}</Badge
-                                            >
+                                            <Badge variant="slate">{floor}</Badge>
                                         {/if}
                                     {/each}
                                     {#if modifiedFloors.length === 0}
-                                        <span class="text-xs text-slate-400"
-                                            >Sin pisos asignados</span
-                                        >
+                                        <span class="text-xs text-slate-400">Sin pisos asignados</span>
                                     {/if}
                                 </div>
                             </div>
@@ -841,29 +715,12 @@
                 {/if}
             {/each}
         </div>
-    {:else if isLoadingPerson}
-        <div
-            class="p-8 text-center text-slate-500 flex flex-col items-center gap-2"
-        >
-            <span class="loading loading-spinner text-emerald-500"></span>
-            <span>Cargando datos de la persona...</span>
-        </div>
     {:else}
-        <div class="p-8 text-center text-slate-500">
-            No se encontraron datos para comparar.
-        </div>
+        <div class="p-8 text-center text-slate-500">No se encontraron datos para comparar.</div>
     {/if}
 
     {#snippet footer()}
-        <Button variant="ghost" onclick={handleReject} disabled={isSubmitting}>
-            Rechazar
-        </Button>
-        <Button
-            variant="primary"
-            onclick={handleConfirm}
-            loading={isSubmitting}
-        >
-            Confirmar Cambios
-        </Button>
+        <Button variant="ghost" onclick={handleReject} disabled={isSubmitting}>Rechazar</Button>
+        <Button variant="primary" onclick={handleConfirm} loading={isSubmitting}>Confirmar Cambios</Button>
     {/snippet}
 </Modal>

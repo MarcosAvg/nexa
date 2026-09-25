@@ -11,8 +11,8 @@
     let {
         icon: Icon,
         label,
-        iconBgClass = "bg-emerald-50",
-        iconColorClass = "text-emerald-600",
+        iconBgClass = 'bg-emerald-50',
+        iconColorClass = 'text-emerald-600',
         disabled = false,
         onclick,
     }: Props = $props();

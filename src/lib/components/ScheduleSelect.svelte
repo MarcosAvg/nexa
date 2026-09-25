@@ -1,6 +1,6 @@
 <script lang="ts">
-    import CatalogSelect from "./CatalogSelect.svelte";
-    import { catalogState } from "../stores";
+    import CatalogSelect from './CatalogSelect.svelte';
+    import { catalogState } from '../stores';
 
     /**
      * ScheduleSelect — Select de horarios conectado al store global.
@@ -24,9 +24,9 @@
 
     let {
         value = $bindable(),
-        placeholder = "Seleccionar...",
+        placeholder = 'Seleccionar...',
         disabled = false,
-        class: className = "",
+        class: className = '',
         id,
         onchange,
     }: Props = $props();
@@ -34,12 +34,4 @@
     let schedules = $derived(catalogState.schedules);
 </script>
 
-<CatalogSelect
-    catalog={schedules}
-    bind:value
-    {placeholder}
-    {disabled}
-    class={className}
-    {id}
-    {onchange}
-/>
+<CatalogSelect catalog={schedules} bind:value {placeholder} {disabled} class={className} {id} {onchange} />

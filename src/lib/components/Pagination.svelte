@@ -1,5 +1,5 @@
 <script lang="ts">
-    import Button from "./Button.svelte";
+    import Button from './Button.svelte';
 
     /**
      * Pagination — Controles de paginación con botones de página y ellipsis.
@@ -41,17 +41,13 @@
     let startRecord = $derived((currentPage - 1) * pageSize + 1);
     let endRecord = $derived(Math.min(currentPage * pageSize, totalRecords));
 
-    function getPageRange(curr: number, total: number): (number | "...")[] {
+    function getPageRange(curr: number, total: number): (number | '...')[] {
         const delta = 2;
         const range: number[] = [];
-        const rangeWithDots: (number | "...")[] = [];
+        const rangeWithDots: (number | '...')[] = [];
 
         for (let i = 1; i <= total; i++) {
-            if (
-                i === 1 ||
-                i === total ||
-                (i >= curr - delta && i <= curr + delta)
-            ) {
+            if (i === 1 || i === total || (i >= curr - delta && i <= curr + delta)) {
                 range.push(i);
             }
         }
@@ -62,7 +58,7 @@
                 if (i - l === 2) {
                     rangeWithDots.push(l + 1);
                 } else if (i - l !== 1) {
-                    rangeWithDots.push("...");
+                    rangeWithDots.push('...');
                 }
             }
             rangeWithDots.push(i);
@@ -99,7 +95,7 @@
             <!-- Páginas — columna central con scroll horizontal en móvil -->
             <div class="flex items-center justify-center gap-1 overflow-x-auto scrollbar-none min-w-0 px-0.5">
                 {#each getPageRange(currentPage, totalPages) as page}
-                    {#if page === "..."}
+                    {#if page === '...'}
                         <span class="w-9 text-center text-slate-400 select-none shrink-0">...</span>
                     {:else}
                         <button

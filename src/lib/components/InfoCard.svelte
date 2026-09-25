@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { ComponentType } from "svelte";
+    import type { ComponentType } from 'svelte';
 
     /**
      * InfoCard — Tarjeta informativa reutilizable para guías visuales.
@@ -13,7 +13,7 @@
      *     <div>contenido</div>
      * </InfoCard>
      */
-    type Variant = "amber" | "rose" | "emerald" | "blue" | "slate" | "indigo" | "orange" | "warning";
+    type Variant = 'amber' | 'rose' | 'emerald' | 'blue' | 'slate' | 'indigo' | 'orange' | 'warning';
 
     type Props = {
         /** Variante de color. @default "slate" */
@@ -27,89 +27,92 @@
         /** Clases adicionales. */
         class?: string;
         /** Contenido principal. */
-        children?: import("svelte").Snippet;
+        children?: import('svelte').Snippet;
     };
 
     let {
-        variant = "slate",
-        title = "",
+        variant = 'slate',
+        title = '',
         icon: Icon,
-        hint = "",
-        class: className = "",
+        hint = '',
+        class: className = '',
         children,
     }: Props = $props();
 
-    const variantStyles: Record<Variant, {
-        border: string;
-        bg: string;
-        headerText: string;
-        hintText: string;
-        iconBg: string;
-        iconColor: string;
-    }> = {
+    const variantStyles: Record<
+        Variant,
+        {
+            border: string;
+            bg: string;
+            headerText: string;
+            hintText: string;
+            iconBg: string;
+            iconColor: string;
+        }
+    > = {
         amber: {
-            border: "border-amber-200",
-            bg: "bg-amber-50",
-            headerText: "text-amber-700",
-            hintText: "text-amber-600",
-            iconBg: "bg-amber-100",
-            iconColor: "text-amber-600",
+            border: 'border-amber-200',
+            bg: 'bg-amber-50',
+            headerText: 'text-amber-700',
+            hintText: 'text-amber-600',
+            iconBg: 'bg-amber-100',
+            iconColor: 'text-amber-600',
         },
         rose: {
-            border: "border-rose-200",
-            bg: "bg-rose-50",
-            headerText: "text-rose-700",
-            hintText: "text-rose-600",
-            iconBg: "bg-rose-100",
-            iconColor: "text-rose-600",
+            border: 'border-rose-200',
+            bg: 'bg-rose-50',
+            headerText: 'text-rose-700',
+            hintText: 'text-rose-600',
+            iconBg: 'bg-rose-100',
+            iconColor: 'text-rose-600',
         },
         emerald: {
-            border: "border-emerald-200",
-            bg: "bg-emerald-50",
-            headerText: "text-emerald-700",
-            hintText: "text-emerald-600",
-            iconBg: "bg-emerald-100",
-            iconColor: "text-emerald-600",
+            border: 'border-emerald-200',
+            bg: 'bg-emerald-50',
+            headerText: 'text-emerald-700',
+            hintText: 'text-emerald-600',
+            iconBg: 'bg-emerald-100',
+            iconColor: 'text-emerald-600',
         },
         blue: {
-            border: "border-blue-200",
-            bg: "bg-blue-50",
-            headerText: "text-blue-700",
-            hintText: "text-blue-600",
-            iconBg: "bg-blue-100",
-            iconColor: "text-blue-600",
+            border: 'border-blue-200',
+            bg: 'bg-blue-50',
+            headerText: 'text-blue-700',
+            hintText: 'text-blue-600',
+            iconBg: 'bg-blue-100',
+            iconColor: 'text-blue-600',
         },
         slate: {
-            border: "border-slate-200",
-            bg: "bg-slate-50",
-            headerText: "text-slate-700",
-            hintText: "text-slate-600",
-            iconBg: "bg-slate-100",
-            iconColor: "text-slate-600",
+            border: 'border-slate-200',
+            bg: 'bg-slate-50',
+            headerText: 'text-slate-700',
+            hintText: 'text-slate-600',
+            iconBg: 'bg-slate-100',
+            iconColor: 'text-slate-600',
         },
         indigo: {
-            border: "border-indigo-200",
-            bg: "bg-indigo-50",
-            headerText: "text-indigo-700",
-            hintText: "text-indigo-600",
-            iconBg: "bg-indigo-100",
-            iconColor: "text-indigo-600",
+            border: 'border-indigo-200',
+            bg: 'bg-indigo-50',
+            headerText: 'text-indigo-700',
+            hintText: 'text-indigo-600',
+            iconBg: 'bg-indigo-100',
+            iconColor: 'text-indigo-600',
         },
         orange: {
-            border: "border-orange-200",
-            bg: "bg-orange-50",
-            headerText: "text-orange-700",
-            hintText: "text-orange-600",
-            iconBg: "bg-orange-100",
-            iconColor: "text-orange-600",
+            border: 'border-orange-200',
+            bg: 'bg-orange-50',
+            headerText: 'text-orange-700',
+            hintText: 'text-orange-600',
+            iconBg: 'bg-orange-100',
+            iconColor: 'text-orange-600',
         },
         warning: {
-            border: "border-yellow-300",
-            bg: "bg-yellow-50",
-            headerText: "text-yellow-700",
-            hintText: "text-yellow-600",
-            iconBg: "bg-yellow-100",
-            iconColor: "text-yellow-600",
+            border: 'border-yellow-300',
+            bg: 'bg-yellow-50',
+            headerText: 'text-yellow-700',
+            hintText: 'text-yellow-600',
+            iconBg: 'bg-yellow-100',
+            iconColor: 'text-yellow-600',
         },
     };
 
@@ -117,9 +120,7 @@
 </script>
 
 <div class="space-y-2 {className}">
-    <div
-        class="rounded-xl border {style.border} {style.bg} p-4 space-y-3"
-    >
+    <div class="rounded-xl border {style.border} {style.bg} p-4 space-y-3">
         {#if title || Icon}
             <div class="flex items-center gap-2">
                 {#if Icon}
@@ -130,9 +131,7 @@
                     </div>
                 {/if}
                 {#if title}
-                    <p
-                        class="text-xs font-bold {style.headerText} uppercase tracking-widest"
-                    >
+                    <p class="text-xs font-bold {style.headerText} uppercase tracking-widest">
                         {title}
                     </p>
                 {/if}

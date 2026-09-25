@@ -1,6 +1,6 @@
-import type { CardlessRegistry } from "../types";
-import { PaginatedListState } from "./paginatedList.svelte";
-import { cardlessRegistryService } from "../services/cardlessRegistry";
+import type { CardlessRegistry } from '../types';
+import { PaginatedListState } from './paginatedList.svelte';
+import { cardlessRegistryService } from '../services/cardlessRegistry';
 
 export type CardlessRegistryFilters = {
     startDate: string;
@@ -15,11 +15,11 @@ export class CardlessRegistryState {
 
     /** Filtros unificados. */
     filters: CardlessRegistryFilters = $state({
-        startDate: "",
-        endDate: "",
-        reason: "",
-        search: "",
-        dependencyId: "",
+        startDate: '',
+        endDate: '',
+        reason: '',
+        search: '',
+        dependencyId: '',
     });
 
     /** Carga la primera página con los filtros actuales. */
@@ -33,10 +33,7 @@ export class CardlessRegistryState {
     }
 
     async refresh(page?: number) {
-        await this.pagination.fetchPage(
-            (p, s) => cardlessRegistryService.fetchAll(p, s, this.filters),
-            page,
-        );
+        await this.pagination.fetchPage((p, s) => cardlessRegistryService.fetchAll(p, s, this.filters), page);
     }
 
     setFilters(partial: Partial<CardlessRegistryFilters>) {

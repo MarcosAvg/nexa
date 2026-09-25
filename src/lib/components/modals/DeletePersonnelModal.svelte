@@ -1,9 +1,9 @@
 <script lang="ts">
-    import Modal from "../Modal.svelte";
-    import Button from "../Button.svelte";
-    import { AlertTriangle, Trash2, RotateCcw } from "lucide-svelte";
-    import type { Person } from "../../types";
-    import { mediaTypeBarClasses } from "../../utils/mediaTypeAppearance";
+    import Modal from '../Modal.svelte';
+    import Button from '../Button.svelte';
+    import { AlertTriangle, Trash2, RotateCcw } from 'lucide-svelte';
+    import type { Person } from '../../types';
+    import { mediaTypeBarClasses } from '../../utils/mediaTypeAppearance';
 
     let {
         /** Controla la visibilidad del modal (two-way bindable). */
@@ -11,7 +11,7 @@
         /** Persona a eliminar. */
         person,
         /** Contexto de la operación: "baja" conserva datos, "eliminar" es irreversible. */
-        mode = "eliminar",
+        mode = 'eliminar',
         /** Callback de confirmación con mapa de decisiones por tarjeta. */
         onConfirm,
         /** Callback al cancelar. */
@@ -19,22 +19,20 @@
     } = $props<{
         isOpen: boolean;
         person: Person;
-        mode?: "baja" | "eliminar";
-        onConfirm: (
-            cardActionMap: Record<string, "delete" | "keep">,
-        ) => Promise<void>;
+        mode?: 'baja' | 'eliminar';
+        onConfirm: (cardActionMap: Record<string, 'delete' | 'keep'>) => Promise<void>;
         onCancel?: () => void;
     }>();
 
-    let esBaja = $derived(mode === "baja");
+    let esBaja = $derived(mode === 'baja');
 
     let isSubmitting = $state(false);
-    let cardActionMap = $state<Record<string, "delete" | "keep">>({});        // Inicializar mapa cuando cambia la persona o se abre el modal
+    let cardActionMap = $state<Record<string, 'delete' | 'keep'>>({}); // Inicializar mapa cuando cambia la persona o se abre el modal
     $effect(() => {
         if (isOpen && person?.cards) {
-            const initialMap: Record<string, "delete" | "keep"> = {};
+            const initialMap: Record<string, 'delete' | 'keep'> = {};
             person.cards.forEach((card: any) => {
-                initialMap[card.id] = "keep";        // Por defecto: conservar como disponible
+                initialMap[card.id] = 'keep'; // Por defecto: conservar como disponible
             });
             cardActionMap = initialMap;
         }
@@ -56,44 +54,35 @@
     }
 
     function toggleAction(cardId: string) {
-        cardActionMap[cardId] =
-            cardActionMap[cardId] === "keep" ? "delete" : "keep";
+        cardActionMap[cardId] = cardActionMap[cardId] === 'keep' ? 'delete' : 'keep';
     }
 </script>
 
 <Modal
     bind:isOpen
-    title={esBaja ? "DAR DE BAJA" : "¿ELIMINAR PERMANENTEMENTE?"}
+    title={esBaja ? 'DAR DE BAJA' : '¿ELIMINAR PERMANENTEMENTE?'}
     size="md"
     zIndex="z-[100]"
     onclose={handleCancel}
 >
     <div class="flex flex-col gap-6">
-        <div
-            class="flex items-start gap-4 p-4 bg-rose-50 border border-rose-100 rounded-xl"
-        >
+        <div class="flex items-start gap-4 p-4 bg-rose-50 border border-rose-100 rounded-xl">
             <div class="p-2.5 bg-rose-100 text-rose-600 rounded-lg">
                 <AlertTriangle size={24} />
             </div>
             <div class="space-y-1">
                 <h3 class="font-bold text-rose-900 uppercase text-sm">
-                    {esBaja
-                        ? "Atención: Se dará de baja"
-                        : "Atención: Acción Irreversible"}
+                    {esBaja ? 'Atención: Se dará de baja' : 'Atención: Acción Irreversible'}
                 </h3>
                 {#if esBaja}
                     <p class="text-sm text-rose-700 leading-relaxed">
-                        Vas a dar de baja a <strong
-                            >{person?.first_name} {person?.last_name}</strong
-                        >. La persona dejará de tener acceso, pero sus datos se
-                        conservarán en el sistema.
+                        Vas a dar de baja a <strong>{person?.first_name} {person?.last_name}</strong>. La
+                        persona dejará de tener acceso, pero sus datos se conservarán en el sistema.
                     </p>
                 {:else}
                     <p class="text-sm text-rose-700 leading-relaxed">
-                        Vas a eliminar a <strong
-                            >{person?.first_name} {person?.last_name}</strong
-                        >. Esta acción borrará todo su historial y registros
-                        personales.
+                        Vas a eliminar a <strong>{person?.first_name} {person?.last_name}</strong>. Esta
+                        acción borrará todo su historial y registros personales.
                     </p>
                 {/if}
             </div>
@@ -101,9 +90,7 @@
 
         {#if person?.cards && person.cards.length > 0}
             <div class="space-y-3">
-                <p
-                    class="text-xs font-bold text-slate-500 uppercase tracking-wider"
-                >
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">
                     Gestión de Tarjetas Asignadas
                 </p>
                 <div class="grid gap-2">
@@ -117,13 +104,13 @@
                         >
                             <div class="flex items-center gap-3">
                                 <div
-                                    class="px-2 py-1 rounded text-[10px] font-bold uppercase {mediaTypeBarClasses(card.type).badge}"
+                                    class="px-2 py-1 rounded text-[10px] font-bold uppercase {mediaTypeBarClasses(
+                                        card.type,
+                                    ).badge}"
                                 >
                                     {card.type}
                                 </div>
-                                <span class="text-sm font-medium text-slate-700"
-                                    >Folio: {card.folio}</span
-                                >
+                                <span class="text-sm font-medium text-slate-700">Folio: {card.folio}</span>
                             </div>
 
                             <button
@@ -133,7 +120,7 @@
                                     : 'bg-white text-emerald-600 border border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50'}"
                                 onclick={() => toggleAction(card.id)}
                             >
-                                {#if cardActionMap[card.id] === "delete"}
+                                {#if cardActionMap[card.id] === 'delete'}
                                     <Trash2 size={14} />
                                     ELIMINAR
                                 {:else}
@@ -145,8 +132,7 @@
                     {/each}
                 </div>
                 <p class="text-[11px] text-slate-400 italic">
-                    * Las tarjetas dejadas disponibles se desvincularán y
-                    volverán al inventario.
+                    * Las tarjetas dejadas disponibles se desvincularán y volverán al inventario.
                 </p>
             </div>
         {:else}
@@ -158,20 +144,9 @@
 
     {#snippet footer()}
         <div class="flex justify-end gap-3 w-full">
-            <Button
-                variant="ghost"
-                onclick={handleCancel}
-                disabled={isSubmitting}
-            >
-                Cancelar
-            </Button>
-            <Button
-                variant="danger"
-                onclick={handleConfirm}
-                loading={isSubmitting}
-                class="min-w-[180px]"
-            >
-                {esBaja ? "Confirmar Baja" : "Confirmar Eliminación"}
+            <Button variant="ghost" onclick={handleCancel} disabled={isSubmitting}>Cancelar</Button>
+            <Button variant="danger" onclick={handleConfirm} loading={isSubmitting} class="min-w-[180px]">
+                {esBaja ? 'Confirmar Baja' : 'Confirmar Eliminación'}
             </Button>
         </div>
     {/snippet}

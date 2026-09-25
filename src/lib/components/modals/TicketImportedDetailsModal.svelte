@@ -7,20 +7,20 @@
      *   - Reposición → auto-detect person+card, validate folio, trigger Firma Responsiva
      *   - Reporte de Falla → show report detail, offer resolve or create reposición ticket
      */
-    import Modal from "../Modal.svelte";
-    import Button from "../Button.svelte";
-    import ModificationCompareModal from "./ModificationCompareModal.svelte";
-    import ConfirmationModal from "./ConfirmationModal.svelte";
-    import { personnelService } from "../../services/personnel";
-    import { ticketService } from "../../services/tickets";
-    import { floorsForKey } from "../../services/accessAssignments";
-    import { catalogState, personnelState } from "../../stores";
-    import { activeMediaTypes } from "../../utils/mediaContract";
-    import InfoCard from "../InfoCard.svelte";
-    import CardCheckItem from "../CardCheckItem.svelte";
-    import { toast } from "svelte-sonner";
-    import { handleError, parseFloors, capitalize } from "../../utils";
-    import { applyFloorAction } from "../../utils/floorActions";
+    import Modal from '../Modal.svelte';
+    import Button from '../Button.svelte';
+    import ModificationCompareModal from './ModificationCompareModal.svelte';
+    import ConfirmationModal from './ConfirmationModal.svelte';
+    import { personnelService } from '../../services/personnel';
+    import { ticketService } from '../../services/tickets';
+    import { floorsForKey } from '../../services/accessAssignments';
+    import { catalogState, personnelState } from '../../stores';
+    import { activeMediaTypes } from '../../utils/mediaContract';
+    import InfoCard from '../InfoCard.svelte';
+    import CardCheckItem from '../CardCheckItem.svelte';
+    import { toast } from 'svelte-sonner';
+    import { handleError, parseFloors, capitalize } from '../../utils';
+    import { applyFloorAction } from '../../utils/floorActions';
     import {
         AlertCircle,
         CheckCircle2,
@@ -34,9 +34,7 @@
         Calendar,
         FileText,
         Search,
-    } from "lucide-svelte";
-
-
+    } from 'lucide-svelte';
 
     let {
         /** Controla la visibilidad (two-way bindable). */
@@ -59,27 +57,25 @@
     let searchDone = $state(false);
 
     // ── Búsqueda manual (cuando el auto-search no encuentra) ──
-    let manualQuery = $state("");
+    let manualQuery = $state('');
     let manualSearching = $state(false);
     let manualCandidates = $state<any[]>([]);
 
     // ── Estado de seguimiento del Reporte de Falla ──
-    let seguimientoEstado = $state<"En revisión" | "Requiere reposición" | "Resuelto">("En revisión");
+    let seguimientoEstado = $state<'En revisión' | 'Requiere reposición' | 'Resuelto'>('En revisión');
 
     // Sub-modales
     let isCompareOpen = $state(false);
     let compareTicket = $state<any>(null);
     let isRejectOpen = $state(false);
     let isConfirmCloseOpen = $state(false);
-    let pendingCloseNote = $state<string>("Ticket cerrado.");
+    let pendingCloseNote = $state<string>('Ticket cerrado.');
 
     let p = $derived(ticket?.payload ?? {});
-    let ticketType = $derived(ticket?.type ?? "");
+    let ticketType = $derived(ticket?.type ?? '');
 
     /** El ticket de modificación puede venir como "Modificación" o "Modificación de datos". */
-    let isModificacion = $derived(
-        ticketType === "Modificación" || ticketType === "Modificación de datos",
-    );
+    let isModificacion = $derived(ticketType === 'Modificación' || ticketType === 'Modificación de datos');
 
     // ── Auto-search when modal opens ──────────────────────
     $effect(() => {
@@ -97,16 +93,13 @@
     });
 
     async function autoSearch() {
-        const apellidos = p.apellidos ?? "";
-        const nombres = p.nombres ?? "";
+        const apellidos = p.apellidos ?? '';
+        const nombres = p.nombres ?? '';
         if (!apellidos && !nombres) return;
 
         isSearching = true;
         try {
-            const results = await personnelService.searchByName(
-                apellidos,
-                nombres,
-            );
+            const results = await personnelService.searchByName(apellidos, nombres);
             candidates = results;
             if (results.length === 1) selectedPerson = results[0];
         } finally {
@@ -125,12 +118,9 @@
         manualSearching = true;
         try {
             const terms = q.split(/\s+/).filter(Boolean);
-            const apellidos = terms[0] ?? "";
-            const nombres = terms.slice(1).join(" ");
-            const results = await personnelService.searchByName(
-                apellidos,
-                nombres,
-            );
+            const apellidos = terms[0] ?? '';
+            const nombres = terms.slice(1).join(' ');
+            const results = await personnelService.searchByName(apellidos, nombres);
             manualCandidates = results;
         } catch {
             manualCandidates = [];
@@ -145,17 +135,14 @@
     function pickManualCandidate(person: any) {
         selectedPerson = person;
         manualCandidates = [];
-        manualQuery = "";
+        manualQuery = '';
         searchDone = true;
     }
 
     // ── Catalog helpers ───────────────────────────────────
     function resolveId(catalog: { id: any; name: string }[], value: string) {
         if (!value) return null;
-        return (
-            catalog.find((c) => c.name.toLowerCase() === value.toLowerCase()) ??
-            null
-        );
+        return catalog.find((c) => c.name.toLowerCase() === value.toLowerCase()) ?? null;
     }
 
     // ── Medios (catálogo genérico con fallback por defecto) ──────────────
@@ -190,7 +177,7 @@
 
     // ── MODIFICACIÓN: build compareTicket for ModificationCompareModal ──
     function openCompareModal() {
-        if (!selectedPerson) return;                // Construir payload 'modified' usando las claves esperadas por ModificationCompareModal
+        if (!selectedPerson) return; // Construir payload 'modified' usando las claves esperadas por ModificationCompareModal
         const modifiedPayload: any = {};
         if (p.nuevo_apellido) modifiedPayload.apellidos = p.nuevo_apellido;
         if (p.nuevo_nombre) modifiedPayload.nombres = p.nuevo_nombre;
@@ -210,24 +197,24 @@
         if (p.hora_entrada) modifiedPayload.horaEntrada = p.hora_entrada;
         if (p.hora_salida) modifiedPayload.horaSalida = p.hora_salida;
 
-    // La lógica de tarjetas y accesos maneja strings: "Añadir", "Reemplazar", "Quitar"
-    // Como ModificationCompareModal compara arrays de pisos, necesitamos aplicar la acción
-    // para generar el estado final "propuesto" de pisos/accesos.
+        // La lógica de tarjetas y accesos maneja strings: "Añadir", "Reemplazar", "Quitar"
+        // Como ModificationCompareModal compara arrays de pisos, necesitamos aplicar la acción
+        // para generar el estado final "propuesto" de pisos/accesos.
 
         // Pisos por clave de medio (derivados del catálogo con has_floors).
-        const floorMediaKeys = Array.from(new Set(
-            catalogState.mediaTypes
-                .filter((m: any) => m.active !== false && m.has_floors)
-                .map((m: any) => m.key),
-        ));
+        const floorMediaKeys = Array.from(
+            new Set(
+                catalogState.mediaTypes
+                    .filter((m: any) => m.active !== false && m.has_floors)
+                    .map((m: any) => m.key),
+            ),
+        );
         for (const key of floorMediaKeys) {
             const cap = capitalize(key);
             const current = [...floorsForKey(selectedPerson.floors, key)];
             const action = (p as any)[`accion_${key}`];
             const pisos = (p as any)[`pisos_${key}`];
-            const proposed = action
-                ? applyFloorAction(action, current, parseFloors(pisos))
-                : current;
+            const proposed = action ? applyFloorAction(action, current, parseFloors(pisos)) : current;
             // Forzar al modal de comparación a mostrar diferencias pasando los arrays generados
             modifiedPayload[`floors_${key}`] = proposed;
             modifiedPayload[`pisos${cap}`] = proposed;
@@ -235,28 +222,19 @@
 
         let proposedAccesses = [...(selectedPerson.specialAccesses || [])];
         if (p.accion_acc) {
-            const accesses = [p.acceso1, p.acceso2, p.acceso3]
-                .map((s) => s?.trim())
-                .filter(Boolean);
+            const accesses = [p.acceso1, p.acceso2, p.acceso3].map((s) => s?.trim()).filter(Boolean);
             proposedAccesses = applyFloorAction(p.accion_acc, proposedAccesses, accesses);
         }
         modifiedPayload.specialAccesses = proposedAccesses;
 
         // Heredar campos no modificados de selectedPerson
-        if (!modifiedPayload.nombres)
-            modifiedPayload.nombres = selectedPerson.first_name;
-        if (!modifiedPayload.apellidos)
-            modifiedPayload.apellidos = selectedPerson.last_name;
-        if (!modifiedPayload.dependency)
-            modifiedPayload.dependency = selectedPerson.dependency;
-        if (!modifiedPayload.edificio)
-            modifiedPayload.edificio = selectedPerson.building;
-        if (!modifiedPayload.pisoBase)
-            modifiedPayload.pisoBase = selectedPerson.floor;
-        if (!modifiedPayload.areaEquipo)
-            modifiedPayload.areaEquipo = selectedPerson.area;
-        if (!modifiedPayload.puestoFuncion)
-            modifiedPayload.puestoFuncion = selectedPerson.position;
+        if (!modifiedPayload.nombres) modifiedPayload.nombres = selectedPerson.first_name;
+        if (!modifiedPayload.apellidos) modifiedPayload.apellidos = selectedPerson.last_name;
+        if (!modifiedPayload.dependency) modifiedPayload.dependency = selectedPerson.dependency;
+        if (!modifiedPayload.edificio) modifiedPayload.edificio = selectedPerson.building;
+        if (!modifiedPayload.pisoBase) modifiedPayload.pisoBase = selectedPerson.floor;
+        if (!modifiedPayload.areaEquipo) modifiedPayload.areaEquipo = selectedPerson.area;
+        if (!modifiedPayload.puestoFuncion) modifiedPayload.puestoFuncion = selectedPerson.position;
 
         // Estos no necesitan heredarse aquí porque se calculan arriba
 
@@ -291,30 +269,37 @@
     type FolioCheck = { card: any; match: boolean; warning: boolean };
 
     let folioChecks = $derived.by((): FolioCheck[] => {
-        if (ticketType !== "Reposición" || !selectedPerson) return [];
-        const cards: any[] = (selectedPerson.cards ?? []).filter(
-            (c: any) => c.status === "active",
-        );
-        const YES = ["sí", "si"];
+        if (ticketType !== 'Reposición' || !selectedPerson) return [];
+        const cards: any[] = (selectedPerson.cards ?? []).filter((c: any) => c.status === 'active');
+        const YES = ['sí', 'si'];
 
         const checks: FolioCheck[] = [];
 
         // Deriva los tipos de medio desde el catálogo; cada uno se busca por
         // sus columnas de reposición (reponer_<key> / folio_<key>).
-        const replacementMediaKeys = Array.from(new Set(
-            catalogState.mediaTypes
-                .filter((m: any) => m.active !== false)
-                .map((m: any) => ({ key: m.key, name: m.name })),
-        ));
+        const replacementMediaKeys = Array.from(
+            new Set(
+                catalogState.mediaTypes
+                    .filter((m: any) => m.active !== false)
+                    .map((m: any) => ({ key: m.key, name: m.name })),
+            ),
+        );
         for (const media of replacementMediaKeys) {
-            const wanted = YES.includes(((`reponer_${media.key}` as any) in p ? (p as any)[`reponer_${media.key}`] : "").toLowerCase());
+            const wanted = YES.includes(
+                ((`reponer_${media.key}` as any) in p
+                    ? (p as any)[`reponer_${media.key}`]
+                    : ''
+                ).toLowerCase(),
+            );
             const folioSought = (p as any)[`folio_${media.key}`]?.trim();
-            const wantFolio = (p as any)[`folio_${media.key}`]?.trim().length > 0 || YES.includes((p[`reponer_${media.key}`] ?? "").toLowerCase());
+            const wantFolio =
+                (p as any)[`folio_${media.key}`]?.trim().length > 0 ||
+                YES.includes((p[`reponer_${media.key}`] ?? '').toLowerCase());
             if (!wanted && !wantFolio) continue;
             const mediaCards = cards.filter((c: any) => c.type === media.name);
             if (mediaCards.length === 0) {
                 checks.push({
-                    card: { type: media.name, folio: folioSought ?? "—" },
+                    card: { type: media.name, folio: folioSought ?? '—' },
                     match: false,
                     warning: true,
                 });
@@ -343,11 +328,11 @@
         // (con folio) antes de cerrar la reposición como gestionada.
         if (!folioChecks.some((c) => !!c.card?.id)) {
             toast.warning(
-                "No se puede marcar como gestionado sin una tarjeta del medio identificada. Verifique el folio/tarjeta a reponer.",
+                'No se puede marcar como gestionado sin una tarjeta del medio identificada. Verifique el folio/tarjeta a reponer.',
             );
             return;
         }
-        pendingCloseNote = "Reposición gestionada";
+        pendingCloseNote = 'Reposición gestionada';
         isConfirmCloseOpen = true;
     }
 
@@ -356,11 +341,11 @@
         isSubmitting = true;
         try {
             await ticketService.delete(ticket.id, pendingCloseNote);
-            toast.success("Ticket cerrado.");
+            toast.success('Ticket cerrado.');
             isOpen = false;
             onComplete?.();
         } catch (err) {
-            handleError(err, "Cerrar Ticket");
+            handleError(err, 'Cerrar Ticket');
         } finally {
             isSubmitting = false;
             isConfirmCloseOpen = false;
@@ -373,11 +358,11 @@
         isSubmitting = true;
         try {
             await ticketService.delete(ticket.id, note);
-            toast.success("Ticket cerrado.");
+            toast.success('Ticket cerrado.');
             isOpen = false;
             onComplete?.();
         } catch (err) {
-            handleError(err, "Cerrar Ticket");
+            handleError(err, 'Cerrar Ticket');
         } finally {
             isSubmitting = false;
         }
@@ -387,7 +372,7 @@
     type AffectedCardCheck = {
         type: string;
         folio: string;
-        status: "found" | "mismatch" | "nocard" | "noperson";
+        status: 'found' | 'mismatch' | 'nocard' | 'noperson';
         cardId: string | null;
     };
 
@@ -400,18 +385,16 @@
     function resolveTipos(raw: string): string[] {
         const t = raw.toLowerCase().trim();
         if (!t) return [];
-        if (t.includes("ambas")) return activeMedias.map((m) => m.name);
-        const matching = activeMedias.filter(
-            (m) => t.includes(m.name.toLowerCase()) || t.includes(m.key),
-        );
+        if (t.includes('ambas')) return activeMedias.map((m) => m.name);
+        const matching = activeMedias.filter((m) => t.includes(m.name.toLowerCase()) || t.includes(m.key));
         if (matching.length > 0) return matching.map((m) => m.name);
         return [raw];
     }
 
     let affectedCardChecks = $derived.by((): AffectedCardCheck[] => {
-        if (ticketType !== "Reporte de Falla") return [];
-        const rawTipo = (p.tipo_tarjeta ?? "").trim();
-        const folio = (p.folio ?? "").trim();
+        if (ticketType !== 'Reporte de Falla') return [];
+        const rawTipo = (p.tipo_tarjeta ?? '').trim();
+        const folio = (p.folio ?? '').trim();
         if (!rawTipo && !folio) return [];
 
         const tipos = resolveTipos(rawTipo);
@@ -420,7 +403,7 @@
             return tipos.map((t) => ({
                 type: t,
                 folio,
-                status: "noperson" as const,
+                status: 'noperson' as const,
                 cardId: null,
             }));
         }
@@ -430,30 +413,26 @@
 
         for (const tipo of tipos) {
             const exact = cards.find(
-                (c: any) =>
-                    c.folio?.toString() === folio &&
-                    c.type?.toLowerCase() === tipo.toLowerCase(),
+                (c: any) => c.folio?.toString() === folio && c.type?.toLowerCase() === tipo.toLowerCase(),
             );
             if (exact) {
                 checks.push({
                     type: exact.type,
                     folio: exact.folio,
-                    status: "found",
+                    status: 'found',
                     cardId: exact.id,
                 });
                 continue;
             }
 
             const sameType = cards.find(
-                (c: any) =>
-                    c.status === "active" &&
-                    c.type?.toLowerCase() === tipo.toLowerCase(),
+                (c: any) => c.status === 'active' && c.type?.toLowerCase() === tipo.toLowerCase(),
             );
             if (sameType) {
                 checks.push({
                     type: sameType.type,
                     folio: sameType.folio,
-                    status: "mismatch",
+                    status: 'mismatch',
                     cardId: sameType.id,
                 });
                 continue;
@@ -462,7 +441,7 @@
             checks.push({
                 type: tipo,
                 folio,
-                status: "nocard",
+                status: 'nocard',
                 cardId: null,
             });
         }
@@ -470,9 +449,7 @@
         return checks;
     });
 
-    let affectedCardId = $derived(
-        affectedCardChecks.find((c) => c.cardId != null)?.cardId ?? null,
-    );
+    let affectedCardId = $derived(affectedCardChecks.find((c) => c.cardId != null)?.cardId ?? null);
 
     function handleViewPersonProfile() {
         if (!selectedPerson) return;
@@ -489,22 +466,20 @@
 
     async function handleComplete(note?: string) {
         if (!ticket) return;
-        pendingCloseNote = note || "Ticket cerrado.";
+        pendingCloseNote = note || 'Ticket cerrado.';
         isConfirmCloseOpen = true;
     }
 
     async function handleCreateReposicionTicket() {
         if (!ticket) return;
         // No crear reposición sin medio/tarjeta o folio especificado.
-        const rawTipo = (p.tipo_tarjeta ?? "").trim();
-        const folio = (p.folio ?? "").trim();
+        const rawTipo = (p.tipo_tarjeta ?? '').trim();
+        const folio = (p.folio ?? '').trim();
         const tipos = resolveTipos(rawTipo);
-        const hasMappedMedia = tipos.some((t) =>
-            activeMedias.some((m) => m.name === t || m.key === t),
-        );
+        const hasMappedMedia = tipos.some((t) => activeMedias.some((m) => m.name === t || m.key === t));
         if (tipos.length === 0 || !hasMappedMedia || (!rawTipo && !folio)) {
             toast.error(
-                "No se puede crear una reposición sin medio/tipo de tarjeta. Verifique el reporte antes de continuar.",
+                'No se puede crear una reposición sin medio/tipo de tarjeta. Verifique el reporte antes de continuar.',
             );
             return;
         }
@@ -513,25 +488,23 @@
             // Mapear campos de Reporte de Falla → campos que entiende el modal de Reposición
             const repoPayload: Record<string, any> = {
                 ...p,
-                origen: "Reporte de Falla",
+                origen: 'Reporte de Falla',
                 estado: seguimientoEstado,
             };
 
             // Usar resolveTipos para manejar "Tarjeta P2000", "Tarjeta KONE" y "Ambas tarjetas"
             for (const media of activeMedias) {
                 if (tipos.includes(media.name)) {
-                    repoPayload[`reponer_${media.key}`] = "sí";
+                    repoPayload[`reponer_${media.key}`] = 'sí';
                     repoPayload[`folio_${media.key}`] = folio;
                 }
             }
 
             await ticketService.create({
-                type: "Reposición",
-                title: `Reposición — ${p.apellidos ?? ""}, ${p.nombres ?? ""}`,
-                description: `De: Reporte de Falla\nTarjeta: ${p.tipo_tarjeta ?? ""}\nFolio: ${p.folio ?? ""}\nLugar: ${p.ubicacion ?? ""}\nDescripción: ${p.descripcion ?? ""}`,
-                priority: p.urgencia?.toLowerCase().includes("alta")
-                    ? "alta"
-                    : "media",
+                type: 'Reposición',
+                title: `Reposición — ${p.apellidos ?? ''}, ${p.nombres ?? ''}`,
+                description: `De: Reporte de Falla\nTarjeta: ${p.tipo_tarjeta ?? ''}\nFolio: ${p.folio ?? ''}\nLugar: ${p.ubicacion ?? ''}\nDescripción: ${p.descripcion ?? ''}`,
+                priority: p.urgencia?.toLowerCase().includes('alta') ? 'alta' : 'media',
                 person_id: selectedPerson?.id ?? null,
                 payload: repoPayload,
             });
@@ -544,9 +517,9 @@
                 personnelState.selectPerson(selectedPerson.id);
             }
 
-            await closeTicketNow("Reposición creada desde reporte de falla");
+            await closeTicketNow('Reposición creada desde reporte de falla');
         } catch (err) {
-            handleError(err, "Crear Ticket de Reposición");
+            handleError(err, 'Crear Ticket de Reposición');
             isSubmitting = false;
         }
     }
@@ -556,13 +529,13 @@
         if (!ticket) return;
         isSubmitting = true;
         try {
-            await ticketService.reject(ticket.id, ticketType || "Ticket");
-            toast.info("Ticket rechazado.");
+            await ticketService.reject(ticket.id, ticketType || 'Ticket');
+            toast.info('Ticket rechazado.');
             isRejectOpen = false;
             isOpen = false;
             onComplete?.();
         } catch (err) {
-            handleError(err, "Rechazar Ticket");
+            handleError(err, 'Rechazar Ticket');
         } finally {
             isSubmitting = false;
         }
@@ -574,11 +547,7 @@
 </script>
 
 <!-- ── Modification compare modal (opens after closing this one) ── -->
-<ModificationCompareModal
-    bind:isOpen={isCompareOpen}
-    ticket={compareTicket}
-    onComplete={onCompareComplete}
-/>
+<ModificationCompareModal bind:isOpen={isCompareOpen} ticket={compareTicket} onComplete={onCompareComplete} />
 
 <!-- ── Reject confirmation ── -->
 <ConfirmationModal
@@ -611,165 +580,146 @@
 >
     <div class="space-y-4">
         <!-- ── Person detection ── -->
-            <div class="rounded-xl border border-slate-200 p-3">
-                <p
-                    class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"
-                >
-                    <User size={11} /> Persona identificada en el sistema
-                </p>
+        <div class="rounded-xl border border-slate-200 p-3">
+            <p
+                class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"
+            >
+                <User size={11} /> Persona identificada en el sistema
+            </p>
 
-                {#if isSearching}
-                    <div class="flex items-center gap-2 text-sm text-slate-500">
-                        <Loader2 size={14} class="animate-spin" />
-                        Buscando <strong>{p.apellidos}, {p.nombres}</strong>…
-                    </div>
-                {:else if candidates.length === 0 && searchDone}
-                    <div class="space-y-2">
-                        <div class="flex items-start gap-2 text-sm text-rose-600">
-                            <AlertCircle size={14} class="mt-0.5 shrink-0" />
-                            <div>
-                                <p class="font-semibold">
-                                    Persona no encontrada en el sistema
-                                </p>
-                                <p class="text-xs text-rose-400">
-                                    Buscado: "{p.apellidos}, {p.nombres}"
-                                </p>
-                            </div>
-                        </div>
-                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
-                            <p
-                                class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"
-                            >
-                                <Search size={11} /> Buscar persona manualmente
+            {#if isSearching}
+                <div class="flex items-center gap-2 text-sm text-slate-500">
+                    <Loader2 size={14} class="animate-spin" />
+                    Buscando <strong>{p.apellidos}, {p.nombres}</strong>…
+                </div>
+            {:else if candidates.length === 0 && searchDone}
+                <div class="space-y-2">
+                    <div class="flex items-start gap-2 text-sm text-rose-600">
+                        <AlertCircle size={14} class="mt-0.5 shrink-0" />
+                        <div>
+                            <p class="font-semibold">Persona no encontrada en el sistema</p>
+                            <p class="text-xs text-rose-400">
+                                Buscado: "{p.apellidos}, {p.nombres}"
                             </p>
-                            <input
-                                type="text"
-                                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                                placeholder="Apellidos, Nombres…"
-                                bind:value={manualQuery}
-                                oninput={onManualQuery}
-                            />
-                            {#if manualSearching}
-                                <div class="flex items-center gap-2 text-xs text-slate-500">
-                                    <Loader2 size={13} class="animate-spin" />
-                                    Buscando…
-                                </div>
-                            {:else if manualCandidates.length > 0}
-                                <div class="space-y-1.5">
-                                    {#each manualCandidates.slice(0, 5) as c}
-                                        <button
-                                            class="w-full flex items-center justify-between p-2 rounded-lg border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-200 text-left transition-colors"
-                                            onclick={() => pickManualCandidate(c)}
-                                        >
-                                            <div class="flex items-center gap-2.5">
-                                                <div
-                                                    class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400"
-                                                >
-                                                    <User size={13} />
-                                                </div>
-                                                <div>
-                                                    <p
-                                                        class="text-sm font-semibold text-slate-800"
-                                                    >
-                                                        {c.last_name}, {c.first_name}
-                                                    </p>
-                                                    <p
-                                                        class="text-[10px] text-slate-500"
-                                                    >
-                                                        {c.dependency} · {c.building}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <span
-                                                class="text-[10px] font-bold text-blue-500"
-                                                >Seleccionar →</span
-                                            >
-                                        </button>
-                                    {/each}
-                                </div>
-                            {:else if manualQuery}
-                                <p
-                                    class="text-[10px] text-slate-400 italic"
-                                >
-                                    Sin coincidencias para "{manualQuery}". Intente con otro nombre.
-                                </p>
-                            {/if}
                         </div>
                     </div>
-                {:else if candidates.length > 1 && !selectedPerson}
-                    <div
-                        class="p-3 bg-amber-50 rounded-lg border border-amber-200 mb-3"
-                    >
+                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
                         <p
-                            class="text-xs font-bold text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-1.5"
+                            class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"
                         >
-                            <AlertCircle size={12} /> Se encontraron {candidates.length}
-                            coincidencias
+                            <Search size={11} /> Buscar persona manualmente
                         </p>
-                        <p class="text-[10px] text-amber-600 mb-3">
-                            Selecciona la persona correcta para vincular este
-                            ticket:
-                        </p>
-                        <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                            {#each candidates as c}
-                                <button
-                                    class="w-full flex items-center justify-between p-2.5 rounded-lg border border-amber-200/50 bg-white hover:bg-amber-100 hover:border-amber-300 text-left transition-all group"
-                                    onclick={() => (selectedPerson = c)}
-                                >
-                                    <div class="flex items-center gap-3">
-                                        <div
-                                            class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-amber-200 group-hover:text-amber-600 transition-colors"
-                                        >
-                                            <User size={14} />
-                                        </div>
-                                        <div>
-                                            <p
-                                                class="text-sm font-bold text-slate-800"
-                                            >
-                                                {c.last_name}, {c.first_name}
-                                            </p>
-                                            <p
-                                                class="text-[10px] text-slate-500"
-                                            >
-                                                {c.dependency} · {c.building}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <span
-                                        class="text-[10px] font-bold text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        >Seleccionar →</span
+                        <input
+                            type="text"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:outline-none focus-visible:border-blue-400 focus-visible:ring-2 focus-visible:ring-blue-100"
+                            placeholder="Apellidos, Nombres…"
+                            bind:value={manualQuery}
+                            oninput={onManualQuery}
+                        />
+                        {#if manualSearching}
+                            <div class="flex items-center gap-2 text-xs text-slate-500">
+                                <Loader2 size={13} class="animate-spin" />
+                                Buscando…
+                            </div>
+                        {:else if manualCandidates.length > 0}
+                            <div class="space-y-1.5">
+                                {#each manualCandidates.slice(0, 5) as c}
+                                    <button
+                                        class="w-full flex items-center justify-between p-2 rounded-lg border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-200 text-left transition-colors"
+                                        onclick={() => pickManualCandidate(c)}
                                     >
-                                </button>
-                            {/each}
-                        </div>
-                    </div>
-                {:else if selectedPerson}
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div
-                                class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"
-                            >
-                                <CheckCircle2 size={16} />
+                                        <div class="flex items-center gap-2.5">
+                                            <div
+                                                class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400"
+                                            >
+                                                <User size={13} />
+                                            </div>
+                                            <div>
+                                                <p class="text-sm font-semibold text-slate-800">
+                                                    {c.last_name}, {c.first_name}
+                                                </p>
+                                                <p class="text-[10px] text-slate-500">
+                                                    {c.dependency} · {c.building}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span class="text-[10px] font-bold text-blue-500">Seleccionar →</span>
+                                    </button>
+                                {/each}
                             </div>
-                            <div>
-                                <p class="text-sm font-semibold text-slate-800">
-                                    {selectedPerson.last_name}, {selectedPerson.first_name}
-                                </p>
-                                <p class="text-xs text-slate-400">
-                                    {selectedPerson.dependency} · {selectedPerson.building}
-                                </p>
-                            </div>
-                        </div>
-                        {#if candidates.length > 1}
-                            <button
-                                class="text-xs text-blue-500 hover:underline"
-                                onclick={() => (selectedPerson = null)}
-                                >Cambiar</button
-                            >
+                        {:else if manualQuery}
+                            <p class="text-[10px] text-slate-400 italic">
+                                Sin coincidencias para "{manualQuery}". Intente con otro nombre.
+                            </p>
                         {/if}
                     </div>
-                {/if}
-            </div>
+                </div>
+            {:else if candidates.length > 1 && !selectedPerson}
+                <div class="p-3 bg-amber-50 rounded-lg border border-amber-200 mb-3">
+                    <p
+                        class="text-xs font-bold text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-1.5"
+                    >
+                        <AlertCircle size={12} /> Se encontraron {candidates.length}
+                        coincidencias
+                    </p>
+                    <p class="text-[10px] text-amber-600 mb-3">
+                        Selecciona la persona correcta para vincular este ticket:
+                    </p>
+                    <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {#each candidates as c}
+                            <button
+                                class="w-full flex items-center justify-between p-2.5 rounded-lg border border-amber-200/50 bg-white hover:bg-amber-100 hover:border-amber-300 text-left transition-all group"
+                                onclick={() => (selectedPerson = c)}
+                            >
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-amber-200 group-hover:text-amber-600 transition-colors"
+                                    >
+                                        <User size={14} />
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-bold text-slate-800">
+                                            {c.last_name}, {c.first_name}
+                                        </p>
+                                        <p class="text-[10px] text-slate-500">
+                                            {c.dependency} · {c.building}
+                                        </p>
+                                    </div>
+                                </div>
+                                <span
+                                    class="text-[10px] font-bold text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >Seleccionar →</span
+                                >
+                            </button>
+                        {/each}
+                    </div>
+                </div>
+            {:else if selectedPerson}
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"
+                        >
+                            <CheckCircle2 size={16} />
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-800">
+                                {selectedPerson.last_name}, {selectedPerson.first_name}
+                            </p>
+                            <p class="text-xs text-slate-400">
+                                {selectedPerson.dependency} · {selectedPerson.building}
+                            </p>
+                        </div>
+                    </div>
+                    {#if candidates.length > 1}
+                        <button
+                            class="text-xs text-blue-500 hover:underline"
+                            onclick={() => (selectedPerson = null)}>Cambiar</button
+                        >
+                    {/if}
+                </div>
+            {/if}
+        </div>
 
         <!-- ── MODIFICACIÓN: summary + open compare button ── -->
         {#if isModificacion && selectedPerson}
@@ -777,12 +727,10 @@
                 variant="amber"
                 icon={ArrowRight}
                 title="Cambios solicitados"
-                hint='Al hacer clic en "Revisar Cambios" se abrirá el panel de comparación completo con los datos actuales vs. propuestos.'
+                hint="Al hacer clic en &quot;Revisar Cambios&quot; se abrirá el panel de comparación completo con los datos actuales vs. propuestos."
             >
                 <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    {#if p.nuevo_apellido}<div class="text-slate-500">
-                            Apellidos
-                        </div>
+                    {#if p.nuevo_apellido}<div class="text-slate-500">Apellidos</div>
                         <div class="text-amber-800 font-medium">
                             {p.nuevo_apellido}
                         </div>{/if}
@@ -823,32 +771,25 @@
                                 Acción {media.name}
                             </div>
                             <div class="text-amber-800 font-medium">
-                                {p[`accion_${media.key}`]}: {p[`pisos_${media.key}`] || "N/A"}
+                                {p[`accion_${media.key}`]}: {p[`pisos_${media.key}`] || 'N/A'}
                             </div>{/if}
                     {/each}
-                    {#if p.accion_acc}<div class="text-slate-500">
-                            Acción Acc. Esp.
-                        </div>
+                    {#if p.accion_acc}<div class="text-slate-500">Acción Acc. Esp.</div>
                         <div
                             class="text-amber-800 font-medium whitespace-nowrap overflow-hidden text-ellipsis"
                         >
-                            {p.accion_acc}: {[
-                                p.acceso1,
-                                p.acceso2,
-                                p.acceso3,
-                            ]
-                                .filter(Boolean)
-                                .join(", ") || "N/A"}
+                            {p.accion_acc}: {[p.acceso1, p.acceso2, p.acceso3].filter(Boolean).join(', ') ||
+                                'N/A'}
                         </div>{/if}
                 </div>
             </InfoCard>
         {/if}
 
         <!-- ── BAJA: guidance card ── -->
-        {#if ticketType === "Baja de Persona" && selectedPerson}
+        {#if ticketType === 'Baja de Persona' && selectedPerson}
             <InfoCard
                 variant="rose"
-                hint='Al hacer clic en "Revisar perfil →" se abrirá el perfil completo de la persona donde podrás gestionar su baja y revisar tarjetas asociadas.'
+                hint="Al hacer clic en &quot;Revisar perfil →&quot; se abrirá el perfil completo de la persona donde podrás gestionar su baja y revisar tarjetas asociadas."
             >
                 <div class="space-y-3">
                     <div class="flex items-start gap-3">
@@ -869,27 +810,20 @@
 
                     <div class="text-sm text-rose-700 font-medium">
                         Se desactivarán <strong
-                            >{(selectedPerson.cards ?? []).filter(
-                                (c: any) => c.status === "active",
-                            ).length}</strong
+                            >{(selectedPerson.cards ?? []).filter((c: any) => c.status === 'active')
+                                .length}</strong
                         > tarjeta(s) asociadas.
                     </div>
 
                     {#if p.tipo_baja || p.motivo}
-                        <div
-                            class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs bg-white/60 rounded-lg p-3"
-                        >
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs bg-white/60 rounded-lg p-3">
                             {#if p.tipo_baja}
                                 <span class="text-slate-500">Tipo de baja</span>
-                                <span class="text-rose-700 font-medium"
-                                    >{p.tipo_baja}</span
-                                >
+                                <span class="text-rose-700 font-medium">{p.tipo_baja}</span>
                             {/if}
                             {#if p.motivo}
                                 <span class="text-slate-500">Motivo</span>
-                                <span class="text-rose-700 font-medium"
-                                    >{p.motivo}</span
-                                >
+                                <span class="text-rose-700 font-medium">{p.motivo}</span>
                             {/if}
                         </div>
                     {/if}
@@ -897,15 +831,11 @@
                     <div
                         class="flex items-start gap-2.5 p-3 rounded-lg bg-rose-100/50 border border-rose-200/50"
                     >
-                        <AlertTriangle
-                            size={16}
-                            class="text-rose-500 shrink-0 mt-0.5"
-                        />
+                        <AlertTriangle size={16} class="text-rose-500 shrink-0 mt-0.5" />
                         <p class="text-xs text-rose-700 leading-relaxed">
                             Revisa la información de
-                            <strong>{selectedPerson.first_name}</strong> en el
-                            panel lateral para confirmar sus datos y tarjetas
-                            antes de procesar la baja.
+                            <strong>{selectedPerson.first_name}</strong> en el panel lateral para confirmar sus
+                            datos y tarjetas antes de procesar la baja.
                         </p>
                     </div>
                 </div>
@@ -913,49 +843,39 @@
         {/if}
 
         <!-- ── REPOSICIÓN: folio validation + cards ── -->
-        {#if ticketType === "Reposición" && selectedPerson}
+        {#if ticketType === 'Reposición' && selectedPerson}
             <InfoCard
                 variant="amber"
-                hint='Al hacer clic en "Ir →" se te llevará al perfil de la persona con la tarjeta preseleccionada para el flujo de Firma Responsiva.'
+                hint="Al hacer clic en &quot;Ir →&quot; se te llevará al perfil de la persona con la tarjeta preseleccionada para el flujo de Firma Responsiva."
             >
                 <div class="space-y-2">
                     {#each folioChecks as check}
                         <CardCheckItem
                             type={check.card.type}
-                            folio={check.card.folio ?? "—"}
+                            folio={check.card.folio ?? '—'}
                             warning={check.warning}
                             navColor="amber"
                             showNav={!!check.card.id}
-                            onNavigate={() =>
-                                handleGoToFirmaResponsiva(check.card)}
+                            onNavigate={() => handleGoToFirmaResponsiva(check.card)}
                         >
                             {#snippet status()}
                                 {#if check.warning}
-                                    <div
-                                        class="text-xs text-amber-700 flex items-start gap-2"
-                                    >
-                                        <AlertTriangle
-                                            size={14}
-                                            class="shrink-0 mt-0.5"
-                                        />
+                                    <div class="text-xs text-amber-700 flex items-start gap-2">
+                                        <AlertTriangle size={14} class="shrink-0 mt-0.5" />
                                         <div class="leading-snug">
                                             {#if !check.card.id}
-                                                No hay tarjeta {check.card.type} activa
-                                                asignada.
+                                                No hay tarjeta {check.card.type} activa asignada.
                                             {:else}
                                                 Folio en plantilla (<strong
                                                     >{folioForType(check.card.type)}</strong
-                                                >) no coincide con la tarjeta
-                                                asignada (<strong
+                                                >) no coincide con la tarjeta asignada (<strong
                                                     >{check.card.folio}</strong
                                                 >). Verifique antes de continuar.
                                             {/if}
                                         </div>
                                     </div>
                                 {:else}
-                                    <p
-                                        class="text-xs text-emerald-600 flex items-center gap-1.5 font-medium"
-                                    >
+                                    <p class="text-xs text-emerald-600 flex items-center gap-1.5 font-medium">
                                         <CheckCircle2 size={13} /> Folio coincide correctamente.
                                     </p>
                                 {/if}
@@ -968,8 +888,8 @@
                         >
                             <AlertCircle size={14} class="mt-0.5 shrink-0" />
                             <span
-                                >No se identificaron tarjetas a reponer según el
-                                payload. Revise los campos "¿Reponer {activeMedias.map((m) => m.name).join("/")}?".</span
+                                >No se identificaron tarjetas a reponer según el payload. Revise los campos
+                                "¿Reponer {activeMedias.map((m) => m.name).join('/')}?".</span
                             >
                         </div>
                     {/if}
@@ -978,15 +898,17 @@
         {/if}
 
         <!-- ── REPORTE DE FALLA: detail view ── -->
-        {#if ticketType === "Reporte de Falla"}
+        {#if ticketType === 'Reporte de Falla'}
             <InfoCard
                 variant="orange"
-                hint='Selecciona "Requiere Reposición" para crear un ticket de reemplazo, o "Falla Resuelta" si el problema ya fue solucionado.'
+                hint="Selecciona &quot;Requiere Reposición&quot; para crear un ticket de reemplazo, o &quot;Falla Resuelta&quot; si el problema ya fue solucionado."
             >
                 <!-- ── Severity banner ── -->
                 {#if p.urgencia}
                     <div
-                        class="flex items-center gap-3 p-3 rounded-xl {p.urgencia?.toLowerCase().includes('alta')
+                        class="flex items-center gap-3 p-3 rounded-xl {p.urgencia
+                            ?.toLowerCase()
+                            .includes('alta')
                             ? 'bg-red-50 border border-red-200'
                             : 'bg-amber-50 border border-amber-200'}"
                     >
@@ -1022,39 +944,30 @@
                 {#each affectedCardChecks as check}
                     <CardCheckItem
                         type={check.type}
-                        folio={check.folio || "Folio no especificado"}
-                        warning={check.status !== "found"}
+                        folio={check.folio || 'Folio no especificado'}
+                        warning={check.status !== 'found'}
                         navColor="orange"
                         showNav={!!check.cardId && !!selectedPerson}
-                        onNavigate={() =>
-                            handleGoToAffectedCard(check.cardId!)}
+                        onNavigate={() => handleGoToAffectedCard(check.cardId!)}
                     >
                         {#snippet status()}
-                            {#if check.status === "found"}
-                                <p
-                                    class="text-[11px] text-emerald-600 font-medium flex items-center gap-1"
-                                >
+                            {#if check.status === 'found'}
+                                <p class="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
                                     <CheckCircle2 size={12} />
                                     Tarjeta encontrada en el sistema
                                 </p>
-                            {:else if check.status === "mismatch"}
-                                <p
-                                    class="text-[11px] text-amber-600 font-medium flex items-center gap-1"
-                                >
+                            {:else if check.status === 'mismatch'}
+                                <p class="text-[11px] text-amber-600 font-medium flex items-center gap-1">
                                     <AlertTriangle size={12} />
                                     Folio no coincide con tarjeta activa
                                 </p>
-                            {:else if check.status === "nocard"}
-                                <p
-                                    class="text-[11px] text-amber-600 font-medium flex items-center gap-1"
-                                >
+                            {:else if check.status === 'nocard'}
+                                <p class="text-[11px] text-amber-600 font-medium flex items-center gap-1">
                                     <AlertTriangle size={12} />
                                     Sin tarjeta activa de este tipo
                                 </p>
                             {:else}
-                                <p
-                                    class="text-[11px] text-slate-500 flex items-center gap-1"
-                                >
+                                <p class="text-[11px] text-slate-500 flex items-center gap-1">
                                     Tarjeta reportada (sin persona asociada)
                                 </p>
                             {/if}
@@ -1075,19 +988,10 @@
                             <div
                                 class="flex items-center gap-2.5 p-2.5 rounded-lg bg-white/60 border border-slate-100"
                             >
-                                <MapPin
-                                    size={14}
-                                    class="text-slate-400 shrink-0"
-                                />
+                                <MapPin size={14} class="text-slate-400 shrink-0" />
                                 <div>
-                                    <p
-                                        class="text-[10px] font-semibold text-slate-400"
-                                    >
-                                        Ubicación
-                                    </p>
-                                    <p
-                                        class="text-xs font-medium text-slate-700"
-                                    >
+                                    <p class="text-[10px] font-semibold text-slate-400">Ubicación</p>
+                                    <p class="text-xs font-medium text-slate-700">
                                         {p.ubicacion}
                                     </p>
                                 </div>
@@ -1097,19 +1001,10 @@
                             <div
                                 class="flex items-center gap-2.5 p-2.5 rounded-lg bg-white/60 border border-slate-100"
                             >
-                                <Calendar
-                                    size={14}
-                                    class="text-slate-400 shrink-0"
-                                />
+                                <Calendar size={14} class="text-slate-400 shrink-0" />
                                 <div>
-                                    <p
-                                        class="text-[10px] font-semibold text-slate-400"
-                                    >
-                                        Desde
-                                    </p>
-                                    <p
-                                        class="text-xs font-medium text-slate-700"
-                                    >
+                                    <p class="text-[10px] font-semibold text-slate-400">Desde</p>
+                                    <p class="text-xs font-medium text-slate-700">
                                         {p.desde_cuando}
                                     </p>
                                 </div>
@@ -1119,19 +1014,10 @@
                             <div
                                 class="flex items-start gap-2.5 p-2.5 rounded-lg bg-white/60 border border-slate-100"
                             >
-                                <FileText
-                                    size={14}
-                                    class="text-slate-400 shrink-0 mt-0.5"
-                                />
+                                <FileText size={14} class="text-slate-400 shrink-0 mt-0.5" />
                                 <div>
-                                    <p
-                                        class="text-[10px] font-semibold text-slate-400"
-                                    >
-                                        Descripción
-                                    </p>
-                                    <p
-                                        class="text-xs text-slate-700 leading-relaxed"
-                                    >
+                                    <p class="text-[10px] font-semibold text-slate-400">Descripción</p>
+                                    <p class="text-xs text-slate-700 leading-relaxed">
                                         {p.descripcion}
                                     </p>
                                 </div>
@@ -1143,9 +1029,7 @@
                 <!-- ── Observaciones ── -->
                 {#if p.observaciones}
                     <div class="pt-2 border-t border-orange-200/50">
-                        <p
-                            class="text-[10px] font-semibold text-orange-600 mb-1.5 flex items-center gap-1.5"
-                        >
+                        <p class="text-[10px] font-semibold text-orange-600 mb-1.5 flex items-center gap-1.5">
                             <AlertTriangle size={11} />
                             Observaciones
                         </p>
@@ -1166,25 +1050,34 @@
                     <AlertTriangle size={11} /> Estado de seguimiento
                 </p>
                 <p class="text-xs text-slate-600">
-                    Registra el avance del reporte. El estado se incluirá al crear
-                    la reposición o al resolver la falla.
+                    Registra el avance del reporte. El estado se incluirá al crear la reposición o al resolver
+                    la falla.
                 </p>
                 <div class="flex flex-wrap gap-2">
                     <button
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {seguimientoEstado === 'En revisión' ? 'bg-orange-100 text-orange-800 border border-orange-300 shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-orange-50'}"
-                        onclick={() => (seguimientoEstado = "En revisión")}
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {seguimientoEstado ===
+                        'En revisión'
+                            ? 'bg-orange-100 text-orange-800 border border-orange-300 shadow-sm'
+                            : 'bg-white text-slate-500 border border-slate-200 hover:bg-orange-50'}"
+                        onclick={() => (seguimientoEstado = 'En revisión')}
                     >
                         <AlertCircle size={13} /> En revisión
                     </button>
                     <button
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {seguimientoEstado === 'Requiere reposición' ? 'bg-amber-100 text-amber-800 border border-amber-300 shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-amber-50'}"
-                        onclick={() => (seguimientoEstado = "Requiere reposición")}
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {seguimientoEstado ===
+                        'Requiere reposición'
+                            ? 'bg-amber-100 text-amber-800 border border-amber-300 shadow-sm'
+                            : 'bg-white text-slate-500 border border-slate-200 hover:bg-amber-50'}"
+                        onclick={() => (seguimientoEstado = 'Requiere reposición')}
                     >
                         <CreditCard size={13} /> Requiere reposición
                     </button>
                     <button
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {seguimientoEstado === 'Resuelto' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:bg-emerald-50'}"
-                        onclick={() => (seguimientoEstado = "Resuelto")}
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {seguimientoEstado ===
+                        'Resuelto'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm'
+                            : 'bg-white text-slate-500 border border-slate-200 hover:bg-emerald-50'}"
+                        onclick={() => (seguimientoEstado = 'Resuelto')}
                     >
                         <CheckCircle2 size={13} /> Resuelto
                     </button>
@@ -1209,16 +1102,12 @@
             <div class="flex items-center gap-2">
                 <!-- MODIFICACIÓN: open compare modal -->
                 {#if isModificacion}
-                    <Button
-                        variant="primary"
-                        disabled={!selectedPerson}
-                        onclick={openCompareModal}
-                    >
+                    <Button variant="primary" disabled={!selectedPerson} onclick={openCompareModal}>
                         Revisar Cambios →
                     </Button>
 
                     <!-- BAJA -->
-                {:else if ticketType === "Baja de Persona"}
+                {:else if ticketType === 'Baja de Persona'}
                     <Button
                         variant="outline"
                         class="border-slate-200 text-slate-600 hover:bg-slate-50 group"
@@ -1234,7 +1123,7 @@
                     </Button>
 
                     <!-- REPOSICIÓN -->
-                {:else if ticketType === "Reposición"}
+                {:else if ticketType === 'Reposición'}
                     <Button
                         variant="outline"
                         class="border-slate-200 text-slate-600 hover:bg-slate-50 group"
@@ -1264,7 +1153,7 @@
                     </Button>
 
                     <!-- REPORTE DE FALLA -->
-                {:else if ticketType === "Reporte de Falla"}
+                {:else if ticketType === 'Reporte de Falla'}
                     <Button
                         variant="outline"
                         class="border-slate-200 text-slate-600 hover:bg-slate-50 group"

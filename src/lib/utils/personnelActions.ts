@@ -1,29 +1,27 @@
-import { personnelService } from "../services/personnel";
-import { cardService } from "../services/cards";
-import { toast } from "svelte-sonner";
-import { handleError } from "../utils/error";
-import { personnelState } from "../stores/personnel.svelte";
-import type { Person } from "../types";
+import { personnelService } from '../services/personnel';
+import { cardService } from '../services/cards';
+import { toast } from 'svelte-sonner';
+import { handleError } from '../utils/error';
+import { personnelState } from '../stores/personnel.svelte';
+import type { Person } from '../types';
 
 export const personnelActions = {
     async handleBlockPerson(person: Person, onSuccess?: () => Promise<void>) {
         const oldStatusRaw = person.status_raw;
-        const newStatus = oldStatusRaw === "blocked" ? "active" : "blocked";
+        const newStatus = oldStatusRaw === 'blocked' ? 'active' : 'blocked';
 
         // Actualización optimista de UI
-        const localPerson = personnelState.pagination.items.find(p => p.id === person.id);
+        const localPerson = personnelState.pagination.items.find((p) => p.id === person.id);
         if (localPerson) localPerson.status_raw = newStatus;
 
         try {
             await personnelService.updateStatus(person.id, newStatus);
-            toast.success(
-                newStatus === "blocked" ? "Persona Bloqueada" : "Persona Reactivada"
-            );
+            toast.success(newStatus === 'blocked' ? 'Persona Bloqueada' : 'Persona Reactivada');
             await onSuccess?.();
         } catch (e) {
             // Revertir en caso de error
             if (localPerson) localPerson.status_raw = oldStatusRaw;
-            handleError(e, "Error al actualizar estado");
+            handleError(e, 'Error al actualizar estado');
         }
     },
 
@@ -31,17 +29,17 @@ export const personnelActions = {
         const oldStatusRaw = person.status_raw;
 
         // Actualización optimista de UI
-        const localPerson = personnelState.pagination.items.find(p => p.id === person.id);
-        if (localPerson) localPerson.status_raw = "inactive";
+        const localPerson = personnelState.pagination.items.find((p) => p.id === person.id);
+        if (localPerson) localPerson.status_raw = 'inactive';
 
         try {
-            await personnelService.updateStatus(person.id, "inactive");
-            toast.success("Persona dada de baja");
+            await personnelService.updateStatus(person.id, 'inactive');
+            toast.success('Persona dada de baja');
             await onSuccess?.();
         } catch (e) {
             // Revertir en caso de error
             if (localPerson) localPerson.status_raw = oldStatusRaw;
-            handleError(e, "Error al dar de baja");
+            handleError(e, 'Error al dar de baja');
         }
     },
 
@@ -49,27 +47,31 @@ export const personnelActions = {
         const oldStatusRaw = person.status_raw;
 
         // Actualización optimista de UI
-        const localPerson = personnelState.pagination.items.find(p => p.id === person.id);
-        if (localPerson) localPerson.status_raw = "active";
+        const localPerson = personnelState.pagination.items.find((p) => p.id === person.id);
+        if (localPerson) localPerson.status_raw = 'active';
 
         try {
-            await personnelService.updateStatus(person.id, "active");
-            toast.success("Persona reactivada");
+            await personnelService.updateStatus(person.id, 'active');
+            toast.success('Persona reactivada');
             await onSuccess?.();
         } catch (e) {
             // Revertir en caso de error
             if (localPerson) localPerson.status_raw = oldStatusRaw;
-            handleError(e, "Error al reactivar");
+            handleError(e, 'Error al reactivar');
         }
     },
 
-    async handleDeletePersonPermanent(person: Person, cardActionMap?: Record<string, "delete" | "keep">, onSuccess?: () => Promise<void>) {
+    async handleDeletePersonPermanent(
+        person: Person,
+        cardActionMap?: Record<string, 'delete' | 'keep'>,
+        onSuccess?: () => Promise<void>,
+    ) {
         try {
             await personnelService.delete(person.id, cardActionMap);
-            toast.success("Registro eliminado");
+            toast.success('Registro eliminado');
             await onSuccess?.();
         } catch (e) {
-            handleError(e, "Error al eliminar");
+            handleError(e, 'Error al eliminar');
         }
     },
 
@@ -77,71 +79,69 @@ export const personnelActions = {
         cardData: { type: string; folio: string },
         personId: string,
         onSuccess?: () => Promise<void>,
-        replacementOptions?: { oldCardStatus: string }
+        replacementOptions?: { oldCardStatus: string },
     ) {
         try {
-            await cardService.save({
-                ...cardData,
-                person_id: personId,
-            }, replacementOptions);
+            await cardService.save(
+                {
+                    ...cardData,
+                    person_id: personId,
+                },
+                replacementOptions,
+            );
             await onSuccess?.();
         } catch (e) {
-            handleError(e, "Error al guardar tarjeta");
+            handleError(e, 'Error al guardar tarjeta');
             throw e;
         }
     },
 
     async handleCardBlock(card: any, onSuccess?: () => Promise<void>) {
         try {
-            const newStatus =
-                card.status === "blocked" || card.status === "inactive"
-                    ? "active"
-                    : "blocked";
+            const newStatus = card.status === 'blocked' || card.status === 'inactive' ? 'active' : 'blocked';
             await cardService.updateStatus(card.id, newStatus);
-            toast.success(
-                newStatus === "blocked" ? "Tarjeta Bloqueada" : "Tarjeta Reactivada"
-            );
+            toast.success(newStatus === 'blocked' ? 'Tarjeta Bloqueada' : 'Tarjeta Reactivada');
             await onSuccess?.();
         } catch (e) {
-            handleError(e, "Error al actualizar tarjeta");
+            handleError(e, 'Error al actualizar tarjeta');
         }
     },
 
     async handleCardUnassign(card: any, onSuccess?: () => Promise<void>) {
         try {
             await cardService.unassign(card.id);
-            toast.success("Tarjeta desvinculada");
+            toast.success('Tarjeta desvinculada');
             await onSuccess?.();
         } catch (e) {
-            handleError(e, "Error al desvincular tarjeta");
+            handleError(e, 'Error al desvincular tarjeta');
         }
     },
 
     async handleCardProgram(card: any, onSuccess?: () => Promise<void>) {
         try {
-            await cardService.updateProgrammingStatus(card.id, "done");
+            await cardService.updateProgrammingStatus(card.id, 'done');
 
             // Buscar tickets pendientes de "Programación" para esta tarjeta y completarlos
-            const { supabase: sb } = await import("../supabase");
+            const { supabase: sb } = await import('../supabase');
             const { data: tickets } = await sb
-                .from("tickets")
-                .select("id")
-                .eq("access_media_id", card.id)
-                .eq("type", "Programación")
-                .eq("status", "pending");
+                .from('tickets')
+                .select('id')
+                .eq('access_media_id', card.id)
+                .eq('type', 'Programación')
+                .eq('status', 'pending');
 
             if (tickets && tickets.length > 0) {
-                const { ticketService } = await import("../services/tickets");
+                const { ticketService } = await import('../services/tickets');
                 for (const t of tickets) {
                     await ticketService.delete(t.id);
                 }
-                toast.success("Tarjeta programada y ticket completado");
+                toast.success('Tarjeta programada y ticket completado');
             } else {
-                toast.success("Tarjeta programada exitosamente");
+                toast.success('Tarjeta programada exitosamente');
             }
             await onSuccess?.();
         } catch (e) {
-            handleError(e, "Error al programar tarjeta");
+            handleError(e, 'Error al programar tarjeta');
         }
-    }
+    },
 };

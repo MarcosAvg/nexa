@@ -1,8 +1,8 @@
 <script lang="ts">
-    import Modal from "../Modal.svelte";
-    import Button from "../Button.svelte";
-    import Badge from "../Badge.svelte";
-    import LinkedPersonSummary from "../LinkedPersonSummary.svelte";
+    import Modal from '../Modal.svelte';
+    import Button from '../Button.svelte';
+    import Badge from '../Badge.svelte';
+    import LinkedPersonSummary from '../LinkedPersonSummary.svelte';
     import {
         personnelService,
         LINKABLE_PERSONNEL_FIELD_DEFS,
@@ -11,23 +11,22 @@
         linkFieldDiffers,
         proposedLinkFieldValue,
         resolveImportedFolioRequests,
-    } from "../../services/personnel";
-    import { cardService, importedFolioLookupKey } from "../../services/cards";
-    import { ticketService } from "../../services/tickets";
-    import { catalogState } from "../../stores";
-    import { toast } from "svelte-sonner";
+    } from '../../services/personnel';
+    import { cardService, importedFolioLookupKey } from '../../services/cards';
+    import { ticketService } from '../../services/tickets';
+    import { catalogState } from '../../stores';
+    import { toast } from 'svelte-sonner';
     import {
         handleError,
-        parseTemplateFile,
         FIELD_LABELS,
         parseFloors,
         type ImportParseResult,
         type ParsedSheet,
         type ParsedRow,
-    } from "../../utils";
-    import { activeMediaTypes, type MediaInfo } from "../../utils/mediaContract";
-    import { wantsCard, analyzeAltaConflicts } from "../../utils/matchAnalysis";
-    import { resolveFloorList } from "../../utils/floorMatch";
+    } from '../../utils';
+    import { activeMediaTypes, type MediaInfo } from '../../utils/mediaContract';
+    import { wantsCard, analyzeAltaConflicts } from '../../utils/matchAnalysis';
+    import { resolveFloorList } from '../../utils/floorMatch';
     import type {
         ImportedFolioOwnership,
         ImportedFolioRequest,
@@ -36,7 +35,7 @@
         LinkablePersonnelField,
         LinkPersonalUpdates,
         Person,
-    } from "../../types";
+    } from '../../types';
     type FolioCheck = {
         request: ImportedFolioRequest;
         targetPersonId: string | null;
@@ -55,7 +54,7 @@
         ChevronRight,
         Ticket,
         UserPlus,
-    } from "lucide-svelte";
+    } from 'lucide-svelte';
 
     /**
      * RegistrosImportModal — Importación masiva de registros de personal (hoja ALTAS).
@@ -72,9 +71,9 @@
         onComplete?: () => void;
     } = $props();
 
-    type Step = "idle" | "parsed" | "review" | "importing" | "done";
+    type Step = 'idle' | 'parsed' | 'review' | 'importing' | 'done';
 
-    let step = $state<Step>("idle");
+    let step = $state<Step>('idle');
     let parseResult = $state<ImportParseResult | null>(null);
     let isParsing = $state(false);
     let mediaTypes = $derived(catalogState.mediaTypes);
@@ -87,11 +86,13 @@
     let isImporting = $state(false);
     let matchResults = $state<Map<string, Person[]>>(new Map());
     let validationErrors = $state<Map<string, string[]>>(new Map());
-    let rowActions = $state<Map<string, "link" | "create" | "skip">>(new Map());
-    let cardActions = $state<Map<string, "omitir" | "reponer">>(new Map());
+    let rowActions = $state<Map<string, 'link' | 'create' | 'skip'>>(new Map());
+    let cardActions = $state<Map<string, 'omitir' | 'reponer'>>(new Map());
     let selectedLinkedPersons = $state<Map<string, string>>(new Map());
     let expandedLinkedCandidates = $state<Set<string>>(new Set());
-    let linkFieldSelections = $state<Map<string, Partial<Record<LinkablePersonnelField, boolean>>>>(new Map());
+    let linkFieldSelections = $state<Map<string, Partial<Record<LinkablePersonnelField, boolean>>>>(
+        new Map(),
+    );
     let folioOwnership = $state<Map<string, ImportedFolioOwnership>>(new Map());
     let folioOwnershipLoaded = $state(false);
     let folioActions = $state<Map<string, ImportedFolioResolution>>(new Map());
@@ -103,7 +104,7 @@
         errores: { rowNumber: number; message: string }[];
     } | null>(null);
 
-    let altasSheet = $derived(parseResult?.sheets.find((s) => s.key === "altas") ?? null);
+    let altasSheet = $derived(parseResult?.sheets.find((s) => s.key === 'altas') ?? null);
 
     // ── Helpers de clasificación ──────────────────────────
     function requestedMedia(fields: Record<string, string>): MediaInfo[] {
@@ -111,7 +112,7 @@
     }
 
     function hasFolio(fields: Record<string, string>): boolean {
-        return requestedMedia(fields).some((m) => (fields[`${m.key}_folio`] ?? "").trim().length > 0);
+        return requestedMedia(fields).some((m) => (fields[`${m.key}_folio`] ?? '').trim().length > 0);
     }
 
     /** Alta directa si tiene folio, o si no solicita ninguna tarjeta. */
@@ -122,8 +123,8 @@
 
     function foliosOf(fields: Record<string, string>): { type: string; folio: string }[] {
         return requestedMedia(fields)
-            .filter((m) => (fields[`${m.key}_folio`] ?? "").trim().length > 0)
-            .map((m) => ({ type: m.name, folio: (fields[`${m.key}_folio`] ?? "").trim() }));
+            .filter((m) => (fields[`${m.key}_folio`] ?? '').trim().length > 0)
+            .map((m) => ({ type: m.name, folio: (fields[`${m.key}_folio`] ?? '').trim() }));
     }
 
     function folioRequestsForRow(rowKey: string, row: ParsedRow): ImportedFolioRequest[] {
@@ -136,12 +137,16 @@
 
     function folioTargetForRow(rowKey: string, row: ParsedRow): string | null {
         if (!isDirect(row.fields)) return null;
-        if (getRowAction(rowKey, row.fields) !== "link") return null;
+        if (getRowAction(rowKey, row.fields) !== 'link') return null;
         return getSelectedLinkedPerson(rowKey, matchResults.get(rowKey) ?? [])?.id ?? null;
     }
 
-    function folioResolutionKey(rowKey: string, targetPersonId: string | null, request: ImportedFolioRequest): string {
-        return `${rowKey}|${targetPersonId ?? "new"}|${request.mediaTypeId}|${request.folio.trim()}`;
+    function folioResolutionKey(
+        rowKey: string,
+        targetPersonId: string | null,
+        request: ImportedFolioRequest,
+    ): string {
+        return `${rowKey}|${targetPersonId ?? 'new'}|${request.mediaTypeId}|${request.folio.trim()}`;
     }
 
     function folioStatusForRequest(
@@ -152,7 +157,10 @@
         return { status: classifyImportedFolio(ownership, targetPersonId), ownership };
     }
 
-    function folioChecksForRow(rowKey: string, row: ParsedRow): (FolioCheck & { targetPersonId: string | null })[] {
+    function folioChecksForRow(
+        rowKey: string,
+        row: ParsedRow,
+    ): (FolioCheck & { targetPersonId: string | null })[] {
         const targetPersonId = folioTargetForRow(rowKey, row);
         return folioRequestsForRow(rowKey, row).map((request) => {
             const { status, ownership } = folioStatusForRequest(request, targetPersonId);
@@ -185,9 +193,9 @@
             if (!selectedRows.has(rowKey)) continue;
             if (validationErrors.has(rowKey)) continue;
             if (!isDirect(row.fields)) continue;
-            if (getRowAction(rowKey, row.fields) === "skip") continue;
+            if (getRowAction(rowKey, row.fields) === 'skip') continue;
             for (const check of folioPlanForRow(rowKey, row)) {
-                if (check.status !== "ocupado") continue;
+                if (check.status !== 'ocupado') continue;
                 if (getFolioAction(check.resolutionKey)) continue;
                 next.set(check.resolutionKey, action);
             }
@@ -195,11 +203,13 @@
         folioActions = next;
     }
 
-    function folioDecision(check: FolioCheck & { targetPersonId: string | null }): "assign" | "omitir" | "ticket" | "pending" {
-        if (check.status === "nuevo" || check.status === "disponible" || check.status === "ya_asignado") {
-            return "assign";
+    function folioDecision(
+        check: FolioCheck & { targetPersonId: string | null },
+    ): 'assign' | 'omitir' | 'ticket' | 'pending' {
+        if (check.status === 'nuevo' || check.status === 'disponible' || check.status === 'ya_asignado') {
+            return 'assign';
         }
-        return getFolioAction(check.resolutionKey) ?? "pending";
+        return getFolioAction(check.resolutionKey) ?? 'pending';
     }
 
     function folioPlanForRow(rowKey: string, row: ParsedRow) {
@@ -218,10 +228,10 @@
             if (!selectedRows.has(rowKey)) continue;
             if (validationErrors.has(rowKey)) continue;
             if (!isDirect(row.fields)) continue;
-            if (getRowAction(rowKey, row.fields) === "skip") continue;
+            if (getRowAction(rowKey, row.fields) === 'skip') continue;
             for (const check of folioPlanForRow(rowKey, row)) {
-                if (folioDecision(check) !== "assign") continue;
-                if (check.status === "ya_asignado") continue;
+                if (folioDecision(check) !== 'assign') continue;
+                if (check.status === 'ya_asignado') continue;
                 const lookupKey = importedFolioLookupKey(check.request.mediaTypeId, check.request.folio);
                 const rows = assigned.get(lookupKey) ?? [];
                 if (!rows.includes(rowKey)) rows.push(rowKey);
@@ -240,27 +250,27 @@
     }
 
     // ── Acciones por fila y por tarjeta ────────────────────
-    function defaultAction(rowKey: string, fields: Record<string, string>): "link" | "create" | "skip" {
+    function defaultAction(rowKey: string, fields: Record<string, string>): 'link' | 'create' | 'skip' {
         const dups = matchResults.get(rowKey) ?? [];
-        if (dups.length === 0) return "create";
-        return hasFolio(fields) ? "link" : "skip";
+        if (dups.length === 0) return 'create';
+        return hasFolio(fields) ? 'link' : 'skip';
     }
 
-    function getRowAction(rowKey: string, fields: Record<string, string>): "link" | "create" | "skip" {
+    function getRowAction(rowKey: string, fields: Record<string, string>): 'link' | 'create' | 'skip' {
         return rowActions.get(rowKey) ?? defaultAction(rowKey, fields);
     }
 
-    function setRowAction(rowKey: string, action: "link" | "create" | "skip") {
+    function setRowAction(rowKey: string, action: 'link' | 'create' | 'skip') {
         const next = new Map(rowActions);
         next.set(rowKey, action);
         rowActions = next;
     }
 
-    function getCardAction(key: string): "omitir" | "reponer" {
-        return cardActions.get(key) ?? "omitir";
+    function getCardAction(key: string): 'omitir' | 'reponer' {
+        return cardActions.get(key) ?? 'omitir';
     }
 
-    function setCardAction(key: string, action: "omitir" | "reponer") {
+    function setCardAction(key: string, action: 'omitir' | 'reponer') {
         const next = new Map(cardActions);
         next.set(key, action);
         cardActions = next;
@@ -283,11 +293,19 @@
         });
     }
 
-    function getLinkFieldSelections(rowKey: string, personId: string): Partial<Record<LinkablePersonnelField, boolean>> {
+    function getLinkFieldSelections(
+        rowKey: string,
+        personId: string,
+    ): Partial<Record<LinkablePersonnelField, boolean>> {
         return linkFieldSelections.get(linkSelectionKey(rowKey, personId)) ?? {};
     }
 
-    function setLinkFieldSelected(rowKey: string, personId: string, field: LinkablePersonnelField, selected: boolean) {
+    function setLinkFieldSelected(
+        rowKey: string,
+        personId: string,
+        field: LinkablePersonnelField,
+        selected: boolean,
+    ) {
         const key = linkSelectionKey(rowKey, personId);
         const next = new Map(linkFieldSelections);
         const current = { ...(next.get(key) ?? {}) };
@@ -314,7 +332,11 @@
         linkFieldSelections = next;
     }
 
-    function selectedLinkPersonalUpdates(rowKey: string, row: ParsedRow, person: Person): LinkPersonalUpdates {
+    function selectedLinkPersonalUpdates(
+        rowKey: string,
+        row: ParsedRow,
+        person: Person,
+    ): LinkPersonalUpdates {
         const selections = getLinkFieldSelections(rowKey, person.id);
         const updates: LinkPersonalUpdates = {};
         for (const definition of LINKABLE_PERSONNEL_FIELD_DEFS) {
@@ -364,7 +386,7 @@
 
     // ── Reset / cierre ────────────────────────────────────
     function reset() {
-        step = "idle";
+        step = 'idle';
         parseResult = null;
         importResult = null;
         selectedRows = new Set();
@@ -419,38 +441,44 @@
         if (!file) return;
         isParsing = true;
         try {
+            const { parseTemplateFile } = await import('../../utils/xlsxImporter');
             const result = await parseTemplateFile(file, mediaTypes);
             if (!result.hasAnyData) {
-                toast.warning("El archivo no contiene datos en ninguna hoja.");
+                toast.warning('El archivo no contiene datos en ninguna hoja.');
                 return;
             }
-            if (!result.sheets.some((s) => s.key === "altas")) {
-                toast.warning("El archivo no contiene la hoja de ALTAS.");
+            if (!result.sheets.some((s) => s.key === 'altas')) {
+                toast.warning('El archivo no contiene la hoja de ALTAS.');
                 return;
             }
             parseResult = result;
-            step = "parsed";
+            step = 'parsed';
 
             const initial = new Set<string>();
             result.sheets.forEach((sheet) => {
                 sheet.rows.forEach((row) => {
-                    if (row.isValid && sheet.key === "altas") initial.add(`${sheet.key}-${row.rowNumber}`);
+                    if (row.isValid && sheet.key === 'altas') initial.add(`${sheet.key}-${row.rowNumber}`);
                 });
             });
             selectedRows = initial;
         } catch (err) {
-            handleError(err, "Leer Plantilla Excel");
+            handleError(err, 'Leer Plantilla Excel');
         } finally {
             isParsing = false;
-            input.value = "";
+            input.value = '';
         }
     }
 
     // ── Validación contra catálogo (bloqueante) ───────────
     function catalogHasName(catalog: { name?: string }[], value: string | null | undefined): boolean {
         if (!value) return false;
-        const norm = (s: string) => s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        return catalog.some((c) => norm(c.name ?? "") === norm(value));
+        const norm = (s: string) =>
+            s
+                .trim()
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+        return catalog.some((c) => norm(c.name ?? '') === norm(value));
     }
 
     function validateRow(fields: Record<string, string>): string[] {
@@ -470,7 +498,8 @@
             const canonical = (b?.floors || []) as string[];
             if (fields.piso_base) {
                 const { unresolved: badBase } = resolveFloorList([fields.piso_base], canonical);
-                if (badBase.length) problems.push(`Piso base "${fields.piso_base}" no existe en ${fields.edificio}`);
+                if (badBase.length)
+                    problems.push(`Piso base "${fields.piso_base}" no existe en ${fields.edificio}`);
             }
             for (const m of activeMediaTypes(cat.mediaTypes)) {
                 if (!m.has_floors) continue;
@@ -479,16 +508,19 @@
                 // El guardado omite en silencio los pisos de un medio que no aplica
                 // a ese edificio: convertirlo en error visible por fila.
                 const rawMedia = (cat.mediaTypes as any[]).find((x) => x?.key === m.key);
-                const allowed = rawMedia?.access_media_type_buildings as { building_id?: number }[] | undefined;
+                const allowed = rawMedia?.access_media_type_buildings as
+                    { building_id?: number }[] | undefined;
                 if (Array.isArray(allowed) && allowed.length > 0 && b?.id !== undefined) {
                     const applies = allowed.some((r) => Number(r?.building_id) === Number((b as any).id));
                     if (!applies) {
-                        problems.push(`${m.name} no aplica al edificio ${fields.edificio} (pisos se omitirían)`);
+                        problems.push(
+                            `${m.name} no aplica al edificio ${fields.edificio} (pisos se omitirían)`,
+                        );
                         continue;
                     }
                 }
                 const { unresolved } = resolveFloorList(raw, canonical);
-                if (unresolved.length) problems.push(`Pisos ${m.name}: ${unresolved.join(", ")}`);
+                if (unresolved.length) problems.push(`Pisos ${m.name}: ${unresolved.join(', ')}`);
             }
         }
         return problems;
@@ -498,7 +530,7 @@
     async function startReview() {
         if (!altasSheet) return;
         isReviewing = true;
-        step = "review";
+        step = 'review';
 
         const newMatches = new Map<string, Person[]>();
         const nameCache = new Map<string, Person[]>();
@@ -507,13 +539,16 @@
             if (!row.isValid) continue;
             const rowKey = `altas-${row.rowNumber}`;
             if (!selectedRows.has(rowKey)) continue;
-            const nameKey = `${(row.fields.apellidos ?? "").toLowerCase().trim()}|${(row.fields.nombres ?? "").toLowerCase().trim()}`;
+            const nameKey = `${(row.fields.apellidos ?? '').toLowerCase().trim()}|${(row.fields.nombres ?? '').toLowerCase().trim()}`;
             if (nameCache.has(nameKey)) {
                 newMatches.set(rowKey, nameCache.get(nameKey)!);
                 continue;
             }
             try {
-                const results = await personnelService.searchByName(row.fields.apellidos ?? "", row.fields.nombres ?? "");
+                const results = await personnelService.searchByName(
+                    row.fields.apellidos ?? '',
+                    row.fields.nombres ?? '',
+                );
                 nameCache.set(nameKey, results);
                 newMatches.set(rowKey, results);
             } catch {
@@ -544,8 +579,8 @@
             folioOwnership = await cardService.checkImportedFolioOwnership(folioRequests);
             folioOwnershipLoaded = true;
         } catch (err) {
-            handleError(err, "Verificar folios");
-            step = "parsed";
+            handleError(err, 'Verificar folios');
+            step = 'parsed';
             isReviewing = false;
             return;
         }
@@ -555,16 +590,16 @@
 
     // ── Construcción de tickets ───────────────────────────
     function buildTicketTitle(row: ParsedRow): string {
-        const name = [row.fields.apellidos, row.fields.nombres].filter(Boolean).join(", ");
-        const dep = row.fields.dependencia || "";
+        const name = [row.fields.apellidos, row.fields.nombres].filter(Boolean).join(', ');
+        const dep = row.fields.dependencia || '';
         return dep ? `${name} (${dep})` : name;
     }
 
     function buildTicketDescription(row: ParsedRow): string {
         return Object.entries(row.fields)
-            .filter(([k, v]) => v && k !== "nombres" && k !== "apellidos")
+            .filter(([k, v]) => v && k !== 'nombres' && k !== 'apellidos')
             .map(([k, v]) => `${FIELD_LABELS[k] ?? k}: ${v}`)
-            .join("\n");
+            .join('\n');
     }
 
     /**
@@ -572,8 +607,13 @@
      * Conserva únicamente los medios elegidos como `ticket`, deja la solicitud
      * activa y elimina el identificador ocupado.
      */
-    function ticketFieldsForFolioConflicts(row: ParsedRow, plan: ReturnType<typeof folioPlanForRow>): Record<string, string> | null {
-        const ticketRequests = plan.filter((check) => check.status === "ocupado" && check.decision === "ticket");
+    function ticketFieldsForFolioConflicts(
+        row: ParsedRow,
+        plan: ReturnType<typeof folioPlanForRow>,
+    ): Record<string, string> | null {
+        const ticketRequests = plan.filter(
+            (check) => check.status === 'ocupado' && check.decision === 'ticket',
+        );
         if (ticketRequests.length === 0) return null;
 
         const ticketFields = { ...row.fields };
@@ -583,22 +623,24 @@
                     item.request.mediaTypeId === request.mediaTypeId &&
                     item.request.folio.trim() === request.folio.trim(),
             );
-            if (check && check.status === "ocupado" && check.decision === "ticket") {
-                ticketFields[`${request.mediaKey}_req`] = "sí";
-                ticketFields[`${request.mediaKey}_folio`] = "";
+            if (check && check.status === 'ocupado' && check.decision === 'ticket') {
+                ticketFields[`${request.mediaKey}_req`] = 'sí';
+                ticketFields[`${request.mediaKey}_folio`] = '';
             } else {
-                ticketFields[`${request.mediaKey}_req`] = "";
-                ticketFields[`${request.mediaKey}_folio`] = "";
-                ticketFields[`pisos_${request.mediaKey}`] = "";
+                ticketFields[`${request.mediaKey}_req`] = '';
+                ticketFields[`${request.mediaKey}_folio`] = '';
+                ticketFields[`pisos_${request.mediaKey}`] = '';
             }
         }
 
         const occupiedDetails = ticketRequests
             .map((check) => {
-                const owner = check.ownership?.ownerName ? ` (propietario actual: ${check.ownership.ownerName})` : "";
+                const owner = check.ownership?.ownerName
+                    ? ` (propietario actual: ${check.ownership.ownerName})`
+                    : '';
                 return `${check.request.mediaName} ${check.request.folio}${owner}`;
             })
-            .join("; ");
+            .join('; ');
         ticketFields.origen = `Importación de registros: folio ocupado, alta sin medio asignado (${occupiedDetails})`;
         return ticketFields;
     }
@@ -609,7 +651,7 @@
 
         const blockedRows = [...validationErrors.entries()].filter(([rk]) => selectedRows.has(rk));
         if (blockedRows.length > 0) {
-            toast.error("No se pueden importar las filas seleccionadas", {
+            toast.error('No se pueden importar las filas seleccionadas', {
                 description: `${blockedRows.length} fila(s) tienen datos que no coinciden con el catálogo. Corrígelas y vuelve a intentarlo.`,
             });
             return;
@@ -621,17 +663,24 @@
             ),
         );
         if (folioBlockingRows.size > 0) {
-            toast.error("Hay folios por resolver antes de importar", {
+            toast.error('Hay folios por resolver antes de importar', {
                 description: `${folioBlockingRows.size} fila(s) tienen folios ocupados sin decisión o duplicados en el archivo. Elige omitir folio o ticket sin medio.`,
             });
             return;
         }
 
         isImporting = true;
-        step = "importing";
+        step = 'importing';
 
         const errores: { rowNumber: number; message: string }[] = [];
-        const ticketDefs: { type: string; title: string; description: string; priority: string; payload: Record<string, string>; person_id: string | null }[] = [];
+        const ticketDefs: {
+            type: string;
+            title: string;
+            description: string;
+            priority: string;
+            payload: Record<string, string>;
+            person_id: string | null;
+        }[] = [];
         let directos = 0;
         let tickets = 0;
         let camposActualizados = 0;
@@ -644,10 +693,10 @@
 
             if (!isDirect(row.fields)) {
                 ticketDefs.push({
-                    type: "Alta de Persona",
+                    type: 'Alta de Persona',
                     title: buildTicketTitle(row),
                     description: buildTicketDescription(row),
-                    priority: "media",
+                    priority: 'media',
                     payload: row.fields,
                     person_id: null,
                 });
@@ -655,43 +704,48 @@
             }
 
             const action = getRowAction(rowKey, row.fields);
-            if (action === "skip") continue;
+            if (action === 'skip') continue;
 
             const folioPlan = folioPlanForRow(rowKey, row);
             const unavailableTicketChecks = folioPlan.filter(
-                (check) => check.status === "ocupado" && check.decision === "ticket",
+                (check) => check.status === 'ocupado' && check.decision === 'ticket',
             );
             const assignableFolioChecks = folioPlan.filter(
                 (check) =>
-                    (check.status === "nuevo" || check.status === "disponible") && check.decision === "assign",
+                    (check.status === 'nuevo' || check.status === 'disponible') &&
+                    check.decision === 'assign',
             );
             const folioExclusions = new Set<string>();
             for (const check of folioPlan) {
-                if (check.status === "ya_asignado") {
+                if (check.status === 'ya_asignado') {
                     folioExclusions.add(check.request.mediaKey);
                     continue;
                 }
-                if (check.status === "ocupado" && check.decision !== "pending") {
+                if (check.status === 'ocupado' && check.decision !== 'pending') {
                     folioExclusions.add(check.request.mediaKey);
                 }
             }
 
             try {
-                if (action === "create") {
+                if (action === 'create') {
                     if (unavailableTicketChecks.length > 0) {
                         const ticketFields = ticketFieldsForFolioConflicts(row, folioPlan);
                         if (ticketFields) {
                             ticketDefs.push({
-                                type: "Alta de Persona",
+                                type: 'Alta de Persona',
                                 title: `${buildTicketTitle(row)} (sin folio disponible)`,
                                 description: buildTicketDescription({ ...row, fields: ticketFields }),
-                                priority: "media",
+                                priority: 'media',
                                 payload: ticketFields,
                                 person_id: null,
                             });
                         }
                     }
-                    if (folioPlan.length > 0 && assignableFolioChecks.length === 0 && unavailableTicketChecks.length > 0) {
+                    if (
+                        folioPlan.length > 0 &&
+                        assignableFolioChecks.length === 0 &&
+                        unavailableTicketChecks.length > 0
+                    ) {
                         continue;
                     }
                     await personnelService.importDirectLegacy(row.fields, {
@@ -704,16 +758,16 @@
                 // Vincular a la candidata seleccionada.
                 const dups = matchResults.get(rowKey) ?? [];
                 const person = getSelectedLinkedPerson(rowKey, dups);
-                if (!person?.id) throw new Error("No se encontró la persona para vincular");
+                if (!person?.id) throw new Error('No se encontró la persona para vincular');
 
                 if (unavailableTicketChecks.length > 0) {
                     const ticketFields = ticketFieldsForFolioConflicts(row, folioPlan);
                     if (ticketFields) {
                         ticketDefs.push({
-                            type: "Alta de Persona",
+                            type: 'Alta de Persona',
                             title: `${buildTicketTitle(row)} (sin folio disponible)`,
                             description: buildTicketDescription({ ...row, fields: ticketFields }),
-                            priority: "media",
+                            priority: 'media',
                             payload: ticketFields,
                             person_id: person.id,
                         });
@@ -721,10 +775,7 @@
                 }
 
                 const conflicts = selectedConflicts(rowKey, row, person);
-                const excludeKeys = new Set([
-                    ...conflicts.map((c) => c.mediaKey),
-                    ...folioExclusions,
-                ]);
+                const excludeKeys = new Set([...conflicts.map((c) => c.mediaKey), ...folioExclusions]);
                 const personalUpdates = selectedLinkPersonalUpdates(rowKey, row, person);
 
                 // Asignar folios no conflictivos a la persona existente y aplicar
@@ -739,17 +790,17 @@
 
                 // Conflictos marcados "reponer" → ticket de Reposición.
                 for (const c of conflicts) {
-                    if (getCardAction(`${rowKey}:${c.mediaKey}`) === "reponer") {
+                    if (getCardAction(`${rowKey}:${c.mediaKey}`) === 'reponer') {
                         ticketDefs.push({
-                            type: "Reposición",
+                            type: 'Reposición',
                             title: `Reposición ${c.mediaName} — ${row.fields.apellidos}, ${row.fields.nombres}`,
-                            description: `Reposición automática desde importación de registros (${c.mediaName} existente: ${c.existingFolio || "N/A"})`,
-                            priority: "media",
+                            description: `Reposición automática desde importación de registros (${c.mediaName} existente: ${c.existingFolio || 'N/A'})`,
+                            priority: 'media',
                             payload: {
                                 ...row.fields,
-                                [`reponer_${c.mediaKey}`]: "sí",
-                                [`folio_${c.mediaKey}`]: c.existingFolio || "",
-                                origen: "Importación de registros",
+                                [`reponer_${c.mediaKey}`]: 'sí',
+                                [`folio_${c.mediaKey}`]: c.existingFolio || '',
+                                origen: 'Importación de registros',
                             },
                             person_id: person.id,
                         });
@@ -758,22 +809,29 @@
 
                 directos++;
             } catch (e) {
-                errores.push({ rowNumber: row.rowNumber, message: e instanceof Error ? e.message : "Error desconocido" });
+                errores.push({
+                    rowNumber: row.rowNumber,
+                    message: e instanceof Error ? e.message : 'Error desconocido',
+                });
             }
         }
 
         if (ticketDefs.length > 0) {
             const res = await ticketService.createBatch(ticketDefs);
             tickets = res.created;
-            res.errors.forEach((e) => errores.push({ rowNumber: 0, message: `Ticket ${e.index + 1}: ${e.message}` }));
+            res.errors.forEach((e) =>
+                errores.push({ rowNumber: 0, message: `Ticket ${e.index + 1}: ${e.message}` }),
+            );
         }
 
         importResult = { directos, tickets, camposActualizados, errores };
         isImporting = false;
-        step = "done";
+        step = 'done';
 
         if (directos + tickets > 0) {
-            toast.success(`${directos} registro(s) directo(s), ${camposActualizados} campo(s) actualizados y ${tickets} ticket(s) creados.`);
+            toast.success(
+                `${directos} registro(s) directo(s), ${camposActualizados} campo(s) actualizados y ${tickets} ticket(s) creados.`,
+            );
         }
         if (errores.length > 0) {
             toast.error(`${errores.length} fila(s) no pudieron importarse.`);
@@ -785,11 +843,15 @@
     let totalDuplicates = $derived([...matchResults.values()].filter((v) => v.length > 0).length);
     let totalDirect = $derived.by(() => {
         if (!altasSheet) return 0;
-        return altasSheet.rows.filter((r) => r.isValid && selectedRows.has(`altas-${r.rowNumber}`) && isDirect(r.fields)).length;
+        return altasSheet.rows.filter(
+            (r) => r.isValid && selectedRows.has(`altas-${r.rowNumber}`) && isDirect(r.fields),
+        ).length;
     });
     let totalTickets = $derived.by(() => {
         if (!altasSheet) return 0;
-        return altasSheet.rows.filter((r) => r.isValid && selectedRows.has(`altas-${r.rowNumber}`) && !isDirect(r.fields)).length;
+        return altasSheet.rows.filter(
+            (r) => r.isValid && selectedRows.has(`altas-${r.rowNumber}`) && !isDirect(r.fields),
+        ).length;
     });
     let folioReview = $derived.by(() => {
         const pendingRows = new Set<string>();
@@ -804,19 +866,22 @@
                 if (!selectedRows.has(rowKey)) continue;
                 if (validationErrors.has(rowKey)) continue;
                 if (!isDirect(row.fields)) continue;
-                if (getRowAction(rowKey, row.fields) === "skip") continue;
+                if (getRowAction(rowKey, row.fields) === 'skip') continue;
 
                 for (const check of folioPlanForRow(rowKey, row)) {
-                    if (check.status === "ocupado") {
+                    if (check.status === 'ocupado') {
                         occupied += 1;
                         if (!getFolioAction(check.resolutionKey)) pendingRows.add(rowKey);
                     }
                     if (
-                        check.status === "nuevo" ||
-                        check.status === "disponible" ||
-                        (check.status === "ya_asignado" && check.targetPersonId)
+                        check.status === 'nuevo' ||
+                        check.status === 'disponible' ||
+                        (check.status === 'ya_asignado' && check.targetPersonId)
                     ) {
-                        const lookupKey = importedFolioLookupKey(check.request.mediaTypeId, check.request.folio);
+                        const lookupKey = importedFolioLookupKey(
+                            check.request.mediaTypeId,
+                            check.request.folio,
+                        );
                         const rows = assigned.get(lookupKey) ?? [];
                         if (!rows.includes(rowKey)) rows.push(rowKey);
                         assigned.set(lookupKey, rows);
@@ -832,34 +897,48 @@
         }
 
         return { occupied, pendingRows, duplicateRows };
-    });</script>
+    });
+</script>
 
 <Modal
     bind:isOpen
     title="Importar Registros"
     description="Suba la hoja ALTAS para dar de alta personal directamente (con folio = legacy, sin ticket)."
-    size={step === "review" ? "xl" : "lg"}
+    size={step === 'review' ? 'xl' : 'lg'}
+    mobileFullScreen
     onclose={closeModal}
 >
     <div class="space-y-5">
-        {#if step === "idle"}
-            <div class="flex flex-col items-center justify-center gap-4 py-10 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50">
-                <div class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+        {#if step === 'idle'}
+            <div
+                class="flex flex-col items-center justify-center gap-4 py-10 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50"
+            >
+                <div
+                    class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600"
+                >
                     <FileSpreadsheet size={28} />
                 </div>
                 <div class="text-center">
                     <p class="text-sm font-semibold text-slate-700">Selecciona la plantilla completada</p>
-                    <p class="text-xs text-slate-400 mt-1">Se usará la hoja <span class="font-mono">✅ ALTAS</span> (.xlsx)</p>
+                    <p class="text-xs text-slate-400 mt-1">
+                        Se usará la hoja <span class="font-mono">✅ ALTAS</span> (.xlsx)
+                    </p>
                 </div>
                 <Button variant="primary" loading={isParsing} onclick={() => fileInput?.click()}>
                     <Upload size={16} class="mr-2" />
-                    {isParsing ? "Leyendo archivo…" : "Seleccionar archivo"}
+                    {isParsing ? 'Leyendo archivo…' : 'Seleccionar archivo'}
                 </Button>
-                <input type="file" accept=".xlsx" class="hidden" bind:this={fileInput} onchange={handleFileChange} />
+                <input
+                    type="file"
+                    accept=".xlsx"
+                    class="hidden"
+                    bind:this={fileInput}
+                    onchange={handleFileChange}
+                />
             </div>
         {/if}
 
-        {#if step === "parsed" && altasSheet}
+        {#if step === 'parsed' && altasSheet}
             <div class="grid grid-cols-3 gap-3 text-center">
                 <div class="rounded-lg p-3 bg-slate-50 border border-slate-200">
                     <p class="text-2xl font-bold text-slate-800">{altasSheet.rows.length}</p>
@@ -869,50 +948,79 @@
                     <p class="text-2xl font-bold text-emerald-700">{totalSelected}</p>
                     <p class="text-xs text-emerald-600 mt-0.5">Seleccionadas</p>
                 </div>
-                <div class="rounded-lg p-3 {altasSheet.invalidCount > 0 ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'} border">
-                    <p class="text-2xl font-bold {altasSheet.invalidCount > 0 ? 'text-rose-600' : 'text-slate-400'}">{altasSheet.invalidCount}</p>
+                <div
+                    class="rounded-lg p-3 {altasSheet.invalidCount > 0
+                        ? 'bg-rose-50 border-rose-200'
+                        : 'bg-slate-50 border-slate-200'} border"
+                >
+                    <p
+                        class="text-2xl font-bold {altasSheet.invalidCount > 0
+                            ? 'text-rose-600'
+                            : 'text-slate-400'}"
+                    >
+                        {altasSheet.invalidCount}
+                    </p>
                     <p class="text-xs text-slate-400 mt-0.5">Con errores</p>
                 </div>
             </div>
 
             <div class="rounded-lg border border-slate-200 overflow-hidden">
-                <div class="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200/50">
+                <div
+                    class="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200/50"
+                >
                     <input
                         type="checkbox"
-                        class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        checked={altasSheet.rows.filter((r) => r.isValid).every((r) => selectedRows.has(`altas-${r.rowNumber}`))}
+                        class="w-4 h-4 rounded border-slate-300 text-blue-600 focus-visible:ring-blue-500"
+                        checked={altasSheet.rows
+                            .filter((r) => r.isValid)
+                            .every((r) => selectedRows.has(`altas-${r.rowNumber}`))}
                         onchange={() => toggleSheetSelection(altasSheet)}
                     />
-                    <button class="flex-1 flex items-center justify-between gap-3 text-left" onclick={() => toggleSheet("altas")}>
-                        <span class="text-xs font-bold text-slate-600">✅ ALTAS · {altasSheet.rows.length} fila(s)</span>
-                        {#if expandedSheets.has("altas")}
+                    <button
+                        class="flex-1 flex items-center justify-between gap-3 text-left"
+                        onclick={() => toggleSheet('altas')}
+                    >
+                        <span class="text-xs font-bold text-slate-600"
+                            >✅ ALTAS · {altasSheet.rows.length} fila(s)</span
+                        >
+                        {#if expandedSheets.has('altas')}
                             <ChevronDown size={14} class="text-slate-400" />
                         {:else}
                             <ChevronRight size={14} class="text-slate-400" />
                         {/if}
                     </button>
                 </div>
-                {#if expandedSheets.has("altas")}
+                {#if expandedSheets.has('altas')}
                     <div class="divide-y divide-slate-100 max-h-56 overflow-y-auto">
                         {#each altasSheet.rows as row}
-                            <div class="flex items-start gap-3 px-4 py-2.5 {row.isValid ? '' : 'bg-rose-50/50'}">
+                            <div
+                                class="flex items-start gap-3 px-4 py-2.5 {row.isValid
+                                    ? ''
+                                    : 'bg-rose-50/50'}"
+                            >
                                 {#if row.isValid}
                                     <input
                                         type="checkbox"
-                                        class="mt-1 w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                        class="mt-1 w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus-visible:ring-blue-500"
                                         checked={selectedRows.has(`altas-${row.rowNumber}`)}
-                                        onchange={() => toggleRow("altas", row.rowNumber)}
+                                        onchange={() => toggleRow('altas', row.rowNumber)}
                                     />
                                 {:else}
                                     <AlertCircle size={14} class="text-rose-500 mt-0.5 shrink-0" />
                                 {/if}
                                 <div class="min-w-0">
                                     <p class="text-xs font-medium text-slate-700 truncate">
-                                        {[row.fields.apellidos, row.fields.nombres].filter(Boolean).join(", ") || `Fila ${row.rowNumber}`}
-                                        {#if row.fields.dependencia}<span class="text-slate-400"> — {row.fields.dependencia}</span>{/if}
+                                        {[row.fields.apellidos, row.fields.nombres]
+                                            .filter(Boolean)
+                                            .join(', ') || `Fila ${row.rowNumber}`}
+                                        {#if row.fields.dependencia}<span class="text-slate-400">
+                                                — {row.fields.dependencia}</span
+                                            >{/if}
                                     </p>
                                     {#if !row.isValid}
-                                        <p class="text-[10px] text-rose-500 mt-0.5">Faltan: {row.missingRequired.join(", ")}</p>
+                                        <p class="text-[10px] text-rose-500 mt-0.5">
+                                            Faltan: {row.missingRequired.join(', ')}
+                                        </p>
                                     {/if}
                                 </div>
                             </div>
@@ -922,35 +1030,52 @@
             </div>
         {/if}
 
-        {#if step === "review"}
+        {#if step === 'review'}
             {#if isReviewing}
                 <div class="flex flex-col items-center gap-4 py-12">
-                    <div class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                    <div
+                        class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600"
+                    >
                         <Loader2 size={28} class="animate-spin" />
                     </div>
                     <p class="text-sm font-semibold text-slate-700">Validando {totalSelected} registro(s)…</p>
                 </div>
             {:else if altasSheet}
                 <div class="flex items-center gap-3 text-xs flex-wrap">
-                    <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium">
-                        <UserPlus size={12} /> {totalDirect} directos (legacy)
+                    <div
+                        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium"
+                    >
+                        <UserPlus size={12} />
+                        {totalDirect} directos (legacy)
                     </div>
-                    <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 font-medium">
-                        <Ticket size={12} /> {totalTickets} tickets de alta
+                    <div
+                        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 font-medium"
+                    >
+                        <Ticket size={12} />
+                        {totalTickets} tickets de alta
                     </div>
                     {#if totalDuplicates > 0}
-                        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 font-medium">
-                            <AlertTriangle size={12} /> {totalDuplicates} posible(s) duplicado(s)
+                        <div
+                            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 font-medium"
+                        >
+                            <AlertTriangle size={12} />
+                            {totalDuplicates} posible(s) duplicado(s)
                         </div>
                     {/if}
                     {#if folioReview.occupied > 0}
-                        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-50 border border-orange-200 text-orange-700 font-medium">
-                            <AlertTriangle size={12} /> {folioReview.occupied} folio(s) ocupado(s)
+                        <div
+                            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-50 border border-orange-200 text-orange-700 font-medium"
+                        >
+                            <AlertTriangle size={12} />
+                            {folioReview.occupied} folio(s) ocupado(s)
                         </div>
                     {/if}
                     {#if validationErrors.size > 0}
-                        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-800 font-bold">
-                            <AlertCircle size={12} /> {validationErrors.size} con datos no reconocidos (bloqueante)
+                        <div
+                            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-800 font-bold"
+                        >
+                            <AlertCircle size={12} />
+                            {validationErrors.size} con datos no reconocidos (bloqueante)
                         </div>
                     {/if}
                 </div>
@@ -960,14 +1085,14 @@
                         <button
                             type="button"
                             class="rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50"
-                            onclick={() => setAllUnresolvedFolioActions("omitir")}
+                            onclick={() => setAllUnresolvedFolioActions('omitir')}
                         >
                             Omitir folios pendientes
                         </button>
                         <button
                             type="button"
                             class="rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50"
-                            onclick={() => setAllUnresolvedFolioActions("ticket")}
+                            onclick={() => setAllUnresolvedFolioActions('ticket')}
                         >
                             Enviar folios pendientes a ticket
                         </button>
@@ -981,20 +1106,36 @@
                             {@const direct = isDirect(row.fields)}
                             {@const errs = validationErrors.get(rowKey) ?? []}
                             {@const dups = matchResults.get(rowKey) ?? []}
-                            {@const action = direct ? getRowAction(rowKey, row.fields) : "create"}
-                            <div class="rounded-lg border {errs.length ? 'border-rose-200 bg-rose-50/50' : 'border-slate-200'} p-3">
+                            {@const action = direct ? getRowAction(rowKey, row.fields) : 'create'}
+                            <div
+                                class="rounded-lg border {errs.length
+                                    ? 'border-rose-200 bg-rose-50/50'
+                                    : 'border-slate-200'} p-3"
+                            >
                                 <div class="flex items-center justify-between gap-3">
                                     <div class="min-w-0">
                                         <p class="text-xs font-bold text-slate-700 truncate">
-                                            {[row.fields.apellidos, row.fields.nombres].filter(Boolean).join(", ")}
+                                            {[row.fields.apellidos, row.fields.nombres]
+                                                .filter(Boolean)
+                                                .join(', ')}
                                         </p>
-                                        <p class="text-[10px] text-slate-400 truncate">{row.fields.dependencia || "—"} · {row.fields.edificio || "—"}</p>
+                                        <p class="text-[10px] text-slate-400 truncate">
+                                            {row.fields.dependencia || '—'} · {row.fields.edificio || '—'}
+                                        </p>
                                     </div>
                                     <div class="flex items-center gap-1.5 shrink-0">
                                         {#if direct}
-                                            <Badge variant="emerald" class="text-[9px] font-extrabold px-1.5 py-0.5">Directo · Legacy</Badge>
+                                            <Badge
+                                                variant="emerald"
+                                                class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                                >Directo · Legacy</Badge
+                                            >
                                         {:else}
-                                            <Badge variant="blue" class="text-[9px] font-extrabold px-1.5 py-0.5">Ticket de alta</Badge>
+                                            <Badge
+                                                variant="blue"
+                                                class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                                >Ticket de alta</Badge
+                                            >
                                         {/if}
                                     </div>
                                 </div>
@@ -1004,48 +1145,94 @@
                                     {@const hasDuplicateFolio = folioReview.duplicateRows.has(rowKey)}
                                     {#if folioPlan.length > 0}
                                         <div class="mt-2 rounded-lg border border-slate-200 bg-white p-2">
-                                            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Folios verificados</p>
+                                            <p
+                                                class="text-[10px] font-bold uppercase tracking-wider text-slate-500"
+                                            >
+                                                Folios verificados
+                                            </p>
                                             <div class="mt-1.5 space-y-1.5">
                                                 {#each folioPlan as check (check.resolutionKey)}
                                                     {@const folioDecision = check.decision}
-                                                    <div class="flex items-start justify-between gap-2 rounded-md bg-slate-50/70 p-1.5">
+                                                    <div
+                                                        class="flex items-start justify-between gap-2 rounded-md bg-slate-50/70 p-1.5"
+                                                    >
                                                         <div class="min-w-0">
-                                                            <p class="truncate text-[10px] font-bold text-slate-700">
-                                                                {check.request.mediaName}: {check.request.folio}
+                                                            <p
+                                                                class="truncate text-[10px] font-bold text-slate-700"
+                                                            >
+                                                                {check.request.mediaName}: {check.request
+                                                                    .folio}
                                                             </p>
                                                             <p class="text-[10px] text-slate-500">
-                                                                {#if check.status === "nuevo"}Nuevo; se creará el medio.
-                                                                {:else if check.status === "disponible"}Disponible en inventario.
-                                                                {:else if check.status === "ya_asignado"}Ya asignado a la persona vinculada.
-                                                                {:else}Ocupado{#if check.ownership?.ownerName} por {check.ownership.ownerName}{/if}{#if check.ownership?.ownerEmployee} (#{check.ownership.ownerEmployee}){/if}.
+                                                                {#if check.status === 'nuevo'}Nuevo; se creará
+                                                                    el medio.
+                                                                {:else if check.status === 'disponible'}Disponible
+                                                                    en inventario.
+                                                                {:else if check.status === 'ya_asignado'}Ya
+                                                                    asignado a la persona vinculada.
+                                                                {:else}Ocupado{#if check.ownership?.ownerName}
+                                                                        por {check.ownership
+                                                                            .ownerName}{/if}{#if check.ownership?.ownerEmployee}
+                                                                        (#{check.ownership
+                                                                            .ownerEmployee}){/if}.
                                                                 {/if}
                                                             </p>
                                                         </div>
                                                         <div class="flex shrink-0 items-center gap-1">
-                                                            {#if check.status === "nuevo"}
-                                                                <Badge variant="emerald" class="px-1.5 py-0.5 text-[9px] font-extrabold">Nuevo</Badge>
-                                                            {:else if check.status === "disponible"}
-                                                                <Badge variant="blue" class="px-1.5 py-0.5 text-[9px] font-extrabold">Disponible</Badge>
-                                                            {:else if check.status === "ya_asignado"}
-                                                                <Badge variant="slate" class="px-1.5 py-0.5 text-[9px] font-extrabold">Verificado</Badge>
+                                                            {#if check.status === 'nuevo'}
+                                                                <Badge
+                                                                    variant="emerald"
+                                                                    class="px-1.5 py-0.5 text-[9px] font-extrabold"
+                                                                    >Nuevo</Badge
+                                                                >
+                                                            {:else if check.status === 'disponible'}
+                                                                <Badge
+                                                                    variant="blue"
+                                                                    class="px-1.5 py-0.5 text-[9px] font-extrabold"
+                                                                    >Disponible</Badge
+                                                                >
+                                                            {:else if check.status === 'ya_asignado'}
+                                                                <Badge
+                                                                    variant="slate"
+                                                                    class="px-1.5 py-0.5 text-[9px] font-extrabold"
+                                                                    >Verificado</Badge
+                                                                >
                                                             {:else}
-                                                                <Badge variant="rose" class="px-1.5 py-0.5 text-[9px] font-extrabold">Ocupado</Badge>
+                                                                <Badge
+                                                                    variant="rose"
+                                                                    class="px-1.5 py-0.5 text-[9px] font-extrabold"
+                                                                    >Ocupado</Badge
+                                                                >
                                                             {/if}
                                                         </div>
                                                     </div>
-                                                    {#if check.status === "ocupado"}
+                                                    {#if check.status === 'ocupado'}
                                                         <div class="flex items-center gap-1">
                                                             <button
                                                                 type="button"
-                                                                class="rounded border px-1.5 py-0.5 text-[9px] font-bold {folioDecision === 'omitir' ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-200 bg-white text-slate-600'}"
-                                                                onclick={() => setFolioAction(check.resolutionKey, "omitir")}
+                                                                class="rounded border px-1.5 py-0.5 text-[9px] font-bold {folioDecision ===
+                                                                'omitir'
+                                                                    ? 'border-slate-700 bg-slate-700 text-white'
+                                                                    : 'border-slate-200 bg-white text-slate-600'}"
+                                                                onclick={() =>
+                                                                    setFolioAction(
+                                                                        check.resolutionKey,
+                                                                        'omitir',
+                                                                    )}
                                                             >
                                                                 Omitir folio
                                                             </button>
                                                             <button
                                                                 type="button"
-                                                                class="rounded border px-1.5 py-0.5 text-[9px] font-bold {folioDecision === 'ticket' ? 'bg-amber-600 text-white border-amber-600' : 'border-slate-200 bg-white text-slate-600'}"
-                                                                onclick={() => setFolioAction(check.resolutionKey, "ticket")}
+                                                                class="rounded border px-1.5 py-0.5 text-[9px] font-bold {folioDecision ===
+                                                                'ticket'
+                                                                    ? 'bg-amber-600 text-white border-amber-600'
+                                                                    : 'border-slate-200 bg-white text-slate-600'}"
+                                                                onclick={() =>
+                                                                    setFolioAction(
+                                                                        check.resolutionKey,
+                                                                        'ticket',
+                                                                    )}
                                                             >
                                                                 Ticket sin medio
                                                             </button>
@@ -1054,8 +1241,11 @@
                                                 {/each}
                                             </div>
                                             {#if hasDuplicateFolio}
-                                                <p class="mt-1.5 flex items-center gap-1 text-[10px] font-bold text-rose-600">
-                                                    <AlertCircle size={11} /> Folio duplicado en el archivo: deja solo una fila con asignación directa.
+                                                <p
+                                                    class="mt-1.5 flex items-center gap-1 text-[10px] font-bold text-rose-600"
+                                                >
+                                                    <AlertCircle size={11} /> Folio duplicado en el archivo: deja
+                                                    solo una fila con asignación directa.
                                                 </p>
                                             {/if}
                                         </div>
@@ -1066,8 +1256,13 @@
                                     {@const selectedPerson = getSelectedLinkedPerson(rowKey, dups)}
                                     {@const conflicts = selectedConflicts(rowKey, row, selectedPerson)}
                                     <div class="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
-                                        <p class="text-[10px] text-amber-700 font-bold flex items-center gap-1">
-                                            <AlertTriangle size={11} /> {dups.length === 1 ? "Posible duplicado" : `${dups.length} posibles duplicados`}
+                                        <p
+                                            class="text-[10px] text-amber-700 font-bold flex items-center gap-1"
+                                        >
+                                            <AlertTriangle size={11} />
+                                            {dups.length === 1
+                                                ? 'Posible duplicado'
+                                                : `${dups.length} posibles duplicados`}
                                         </p>
                                         <div class="mt-2 space-y-1.5">
                                             {#each dups as candidate (candidate.id)}
@@ -1077,35 +1272,76 @@
                                                     selected={selectedPerson?.id === candidate.id}
                                                     expanded={expandedLinkedCandidates.has(candidateKey)}
                                                     onSelect={(id) => setSelectedLinkedPerson(rowKey, id)}
-                                                    onToggle={(id) => toggleLinkedCandidate(`${rowKey}:${id}`)}
+                                                    onToggle={(id) =>
+                                                        toggleLinkedCandidate(`${rowKey}:${id}`)}
                                                 />
                                             {/each}
                                         </div>
                                         <div class="mt-1.5 flex items-center gap-1 flex-wrap">
-                                            <button class="px-2 py-1 rounded text-[10px] font-bold {action === 'link' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}" onclick={() => setRowAction(rowKey, "link")}>Vincular</button>
-                                            <button class="px-2 py-1 rounded text-[10px] font-bold {action === 'create' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}" onclick={() => setRowAction(rowKey, "create")}>Crear nuevo</button>
-                                            <button class="px-2 py-1 rounded text-[10px] font-bold {action === 'skip' ? 'bg-rose-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}" onclick={() => setRowAction(rowKey, "skip")}>Omitir</button>
+                                            <button
+                                                class="px-2 py-1 rounded text-[10px] font-bold {action ===
+                                                'link'
+                                                    ? 'bg-emerald-600 text-white'
+                                                    : 'bg-white text-slate-600 border border-slate-200'}"
+                                                onclick={() => setRowAction(rowKey, 'link')}>Vincular</button
+                                            >
+                                            <button
+                                                class="px-2 py-1 rounded text-[10px] font-bold {action ===
+                                                'create'
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-white text-slate-600 border border-slate-200'}"
+                                                onclick={() => setRowAction(rowKey, 'create')}
+                                                >Crear nuevo</button
+                                            >
+                                            <button
+                                                class="px-2 py-1 rounded text-[10px] font-bold {action ===
+                                                'skip'
+                                                    ? 'bg-rose-600 text-white'
+                                                    : 'bg-white text-slate-600 border border-slate-200'}"
+                                                onclick={() => setRowAction(rowKey, 'skip')}>Omitir</button
+                                            >
                                         </div>
 
-                                        {#if action === "link" && selectedPerson}
+                                        {#if action === 'link' && selectedPerson}
                                             {@const comparisons = linkFieldComparisons(selectedPerson, row)}
-                                            {@const selections = getLinkFieldSelections(rowKey, selectedPerson.id)}
-                                            {@const selectableComparisons = comparisons.filter((comparison) => comparison.selectable)}
+                                            {@const selections = getLinkFieldSelections(
+                                                rowKey,
+                                                selectedPerson.id,
+                                            )}
+                                            {@const selectableComparisons = comparisons.filter(
+                                                (comparison) => comparison.selectable,
+                                            )}
                                             <div class="mt-2 rounded-lg border border-slate-200 bg-white p-2">
                                                 <div class="flex items-center justify-between gap-2">
-                                                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Datos a actualizar</p>
+                                                    <p
+                                                        class="text-[10px] font-bold uppercase tracking-wider text-slate-500"
+                                                    >
+                                                        Datos a actualizar
+                                                    </p>
                                                     <div class="flex items-center gap-1">
                                                         <button
                                                             type="button"
                                                             class="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 hover:bg-slate-100"
-                                                            onclick={() => setAllLinkFields(rowKey, row, selectedPerson, true)}
+                                                            onclick={() =>
+                                                                setAllLinkFields(
+                                                                    rowKey,
+                                                                    row,
+                                                                    selectedPerson,
+                                                                    true,
+                                                                )}
                                                         >
                                                             Marcar nuevos
                                                         </button>
                                                         <button
                                                             type="button"
                                                             class="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-500 hover:bg-slate-50"
-                                                            onclick={() => setAllLinkFields(rowKey, row, selectedPerson, false)}
+                                                            onclick={() =>
+                                                                setAllLinkFields(
+                                                                    rowKey,
+                                                                    row,
+                                                                    selectedPerson,
+                                                                    false,
+                                                                )}
                                                         >
                                                             Limpiar
                                                         </button>
@@ -1114,43 +1350,88 @@
                                                 {#if selectableComparisons.length > 0}
                                                     <ul class="mt-1.5 divide-y divide-slate-100">
                                                         {#each selectableComparisons as comparison (comparison.field)}
-                                                            <li class="flex items-start justify-between gap-2 py-1">
-                                                                <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-1.5">
+                                                            <li
+                                                                class="flex items-start justify-between gap-2 py-1"
+                                                            >
+                                                                <label
+                                                                    class="flex min-w-0 flex-1 cursor-pointer items-start gap-1.5"
+                                                                >
                                                                     <input
                                                                         type="checkbox"
-                                                                        class="mt-0.5 h-3 w-3 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                                                                        checked={selections[comparison.field] === true}
-                                                                        onchange={(event) => setLinkFieldSelected(rowKey, selectedPerson.id, comparison.field, event.currentTarget.checked)}
+                                                                        class="mt-0.5 h-3 w-3 rounded border-slate-300 text-emerald-600 focus-visible:ring-emerald-500"
+                                                                        checked={selections[
+                                                                            comparison.field
+                                                                        ] === true}
+                                                                        onchange={(event) =>
+                                                                            setLinkFieldSelected(
+                                                                                rowKey,
+                                                                                selectedPerson.id,
+                                                                                comparison.field,
+                                                                                event.currentTarget.checked,
+                                                                            )}
                                                                     />
                                                                     <span class="min-w-0">
-                                                                        <span class="block text-[10px] font-bold text-slate-700">{comparison.label}</span>
-                                                                        <span class="block truncate text-[10px] text-slate-500">{comparison.current || "—"} → {comparison.proposed}</span>
+                                                                        <span
+                                                                            class="block text-[10px] font-bold text-slate-700"
+                                                                            >{comparison.label}</span
+                                                                        >
+                                                                        <span
+                                                                            class="block truncate text-[10px] text-slate-500"
+                                                                            >{comparison.current || '—'} → {comparison.proposed}</span
+                                                                        >
                                                                     </span>
                                                                 </label>
                                                             </li>
                                                         {/each}
                                                     </ul>
                                                 {:else}
-                                                    <p class="mt-1.5 text-[10px] italic text-slate-400">No hay datos nuevos en esta fila.</p>
+                                                    <p class="mt-1.5 text-[10px] italic text-slate-400">
+                                                        No hay datos nuevos en esta fila.
+                                                    </p>
                                                 {/if}
                                             </div>
                                             {#if conflicts.length > 0}
                                                 <div class="mt-2 space-y-1.5">
-                                                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{selectedPerson.name} ya tiene:</p>
+                                                    <p
+                                                        class="text-[10px] font-bold text-slate-500 uppercase tracking-wider"
+                                                    >
+                                                        {selectedPerson.name} ya tiene:
+                                                    </p>
                                                     {#each conflicts as c (c.mediaKey)}
                                                         {@const cardKey = `${rowKey}:${c.mediaKey}`}
                                                         {@const cardAction = getCardAction(cardKey)}
                                                         <div class="flex items-center justify-between gap-2">
-                                                            <span class="text-[10px] font-bold text-slate-700">{c.mediaName} ({c.existingFolio || "activa"})</span>
+                                                            <span class="text-[10px] font-bold text-slate-700"
+                                                                >{c.mediaName} ({c.existingFolio ||
+                                                                    'activa'})</span
+                                                            >
                                                             <div class="flex items-center gap-1 shrink-0">
-                                                                <button class="px-2 py-0.5 rounded text-[9px] font-bold {cardAction === 'omitir' ? 'bg-slate-700 text-white' : 'bg-white text-slate-500 border border-slate-200'}" onclick={() => setCardAction(cardKey, "omitir")}>Omitir</button>
-                                                                <button class="px-2 py-0.5 rounded text-[9px] font-bold {cardAction === 'reponer' ? 'bg-amber-600 text-white' : 'bg-white text-slate-500 border border-slate-200'}" onclick={() => setCardAction(cardKey, "reponer")}>Reponer</button>
+                                                                <button
+                                                                    class="px-2 py-0.5 rounded text-[9px] font-bold {cardAction ===
+                                                                    'omitir'
+                                                                        ? 'bg-slate-700 text-white'
+                                                                        : 'bg-white text-slate-500 border border-slate-200'}"
+                                                                    onclick={() =>
+                                                                        setCardAction(cardKey, 'omitir')}
+                                                                    >Omitir</button
+                                                                >
+                                                                <button
+                                                                    class="px-2 py-0.5 rounded text-[9px] font-bold {cardAction ===
+                                                                    'reponer'
+                                                                        ? 'bg-amber-600 text-white'
+                                                                        : 'bg-white text-slate-500 border border-slate-200'}"
+                                                                    onclick={() =>
+                                                                        setCardAction(cardKey, 'reponer')}
+                                                                    >Reponer</button
+                                                                >
                                                             </div>
                                                         </div>
                                                     {/each}
                                                 </div>
                                             {:else}
-                                                <p class="mt-1.5 text-[10px] text-emerald-700 font-medium">Se asignarán los folios a {selectedPerson.name}.</p>
+                                                <p class="mt-1.5 text-[10px] text-emerald-700 font-medium">
+                                                    Se asignarán los folios a {selectedPerson.name}.
+                                                </p>
                                             {/if}
                                         {/if}
                                     </div>
@@ -1159,17 +1440,23 @@
                                     {#if folios.length > 0}
                                         <div class="mt-1.5 flex flex-wrap gap-1.5">
                                             {#each folios as f}
-                                                <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">{f.type}: {f.folio}</span>
+                                                <span
+                                                    class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded"
+                                                    >{f.type}: {f.folio}</span
+                                                >
                                             {/each}
                                         </div>
                                     {:else}
-                                        <p class="mt-1.5 text-[10px] text-slate-400 italic">Sin tarjeta (solo datos).</p>
+                                        <p class="mt-1.5 text-[10px] text-slate-400 italic">
+                                            Sin tarjeta (solo datos).
+                                        </p>
                                     {/if}
                                 {/if}
 
                                 {#if errs.length > 0}
                                     <p class="mt-1.5 text-[10px] text-rose-600 flex items-center gap-1">
-                                        <AlertCircle size={11} /> {errs.join(" · ")}
+                                        <AlertCircle size={11} />
+                                        {errs.join(' · ')}
                                     </p>
                                 {/if}
                             </div>
@@ -1179,16 +1466,18 @@
             {/if}
         {/if}
 
-        {#if step === "importing"}
+        {#if step === 'importing'}
             <div class="flex flex-col items-center gap-4 py-12">
-                <div class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <div
+                    class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600"
+                >
                     <Loader2 size={28} class="animate-spin" />
                 </div>
                 <p class="text-sm font-semibold text-slate-700">Importando registros…</p>
             </div>
         {/if}
 
-        {#if step === "done" && importResult}
+        {#if step === 'done' && importResult}
             <div class="space-y-3">
                 <div class="flex items-center gap-2 text-sm font-bold text-emerald-700">
                     <CheckCircle2 size={18} /> Importación completada
@@ -1208,9 +1497,14 @@
                     </div>
                 </div>
                 {#if importResult.errores.length > 0}
-                    <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 space-y-1 max-h-40 overflow-y-auto">
+                    <div
+                        class="rounded-lg border border-rose-200 bg-rose-50 p-3 space-y-1 max-h-40 overflow-y-auto"
+                    >
                         {#each importResult.errores as err}
-                            <p class="text-[11px] text-rose-700">{#if err.rowNumber}Fila {err.rowNumber}: {/if}{err.message}</p>
+                            <p class="text-[11px] text-rose-700">
+                                {#if err.rowNumber}Fila {err.rowNumber}:
+                                {/if}{err.message}
+                            </p>
                         {/each}
                     </div>
                 {/if}
@@ -1219,13 +1513,13 @@
     </div>
 
     {#snippet footer()}
-        {#if step === "parsed"}
+        {#if step === 'parsed'}
             <Button variant="secondary" onclick={closeModal}>Cancelar</Button>
             <Button variant="primary" disabled={totalSelected === 0} onclick={startReview}>Continuar</Button>
-        {:else if step === "review"}
-            <Button variant="secondary" onclick={() => (step = "parsed")}>Atrás</Button>
+        {:else if step === 'review'}
+            <Button variant="secondary" onclick={() => (step = 'parsed')}>Atrás</Button>
             <Button variant="primary" onclick={handleImport}>Importar</Button>
-        {:else if step === "done"}
+        {:else if step === 'done'}
             <Button variant="primary" onclick={closeModal}>Cerrar</Button>
         {/if}
     {/snippet}

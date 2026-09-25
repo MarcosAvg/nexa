@@ -8,80 +8,86 @@
  * cliente contrató (los no listados nunca se importan, por lo que no entran al
  * bundle vía tree-shaking).
  */
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "..");
-const outFile = resolve(root, "src/lib/modules/generated.ts");
+const root = resolve(__dirname, '..');
+const outFile = resolve(root, 'src/lib/modules/generated.ts');
 
 // ── Módulos con ruta (vista) ──────────────────────────────────────────────
 const ROUTE_MODULES = {
     registro_sin_tarjeta: {
-        path: "/registro-sin-tarjeta",
-        view: "../views/RegistroSinTarjetaView.svelte",
+        path: '/registro-sin-tarjeta',
+        view: '../views/RegistroSinTarjetaView.svelte',
     },
 };
 
 // ── Módulos "context" (componente embebido, p. ej. modal) ─────────────────
 const CONTEXT_MODULES = {
-    conteo_uso: "../components/modals/UsoTarjetasImportModal.svelte",
+    conteo_uso: '../components/modals/UsoTarjetasImportModal.svelte',
 };
 
-const ALL_IDS = ["conteo_uso", "registro_sin_tarjeta"];
-
-/** Símbolo JS estable por módulo. */
-const sym = (id) => `__mod_${id.replace(/[^a-z0-9]/gi, "_")}`;
+const ALL_IDS = ['conteo_uso', 'registro_sin_tarjeta'];
 
 // ── Leer módulos contratados (env o .env) ────────────────────────────────
-let raw = (process.env.VITE_MODULES || "").trim();
+let raw = (process.env.VITE_MODULES || '').trim();
 if (!raw) {
     try {
-        const env = readFileSync(resolve(root, ".env"), "utf8");
+        const env = readFileSync(resolve(root, '.env'), 'utf8');
         const m = env.match(/^VITE_MODULES=(.*)$/m);
-        raw = m ? m[1].trim() : "";
+        raw = m ? m[1].trim() : '';
     } catch {
         // sin .env
     }
 }
 const contracted = raw
-    ? raw.split(",").map((s) => s.trim()).filter(Boolean)
+    ? raw
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
     : ALL_IDS;
 
 const lines = [
-    "// ⚠️ Archivo GENERADO por scripts/generate-modules.mjs — NO editar a mano.",
-    `// Módulos contratados (VITE_MODULES): ${contracted.join(", ") || "todos"}`,
-    "",
+    '// ⚠️ Archivo GENERADO por scripts/generate-modules.mjs — NO editar a mano.',
+    `// Módulos contratados (VITE_MODULES): ${contracted.join(', ') || 'todos'}`,
+    '',
 ];
 
-// Imports estáticos SOLO de los módulos contratados (clave para el tree-shaking)
+const hasRouteModules = contracted.some((id) => ROUTE_MODULES[id]);
+if (hasRouteModules) {
+    lines.push('import { wrap } from "svelte-spa-router/wrap";');
+    lines.push('import RouteFallback from "../components/RouteFallback.svelte";');
+    lines.push('');
+}
+
+lines.push(
+    'export const BUILT_MODULES: string[] = [' + contracted.map((id) => JSON.stringify(id)).join(', ') + '];',
+);
+lines.push('');
+
+lines.push('export const moduleRoutes: Record<string, any> = {');
 for (const id of contracted) {
     const r = ROUTE_MODULES[id];
-    if (r) lines.push(`import ${sym(id)} from ${JSON.stringify(r.view)};`);
+    if (r) {
+        lines.push(
+            `  ${JSON.stringify(r.path)}: wrap({ asyncComponent: () => import(${JSON.stringify(r.view)}) as any, loadingComponent: RouteFallback as any }),`,
+        );
+    }
 }
-lines.push("");
-
-lines.push("export const BUILT_MODULES: string[] = [" + contracted.map((id) => JSON.stringify(id)).join(", ") + "];");
-lines.push("");
-
-lines.push("export const moduleRoutes: Record<string, any> = {");
-for (const id of contracted) {
-    const r = ROUTE_MODULES[id];
-    if (r) lines.push(`  ${JSON.stringify(r.path)}: ${sym(id)},`);
-}
-lines.push("};");
-lines.push("");
+lines.push('};');
+lines.push('');
 
 // Componentes "context" → lazy import (solo si está contratado)
-lines.push("export const moduleComponents: Record<string, () => any> = {");
+lines.push('export const moduleComponents: Record<string, () => any> = {');
 for (const id of contracted) {
     const c = CONTEXT_MODULES[id];
     if (c) lines.push(`  ${JSON.stringify(id)}: () => import(${JSON.stringify(c)}),`);
 }
-lines.push("};");
-lines.push("");
+lines.push('};');
+lines.push('');
 
 mkdirSync(dirname(outFile), { recursive: true });
-writeFileSync(outFile, lines.join("\n"), "utf8");
-console.log(`✅ generated.ts → módulos contratados: ${contracted.join(", ")}`);
+writeFileSync(outFile, lines.join('\n'), 'utf8');
+console.log(`✅ generated.ts → módulos contratados: ${contracted.join(', ')}`);

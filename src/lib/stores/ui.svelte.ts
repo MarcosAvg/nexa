@@ -1,5 +1,5 @@
 export class UIState {
-    activePage = $state("Dashboard");
+    activePage = $state('Dashboard');
     isSidebarOpen = $state(false);
     isSidebarCondensed = $state(false);
     isDirectEditMode = $state(false);

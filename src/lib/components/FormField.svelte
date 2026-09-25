@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { type Snippet } from "svelte";
+    import { type Snippet } from 'svelte';
 
     /**
      * FormField — Campo de formulario con label, slot y mensaje de error.
@@ -20,25 +20,19 @@
         children?: Snippet;
     };
 
-    let {
-        label,
-        for: htmlFor,
-        error,
-        children,
-    }: Props = $props();
+    let { label, for: htmlFor, error, children }: Props = $props();
 </script>
 
 <div class="space-y-1.5">
     {#if label}
-        <label
-            for={htmlFor || undefined}
-            class="text-xs font-bold text-slate-600 block"
-        >
+        <label for={htmlFor || undefined} class="text-xs font-bold text-slate-600 block">
             {label}
         </label>
     {/if}
     {@render children?.()}
     {#if error}
-        <p class="text-[10px] text-red-500 font-medium">{error}</p>
+        <p class="text-[10px] text-red-500 font-medium" role="alert" aria-live="polite">
+            {error}
+        </p>
     {/if}
 </div>

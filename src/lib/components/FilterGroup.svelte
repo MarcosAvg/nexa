@@ -20,9 +20,7 @@
 </script>
 
 <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-    <span
-        class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap pl-1"
-    >
+    <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap pl-1">
         {label}
     </span>
     <div

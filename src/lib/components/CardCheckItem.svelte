@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { CreditCard, ArrowRight } from "lucide-svelte";
-    import type { Snippet } from "svelte";
+    import { CreditCard, ArrowRight } from 'lucide-svelte';
+    import type { Snippet } from 'svelte';
 
-    type NavColor = "amber" | "orange" | "emerald";
+    type NavColor = 'amber' | 'orange' | 'emerald';
 
     type Props = {
         /** Tipo de tarjeta (e.g. "P2000", "KONE") */
@@ -25,17 +25,16 @@
         type,
         folio,
         warning = false,
-        navColor = "amber" as NavColor,
+        navColor = 'amber' as NavColor,
         showNav = false,
         onNavigate,
         status,
     }: Props = $props();
 
     const navStyles: Record<NavColor, string> = {
-        amber: "text-amber-600 hover:text-amber-700 hover:bg-amber-100",
-        orange: "text-orange-600 hover:text-orange-700 hover:bg-orange-100",
-        emerald:
-            "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100",
+        amber: 'text-amber-600 hover:text-amber-700 hover:bg-amber-100',
+        orange: 'text-orange-600 hover:text-orange-700 hover:bg-orange-100',
+        emerald: 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100',
     };
 </script>
 
@@ -68,7 +67,9 @@
 
     {#if showNav}
         <button
-            class="text-xs font-medium shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all {navStyles[navColor]}"
+            class="text-xs font-medium shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all {navStyles[
+                navColor
+            ]}"
             onclick={onNavigate}
         >
             Ir

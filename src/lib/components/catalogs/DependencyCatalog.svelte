@@ -1,16 +1,17 @@
 <script lang="ts">
-    import { toast } from "svelte-sonner";
-    import { catalogService } from "../../services";
-    import { catalogState } from "../../stores";
-    import Button from "../Button.svelte";
-    import Input from "../Input.svelte";
-    import Modal from "../Modal.svelte";
-    import DataTable from "../DataTable.svelte";
-    import DeleteConfirmTypedModal from "../DeleteConfirmTypedModal.svelte";
-    import CatalogSectionHeader from "./CatalogSectionHeader.svelte";
-    import CatalogRowActions from "./CatalogRowActions.svelte";
-    import { useCatalogReorder } from "./useCatalogReorder.svelte";
-    import { Plus } from "lucide-svelte";
+    import { toast } from 'svelte-sonner';
+    import { catalogService } from '../../services';
+    import { catalogState } from '../../stores';
+    import Button from '../Button.svelte';
+    import Input from '../Input.svelte';
+    import Modal from '../Modal.svelte';
+    import DataTable from '../DataTable.svelte';
+    import DataList from '../DataList.svelte';
+    import DeleteConfirmTypedModal from '../DeleteConfirmTypedModal.svelte';
+    import CatalogSectionHeader from './CatalogSectionHeader.svelte';
+    import CatalogRowActions from './CatalogRowActions.svelte';
+    import { useCatalogReorder } from './useCatalogReorder.svelte';
+    import { Plus } from 'lucide-svelte';
 
     /**
      * DependencyCatalog — Gestión de dependencias (CRUD).
@@ -29,7 +30,7 @@
 
     // Reordenamiento con actualización optimista y rollback
     const { isReordering, handleDrop } = useCatalogReorder({
-        table: "dependencies",
+        table: 'dependencies',
         getItems: () => dependencies,
         setItems: (items: any[]) => catalogState.setDependencies(items),
         fetchFn: fetchDependencies,
@@ -38,7 +39,7 @@
     // Add/Edit modal state
     let isModalOpen = $state(false);
     let editingId = $state<number | null>(null);
-    let dependencyName = $state("");
+    let dependencyName = $state('');
 
     // Delete modal state
     let isDeleteModalOpen = $state(false);
@@ -55,39 +56,39 @@
             dependencyName = dep.name;
         } else {
             editingId = null;
-            dependencyName = "";
+            dependencyName = '';
         }
         isModalOpen = true;
     }
 
     async function saveDependency() {
         if (!dependencyName.trim()) {
-            toast.error("El nombre de la dependencia es requerido");
+            toast.error('El nombre de la dependencia es requerido');
             return;
         }
         try {
             await catalogService.saveDependency(editingId, { name: dependencyName });
             await fetchDependencies();
             isModalOpen = false;
-            toast.success(editingId ? "Dependencia actualizada" : "Dependencia creada");
+            toast.success(editingId ? 'Dependencia actualizada' : 'Dependencia creada');
         } catch {
-            toast.error("Error al guardar la dependencia");
+            toast.error('Error al guardar la dependencia');
         }
     }
 
     function openDeleteModal(item: any) {
-        deleteTarget = { ...item, type: "dependency" };
+        deleteTarget = { ...item, type: 'dependency' };
         isDeleteModalOpen = true;
     }
 
     async function confirmDelete() {
         if (!deleteTarget) return;
         try {
-            await catalogService.deleteCatalogItem("dependencies", deleteTarget.id, deleteTarget.name);
+            await catalogService.deleteCatalogItem('dependencies', deleteTarget.id, deleteTarget.name);
             await fetchDependencies();
             toast.success(`"${deleteTarget.name}" eliminado correctamente`);
         } catch {
-            toast.error("Error al eliminar la dependencia");
+            toast.error('Error al eliminar la dependencia');
         }
         isDeleteModalOpen = false;
         deleteTarget = null;
@@ -106,8 +107,9 @@
 
     <DataTable
         data={dependencies}
-        columns={[{ key: "name", label: "Nombre", sortable: false }]}
+        columns={[{ key: 'name', label: 'Nombre', sortable: false }]}
         dnd={{ onDrop: handleDrop, disabled: isReordering }}
+        {mobileList}
     >
         {#snippet actions(row: any)}
             {#if canEdit}
@@ -117,17 +119,47 @@
     </DataTable>
 </div>
 
+{#snippet mobileList(rows: any[])}
+    <DataList
+        items={rows}
+        key={(r: any) => r.id}
+        sheetTitle={(r: any) => r.name}
+        actions={(r: any) =>
+            canEdit
+                ? [
+                      { label: 'Editar', tone: 'blue' as const, onAction: () => openModal(r) },
+                      { label: 'Eliminar', tone: 'rose' as const, onAction: () => openDeleteModal(r) },
+                  ]
+                : []}
+    >
+        {#snippet title(r: any)}
+            <span>{r.name}</span>
+        {/snippet}
+        {#snippet details(r: any)}
+            {#if canEdit}
+                <CatalogRowActions onEdit={() => openModal(r)} onDelete={() => openDeleteModal(r)} />
+            {/if}
+        {/snippet}
+    </DataList>
+{/snippet}
+
 <!-- Add/Edit Dependency Modal -->
-<Modal bind:isOpen={isModalOpen} title={editingId ? "Editar Dependencia" : "Nueva Dependencia"} description="Registra una nueva dependencia o área.">
+<Modal
+    bind:isOpen={isModalOpen}
+    title={editingId ? 'Editar Dependencia' : 'Nueva Dependencia'}
+    description="Registra una nueva dependencia o área."
+>
     <div class="space-y-4">
         <div>
-            <label for="dependency-name" class="block text-sm font-medium text-slate-700 mb-1">Nombre de la Dependencia</label>
+            <label for="dependency-name" class="block text-sm font-medium text-slate-700 mb-1"
+                >Nombre de la Dependencia</label
+            >
             <Input id="dependency-name" placeholder="Ej. Dirección General" bind:value={dependencyName} />
         </div>
     </div>
     {#snippet footer()}
         <Button variant="secondary" onclick={() => (isModalOpen = false)}>Cancelar</Button>
-        <Button variant="primary" onclick={saveDependency}>{editingId ? "Actualizar" : "Guardar"}</Button>
+        <Button variant="primary" onclick={saveDependency}>{editingId ? 'Actualizar' : 'Guardar'}</Button>
     {/snippet}
 </Modal>
 
@@ -135,7 +167,7 @@
 <DeleteConfirmTypedModal
     bind:isOpen={isDeleteModalOpen}
     title="Eliminar Dependencia"
-    targetName={deleteTarget?.name ?? ""}
+    targetName={deleteTarget?.name ?? ''}
     confirmText="Eliminar permanentemente"
     onConfirm={confirmDelete}
     onCancel={() => (isDeleteModalOpen = false)}

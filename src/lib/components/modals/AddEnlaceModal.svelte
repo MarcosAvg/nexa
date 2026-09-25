@@ -1,12 +1,12 @@
 <script lang="ts">
-    import Modal from "../Modal.svelte";
-    import Button from "../Button.svelte";
-    import Input from "../Input.svelte";
-    import { personnelService } from "../../services/personnel";
-    import { enlaceService } from "../../services/enlaces";
-    import { fullName } from "../../utils";
-    import { Search, UserPlus } from "lucide-svelte";
-    import { toast } from "svelte-sonner";
+    import Modal from '../Modal.svelte';
+    import Button from '../Button.svelte';
+    import Input from '../Input.svelte';
+    import { personnelService } from '../../services/personnel';
+    import { enlaceService } from '../../services/enlaces';
+    import { fullName } from '../../utils';
+    import { Search, UserPlus } from 'lucide-svelte';
+    import { toast } from 'svelte-sonner';
 
     /**
      * AddEnlaceModal — Modal para asignar un enlace administrativo.
@@ -23,10 +23,10 @@
 
     let { isOpen = $bindable(), onComplete }: Props = $props();
 
-    let searchQuery = $state("");
-    let selectedPersonId = $state("");
-    let selectedPersonName = $state("");
-    let extension = $state("");
+    let searchQuery = $state('');
+    let selectedPersonId = $state('');
+    let selectedPersonName = $state('');
+    let extension = $state('');
     let isSubmitting = $state(false);
 
     let searchResults = $state<any[]>([]);
@@ -41,10 +41,7 @@
         if (val.trim().length >= 1) {
             searchDebounce = setTimeout(async () => {
                 try {
-                    const results = await personnelService.searchByName(
-                        "",
-                        val,
-                    );
+                    const results = await personnelService.searchByName('', val);
                     if (searchQuery.trim() === val) {
                         searchResults = results.slice(0, 5);
                     }
@@ -60,14 +57,14 @@
     function selectPerson(p: any) {
         selectedPersonId = p.id;
         selectedPersonName = fullName(p.first_name, p.last_name);
-        searchQuery = "";
+        searchQuery = '';
     }
 
     function reset() {
-        searchQuery = "";
-        selectedPersonId = "";
-        selectedPersonName = "";
-        extension = "";
+        searchQuery = '';
+        selectedPersonId = '';
+        selectedPersonName = '';
+        extension = '';
         isOpen = false;
     }
 
@@ -77,14 +74,14 @@
         isSubmitting = true;
         try {
             await enlaceService.add(selectedPersonId, extension.trim());
-            toast.success("Enlace Asignado", {
-                description: "Se ha agregado el contacto correctamente.",
+            toast.success('Enlace Asignado', {
+                description: 'Se ha agregado el contacto correctamente.',
             });
             onComplete();
             reset();
         } catch (error: any) {
-            toast.error("Error", {
-                description: error.message || "No se pudo asignar el enlace.",
+            toast.error('Error', {
+                description: error.message || 'No se pudo asignar el enlace.',
             });
         } finally {
             isSubmitting = false;
@@ -102,13 +99,9 @@
     <!-- Se agrega min-h-[300px] para que el modal sea un poco más alto -->
     <div class="space-y-4 min-h-[300px]">
         {#if selectedPersonId}
-            <div
-                class="p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-between"
-            >
+            <div class="p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-between">
                 <div>
-                    <p
-                        class="text-[10px] font-bold text-blue-400 tracking-widest uppercase"
-                    >
+                    <p class="text-[10px] font-bold text-blue-400 tracking-widest uppercase">
                         Personal Seleccionado
                     </p>
                     <p class="text-sm font-bold text-blue-900">
@@ -119,8 +112,8 @@
                     type="button"
                     class="text-xs font-bold text-blue-600 hover:text-blue-800"
                     onclick={() => {
-                        selectedPersonId = "";
-                        selectedPersonName = "";
+                        selectedPersonId = '';
+                        selectedPersonName = '';
                     }}>Cambiar</button
                 >
             </div>
@@ -157,9 +150,7 @@
                                     {p.last_name}
                                 </div>
                                 <div class="text-[10px] text-slate-400">
-                                    {p.employee_no
-                                        ? `#${p.employee_no}`
-                                        : "Sin número"}
+                                    {p.employee_no ? `#${p.employee_no}` : 'Sin número'}
                                 </div>
                             </button>
                         {/each}
@@ -169,8 +160,7 @@
         {/if}
 
         <div class="space-y-1">
-            <span
-                class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
                 >Extensión Telefónica</span
             >
             <Input

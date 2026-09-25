@@ -72,7 +72,9 @@ export function altasMediaCols(media: MediaInfo): { key: string; label: string; 
 }
 
 /** Columnas de modificación de pisos por medio (solo medios con pisos). */
-export function modifMediaCols(media: MediaInfo): { key: string; label: string; required?: boolean; accion?: boolean }[] {
+export function modifMediaCols(
+    media: MediaInfo,
+): { key: string; label: string; required?: boolean; accion?: boolean }[] {
     if (!media.has_floors) return [];
     return [
         { key: `accion_${media.key}`, label: `Acción ${media.name}`, accion: true },
@@ -86,7 +88,10 @@ export function reposMediaCols(media: MediaInfo): { key: string; label: string; 
         { key: `reponer_${media.key}`, label: `¿Reponer ${media.name}?`, required: true },
     ];
     if (media.requires_identifier) {
-        cols.push({ key: `folio_${media.key}`, label: `${media.identifier_label} ${media.name} Anterior (si lo conoce)` });
+        cols.push({
+            key: `folio_${media.key}`,
+            label: `${media.identifier_label} ${media.name} Anterior (si lo conoce)`,
+        });
     }
     return cols;
 }

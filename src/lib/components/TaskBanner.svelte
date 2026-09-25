@@ -1,8 +1,8 @@
 <script lang="ts">
-    import Badge from "./Badge.svelte";
-    import Button from "./Button.svelte";
-    import PermissionGuard from "./PermissionGuard.svelte";
-    import TicketStateBadge from "./TicketStateBadge.svelte";
+    import Badge from './Badge.svelte';
+    import Button from './Button.svelte';
+    import PermissionGuard from './PermissionGuard.svelte';
+    import TicketStateBadge from './TicketStateBadge.svelte';
     import {
         Clock,
         CreditCard,
@@ -15,10 +15,10 @@
         Hash,
         MoreHorizontal,
         AlertCircle,
-    } from "lucide-svelte";
-    import { networkStore } from "../stores/network.svelte";
-    import { settingsState } from "../stores";
-    import { getTicketPriorityVariant } from "../constants/status";
+    } from 'lucide-svelte';
+    import { networkStore } from '../stores/network.svelte';
+    import { settingsState } from '../stores';
+    import { getTicketPriorityVariant } from '../constants/status';
 
     type Ticket = {
         id: number | string;
@@ -63,128 +63,125 @@
     > = {
         Programación: {
             icon: CreditCard,
-            color: "text-blue-600",
-            bg: "bg-blue-50",
-            border: "border-blue-100",
-            cardBg: "bg-blue-50/60",
-            cardBorder: "border-blue-200/60",
+            color: 'text-blue-600',
+            bg: 'bg-blue-50',
+            border: 'border-blue-100',
+            cardBg: 'bg-blue-50/60',
+            cardBorder: 'border-blue-200/60',
         },
-        "Firma Responsiva": {
+        'Firma Responsiva': {
             icon: FileSignature,
-            color: "text-indigo-600",
-            bg: "bg-indigo-50",
-            border: "border-indigo-100",
-            cardBg: "bg-indigo-50/60",
-            cardBorder: "border-indigo-200/60",
+            color: 'text-indigo-600',
+            bg: 'bg-indigo-50',
+            border: 'border-indigo-100',
+            cardBg: 'bg-indigo-50/60',
+            cardBorder: 'border-indigo-200/60',
         },
-        "Alta de Persona": {
+        'Alta de Persona': {
             icon: User,
-            color: "text-emerald-600",
-            bg: "bg-emerald-50",
-            border: "border-emerald-100",
-            cardBg: "bg-emerald-50/60",
-            cardBorder: "border-emerald-200/60",
+            color: 'text-emerald-600',
+            bg: 'bg-emerald-50',
+            border: 'border-emerald-100',
+            cardBg: 'bg-emerald-50/60',
+            cardBorder: 'border-emerald-200/60',
         },
-        "Baja de Persona": {
+        'Baja de Persona': {
             icon: Lock,
-            color: "text-rose-600",
-            bg: "bg-rose-50",
-            border: "border-rose-100",
-            cardBg: "bg-rose-50/60",
-            cardBorder: "border-rose-200/60",
+            color: 'text-rose-600',
+            bg: 'bg-rose-50',
+            border: 'border-rose-100',
+            cardBg: 'bg-rose-50/60',
+            cardBorder: 'border-rose-200/60',
         },
-        "Modificación de datos": {
+        'Modificación de datos': {
             icon: ArrowRight,
-            color: "text-amber-600",
-            bg: "bg-amber-50",
-            border: "border-amber-100",
-            cardBg: "bg-amber-50/60",
-            cardBorder: "border-amber-200/60",
+            color: 'text-amber-600',
+            bg: 'bg-amber-50',
+            border: 'border-amber-100',
+            cardBg: 'bg-amber-50/60',
+            cardBorder: 'border-amber-200/60',
         },
         Modificación: {
             icon: ArrowRight,
-            color: "text-amber-600",
-            bg: "bg-amber-50",
-            border: "border-amber-100",
-            cardBg: "bg-amber-50/60",
-            cardBorder: "border-amber-200/60",
+            color: 'text-amber-600',
+            bg: 'bg-amber-50',
+            border: 'border-amber-100',
+            cardBg: 'bg-amber-50/60',
+            cardBorder: 'border-amber-200/60',
         },
         Reposición: {
             icon: CreditCard,
-            color: "text-sky-600",
-            bg: "bg-sky-50",
-            border: "border-sky-100",
-            cardBg: "bg-sky-50/60",
-            cardBorder: "border-sky-200/60",
+            color: 'text-sky-600',
+            bg: 'bg-sky-50',
+            border: 'border-sky-100',
+            cardBg: 'bg-sky-50/60',
+            cardBorder: 'border-sky-200/60',
         },
-        "Reporte de Fallo": {
+        'Reporte de Fallo': {
             icon: AlertCircle,
-            color: "text-orange-600",
-            bg: "bg-orange-50",
-            border: "border-orange-100",
-            cardBg: "bg-orange-50/60",
-            cardBorder: "border-orange-200/60",
+            color: 'text-orange-600',
+            bg: 'bg-orange-50',
+            border: 'border-orange-100',
+            cardBg: 'bg-orange-50/60',
+            cardBorder: 'border-orange-200/60',
         },
-        "Reporte de Falla": {
+        'Reporte de Falla': {
             icon: AlertCircle,
-            color: "text-orange-600",
-            bg: "bg-orange-50",
-            border: "border-orange-100",
-            cardBg: "bg-orange-50/60",
-            cardBorder: "border-orange-200/60",
+            color: 'text-orange-600',
+            bg: 'bg-orange-50',
+            border: 'border-orange-100',
+            cardBg: 'bg-orange-50/60',
+            cardBorder: 'border-orange-200/60',
         },
         Default: {
             icon: MoreHorizontal,
-            color: "text-slate-600",
-            bg: "bg-slate-50",
-            border: "border-slate-100",
-            cardBg: "bg-slate-50/60",
-            cardBorder: "border-slate-200/60",
+            color: 'text-slate-600',
+            bg: 'bg-slate-50',
+            border: 'border-slate-100',
+            cardBg: 'bg-slate-50/60',
+            cardBorder: 'border-slate-200/60',
         },
     };
 
-    const movementTypeConfig: Record<
-        string,
-        { color: string; bg: string; border: string }
-    > = {
-        "Alta de Personal": {
-            color: "text-emerald-700",
-            bg: "bg-emerald-50",
-            border: "border-emerald-200",
+    const movementTypeConfig: Record<string, { color: string; bg: string; border: string }> = {
+        'Alta de Personal': {
+            color: 'text-emerald-700',
+            bg: 'bg-emerald-50',
+            border: 'border-emerald-200',
         },
         Reposición: {
-            color: "text-sky-700",
-            bg: "bg-sky-50",
-            border: "border-sky-200",
+            color: 'text-sky-700',
+            bg: 'bg-sky-50',
+            border: 'border-sky-200',
         },
         Asignación: {
-            color: "text-violet-700",
-            bg: "bg-violet-50",
-            border: "border-violet-200",
+            color: 'text-violet-700',
+            bg: 'bg-violet-50',
+            border: 'border-violet-200',
         },
-        "Sin clasificar": {
-            color: "text-slate-600",
-            bg: "bg-slate-50",
-            border: "border-slate-200",
+        'Sin clasificar': {
+            color: 'text-slate-600',
+            bg: 'bg-slate-50',
+            border: 'border-slate-200',
         },
     };
 
     const movementStyle = $derived(
         ticket.movementType
-            ? movementTypeConfig[ticket.movementType] || movementTypeConfig["Sin clasificar"]
+            ? movementTypeConfig[ticket.movementType] || movementTypeConfig['Sin clasificar']
             : null,
     );
 
-    const config = $derived(typeConfig[ticket.type] || typeConfig["Default"]);
+    const config = $derived(typeConfig[ticket.type] || typeConfig['Default']);
 
     function formatDate(dateStr?: string) {
-        if (!dateStr) return "";
+        if (!dateStr) return '';
         const date = new Date(dateStr);
-        return date.toLocaleDateString("es-MX", {
-            day: "numeric",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
+        return date.toLocaleDateString('es-MX', {
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
         });
     }
 
@@ -193,9 +190,9 @@
     // Colores para texto/metadatos de urgencia (Firma Responsiva)
     // Clases de borde completo con opacidad para integrarse al estilo existente
     const URGENCY_BORDER_CLASSES: Record<string, string> = {
-        rose: "border-rose-200/80",
-        emerald: "border-emerald-200/80",
-        amber: "border-amber-200/80",
+        rose: 'border-rose-200/80',
+        emerald: 'border-emerald-200/80',
+        amber: 'border-amber-200/80',
     };
 
     // Configuración de urgencia para Firma Responsiva.
@@ -204,23 +201,24 @@
         Math.max(0, settingsState.responsivaPickupDays - (ticket.daysElapsed ?? 0)),
     );
     const responsivaUrgency = $derived(
-        ticket.type === "Firma Responsiva" && ticket.daysElapsed != null
+        ticket.type === 'Firma Responsiva' && ticket.daysElapsed != null
             ? ticket.needsBaja
-                ? { variant: "rose" as const, label: "Baja de Registro" }
+                ? { variant: 'rose' as const, label: 'Baja de Registro' }
                 : ticket.daysElapsed >= settingsState.responsivaWarnDays
-                    ? { variant: "amber" as const, label: "Por vencer" }
-                    : { variant: "emerald" as const, label: "Pendiente" }
-            : null
+                  ? { variant: 'amber' as const, label: 'Por vencer' }
+                  : { variant: 'emerald' as const, label: 'Pendiente' }
+            : null,
     );
 
     // Borde completo de la card teñido según urgencia
     const urgencyBorderClass = $derived(
-        responsivaUrgency ? URGENCY_BORDER_CLASSES[responsivaUrgency.variant] : null
+        responsivaUrgency ? URGENCY_BORDER_CLASSES[responsivaUrgency.variant] : null,
     );
 </script>
 
 <article
-    class="group relative flex flex-col h-full {config.cardBg} rounded-2xl border {urgencyBorderClass ?? config.cardBorder} overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/60 hover:-translate-y-1"
+    class="group relative flex flex-col h-full {config.cardBg} rounded-2xl border {urgencyBorderClass ??
+        config.cardBorder} overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/60 hover:-translate-y-1"
     class:border-2={!!responsivaUrgency}
 >
     <!-- Encabezado: Icono de tipo y prioridad -->
@@ -235,12 +233,10 @@
                 {/if}
             </div>
             <div class="min-w-0">
-                <p
-                    class="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1"
-                >
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1">
                     {ticket.type}
                 </p>
-                {#if ticket.type === "Firma Responsiva" && ticket.movementType && movementStyle}
+                {#if ticket.type === 'Firma Responsiva' && ticket.movementType && movementStyle}
                     <div class="flex flex-wrap items-center gap-1.5 mb-1 min-h-[1.25rem]">
                         <span
                             class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide border {movementStyle.bg} {movementStyle.color} {movementStyle.border}"
@@ -252,9 +248,7 @@
                 <div class="flex items-center gap-1.5 text-slate-300">
                     <Hash size={10} />
                     <span class="text-[10px] font-bold"
-                        >Ticket #{String(ticket.id)
-                            .slice(-6)
-                            .toUpperCase()}</span
+                        >Ticket #{String(ticket.id).slice(-6).toUpperCase()}</span
                     >
                 </div>
             </div>
@@ -267,15 +261,17 @@
             >
                 {ticket.priority}
             </Badge>
-            <TicketStateBadge status={ticket.status} followup={(ticket.payload as any)?.estado} type={ticket.type} />
+            <TicketStateBadge
+                status={ticket.status}
+                followup={(ticket.payload as any)?.estado}
+                type={ticket.type}
+            />
         </div>
     </div>
 
     <!-- Cuerpo: Título y descripción -->
     <div class="px-4 pb-2 flex-1">
-        <h3
-            class="text-sm font-bold text-slate-900 leading-snug mb-1.5 line-clamp-2 min-h-[2.5rem]"
-        >
+        <h3 class="text-sm font-bold text-slate-900 leading-snug mb-1.5 line-clamp-2 min-h-[2.5rem]">
             {ticket.title}
         </h3>
         <p class="text-xs font-medium text-slate-500 line-clamp-2 min-h-[2rem]">
@@ -284,47 +280,43 @@
     </div>
 
     <!-- Sección de metadatos -->
-    <div class="px-4 pb-4 space-y-3">                <!-- Etiqueta de persona principal -->
-        <div
-            class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50/80 border border-slate-100/60"
-        >
+    <div class="px-4 pb-4 space-y-3">
+        <!-- Etiqueta de persona principal -->
+        <div class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50/80 border border-slate-100/60">
             <div
                 class="h-8 w-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm shrink-0"
             >
                 <User size={14} />
             </div>
             <div class="min-w-0 overflow-hidden">
-                <p
-                    class="text-[9px] font-bold text-slate-400 uppercase leading-none mb-0.5"
-                >
+                <p class="text-[9px] font-bold text-slate-400 uppercase leading-none mb-0.5">
                     Solicitante / Beneficiario
                 </p>
                 <p class="text-xs font-bold text-slate-700 truncate">
                     {ticket.personName}
                 </p>
             </div>
-        </div>                <!-- Metadatos secundarios (fecha y recursos) -->
-        <div
-            class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 text-[10px] font-bold px-1"
-        >
+        </div>
+        <!-- Metadatos secundarios (fecha y recursos) -->
+        <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 text-[10px] font-bold px-1">
             <div class="flex flex-wrap items-center gap-2 text-slate-400 min-w-0">
                 <div class="flex items-center gap-1.5">
                     <Calendar size={12} />
                     <span>{formatDate(ticket.created_at)}</span>
                 </div>
 
-                        {#if responsivaUrgency}
-                            <Badge
-                                variant={responsivaUrgency.variant}
-                                class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5"
-                            >
-                                {#if ticket.needsBaja}
-                                    {responsivaUrgency.label}
-                                {:else}
-                                    Restan {responsivaDaysRemaining} día{responsivaDaysRemaining !== 1 ? "s" : ""} · {responsivaUrgency.label}
-                                {/if}
-                            </Badge>
+                {#if responsivaUrgency}
+                    <Badge
+                        variant={responsivaUrgency.variant}
+                        class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5"
+                    >
+                        {#if ticket.needsBaja}
+                            {responsivaUrgency.label}
+                        {:else}
+                            Restan {responsivaDaysRemaining} día{responsivaDaysRemaining !== 1 ? 's' : ''} · {responsivaUrgency.label}
                         {/if}
+                    </Badge>
+                {/if}
             </div>
 
             {#if ticket.cardFolio}
@@ -341,7 +333,7 @@
     <div class="p-3 bg-slate-50/50 border-t border-slate-100 flex gap-2">
         <PermissionGuard requireEdit disabledOnly>
             {#snippet children({ disabled })}
-                {#if ticket.type === "Programación" || ticket.type === "Firma Responsiva"}
+                {#if ticket.type === 'Programación' || ticket.type === 'Firma Responsiva'}
                     <Button
                         variant="primary"
                         size="sm"
@@ -351,10 +343,7 @@
                         title="Abre el perfil de la persona para completar la gestión. El ticket se cerrará automáticamente al resolver."
                     >
                         Gestionar en perfil
-                        <ArrowRight
-                            size={16}
-                            class="ml-2 group-hover:translate-x-1 transition-transform"
-                        />
+                        <ArrowRight size={16} class="ml-2 group-hover:translate-x-1 transition-transform" />
                     </Button>
                 {:else}
                     <Button
@@ -365,10 +354,7 @@
                         disabled={disabled || !networkStore.isOnline}
                     >
                         Gestionar Ticket
-                        <ArrowRight
-                            size={16}
-                            class="ml-2 group-hover:translate-x-1 transition-transform"
-                        />
+                        <ArrowRight size={16} class="ml-2 group-hover:translate-x-1 transition-transform" />
                     </Button>
                 {/if}
             {/snippet}

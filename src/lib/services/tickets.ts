@@ -1,9 +1,15 @@
-import { supabase } from "../supabase";
-import { HistoryService } from "./history";
-import type { Ticket } from "../types";
-import { withErrorHandling, withErrorHandlingSafe, withErrorHandlingConditional, batchPaginate, handleError } from "../utils";
-import { ticketState, settingsState } from "../stores";
-import { RESPONSIVA_TICKET_TYPES } from "../constants/tickets";
+import { supabase } from '../supabase';
+import { HistoryService } from './history';
+import type { Ticket } from '../types';
+import {
+    withErrorHandling,
+    withErrorHandlingSafe,
+    withErrorHandlingConditional,
+    batchPaginate,
+    handleError,
+} from '../utils';
+import { ticketState, settingsState } from '../stores';
+import { RESPONSIVA_TICKET_TYPES } from '../constants/tickets';
 
 type CardAssignmentInfo = {
     movementType: string;
@@ -12,36 +18,39 @@ type CardAssignmentInfo = {
 
 function applySectionFilter(query: any, section: string) {
     const names = RESPONSIVA_TICKET_TYPES;
-    if (section === "Responsivas") return query.in("type", names);
-    return query.not("type", "in", `(${names.join(",")})`);
+    if (section === 'Responsivas') return query.in('type', names);
+    return query.not('type', 'in', `(${names.join(',')})`);
 }
 
 async function fetchCardAssignmentTypes(
     cardIds: string[],
-    personnelCreatedAt: Record<string, string>
+    personnelCreatedAt: Record<string, string>,
 ): Promise<Record<string, CardAssignmentInfo>> {
     const result: Record<string, CardAssignmentInfo> = {};
     if (cardIds.length === 0) return result;
 
     const uniqueIds = [...new Set(cardIds)];
-    const logs: { action: string; details: Record<string, unknown>; timestamp: string; entity_id?: string }[] = [];
+    const logs: {
+        action: string;
+        details: Record<string, unknown>;
+        timestamp: string;
+        entity_id?: string;
+    }[] = [];
 
     const chunkSize = 40;
     for (let i = 0; i < uniqueIds.length; i += chunkSize) {
         const chunk = uniqueIds.slice(i, i + chunkSize);
-        const orFilter = chunk
-            .map((id) => `details->>related_card_id.eq.${id}`)
-            .join(",");
+        const orFilter = chunk.map((id) => `details->>related_card_id.eq.${id}`).join(',');
 
         const { data, error } = await supabase
-            .from("history_logs")
-            .select("action, details, timestamp, entity_id")
-            .eq("entity_type", "PERSON")
-            .in("action", ["REPLACE_CARD", "ASSIGN_CARD"])
+            .from('history_logs')
+            .select('action, details, timestamp, entity_id')
+            .eq('entity_type', 'PERSON')
+            .in('action', ['REPLACE_CARD', 'ASSIGN_CARD'])
             .or(orFilter);
 
         if (error) {
-            handleError(error, "Fetch Card Assignment Types");
+            handleError(error, 'Fetch Card Assignment Types');
             continue;
         }
         if (data) logs.push(...data);
@@ -59,13 +68,15 @@ async function fetchCardAssignmentTypes(
             !existing ||
             log.timestamp > existing.timestamp ||
             (log.timestamp === existing.timestamp &&
-                log.action === "REPLACE_CARD" &&
-                existing.action !== "REPLACE_CARD")
+                log.action === 'REPLACE_CARD' &&
+                existing.action !== 'REPLACE_CARD')
         ) {
             byCard[cardId] = {
                 action: log.action,
                 timestamp: log.timestamp,
-                personId: log.entity_id || (log.details as Record<string, unknown>)?.related_person_id as string | undefined,
+                personId:
+                    log.entity_id ||
+                    ((log.details as Record<string, unknown>)?.related_person_id as string | undefined),
             };
         }
     }
@@ -73,25 +84,25 @@ async function fetchCardAssignmentTypes(
     for (const cardId of uniqueIds) {
         const entry = byCard[cardId];
         if (!entry) {
-            result[cardId] = { movementType: "Sin clasificar", registeredAt: "" };
+            result[cardId] = { movementType: 'Sin clasificar', registeredAt: '' };
             continue;
         }
 
-        if (entry.action === "REPLACE_CARD") {
-            result[cardId] = { movementType: "Reposición", registeredAt: entry.timestamp };
+        if (entry.action === 'REPLACE_CARD') {
+            result[cardId] = { movementType: 'Reposición', registeredAt: entry.timestamp };
             continue;
         }
 
         const personCreated = entry.personId ? personnelCreatedAt[entry.personId] : null;
-        let movementType = "Asignación";
+        let movementType = 'Asignación';
         if (personCreated) {
             const assignDate = new Date(entry.timestamp);
             const createDate = new Date(personCreated);
             const diffDays = Math.floor(
-                (assignDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24)
+                (assignDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24),
             );
             if (diffDays >= 0 && diffDays <= settingsState.responsivaPickupDays) {
-                movementType = "Alta de Personal";
+                movementType = 'Alta de Personal';
             }
         }
 
@@ -107,17 +118,17 @@ async function enrichWithAccessMedia(tickets: any[]): Promise<any[]> {
 
     const uniqueIds = [...new Set(mediaIds)];
     const { data } = await supabase
-        .from("access_media")
-        .select("id, identifier, access_media_types(name)")
-        .in("id", uniqueIds);
+        .from('access_media')
+        .select('id, identifier, access_media_types(name)')
+        .in('id', uniqueIds);
 
     const byMediaId = new Map<string, { type: string; folio: string }>();
     for (const m of data || []) {
         const rel = m.access_media_types as { name?: string }[] | { name?: string } | null | undefined;
-        const typeName = Array.isArray(rel) ? (rel[0]?.name ?? "") : (rel?.name ?? "");
+        const typeName = Array.isArray(rel) ? (rel[0]?.name ?? '') : (rel?.name ?? '');
         byMediaId.set(m.id, {
             type: typeName,
-            folio: m.identifier ?? "",
+            folio: m.identifier ?? '',
         });
     }
 
@@ -130,7 +141,9 @@ async function enrichWithAccessMedia(tickets: any[]): Promise<any[]> {
     });
 }
 
-async function enrichWithMovementType(tickets: Ticket[]): Promise<(Ticket & { movementType: string; assignmentDate: string })[]> {
+async function enrichWithMovementType(
+    tickets: Ticket[],
+): Promise<(Ticket & { movementType: string; assignmentDate: string })[]> {
     const cardIds = tickets.map((t) => t.access_media_id).filter(Boolean) as string[];
     const personnelCreatedAt: Record<string, string> = {};
     for (const t of tickets) {
@@ -144,225 +157,249 @@ async function enrichWithMovementType(tickets: Ticket[]): Promise<(Ticket & { mo
 
     return tickets.map((t: Ticket & { movementType?: string; assignmentDate?: string }) => {
         const info = t.access_media_id ? assignmentMap[t.access_media_id] : undefined;
-        let movementType = info?.movementType ?? "Sin clasificar";
+        let movementType = info?.movementType ?? 'Sin clasificar';
         let assignmentDate = info?.registeredAt || t.created_at;
 
         const personnelWithDate = t.personnel as { created_at?: string } | null;
         // Sin historial: se clasifica por antigüedad (Alta vs Asignación).
         // Nunca se infiere Reposición aquí: requiere REPLACE_CARD para esa tarjeta.
-        if (movementType === "Sin clasificar" && t.person_id && personnelWithDate?.created_at) {
+        if (movementType === 'Sin clasificar' && t.person_id && personnelWithDate?.created_at) {
             const createDate = new Date(personnelWithDate.created_at);
             const ticketDate = new Date(t.created_at);
             const diffDays = Math.floor(
-                (ticketDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24)
+                (ticketDate.getTime() - createDate.getTime()) / (1000 * 60 * 60 * 24),
             );
             if (diffDays >= 0 && diffDays <= settingsState.responsivaPickupDays) {
-                movementType = "Alta de Personal";
+                movementType = 'Alta de Personal';
                 assignmentDate = personnelWithDate.created_at;
             } else {
-                movementType = "Asignación";
+                movementType = 'Asignación';
             }
         }
 
-        return { ...t, movementType, assignmentDate } as Ticket & { movementType: string; assignmentDate: string };
+        return { ...t, movementType, assignmentDate } as Ticket & {
+            movementType: string;
+            assignmentDate: string;
+        };
     });
 }
 
 export const ticketService = {
     async fetchAll(throwOnError: boolean = false): Promise<Ticket[]> {
-        return withErrorHandlingConditional(async () => {
-            const { data, error } = await supabase
-                .from("tickets")
-                .select("*, personnel(first_name, last_name)")
-                .eq("status", "pending")
-                .order('created_at', { ascending: true })
-                .limit(200);
+        return withErrorHandlingConditional(
+            async () => {
+                const { data, error } = await supabase
+                    .from('tickets')
+                    .select('*, personnel(first_name, last_name)')
+                    .eq('status', 'pending')
+                    .order('created_at', { ascending: true })
+                    .limit(200);
 
-            if (error) throw error;
-            return (data || []).map(t => ({ ...t } as Ticket));
-        }, "Fetch Tickets", throwOnError, []);
+                if (error) throw error;
+                return (data || []).map((t) => ({ ...t }) as Ticket);
+            },
+            'Fetch Tickets',
+            throwOnError,
+            [],
+        );
     },
 
     async fetchPaginated(
         page: number = 1,
         limit: number = 50,
-        typeFilter: string = "Todos",
-        priorityFilter: string = "Todas",
-        search: string = "",
-        section: string = "General",
-        dependencyId: string = "",
-        buildingId: string = "",
-        floor: string = ""
+        typeFilter: string = 'Todos',
+        priorityFilter: string = 'Todas',
+        search: string = '',
+        section: string = 'General',
+        dependencyId: string = '',
+        buildingId: string = '',
+        floor: string = '',
     ): Promise<{ data: Ticket[]; count: number }> {
-        return withErrorHandlingSafe(async () => {
-            const from = (page - 1) * limit;
-            const to = from + limit - 1;
+        return withErrorHandlingSafe(
+            async () => {
+                const from = (page - 1) * limit;
+                const to = from + limit - 1;
 
-            // Al filtrar por persona (dependencia/edificio/piso) se usa
-            // personnel!inner, por lo que los tickets sin persona quedan fuera.
-            const useInner = Boolean(dependencyId || buildingId || floor);
-            let selectString = "*, personnel(first_name, last_name, dependency_id, building_id, floor)";
-            if (useInner) {
-                selectString = "*, personnel!inner(first_name, last_name, dependency_id, building_id, floor)";
-            }
-            if (section === "Responsivas") {
-                selectString = useInner
-                    ? "*, access_media(id, identifier, status, access_media_types(name)), personnel!inner(first_name, last_name, dependency_id, building_id, floor, created_at)"
-                    : "*, access_media(id, identifier, status, access_media_types(name)), personnel(first_name, last_name, dependency_id, building_id, floor, created_at)";
-            }
-
-            let query = supabase
-                .from("tickets")
-                .select(selectString, { count: "exact" })
-                .eq("status", "pending");
-
-            if (section === "Responsivas") {
-                query = applySectionFilter(query, "Responsivas");
-            } else {
-                query = applySectionFilter(query, "General");
-                if (typeFilter && typeFilter !== "Todos") {
-                    query = query.eq("type", typeFilter);
+                // Al filtrar por persona (dependencia/edificio/piso) se usa
+                // personnel!inner, por lo que los tickets sin persona quedan fuera.
+                const useInner = Boolean(dependencyId || buildingId || floor);
+                let selectString = '*, personnel(first_name, last_name, dependency_id, building_id, floor)';
+                if (useInner) {
+                    selectString =
+                        '*, personnel!inner(first_name, last_name, dependency_id, building_id, floor)';
                 }
-            }
-            if (priorityFilter && priorityFilter !== "Todas") {
-                query = query.ilike("priority", priorityFilter);
-            }
-            if (dependencyId) {
-                query = query.eq("personnel.dependency_id", dependencyId);
-            }
-            if (buildingId === "__none__") {
-                query = query.is("personnel.building_id", null);
-            } else if (buildingId) {
-                query = query.eq("personnel.building_id", buildingId);
-            }
-            if (floor === "__none__") {
-                query = query.or("floor.is.null,floor.eq.", { foreignTable: "personnel" });
-            } else if (floor) {
-                query = query.eq("personnel.floor", floor);
-            }
-            if (search) {
-                const terms = search.trim().split(/\s+/).filter(Boolean);
-                const searchTerm = `%${search}%`;
-
-                let peopleQuery = supabase
-                    .from("personnel")
-                    .select("id");
-
-                for (const term of terms) {
-                    const termPattern = `%${term}%`;
-                    peopleQuery = peopleQuery.or(`first_name.ilike.${termPattern},last_name.ilike.${termPattern}`);
+                if (section === 'Responsivas') {
+                    selectString = useInner
+                        ? '*, access_media(id, identifier, status, access_media_types(name)), personnel!inner(first_name, last_name, dependency_id, building_id, floor, created_at)'
+                        : '*, access_media(id, identifier, status, access_media_types(name)), personnel(first_name, last_name, dependency_id, building_id, floor, created_at)';
                 }
 
-                const { data: people } = await peopleQuery;
-                const personIds = people?.map(p => p.id) || [];
-
-                if (personIds.length > 0) {
-                    query = query.or(`title.ilike.${searchTerm},description.ilike.${searchTerm},person_id.in.(${personIds.join(',')})`);
-                } else {
-                    query = query.or(`title.ilike.${searchTerm},description.ilike.${searchTerm}`);
-                }
-            }
-
-            const { data, count, error } = await query
-                .order('created_at', { ascending: true })
-                .range(from, to);
-
-            if (error) throw error;
-
-            // Compatibilidad: exponer el medio como `cards` para consumidores existentes.
-            const mapped = ((data || []) as any[]).map(t => ({
-                ...t,
-                cards: t.access_media
-                    ? {
-                          type: t.access_media.access_media_types?.name ?? "",
-                          folio: t.access_media.identifier ?? "",
-                      }
-                    : undefined,
-            }) as unknown as Ticket);
-            const withMedia = await enrichWithAccessMedia(mapped);
-
-            if (section === "Responsivas" && withMedia.length > 0) {
-                const enriched = await enrichWithMovementType(withMedia);
-                return { data: enriched as unknown as Ticket[], count: count || 0 };
-            }
-
-            return { data: withMedia as unknown as Ticket[], count: count || 0 };
-        }, "Fetch Tickets Paginated", { data: [], count: 0 });
-    },
-
-    async fetchResponsivasForExport(
-        dependencyId: string = "",
-        search: string = "",
-        buildingId: string = "",
-        floor: string = ""
-    ): Promise<(Ticket & { movementType: string; assignmentDate: string })[]> {
-        return withErrorHandlingSafe(async () => {
-            const useInner = Boolean(dependencyId || buildingId || floor);
-            const personnelSelect = useInner
-                ? "personnel!inner(id, first_name, last_name, employee_no, dependency_id, building_id, floor, created_at, dependencies(name))"
-                : "personnel(id, first_name, last_name, employee_no, dependency_id, building_id, floor, created_at, dependencies(name))";
-
-            // Resolver IDs de personas para la búsqueda una sola vez (fuera del batch)
-            let searchPersonIds: string[] = [];
-            if (search) {
-                const terms = search.trim().split(/\s+/).filter(Boolean);
-                let peopleQuery = supabase.from("personnel").select("id");
-                for (const term of terms) {
-                    peopleQuery = peopleQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
-                }
-                const { data: people } = await peopleQuery;
-                searchPersonIds = people?.map(p => p.id) || [];
-            }
-
-            const allData = await batchPaginate<any>(async (from, to) => {
                 let query = supabase
-                    .from("tickets")
-                    .select(`*, access_media(id, identifier, status, access_media_types(name)), ${personnelSelect}`)
-                    .eq("status", "pending");
+                    .from('tickets')
+                    .select(selectString, { count: 'exact' })
+                    .eq('status', 'pending');
 
-                query = applySectionFilter(query, "Responsivas");
-
+                if (section === 'Responsivas') {
+                    query = applySectionFilter(query, 'Responsivas');
+                } else {
+                    query = applySectionFilter(query, 'General');
+                    if (typeFilter && typeFilter !== 'Todos') {
+                        query = query.eq('type', typeFilter);
+                    }
+                }
+                if (priorityFilter && priorityFilter !== 'Todas') {
+                    query = query.ilike('priority', priorityFilter);
+                }
                 if (dependencyId) {
-                    query = query.eq("personnel.dependency_id", dependencyId);
+                    query = query.eq('personnel.dependency_id', dependencyId);
                 }
-                if (buildingId === "__none__") {
-                    query = query.is("personnel.building_id", null);
+                if (buildingId === '__none__') {
+                    query = query.is('personnel.building_id', null);
                 } else if (buildingId) {
-                    query = query.eq("personnel.building_id", buildingId);
+                    query = query.eq('personnel.building_id', buildingId);
                 }
-                if (floor === "__none__") {
-                    query = query.or("floor.is.null,floor.eq.", { foreignTable: "personnel" });
+                if (floor === '__none__') {
+                    query = query.or('floor.is.null,floor.eq.', { foreignTable: 'personnel' });
                 } else if (floor) {
-                    query = query.eq("personnel.floor", floor);
+                    query = query.eq('personnel.floor', floor);
                 }
                 if (search) {
+                    const terms = search.trim().split(/\s+/).filter(Boolean);
                     const searchTerm = `%${search}%`;
-                    if (searchPersonIds.length > 0) {
-                        query = query.or(`title.ilike.${searchTerm},description.ilike.${searchTerm},person_id.in.(${searchPersonIds.join(',')})`);
+
+                    let peopleQuery = supabase.from('personnel').select('id');
+
+                    for (const term of terms) {
+                        const termPattern = `%${term}%`;
+                        peopleQuery = peopleQuery.or(
+                            `first_name.ilike.${termPattern},last_name.ilike.${termPattern}`,
+                        );
+                    }
+
+                    const { data: people } = await peopleQuery;
+                    const personIds = people?.map((p) => p.id) || [];
+
+                    if (personIds.length > 0) {
+                        query = query.or(
+                            `title.ilike.${searchTerm},description.ilike.${searchTerm},person_id.in.(${personIds.join(',')})`,
+                        );
                     } else {
                         query = query.or(`title.ilike.${searchTerm},description.ilike.${searchTerm}`);
                     }
                 }
 
-                return query
-                    .order("created_at", { ascending: true })
+                const { data, count, error } = await query
+                    .order('created_at', { ascending: true })
                     .range(from, to);
-            });
 
-            // Compatibilidad: exponer el medio como `cards` para consumidores existentes.
-            const withCompat = allData.map((t: any) => ({
-                ...t,
-                cards: t.access_media
-                    ? {
-                          type: t.access_media.access_media_types?.name ?? "",
-                          folio: t.access_media.identifier ?? "",
-                      }
-                    : undefined,
-            }));
+                if (error) throw error;
 
-            const withMedia = await enrichWithAccessMedia(withCompat);
-            return enrichWithMovementType(withMedia);
-        }, "Fetch Responsivas for Export", []);
+                // Compatibilidad: exponer el medio como `cards` para consumidores existentes.
+                const mapped = ((data || []) as any[]).map(
+                    (t) =>
+                        ({
+                            ...t,
+                            cards: t.access_media
+                                ? {
+                                      type: t.access_media.access_media_types?.name ?? '',
+                                      folio: t.access_media.identifier ?? '',
+                                  }
+                                : undefined,
+                        }) as unknown as Ticket,
+                );
+                const withMedia = await enrichWithAccessMedia(mapped);
+
+                if (section === 'Responsivas' && withMedia.length > 0) {
+                    const enriched = await enrichWithMovementType(withMedia);
+                    return { data: enriched as unknown as Ticket[], count: count || 0 };
+                }
+
+                return { data: withMedia as unknown as Ticket[], count: count || 0 };
+            },
+            'Fetch Tickets Paginated',
+            { data: [], count: 0 },
+        );
+    },
+
+    async fetchResponsivasForExport(
+        dependencyId: string = '',
+        search: string = '',
+        buildingId: string = '',
+        floor: string = '',
+    ): Promise<(Ticket & { movementType: string; assignmentDate: string })[]> {
+        return withErrorHandlingSafe(
+            async () => {
+                const useInner = Boolean(dependencyId || buildingId || floor);
+                const personnelSelect = useInner
+                    ? 'personnel!inner(id, first_name, last_name, employee_no, dependency_id, building_id, floor, created_at, dependencies(name))'
+                    : 'personnel(id, first_name, last_name, employee_no, dependency_id, building_id, floor, created_at, dependencies(name))';
+
+                // Resolver IDs de personas para la búsqueda una sola vez (fuera del batch)
+                let searchPersonIds: string[] = [];
+                if (search) {
+                    const terms = search.trim().split(/\s+/).filter(Boolean);
+                    let peopleQuery = supabase.from('personnel').select('id');
+                    for (const term of terms) {
+                        peopleQuery = peopleQuery.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
+                    }
+                    const { data: people } = await peopleQuery;
+                    searchPersonIds = people?.map((p) => p.id) || [];
+                }
+
+                const allData = await batchPaginate<any>(async (from, to) => {
+                    let query = supabase
+                        .from('tickets')
+                        .select(
+                            `*, access_media(id, identifier, status, access_media_types(name)), ${personnelSelect}`,
+                        )
+                        .eq('status', 'pending');
+
+                    query = applySectionFilter(query, 'Responsivas');
+
+                    if (dependencyId) {
+                        query = query.eq('personnel.dependency_id', dependencyId);
+                    }
+                    if (buildingId === '__none__') {
+                        query = query.is('personnel.building_id', null);
+                    } else if (buildingId) {
+                        query = query.eq('personnel.building_id', buildingId);
+                    }
+                    if (floor === '__none__') {
+                        query = query.or('floor.is.null,floor.eq.', { foreignTable: 'personnel' });
+                    } else if (floor) {
+                        query = query.eq('personnel.floor', floor);
+                    }
+                    if (search) {
+                        const searchTerm = `%${search}%`;
+                        if (searchPersonIds.length > 0) {
+                            query = query.or(
+                                `title.ilike.${searchTerm},description.ilike.${searchTerm},person_id.in.(${searchPersonIds.join(',')})`,
+                            );
+                        } else {
+                            query = query.or(`title.ilike.${searchTerm},description.ilike.${searchTerm}`);
+                        }
+                    }
+
+                    return query.order('created_at', { ascending: true }).range(from, to);
+                });
+
+                // Compatibilidad: exponer el medio como `cards` para consumidores existentes.
+                const withCompat = allData.map((t: any) => ({
+                    ...t,
+                    cards: t.access_media
+                        ? {
+                              type: t.access_media.access_media_types?.name ?? '',
+                              folio: t.access_media.identifier ?? '',
+                          }
+                        : undefined,
+                }));
+
+                const withMedia = await enrichWithAccessMedia(withCompat);
+                return enrichWithMovementType(withMedia);
+            },
+            'Fetch Responsivas for Export',
+            [],
+        );
     },
 
     async create(data: {
@@ -377,52 +414,59 @@ export const ticketService = {
     }) {
         return withErrorHandling(async () => {
             // Legacy no requiere firma: bloquear creación manual de Firma Responsiva.
-            if (data.type === "Firma Responsiva" && data.access_media_id) {
+            if (data.type === 'Firma Responsiva' && data.access_media_id) {
                 const { data: media, error: mediaError } = await supabase
-                    .from("access_media")
-                    .select("responsiva_status")
-                    .eq("id", data.access_media_id)
+                    .from('access_media')
+                    .select('responsiva_status')
+                    .eq('id', data.access_media_id)
                     .single();
                 if (mediaError) throw mediaError;
-                if (media?.responsiva_status === "legacy") {
-                    throw new Error("El medio está en Legacy, no requiere firma de responsiva.");
+                if (media?.responsiva_status === 'legacy') {
+                    throw new Error('El medio está en Legacy, no requiere firma de responsiva.');
                 }
             }
             const payload = {
                 type: data.type,
                 description: data.description,
-                priority: (data.priority || "media").toLowerCase(),
-                status: "pending",
+                priority: (data.priority || 'media').toLowerCase(),
+                status: 'pending',
                 person_id: data.person_id || null,
                 access_media_id: data.access_media_id || null,
                 title: data.title || data.type,
-                payload: data.payload || data.metadata || {}
+                payload: data.payload || data.metadata || {},
             };
 
             const { data: newTicket, error } = await supabase
-                .from("tickets")
+                .from('tickets')
                 .insert([payload])
                 .select()
                 .single();
 
             if (error) throw error;
 
-            await HistoryService.log("TICKET", newTicket.id, "CREATE", {
+            await HistoryService.log('TICKET', newTicket.id, 'CREATE', {
                 message: `Ticket creado: ${payload.title}`,
-                entityName: `Ticket #${newTicket.id}: ${payload.title}`
+                entityName: `Ticket #${newTicket.id}: ${payload.title}`,
             });
 
             ticketState.addTicket(newTicket as Ticket);
-        }, "Create Ticket");
+        }, 'Create Ticket');
     },
 
     async createBatch(
-        tickets: { type: string; title: string; description: string; priority: string; payload: Record<string, string>; person_id?: string | null }[]
+        tickets: {
+            type: string;
+            title: string;
+            description: string;
+            priority: string;
+            payload: Record<string, string>;
+            person_id?: string | null;
+        }[],
     ): Promise<{ created: number; errors: { index: number; message: string }[] }> {
         const errors: { index: number; message: string }[] = [];
         let created = 0;
 
-        const payloads = tickets.map(t => ({
+        const payloads = tickets.map((t) => ({
             type: t.type,
             title: t.title,
             description: t.description,
@@ -434,10 +478,7 @@ export const ticketService = {
         }));
 
         try {
-            const { data: newTickets, error } = await supabase
-                .from('tickets')
-                .insert(payloads)
-                .select();
+            const { data: newTickets, error } = await supabase.from('tickets').insert(payloads).select();
 
             if (error) throw error;
 
@@ -466,97 +507,95 @@ export const ticketService = {
         return { created, errors };
     },
 
-
     async delete(
         id: number,
         reason?: string,
-        action: "COMPLETE" | "CANCEL" | "REJECT" = "COMPLETE",
+        action: 'COMPLETE' | 'CANCEL' | 'REJECT' = 'COMPLETE',
         ticketType?: string,
     ) {
         return withErrorHandling(async () => {
             return HistoryService.withFlow(async () => {
-            const { data: ticket } = await supabase.from("tickets").select("title, type").eq("id", id).single();
+                const { data: ticket } = await supabase
+                    .from('tickets')
+                    .select('title, type')
+                    .eq('id', id)
+                    .single();
 
-            const typeLabel = ticketType
-                || ticket?.type
-                || (ticket?.title || "").replace(/^Firma:\s*/, "");
-            await HistoryService.log("TICKET", id, action, {
-                message: action === "REJECT"
-                    ? `Ticket de ${typeLabel} rechazado`
-                    : (reason || `Ticket completado/atendido`),
-                ticketType: action === "REJECT" ? typeLabel : undefined,
-                entityName: ticket ? `Ticket #${id}: ${ticket.title}` : `Ticket #${id}`
-            });
+                const typeLabel =
+                    ticketType || ticket?.type || (ticket?.title || '').replace(/^Firma:\s*/, '');
+                await HistoryService.log('TICKET', id, action, {
+                    message:
+                        action === 'REJECT'
+                            ? `Ticket de ${typeLabel} rechazado`
+                            : reason || `Ticket completado/atendido`,
+                    ticketType: action === 'REJECT' ? typeLabel : undefined,
+                    entityName: ticket ? `Ticket #${id}: ${ticket.title}` : `Ticket #${id}`,
+                });
 
-            const { error } = await supabase.from("tickets").delete().eq("id", id);
-            if (error) throw error;
-            ticketState.removeTicket(id);
+                const { error } = await supabase.from('tickets').delete().eq('id', id);
+                if (error) throw error;
+                ticketState.removeTicket(id);
             });
-        }, "Delete Ticket");
+        }, 'Delete Ticket');
     },
 
     /** Rechaza un tiquet registrando una sola fila TICKET REJECT con su tipo. */
     async reject(id: number, ticketType?: string) {
-        return this.delete(id, undefined, "REJECT", ticketType);
+        return this.delete(id, undefined, 'REJECT', ticketType);
     },
 
     async deleteByCard(cardId: string, types?: string[], reason?: string) {
         return withErrorHandling(async () => {
             return HistoryService.withFlow(async () => {
-            let fetchQuery = supabase.from("tickets")
-                .select("id, title")
-                .eq("access_media_id", cardId);
-            if (types && types.length > 0) fetchQuery = fetchQuery.in("type", types);
+                let fetchQuery = supabase.from('tickets').select('id, title').eq('access_media_id', cardId);
+                if (types && types.length > 0) fetchQuery = fetchQuery.in('type', types);
 
-            const { data: tickets } = await fetchQuery;
+                const { data: tickets } = await fetchQuery;
 
-            if (tickets) {
-                for (const t of tickets) {
-                    await HistoryService.log("TICKET", t.id, "CANCEL", {
-                        message: reason || `Ticket #${t.id} cancelado por baja de tarjeta`,
-                        entityName: `Ticket #${t.id}: ${t.title}`
-                    });
+                if (tickets) {
+                    for (const t of tickets) {
+                        await HistoryService.log('TICKET', t.id, 'CANCEL', {
+                            message: reason || `Ticket #${t.id} cancelado por baja de tarjeta`,
+                            entityName: `Ticket #${t.id}: ${t.title}`,
+                        });
+                    }
                 }
-            }
 
-            let query = supabase.from("tickets").delete().eq("access_media_id", cardId);
-            if (types && types.length > 0) {
-                query = query.in("type", types);
-            }
-            const { error } = await query;
-            if (error) throw error;
-            ticketState.removeByCard(cardId, types);
+                let query = supabase.from('tickets').delete().eq('access_media_id', cardId);
+                if (types && types.length > 0) {
+                    query = query.in('type', types);
+                }
+                const { error } = await query;
+                if (error) throw error;
+                ticketState.removeByCard(cardId, types);
             });
-        }, "Delete Tickets by Card");
+        }, 'Delete Tickets by Card');
     },
 
     async deleteByPerson(personId: string, reason?: string, types?: string[]) {
         return withErrorHandling(async () => {
             return HistoryService.withFlow(async () => {
-            let fetchQuery = supabase.from("tickets")
-                .select("id, title")
-                .eq("person_id", personId);
-            if (types && types.length > 0) fetchQuery = fetchQuery.in("type", types);
-            const { data: tickets } = await fetchQuery;
+                let fetchQuery = supabase.from('tickets').select('id, title').eq('person_id', personId);
+                if (types && types.length > 0) fetchQuery = fetchQuery.in('type', types);
+                const { data: tickets } = await fetchQuery;
 
-            if (tickets) {
-                for (const t of tickets) {
-                    await HistoryService.log("TICKET", t.id, "CANCEL", {
-                        message: reason || `Ticket #${t.id} cancelado por baja de personal`,
-                        entityName: `Ticket #${t.id}: ${t.title}`
-                    });
+                if (tickets) {
+                    for (const t of tickets) {
+                        await HistoryService.log('TICKET', t.id, 'CANCEL', {
+                            message: reason || `Ticket #${t.id} cancelado por baja de personal`,
+                            entityName: `Ticket #${t.id}: ${t.title}`,
+                        });
+                    }
                 }
-            }
 
-            let query = supabase.from("tickets").delete().eq("person_id", personId);
-            if (types && types.length > 0) {
-                query = query.in("type", types);
-            }
-            const { error } = await query;
-            if (error) throw error;
-            ticketState.removeByPerson(personId);
+                let query = supabase.from('tickets').delete().eq('person_id', personId);
+                if (types && types.length > 0) {
+                    query = query.in('type', types);
+                }
+                const { error } = await query;
+                if (error) throw error;
+                ticketState.removeByPerson(personId);
             });
-        }, "Delete Tickets by Person");
+        }, 'Delete Tickets by Person');
     },
-
 };

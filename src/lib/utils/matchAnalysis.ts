@@ -9,15 +9,15 @@
  * `accion_<key>`, `reponer_<key>`, `<key>_folio`) de `mediaContract`.
  */
 
-import type { Person } from "../types";
-import { floorsForKey } from "../services/accessAssignments";
-import { activeMediaTypes, type MediaInfo } from "./mediaContract";
-import { parseFloors } from "./xlsxImporter";
-import { applyFloorAction } from "./floorActions";
+import type { Person } from '../types';
+import { floorsForKey } from '../services/accessAssignments';
+import { activeMediaTypes, type MediaInfo } from './mediaContract';
+import { parseFloors } from './xlsxFields';
+import { applyFloorAction } from './floorActions';
 
 // ─── Types ──────────────────────────────────────────────────
 
-export type CardConflictAction = "proceed" | "skip_card" | "convert_to_reposicion";
+export type CardConflictAction = 'proceed' | 'skip_card' | 'convert_to_reposicion';
 
 export interface AltaCardConflict {
     mediaKey: string;
@@ -36,7 +36,7 @@ export interface AltaCardConflict {
 }
 
 export interface AltaConflictAnalysis {
-    type: "altas";
+    type: 'altas';
     rowKey: string;
     person: Person;
     conflicts: AltaCardConflict[];
@@ -51,7 +51,7 @@ export interface ModificacionFieldChange {
     changed: boolean;
 }
 
-export type ModificacionResolution = "apply" | "reject" | null;
+export type ModificacionResolution = 'apply' | 'reject' | null;
 
 export interface FloorChange {
     added: string[];
@@ -60,7 +60,7 @@ export interface FloorChange {
 }
 
 export interface ModificacionConflictAnalysis {
-    type: "modificaciones";
+    type: 'modificaciones';
     rowKey: string;
     person: Person;
     changes: ModificacionFieldChange[];
@@ -78,15 +78,15 @@ export type RowAnalysis = AltaConflictAnalysis | ModificacionConflictAnalysis;
 
 // ─── Helpers ────────────────────────────────────────────────
 
-const YES_VALUES = ["sí", "si"];
+const YES_VALUES = ['sí', 'si'];
 
 /**
  * Detecta si una fila solicita un medio concreto (hoja ALTAS).
  * Para medios SIN pisos, un folio relleno también implica solicitud.
  */
 export function wantsCard(fields: Record<string, string>, media: MediaInfo): boolean {
-    if (YES_VALUES.includes((fields[`${media.key}_req`] ?? "").toLowerCase())) return true;
-    if (!media.has_floors && (fields[`${media.key}_folio`] ?? "").trim().length > 0) return true;
+    if (YES_VALUES.includes((fields[`${media.key}_req`] ?? '').toLowerCase())) return true;
+    if (!media.has_floors && (fields[`${media.key}_folio`] ?? '').trim().length > 0) return true;
     return false;
 }
 
@@ -106,7 +106,7 @@ export function analyzeAltaConflicts(
     onlyKeys?: string[],
 ): AltaConflictAnalysis {
     const medias = activeMediaTypes(mediaTypes);
-    const activeCards = (person.cards ?? []).filter((c) => c.status === "active");
+    const activeCards = (person.cards ?? []).filter((c) => c.status === 'active');
 
     const conflicts: AltaCardConflict[] = [];
 
@@ -114,9 +114,7 @@ export function analyzeAltaConflicts(
         if (onlyKeys && !onlyKeys.includes(media.key)) continue;
 
         const requested = wantsCard(fields, media);
-        const requestedValue = media.has_floors
-            ? fields[`pisos_${media.key}`]
-            : fields[`${media.key}_folio`];
+        const requestedValue = media.has_floors ? fields[`pisos_${media.key}`] : fields[`${media.key}_folio`];
         const existing = activeCards.find((c) => c.type === media.name);
         const conflict = requested && !!existing;
 
@@ -136,12 +134,12 @@ export function analyzeAltaConflicts(
                 : requested
                   ? `No tiene ${media.name} — sin conflicto`
                   : `No solicitó ${media.name}`,
-            resolution: conflict ? "skip_card" : "proceed",
+            resolution: conflict ? 'skip_card' : 'proceed',
         });
     }
 
     return {
-        type: "altas",
+        type: 'altas',
         rowKey,
         person,
         conflicts,
@@ -164,47 +162,52 @@ export function analyzeModificacionConflicts(
     const changes: ModificacionFieldChange[] = [];
 
     const fieldMap: [string, string, keyof Person | undefined][] = [
-        ["nuevo_apellido", "Apellidos", "last_name"],
-        ["nuevo_nombre", "Nombres", "first_name"],
-        ["nueva_dep", "Dependencia", "dependency"],
-        ["nuevo_edificio", "Edificio", "building"],
-        ["nuevo_piso", "Piso Base", "floor"],
-        ["nueva_area", "Área", "area"],
-        ["nuevo_puesto", "Puesto", "position"],
+        ['nuevo_apellido', 'Apellidos', 'last_name'],
+        ['nuevo_nombre', 'Nombres', 'first_name'],
+        ['nueva_dep', 'Dependencia', 'dependency'],
+        ['nuevo_edificio', 'Edificio', 'building'],
+        ['nuevo_piso', 'Piso Base', 'floor'],
+        ['nueva_area', 'Área', 'area'],
+        ['nuevo_puesto', 'Puesto', 'position'],
     ];
 
     for (const [field, label, personKey] of fieldMap) {
         const newVal = fields[field]?.trim();
         if (newVal) {
-            const currentVal = personKey
-                ? String((person as any)[personKey] ?? "")
-                : "";
+            const currentVal = personKey ? String((person as any)[personKey] ?? '') : '';
             changes.push({
                 field,
                 label,
-                currentValue: currentVal || "—",
+                currentValue: currentVal || '—',
                 newValue: newVal,
-                changed: currentVal.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") !==
-                    newVal.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""),
+                changed:
+                    currentVal
+                        .toLowerCase()
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '') !==
+                    newVal
+                        .toLowerCase()
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, ''),
             });
         }
     }
 
     if (fields.hora_entrada?.trim()) {
-        const currentEntry = person.schedule?.entry || "—";
+        const currentEntry = person.schedule?.entry || '—';
         changes.push({
-            field: "hora_entrada",
-            label: "Hora Entrada",
+            field: 'hora_entrada',
+            label: 'Hora Entrada',
             currentValue: currentEntry,
             newValue: fields.hora_entrada,
             changed: currentEntry !== fields.hora_entrada,
         });
     }
     if (fields.hora_salida?.trim()) {
-        const currentExit = person.schedule?.exit || "—";
+        const currentExit = person.schedule?.exit || '—';
         changes.push({
-            field: "hora_salida",
-            label: "Hora Salida",
+            field: 'hora_salida',
+            label: 'Hora Salida',
             currentValue: currentExit,
             newValue: fields.hora_salida,
             changed: currentExit !== fields.hora_salida,
@@ -226,11 +229,7 @@ export function analyzeModificacionConflicts(
         const action = fields[`accion_${media.key}`];
         if (action) {
             const current = floorsForKey(person.floors, media.key);
-            const final = applyFloorAction(
-                action,
-                current,
-                parseFloors(fields[`pisos_${media.key}`]),
-            );
+            const final = applyFloorAction(action, current, parseFloors(fields[`pisos_${media.key}`]));
             addFloorChange(media.key, current, final);
         }
     }
@@ -241,7 +240,7 @@ export function analyzeModificacionConflicts(
             .map((s) => s?.trim())
             .filter(Boolean);
         const final = applyFloorAction(fields.accion_acc, currentAccesses, requestedAccesses);
-        addFloorChange("accesses", currentAccesses, final);
+        addFloorChange('accesses', currentAccesses, final);
     }
 
     const anyFloorChange = Object.values(floorChanges).some(
@@ -249,7 +248,7 @@ export function analyzeModificacionConflicts(
     );
 
     return {
-        type: "modificaciones",
+        type: 'modificaciones',
         rowKey,
         person,
         changes,

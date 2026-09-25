@@ -1,8 +1,9 @@
 <script lang="ts">
-    import { type Snippet } from "svelte";
-    import { fade } from "svelte/transition";
-    import Button from "./Button.svelte";
-    import { ChevronDown } from "lucide-svelte";
+    import { type Snippet } from 'svelte';
+    import { fade } from 'svelte/transition';
+    import Button from './Button.svelte';
+    import { ChevronDown } from 'lucide-svelte';
+    import { mediaState } from '../stores';
 
     type Props = {
         /** Icono del botón trigger */
@@ -23,13 +24,16 @@
         icon: Icon,
         label,
         items,
-        class: className = "",
+        class: className = '',
         disabled = false,
-        menuWidth = "w-56",
+        menuWidth = 'w-56',
     }: Props = $props();
 
     let container: HTMLDivElement | undefined = $state();
     let isOpen = $state(false);
+
+    // En móvil se comporta como un item de sheet: botón full-width y menú en flujo.
+    const isMobile = $derived(mediaState.isMobile.matches);
 
     function toggle() {
         isOpen = !isOpen;
@@ -40,7 +44,7 @@
     }
 
     function handleKeydown(e: KeyboardEvent) {
-        if (e.key === "Escape") close();
+        if (e.key === 'Escape') close();
     }
 
     function handleWindowClick(e: MouseEvent) {
@@ -52,27 +56,28 @@
 
 <svelte:window onkeydown={handleKeydown} onclick={handleWindowClick} />
 
-<div bind:this={container} class="relative">
+<div bind:this={container} class="relative {isMobile ? 'w-full' : ''}">
     <Button
         variant="soft-emerald"
         onclick={toggle}
-        class="flex items-center gap-2 h-10 px-4 {className}"
+        class="flex items-center gap-2 {isMobile ? 'w-full h-11 justify-center' : 'h-10 px-4'} {className}"
         {disabled}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
     >
         <Icon size={16} />
 
         {label}
 
-        <ChevronDown
-            size={14}
-            class="ml-1 opacity-50 transition-transform {isOpen ? 'rotate-180' : ''}"
-        />
+        <ChevronDown size={14} class="ml-1 opacity-50 transition-transform {isOpen ? 'rotate-180' : ''}" />
     </Button>
 
     {#if isOpen}
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
         <div
-            class="absolute right-0 top-full mt-2 {menuWidth} bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 z-50 py-1.5 overflow-hidden"
+            role="menu"
+            class="{isMobile
+                ? 'static w-full mt-2 max-h-[45dvh] overflow-y-auto overscroll-contain'
+                : `absolute right-0 top-full mt-2 ${menuWidth} overflow-hidden`} bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 z-50 py-1.5"
             transition:fade={{ duration: 150 }}
         >
             {@render items()}

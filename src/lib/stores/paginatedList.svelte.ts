@@ -27,6 +27,9 @@ export class PaginatedListState<T> {
     /** Indicador de carga. */
     isLoading = $state(false);
 
+    /** Mensaje de error de la última carga (null si no hubo). */
+    error = $state<string | null>(null);
+
     /** Total de páginas (derivado). */
     totalPages = $derived(Math.ceil(this.totalRecords / this.pageSize));
 
@@ -47,6 +50,7 @@ export class PaginatedListState<T> {
         this.totalRecords = 0;
         this.currentPage = 1;
         this.isLoading = false;
+        this.error = null;
     }
 
     /** Avanza una página si es posible. Devuelve true si hubo cambio. */
@@ -96,11 +100,15 @@ export class PaginatedListState<T> {
     ) {
         const seq = ++this._fetchSeq;
         this.isLoading = true;
+        this.error = null;
         if (page !== undefined) this.currentPage = page;
         try {
             const result = await fetcher(this.currentPage, this.pageSize);
             if (seq !== this._fetchSeq) return; // respuesta obsoleta
             this.setItems(result.data, result.count);
+        } catch (err) {
+            if (seq !== this._fetchSeq) return;
+            this.error = err instanceof Error ? err.message : 'No se pudieron cargar los datos.';
         } finally {
             if (seq === this._fetchSeq) {
                 this.isLoading = false;
