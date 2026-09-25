@@ -653,22 +653,26 @@
 
     {#if userState.isAdmin && selectedCards.length > 0}
         <div
-            class="flex flex-wrap items-center gap-3 p-3 rounded-2xl border border-blue-200 bg-blue-50/95 backdrop-blur max-lg:fixed max-lg:inset-x-3 max-lg:bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] max-lg:z-40 max-lg:shadow-2xl"
+            class="flex flex-wrap items-center gap-3 p-3 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur max-lg:fixed max-lg:inset-x-3 max-lg:bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] max-lg:z-40 max-lg:shadow-2xl"
         >
             <span class="text-sm font-extrabold text-blue-800">
                 {selectedCards.length} tarjeta(s) seleccionada(s)
             </span>
             <div class="flex flex-wrap items-center gap-2 ml-auto">
                 <Button variant="soft-slate" size="sm" onclick={clearSelection}>Limpiar</Button>
+                <Button
+                    variant="soft-blue"
+                    size="sm"
+                    disabled={!networkStore.isOnline}
+                    onclick={bulkExportSelected}
+                >
+                    <FileSpreadsheet size={15} class="mr-1.5" />
+                    Exportar selección
+                </Button>
+
+                <span class="hidden sm:block w-px h-5 bg-slate-200"></span>
+
                 <PermissionGuard requireEdit>
-                    <Button
-                        variant="amber"
-                        size="sm"
-                        disabled={!networkStore.isOnline}
-                        onclick={() => bulkSetStatus('blocked')}
-                    >
-                        Bloquear
-                    </Button>
                     <Button
                         variant="soft-emerald"
                         size="sm"
@@ -678,6 +682,17 @@
                         Reactivar
                     </Button>
                     <Button
+                        variant="amber"
+                        size="sm"
+                        disabled={!networkStore.isOnline}
+                        onclick={() => bulkSetStatus('blocked')}
+                    >
+                        Bloquear
+                    </Button>
+
+                    <span class="hidden sm:block w-px h-5 bg-slate-200"></span>
+
+                    <Button
                         variant="soft-slate"
                         size="sm"
                         disabled={!networkStore.isOnline}
@@ -685,8 +700,11 @@
                     >
                         Desvincular
                     </Button>
+
+                    <span class="hidden sm:block w-px h-5 bg-slate-200"></span>
+
                     <Button
-                        variant="danger"
+                        variant="soft-rose"
                         size="sm"
                         disabled={!networkStore.isOnline}
                         onclick={bulkInactivate}
@@ -697,15 +715,6 @@
                         Eliminar
                     </Button>
                 </PermissionGuard>
-                <Button
-                    variant="soft-blue"
-                    size="sm"
-                    disabled={!networkStore.isOnline}
-                    onclick={bulkExportSelected}
-                >
-                    <FileSpreadsheet size={15} class="mr-1.5" />
-                    Exportar selección
-                </Button>
             </div>
         </div>
     {/if}

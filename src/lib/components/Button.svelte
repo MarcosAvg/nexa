@@ -16,6 +16,7 @@
         | 'indigo'
         | 'soft-blue'
         | 'soft-emerald'
+        | 'soft-rose'
         | 'soft-slate';
 
     /** Tamaño predefinido del botón. */
@@ -130,6 +131,8 @@
             'bg-blue-50/70 text-blue-700 border border-blue-100/60 hover:bg-blue-100 hover:text-blue-800 shadow-none',
         'soft-emerald':
             'bg-emerald-50/70 text-emerald-700 border border-emerald-100/60 hover:bg-emerald-100 hover:text-emerald-800 shadow-none',
+        'soft-rose':
+            'bg-rose-50/70 text-rose-700 border border-rose-100/60 hover:bg-rose-100 hover:text-rose-800 shadow-none',
         'soft-slate':
             'bg-slate-50/70 text-slate-600 border border-slate-100/60 hover:bg-slate-100 hover:text-slate-900 shadow-none',
     };
