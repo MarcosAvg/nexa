@@ -3,7 +3,7 @@
     import { confirm } from "../utils/confirmModal.svelte";
     import { handleError } from "../utils";
     import {
-        SectionHeader, FilterSelect, Button, Card,
+        SectionHeader, FilterSelect, FilterToolbar, Button, Card,
         DataTable, Badge, PermissionGuard, FloatingActionButton,
         ContentView, SearchInput, Pagination,
         AddCardModal, ResponsivaProgramBadges,
@@ -36,6 +36,28 @@
     let searchFilter = $state("");
     // Nombre de dependencia → ID (mapeo local)
     let depNameFilter = $state("");
+
+    function clearCardFilters() {
+        typeFilter = "Todos";
+        statusFilter = "Todas";
+        searchFilter = "";
+        depNameFilter = "";
+    }
+
+    // Chips de filtros activos para el toolbar.
+    let cardChips = $derived.by(() => {
+        const chips: { label: string; value: string; onClear: () => void }[] = [];
+        if (typeFilter !== "Todos") {
+            chips.push({ label: "Tipo", value: typeFilter, onClear: () => (typeFilter = "Todos") });
+        }
+        if (statusFilter !== "Todas") {
+            chips.push({ label: "Estado", value: statusFilter, onClear: () => (statusFilter = "Todas") });
+        }
+        if (depNameFilter) {
+            chips.push({ label: "Dependencia", value: depNameFilter, onClear: () => (depNameFilter = "") });
+        }
+        return chips;
+    });
 
     // Estado del modal
     let isModalOpen = $state(false);
@@ -192,23 +214,19 @@
 <div class="space-y-6">
     <SectionHeader title="Gestión de tarjetas">
         {#snippet filters()}
-            <FilterSelect
-                label="Tipo"
-                options={["Todos", ...mediaTypeNames]}
-                bind:value={typeFilter}
-            />
-            <FilterSelect
-                label="Estado"
-                options={["Todas", "Disponible", "Activa", "Bloqueada", "Baja"]}
-                bind:value={statusFilter}
-            />
-            <FilterSelect
-                label="Dependencia"
-                options={dependencyNames}
-                placeholder="Todas"
-                bind:value={depNameFilter}
-            />
-<div class="flex flex-col sm:flex-row sm:items-center gap-2">
+            <FilterToolbar chips={cardChips} onClearAll={clearCardFilters}>
+                {#snippet primary()}
+                    <FilterSelect
+                        label="Tipo"
+                        options={["Todos", ...mediaTypeNames]}
+                        bind:value={typeFilter}
+                    />
+                    <FilterSelect
+                        label="Estado"
+                        options={["Todas", "Disponible", "Activa", "Bloqueada", "Baja"]}
+                        bind:value={statusFilter}
+                    />
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-[200px] w-full">
                         <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
                         <SearchInput
                             placeholder="Folio..."
@@ -217,6 +235,16 @@
                             class="h-9 text-xs font-bold"
                         />
                     </div>
+                {/snippet}
+                {#snippet overflow()}
+                    <FilterSelect
+                        label="Dependencia"
+                        options={dependencyNames}
+                        placeholder="Todas"
+                        bind:value={depNameFilter}
+                    />
+                {/snippet}
+            </FilterToolbar>
         {/snippet}
 
         {#snippet actions()}
@@ -286,10 +314,7 @@ data={cards}
         emptyIcon={CreditCard}
         emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"                    hasFilters={!!(searchFilter || typeFilter !== "Todos" || statusFilter !== "Todas" || depNameFilter)}
                     onClearFilters={() => {
-                        depNameFilter = '';
-                        typeFilter = 'Todos';
-                        statusFilter = 'Todas';
-                        searchFilter = '';
+                        clearCardFilters();
                         // El $effect se encarga de refrescar
                     }}
         skeletonColumns={4}

@@ -4,7 +4,7 @@
     import type { HistoryStory } from "../stores/history.svelte";
     import {
         SectionHeader, DataTable, Badge, Button, HistoryFilters,
-        Pagination, ContentView,
+        FilterToolbar, Pagination, ContentView,
     } from "../components";
     import {
         FileSpreadsheet,
@@ -53,6 +53,33 @@
         return () => {
             clearTimeout(filterDebounce);
         };
+    });
+
+    // Chips de filtros activos para el toolbar (HistoryFilters es un grupo
+    // reutilizable cohesivo: se muestra íntegro como primario).
+    let historyChips = $derived.by(() => {
+        const chips: { label: string; value: string; onClear: () => void }[] = [];
+        const f = historyState.filters;
+        if (f.person) {
+            chips.push({ label: "Persona", value: f.person, onClear: () => historyState.setFilters({ person: "" }) });
+        }
+        if (f.cardType !== "Todos") {
+            chips.push({ label: "Tarjeta", value: f.cardType, onClear: () => historyState.setFilters({ cardType: "Todos" }) });
+        }
+        if (f.folio) {
+            chips.push({ label: "Folio", value: f.folio, onClear: () => historyState.setFilters({ folio: "" }) });
+        }
+        if (f.action !== "Todas") {
+            chips.push({ label: "Acción", value: f.action, onClear: () => historyState.setFilters({ action: "Todas" }) });
+        }
+        if (f.startDate || f.endDate) {
+            chips.push({
+                label: "Fechas",
+                value: [f.startDate || "…", f.endDate || "…"].join(" → "),
+                onClear: () => historyState.setFilters({ startDate: "", endDate: "" }),
+            });
+        }
+        return chips;
     });
 
     // ── Datos derivados del store ──
@@ -224,14 +251,18 @@
 <div class="space-y-6">
     <SectionHeader title="Historial de acciones">
         {#snippet filters()}
-            <HistoryFilters
-                bind:personName={historyState.filters.person}
-                bind:cardType={historyState.filters.cardType}
-                bind:cardFolio={historyState.filters.folio}
-                bind:action={historyState.filters.action}
-                bind:startDate={historyState.filters.startDate}
-                bind:endDate={historyState.filters.endDate}
-            />
+            <FilterToolbar chips={historyChips} onClearAll={() => historyState.clearFilters()}>
+                {#snippet primary()}
+                    <HistoryFilters
+                        bind:personName={historyState.filters.person}
+                        bind:cardType={historyState.filters.cardType}
+                        bind:cardFolio={historyState.filters.folio}
+                        bind:action={historyState.filters.action}
+                        bind:startDate={historyState.filters.startDate}
+                        bind:endDate={historyState.filters.endDate}
+                    />
+                {/snippet}
+            </FilterToolbar>
         {/snippet}
 
         {#snippet actions()}

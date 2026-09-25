@@ -4,7 +4,7 @@
         catalogState,
     } from "../stores";
     import {
-        SectionHeader, FilterSelect, Button, Card, DataTable,
+        SectionHeader, FilterSelect, FilterToolbar, Button, Card, DataTable,
         Badge, PermissionGuard, Pagination, FloatingActionButton,
         ContentView, SearchInput, Input, ExportDropdown, ExportMenuItem,
         CardlessRegistryModal, ConfirmationModal,
@@ -46,6 +46,31 @@
     let dependencies = $derived(catalogState.dependencies);
     let dependencyNames = $derived(dependencies.map((d) => d.name));
     let reasons = $derived(cardlessRegistryService.REASONS);
+
+    function clearRegistroFilters() {
+        depNameFilter = "";
+        cardlessRegistryState.setFilters({ startDate: "", endDate: "", reason: "", search: "", dependencyId: "" });
+    }
+
+    // Chips de filtros activos para el toolbar.
+    let registroChips = $derived.by(() => {
+        const chips: { label: string; value: string; onClear: () => void }[] = [];
+        const f = cardlessRegistryState.filters;
+        if (f.startDate || f.endDate) {
+            chips.push({
+                label: "Fechas",
+                value: [f.startDate || "…", f.endDate || "…"].join(" → "),
+                onClear: () => cardlessRegistryState.setFilters({ startDate: "", endDate: "" }),
+            });
+        }
+        if (depNameFilter) {
+            chips.push({ label: "Dependencia", value: depNameFilter, onClear: () => (depNameFilter = "") });
+        }
+        if (f.reason) {
+            chips.push({ label: "Motivo", value: f.reason, onClear: () => cardlessRegistryState.setFilters({ reason: "" }) });
+        }
+        return chips;
+    });
 
     let isModalOpen = $state(false);
     let editingRegistry = $state<CardlessRegistry | null>(null);
@@ -323,45 +348,51 @@
 <div class="space-y-6">
     <SectionHeader title="Sin Tarjeta">
         {#snippet filters()}
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha Inicio</span>
-                <Input
-                    type="date"
-                    bind:value={cardlessRegistryState.filters.startDate}
-                    max={cardlessRegistryState.filters.endDate || undefined}
-                    class="h-9 text-xs font-bold {dateRangeError ? 'border-rose-400' : ''}"
-                />
-            </div>
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha Fin</span>
-                <Input
-                    type="date"
-                    bind:value={cardlessRegistryState.filters.endDate}
-                    min={cardlessRegistryState.filters.startDate || undefined}
-                    class="h-9 text-xs font-bold {dateRangeError ? 'border-rose-400' : ''}"
-                />
-            </div>
-            <FilterSelect
-                label="Dependencia"
-                options={dependencyNames}
-                placeholder="Todas"
-                bind:value={depNameFilter}
-            />
-            <FilterSelect
-                label="Motivo"
-                options={reasons}
-                placeholder="Todos"
-                bind:value={cardlessRegistryState.filters.reason}
-            />
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Búsqueda</span>
-                <SearchInput
-                    placeholder="Nombre o # empleado..."
-                    bind:value={cardlessRegistryState.filters.search}
-                    oninput={() => {}}
-                    class="h-9 text-xs font-bold w-48"
-                />
-            </div>
+            <FilterToolbar chips={registroChips} onClearAll={clearRegistroFilters}>
+                {#snippet primary()}
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha Inicio</span>
+                        <Input
+                            type="date"
+                            bind:value={cardlessRegistryState.filters.startDate}
+                            max={cardlessRegistryState.filters.endDate || undefined}
+                            class="h-9 text-xs font-bold {dateRangeError ? 'border-rose-400' : ''}"
+                        />
+                    </div>
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Fecha Fin</span>
+                        <Input
+                            type="date"
+                            bind:value={cardlessRegistryState.filters.endDate}
+                            min={cardlessRegistryState.filters.startDate || undefined}
+                            class="h-9 text-xs font-bold {dateRangeError ? 'border-rose-400' : ''}"
+                        />
+                    </div>
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-[200px] w-full">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Búsqueda</span>
+                        <SearchInput
+                            placeholder="Nombre o # empleado..."
+                            bind:value={cardlessRegistryState.filters.search}
+                            oninput={() => {}}
+                            class="h-9 text-xs font-bold w-48"
+                        />
+                    </div>
+                {/snippet}
+                {#snippet overflow()}
+                    <FilterSelect
+                        label="Dependencia"
+                        options={dependencyNames}
+                        placeholder="Todas"
+                        bind:value={depNameFilter}
+                    />
+                    <FilterSelect
+                        label="Motivo"
+                        options={reasons}
+                        placeholder="Todos"
+                        bind:value={cardlessRegistryState.filters.reason}
+                    />
+                {/snippet}
+            </FilterToolbar>
         {/snippet}
 
         {#snippet actions()}

@@ -17,6 +17,7 @@ export { default as FormField } from './FormField.svelte';
 
 // ─── Filters ───────────────────────────────────────────────
 export { default as FilterSelect } from './FilterSelect.svelte';
+export { default as FilterToolbar } from './FilterToolbar.svelte';
 export { default as ToggleGroup } from './ToggleGroup.svelte';
 export { default as SectionHeader } from './SectionHeader.svelte';
 export { default as SectionPill } from './SectionPill.svelte';

@@ -7,7 +7,7 @@
         moduleState,
     } from "../stores";
     import {
-        SectionHeader, FilterSelect, Button, DataTable,
+        SectionHeader, FilterSelect, FilterToolbar, Button, DataTable,
         Badge, PermissionGuard, FloatingActionButton, Pagination,
         ContentView, SearchInput, ExportDropdown, ExportMenuItem,
         UsoTarjetasImportModal, RegistrosImportModal,
@@ -129,6 +129,36 @@
     $effect(() => {
         const depId = dependencies.find((d) => d.name === dependencyFilter)?.id || "";
         personnelState.filters.dependencyId = depId;
+    });
+
+    function clearPersonnelFilters() {
+        personnelState.filters.status = "Todos";
+        personnelState.filters.search = "";
+        dependencyFilter = "";
+        buildingFilter = "";
+        floorFilter = "";
+        mediaFilter = "";
+    }
+
+    // Chips de filtros activos para el toolbar.
+    let personnelChips = $derived.by(() => {
+        const chips: { label: string; value: string; onClear: () => void }[] = [];
+        if (personnelState.filters.status !== "Todos") {
+            chips.push({ label: "Estado", value: personnelState.filters.status, onClear: () => (personnelState.filters.status = "Todos") });
+        }
+        if (dependencyFilter) {
+            chips.push({ label: "Dependencia", value: dependencyFilter, onClear: () => (dependencyFilter = "") });
+        }
+        if (buildingFilter) {
+            chips.push({ label: "Edificio", value: buildingFilter, onClear: () => (buildingFilter = "") });
+        }
+        if (floorFilter) {
+            chips.push({ label: "Piso", value: floorFilterLabel || floorFilter, onClear: () => (floorFilter = "") });
+        }
+        if (mediaFilter) {
+            chips.push({ label: "Tarjeta", value: mediaTypeName || mediaFilter, onClear: () => (mediaFilter = "") });
+        }
+        return chips;
     });
 
     // Estado del modal
@@ -337,56 +367,62 @@
 <div class="space-y-6">
     <SectionHeader title="Directorio de Personal">
         {#snippet filters()}
-            <FilterSelect
-                label="Estado"
-                options={[
-                    "Todos",
-                    "Activo/a",
-                    "No Activos",
-                    "Parcial",
-                    "En proceso",
-                    "Media de otro edificio",
-                    "Otro edificio en proceso",
-                    "Sin Acceso",
-                    "Bloqueado/a",
-                    "Baja",
-                ]}
-                bind:value={personnelState.filters.status}
-            />
-            <FilterSelect
-                label="Dependencia"
-                options={dependencyNames}
-                placeholder="Todas las dependencias"
-                bind:value={dependencyFilter}
-            />
-            <FilterSelect
-                label="Edificio"
-                options={buildingNames}
-                placeholder="Todos los edificios"
-                bind:value={buildingFilter}
-            />
-            <FilterSelect
-                label="Piso base"
-                options={isFloorFilterEnabled ? floorOptions : []}
-                placeholder={floorPlaceholder}
-                bind:value={floorFilter}
-                disabled={!isFloorFilterEnabled}
-            />
-            <FilterSelect
-                label="Tipo de tarjeta"
-                options={mediaTypeOptions}
-                placeholder="Todos los tipos"
-                bind:value={mediaFilter}
-            />
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
-                <SearchInput
-                    placeholder="Nombre, No. Empleado..."
-                    bind:value={personnelState.filters.search}
-                    oninput={() => {}}
-                    class="h-9 text-xs font-bold"
-                />
-            </div>
+            <FilterToolbar chips={personnelChips} onClearAll={clearPersonnelFilters}>
+                {#snippet primary()}
+                    <FilterSelect
+                        label="Estado"
+                        options={[
+                            "Todos",
+                            "Activo/a",
+                            "No Activos",
+                            "Parcial",
+                            "En proceso",
+                            "Media de otro edificio",
+                            "Otro edificio en proceso",
+                            "Sin Acceso",
+                            "Bloqueado/a",
+                            "Baja",
+                        ]}
+                        bind:value={personnelState.filters.status}
+                    />
+                    <FilterSelect
+                        label="Edificio"
+                        options={buildingNames}
+                        placeholder="Todos los edificios"
+                        bind:value={buildingFilter}
+                    />
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-[200px] w-full">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Buscar</span>
+                        <SearchInput
+                            placeholder="Nombre, No. Empleado..."
+                            bind:value={personnelState.filters.search}
+                            oninput={() => {}}
+                            class="h-9 text-xs font-bold"
+                        />
+                    </div>
+                {/snippet}
+                {#snippet overflow()}
+                    <FilterSelect
+                        label="Dependencia"
+                        options={dependencyNames}
+                        placeholder="Todas las dependencias"
+                        bind:value={dependencyFilter}
+                    />
+                    <FilterSelect
+                        label="Piso base"
+                        options={isFloorFilterEnabled ? floorOptions : []}
+                        placeholder={floorPlaceholder}
+                        bind:value={floorFilter}
+                        disabled={!isFloorFilterEnabled}
+                    />
+                    <FilterSelect
+                        label="Tipo de tarjeta"
+                        options={mediaTypeOptions}
+                        placeholder="Todos los tipos"
+                        bind:value={mediaFilter}
+                    />
+                {/snippet}
+            </FilterToolbar>
         {/snippet}
 
         {#snippet actions()}

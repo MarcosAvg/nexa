@@ -6,7 +6,7 @@
     } from "../stores";
     import {
         SectionHeader, TaskBanner, Button, FilterSelect,
-        Input, PermissionGuard, ContentView,
+        FilterToolbar, Input, PermissionGuard, ContentView,
         Pagination, ExportDropdown, ExportMenuItem, Tabs,
         ModificationCompareModal,
     } from "../components";
@@ -102,6 +102,44 @@
 
     // Secciones
     let currentSection = $derived(ticketState.filters.section);
+
+    function clearTicketFilters() {
+        ticketState.filters.type = 'Todos';
+        ticketState.filters.search = '';
+        responsivaFilter = 'Todas';
+        movementTypeFilter = 'Todas';
+        mediaFilter = 'Todas';
+        depNameFilter = 'Todas';
+        buildingNameFilter = 'Todos';
+        floorFilter = 'Todos';
+    }
+
+    // Chips de filtros activos para el toolbar.
+    let ticketChips = $derived.by(() => {
+        const chips: { label: string; value: string; onClear: () => void }[] = [];
+        if (currentSection === "General" && ticketState.filters.type !== "Todos") {
+            chips.push({ label: "Tipo", value: ticketState.filters.type, onClear: () => (ticketState.filters.type = "Todos") });
+        }
+        if (currentSection === "Responsivas" && movementTypeFilter !== "Todas") {
+            chips.push({ label: "Tipo", value: movementTypeFilter, onClear: () => (movementTypeFilter = "Todas") });
+        }
+        if (currentSection === "Responsivas" && responsivaFilter !== "Todas") {
+            chips.push({ label: "Estado", value: responsivaFilter, onClear: () => (responsivaFilter = "Todas") });
+        }
+        if (currentSection === "Responsivas" && mediaFilter !== "Todas") {
+            chips.push({ label: "Medio", value: mediaFilter, onClear: () => (mediaFilter = "Todas") });
+        }
+        if (currentSection === "Responsivas" && depNameFilter !== "Todas") {
+            chips.push({ label: "Dependencia", value: depNameFilter, onClear: () => (depNameFilter = "Todas") });
+        }
+        if (buildingNameFilter !== "Todos") {
+            chips.push({ label: "Edificio", value: buildingNameFilter, onClear: () => (buildingNameFilter = "Todos") });
+        }
+        if (floorFilter !== "Todos") {
+            chips.push({ label: "Piso", value: floorFilter, onClear: () => (floorFilter = "Todos") });
+        }
+        return chips;
+    });
 
     function switchSection(section: "General" | "Responsivas") {
         if (ticketState.filters.section === section) return;
@@ -430,103 +468,104 @@ function onStartCompletion(ticket: any) {
             />
         {/snippet}
         {#snippet filters()}
-            <div
-                class="flex flex-col xl:flex-row flex-wrap gap-4 items-center w-full"
-            >
-                <!-- Type Filters -->
-                {#if currentSection === "General"}
-                    <div class="w-full xl:w-auto">
+            <FilterToolbar chips={ticketChips} onClearAll={clearTicketFilters}>
+                {#snippet primary()}
+                    <!-- Type Filters -->
+                    {#if currentSection === "General"}
+                        <div class="w-full xl:w-auto">
+                            <FilterSelect
+                                label="Tipo"
+                                options={ticketTypes}
+                                placeholder=""
+                                bind:value={ticketState.filters.type}
+                            />
+                        </div>
+                    {/if}
+
+                    <!-- Tipo de movimiento (solo Responsivas) -->
+                    {#if currentSection === "Responsivas"}
+                        <div class="w-full xl:w-auto">
+                            <FilterSelect
+                                label="Tipo"
+                                options={["Todas", "Alta de Personal", "Reposición", "Asignación", "Sin clasificar"]}
+                                placeholder=""
+                                bind:value={movementTypeFilter}
+                            />
+                        </div>
+                    {/if}
+
+                    <!-- Urgency (solo Responsivas) -->
+                    {#if currentSection === "Responsivas"}
+                        <div class="w-full xl:w-auto">
+                            <FilterSelect
+                                label="Estado"
+                                options={["Todas", "Pendiente", "Por vencer", "Baja de Registro"]}
+                                bind:value={responsivaFilter}
+                            />
+                        </div>
+                    {/if}
+
+                    <!-- Medio (solo Responsivas) -->
+                    {#if currentSection === "Responsivas"}
+                        <div class="w-full xl:w-auto">
+                            <FilterSelect
+                                label="Medio"
+                                options={mediaOptions}
+                                placeholder=""
+                                bind:value={mediaFilter}
+                            />
+                        </div>
+                    {/if}
+
+                    <!-- Search -->
+                    <div class="flex-1 min-w-[200px] w-full relative">
+                        <Search
+                            class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                            size={16}
+                        />
+                        <Input
+                            id="ticket-search"
+                            placeholder="Buscar por folio, persona..."
+                            class="pl-10 h-9 text-xs font-bold"
+                            bind:value={ticketState.filters.search}
+                        />
+                    </div>
+                {/snippet}
+                {#snippet overflow()}
+                    <!-- Dependency -->
+                    {#if currentSection === "Responsivas"}
+                        <div class="w-full">
+                            <FilterSelect
+                                label="Dependencia"
+                                options={["Todas", ...dependencies.map((d) => d.name)]}
+                                placeholder=""
+                                bind:value={depNameFilter}
+                            />
+                        </div>
+                    {/if}
+
+                    <!-- Edificio (radicación de la persona) -->
+                    <div class="w-full">
                         <FilterSelect
-                            label="Tipo"
-                            options={ticketTypes}
+                            label="Edificio"
+                            options={["Todos", ...buildings.map((b) => b.name), "Sin Edificio"]}
                             placeholder=""
-                            bind:value={ticketState.filters.type}
+                            bind:value={buildingNameFilter}
                         />
                     </div>
-                {/if}
 
-                <!-- Tipo de movimiento (solo Responsivas) -->
-                {#if currentSection === "Responsivas"}
-                    <div class="w-full xl:w-auto">
+                    <!-- Piso base (depende del edificio) -->
+                    <div class="w-full">
                         <FilterSelect
-                            label="Tipo"
-                            options={["Todas", "Alta de Personal", "Reposición", "Asignación", "Sin clasificar"]}
-                            placeholder=""
-                            bind:value={movementTypeFilter}
+                            label="Piso"
+                            options={floorOptions}
+                            placeholder={buildingNameFilter === "Todos" ? "Elige edificio" : "Todos los pisos"}
+                            bind:value={floorFilter}
+                            disabled={!isFloorFilterEnabled}
                         />
                     </div>
-                {/if}
-
-                <!-- Urgency (solo Responsivas) -->
-                {#if currentSection === "Responsivas"}
-                    <div class="w-full xl:w-auto">
-                        <FilterSelect
-                            label="Estado"
-                            options={["Todas", "Pendiente", "Por vencer", "Baja de Registro"]}
-                            bind:value={responsivaFilter}
-                        />
-                    </div>
-                {/if}
-
-                <!-- Medio (solo Responsivas) -->
-                {#if currentSection === "Responsivas"}
-                    <div class="w-full xl:w-auto">
-                        <FilterSelect
-                            label="Medio"
-                            options={mediaOptions}
-                            placeholder=""
-                            bind:value={mediaFilter}
-                        />
-                    </div>
-                {/if}
-
-                <!-- Dependency -->
-                {#if currentSection === "Responsivas"}
-                    <div class="w-full xl:w-auto">
-                        <FilterSelect
-                            label="Dependencia"
-                            options={["Todas", ...dependencies.map((d) => d.name)]}
-                            placeholder=""
-                            bind:value={depNameFilter}
-                        />
-                    </div>
-                {/if}
-
-                <!-- Edificio (radicación de la persona) -->
-                <div class="w-full xl:w-auto">
-                    <FilterSelect
-                        label="Edificio"
-                        options={["Todos", ...buildings.map((b) => b.name), "Sin Edificio"]}
-                        placeholder=""
-                        bind:value={buildingNameFilter}
-                    />
-                </div>
-
-                <!-- Piso base (depende del edificio) -->
-                <div class="w-full xl:w-auto">
-                    <FilterSelect
-                        label="Piso"
-                        options={floorOptions}
-                        placeholder={buildingNameFilter === "Todos" ? "Elige edificio" : "Todos los pisos"}
-                        bind:value={floorFilter}
-                        disabled={!isFloorFilterEnabled}
-                    />
-                </div>
-
-                <!-- Search -->
-                <div class="flex-1 min-w-[200px] w-full relative">
-                    <Search
-                        class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                        size={16}
-                    />
-                    <Input
-                        id="ticket-search"
-                        placeholder="Buscar por folio, persona..."
-                        class="pl-10 h-9 text-xs font-bold"
-                        bind:value={ticketState.filters.search}
-                    />
-                </div>
-            </div>
+                {/snippet}
+            </FilterToolbar>
         {/snippet}
 
         {#snippet actions()}
@@ -582,14 +621,7 @@ function onStartCompletion(ticket: any) {
             : "from-emerald-50 to-emerald-100 ring-1 ring-emerald-200/60 text-emerald-400"}
         hasFilters={!!(ticketState.filters.type !== "Todos" || ticketState.filters.search || responsivaFilter !== "Todas" || movementTypeFilter !== "Todas" || mediaFilter !== "Todas" || depNameFilter !== "Todas" || buildingNameFilter !== "Todos" || floorFilter !== "Todos")}
         onClearFilters={() => {
-            ticketState.filters.type = 'Todos';
-            ticketState.filters.search = '';
-            responsivaFilter = 'Todas';
-            movementTypeFilter = 'Todas';
-            mediaFilter = 'Todas';
-            depNameFilter = 'Todas';
-            buildingNameFilter = 'Todos';
-            floorFilter = 'Todos';
+            clearTicketFilters();
             // El $effect debounced dispara refresh(1) automáticamente
         }}
         skeletonColumns={4}

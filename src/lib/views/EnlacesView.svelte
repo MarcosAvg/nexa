@@ -6,7 +6,7 @@
     import { fullName } from "../utils";
     import {
         SectionHeader, FloatingActionButton, PermissionGuard,
-        DataTable, FilterSelect, Button, ContentView, SearchInput,
+        DataTable, FilterSelect, FilterToolbar, Button, ContentView, SearchInput,
         AddEnlaceModal, EditEnlaceModal,
     } from "../components";
     import { catalogState } from "../stores";
@@ -28,6 +28,24 @@
     let searchQuery = $state("");
     let filterDependency = $state("");
     let filterFloor = $state("");
+
+    function clearEnlaceFilters() {
+        searchQuery = '';
+        filterDependency = '';
+        filterFloor = '';
+    }
+
+    // Chips de filtros activos para el toolbar.
+    let enlaceChips = $derived.by(() => {
+        const chips: { label: string; value: string; onClear: () => void }[] = [];
+        if (filterDependency) {
+            chips.push({ label: "Dependencia", value: filterDependency, onClear: () => (filterDependency = "") });
+        }
+        if (filterFloor) {
+            chips.push({ label: "Piso", value: filterFloor, onClear: () => (filterFloor = "") });
+        }
+        return chips;
+    });
 
     let isEditOpen = $state(false);
     let selectedEnlaceForEdit = $state<Enlace | null>(null);
@@ -232,29 +250,35 @@
 <div class="space-y-6">
     <SectionHeader title="Directorio de Enlaces">
         {#snippet filters()}
-            <FilterSelect
-                label="Dependencia"
-                options={dependencyNames}
-                placeholder="Todas"
-                bind:value={filterDependency}
-            />
-            <FilterSelect
-                label="Piso Base"
-                options={availableFloors}
-                placeholder="Todos"
-                bind:value={filterFloor}
-            />
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <span
-                    class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap"
-                    >Buscar</span
-                >
-                <SearchInput
-                    placeholder="Nombre, correo o ext..."
-                    bind:value={searchQuery}
-                    class="h-9 text-xs font-bold"
-                />
-            </div>
+            <FilterToolbar chips={enlaceChips} onClearAll={clearEnlaceFilters}>
+                {#snippet primary()}
+                    <FilterSelect
+                        label="Dependencia"
+                        options={dependencyNames}
+                        placeholder="Todas"
+                        bind:value={filterDependency}
+                    />
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-[200px] w-full">
+                        <span
+                            class="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap"
+                            >Buscar</span
+                        >
+                        <SearchInput
+                            placeholder="Nombre, correo o ext..."
+                            bind:value={searchQuery}
+                            class="h-9 text-xs font-bold"
+                        />
+                    </div>
+                {/snippet}
+                {#snippet overflow()}
+                    <FilterSelect
+                        label="Piso Base"
+                        options={availableFloors}
+                        placeholder="Todos"
+                        bind:value={filterFloor}
+                    />
+                {/snippet}
+            </FilterToolbar>
         {/snippet}
         {#snippet actions()}
             <PermissionGuard requireEdit>
@@ -296,9 +320,7 @@
         emptyIconBgClass="from-violet-50 to-violet-100 ring-1 ring-violet-200/50 text-violet-400"
         hasFilters={!!(searchQuery || filterDependency || filterFloor)}
         onClearFilters={() => {
-            searchQuery = '';
-            filterDependency = '';
-            filterFloor = '';
+            clearEnlaceFilters();
         }}
         skeletonColumns={4}
         skeletonRows={5}
