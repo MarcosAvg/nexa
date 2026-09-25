@@ -263,13 +263,13 @@
 <div class="space-y-8">
     <!-- ── HERO ── -->
     <section class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-            <div class="flex items-center gap-2.5">
-                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">
+        <div class="min-w-0">
+            <div class="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
                     {greeting()}!
                 </h1>
                 {#if currentUser?.name}
-                    <span class="text-3xl font-extrabold text-sky-600 tracking-tight">
+                    <span class="text-2xl sm:text-3xl font-extrabold text-sky-600 tracking-tight break-words">
                         {currentUser.name.split(" ")[0]}
                     </span>
                 {/if}
@@ -395,7 +395,7 @@
                     </div>
                 </div>
                 <div class="p-6">
-                <div class="relative h-44 w-44 mx-auto">
+                <div class="relative h-40 w-40 sm:h-44 sm:w-44 mx-auto">
                     <canvas bind:this={stateCanvas}></canvas>
                 </div>
                     <div class="mt-5 grid grid-cols-2 gap-2">
@@ -445,11 +445,11 @@
                         </div>
                     {/each}
                     <div class="pt-4 border-t border-slate-100/60">
-                        <div class="grid gap-3 {mediaStock.length === 3 ? 'grid-cols-3' : mediaStock.length === 4 ? 'grid-cols-4' : 'grid-cols-2'}">
+                        <div class="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
                             {#each mediaStock as s}
                                 {@const cls = mediaTypeStockClasses(s.name)}
-                                <div class="{cls.wrap} rounded-xl p-3 text-center">
-                                    <div class="text-[10px] font-extrabold {cls.label} uppercase tracking-wider mb-0.5">Stock {s.name}</div>
+                                <div class="{cls.wrap} rounded-xl p-3 text-center min-w-0">
+                                    <div class="text-[10px] font-extrabold {cls.label} uppercase tracking-wider mb-0.5 truncate">Stock {s.name}</div>
                                     <div class="text-xl font-black {cls.value} tabular-nums">{s.stock}</div>
                                 </div>
                             {/each}
@@ -471,7 +471,7 @@
                 </div>
                 <div class="p-6 space-y-4">
                     <div class="flex items-center gap-4">
-                        <div class="relative h-24 w-24 shrink-0">
+                        <div class="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0">
                             <canvas bind:this={qualityCanvas}></canvas>
                         </div>
                         <div>
@@ -559,8 +559,8 @@
                                 {#each bldg.floors as floor}
                                     {@const pisoBarWidth = bldgTotal > 0 ? pct(floor.people, bldgTotal) : 0}
                                     {@const pisoPct = bldgTotal > 0 ? pct(floor.people, bldgTotal) : 0}
-                                    <div class="flex items-center gap-3">
-                                        <span class="text-[11px] font-bold text-slate-600 w-24 shrink-0 truncate">{floor.label}</span>
+                                    <div class="flex items-center gap-2 sm:gap-3">
+                                        <span class="text-[11px] font-bold text-slate-600 w-16 sm:w-24 shrink-0 truncate">{floor.label}</span>
                                         <div class="flex-1 min-w-0 h-2 bg-slate-100 rounded-full overflow-hidden">
                                             <div class="bg-cyan-500 h-full rounded-full transition-all duration-700" style="width: {pisoBarWidth}%"></div>
                                         </div>
@@ -588,8 +588,8 @@
                             <p class="text-[11px] text-slate-400 font-medium">Incremento de plantilla por rango de fechas</p>
                         </div>
                     </div>
-                    <div class="flex items-end gap-2 flex-wrap">
-                        <div class="w-40">
+                    <div class="flex items-end gap-2 flex-wrap w-full xl:w-auto">
+                        <div class="flex-1 min-w-[140px] sm:w-40 sm:flex-none">
                             <label for="growth-start" class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1 ml-1"><Calendar size={12} /> Desde</label>
                             <Input
                                 id="growth-start"
@@ -600,7 +600,7 @@
                                 class="h-9"
                             />
                         </div>
-                        <div class="w-40">
+                        <div class="flex-1 min-w-[140px] sm:w-40 sm:flex-none">
                             <label for="growth-end" class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1 ml-1"><Calendar size={12} /> Hasta</label>
                             <Input
                                 id="growth-end"

@@ -372,7 +372,7 @@
                     <button
                         type="button"
                         disabled={!!replacingCard}
-                        class="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all {cardType ===
+                        class="relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border-2 transition-all {cardType ===
                         m.name
                             ? typeActiveClass(m)
                             : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'} {replacingCard &&

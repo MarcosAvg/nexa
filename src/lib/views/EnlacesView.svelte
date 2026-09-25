@@ -247,6 +247,76 @@
     <span>{row.extension || "N/A"}</span>
 {/snippet}
 
+{#snippet rowActions(row: Enlace)}
+    <div class="flex flex-wrap items-center gap-1 justify-end">
+        {#if row.personnel?.email && row.personnel?.email !== "N/A"}
+            <button
+                type="button"
+                class="h-11 w-11 sm:h-9 sm:w-9 flex items-center justify-center text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+                onclick={() => copyEmail(row.personnel!.email!)}
+                title="Copiar Correo"
+            >
+                <Copy size={16} />
+            </button>
+            <button
+                type="button"
+                class="h-11 w-11 sm:h-9 sm:w-9 flex items-center justify-center text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent hover:border-indigo-100"
+                onclick={() => sendEmail(row.personnel!.email!)}
+                title="Enviar Correo"
+            >
+                <Mail size={16} />
+            </button>
+        {/if}
+        <PermissionGuard requireEdit>
+            {#snippet children({ disabled })}
+                <button
+                    type="button"
+                    class="h-11 w-11 sm:h-9 sm:w-9 flex items-center justify-center text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors border border-transparent hover:border-emerald-100"
+                    onclick={() => requestEdit(row)}
+                    title="Editar Extensión"
+                    {disabled}
+                >
+                    <Edit size={16} />
+                </button>
+                <button
+                    type="button"
+                    class="h-11 w-11 sm:h-9 sm:w-9 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
+                    onclick={() => requestRemove(row)}
+                    title="Remover"
+                    {disabled}
+                >
+                    <Trash2 size={16} />
+                </button>
+            {/snippet}
+        </PermissionGuard>
+    </div>
+{/snippet}
+
+{#snippet mobileCard(row: Enlace)}
+    <article class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-4 space-y-3">
+        <div class="min-w-0">
+            {@render renderName(row)}
+        </div>
+        <div class="space-y-1.5">
+            <div class="flex items-start justify-between gap-3">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 shrink-0">Dependencia</span>
+                <span class="text-[13px] font-semibold text-slate-700 text-right min-w-0">{@render renderDependency(row)}</span>
+            </div>
+            <div class="flex items-start justify-between gap-3">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 shrink-0">Correo</span>
+                <span class="text-[13px] font-semibold text-slate-700 text-right min-w-0 break-all">{@render renderEmail(row)}</span>
+            </div>
+            <div class="flex items-start justify-between gap-3">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 shrink-0">Extensión</span>
+                <span class="text-[13px] font-semibold text-slate-700 text-right min-w-0">{@render renderExtension(row)}</span>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-1 pt-2.5 border-t border-slate-100">
+            {@render rowActions(row)}
+        </div>
+    </article>
+{/snippet}
+
 <div class="space-y-6">
     <SectionHeader title="Directorio de Enlaces">
         {#snippet filters()}
@@ -328,51 +398,7 @@
         cardClass="overflow-hidden"
     >
         {#snippet children()}
-            <DataTable data={filteredEnlaces} {columns} actionsWidth="220px">
-                {#snippet actions(row: Enlace)}
-                    <div class="flex items-center gap-1 justify-end">
-                        {#if row.personnel?.email && row.personnel?.email !== "N/A"}
-                            <button
-                                type="button"
-                                class="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
-                                onclick={() => copyEmail(row.personnel!.email!)}
-                                title="Copiar Correo"
-                            >
-                                <Copy size={16} />
-                            </button>
-                            <button
-                                type="button"
-                                class="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent hover:border-indigo-100"
-                                onclick={() => sendEmail(row.personnel!.email!)}
-                                title="Enviar Correo"
-                            >
-                                <Mail size={16} />
-                            </button>
-                        {/if}
-                        <PermissionGuard requireEdit>
-                            {#snippet children({ disabled })}
-                                <button
-                                    type="button"
-                                    class="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors border border-transparent hover:border-emerald-100"
-                                    onclick={() => requestEdit(row)}
-                                    title="Editar Extensión"
-                                    {disabled}
-                                >
-                                    <Edit size={16} />
-                                </button>
-                                <button
-                                    type="button"
-                                    class="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
-                                    onclick={() => requestRemove(row)}
-                                    title="Remover"
-                                    {disabled}
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            {/snippet}
-                        </PermissionGuard>
-                    </div>
-                {/snippet}
+            <DataTable data={filteredEnlaces} {columns} actions={rowActions} mobileCard={mobileCard} actionsWidth="220px">
             </DataTable>
         {/snippet}
 

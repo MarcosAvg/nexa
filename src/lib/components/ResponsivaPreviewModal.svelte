@@ -19,6 +19,7 @@
 
     import { responsivaService, fetchLegalText } from "../services/responsiva";
     import { supabase } from "../supabase";
+    import { mediaState } from "../stores";
 
     import bgImage from "../../assets/responsiva_bg.png";
 
@@ -95,8 +96,8 @@
             // Texto legal desde el catálogo de plantillas (data-driven)
             fetchLegalText(card?.type ?? "").then((t) => (legalTexts = t));
 
-            // Activar modo texto automático en pantallas pequeñas
-            if (window.innerWidth < 480) {
+            // Activar modo texto automático en pantallas pequeñas (reactivo a rotación)
+            if (mediaState.isPhone.matches) {
                 isTextMode = true;
             }
         }

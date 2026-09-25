@@ -431,7 +431,7 @@
                     <Button
                         variant="soft-blue"
                         onclick={() => (showKoneUsageModal = true)}
-                        class="flex items-center gap-2.5 h-10 px-5"
+                        class="flex items-center gap-2.5 h-11 sm:h-10 px-5"
                         disabled={!networkStore.isOnline}
                     >
                         <Upload
@@ -448,7 +448,7 @@
                 <Button
                     variant="soft-emerald"
                     onclick={() => (showRegistrosImport = true)}
-                    class="flex items-center gap-2.5 h-10 px-5"
+                    class="flex items-center gap-2.5 h-11 sm:h-10 px-5"
                     disabled={!networkStore.isOnline}
                 >
                     <Upload size={18} strokeWidth={2.5} class="text-emerald-600/80" />
@@ -460,7 +460,7 @@
                 icon={FileSpreadsheet}
                 label="Exportar Excel"
                 disabled={personnel.length === 0 || !networkStore.isOnline}
-                class="h-10 px-5"
+                class="h-11 sm:h-10 px-5"
             >
                 {#snippet items()}
                     <ExportMenuItem
@@ -484,7 +484,7 @@
                             {#each mediaTypeNames as t}
                                 <button
                                     type="button"
-                                    class="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-[12px] font-bold transition-colors {exportCardTypes.includes(t)
+                                    class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[12px] font-bold transition-colors {exportCardTypes.includes(t)
                                         ? 'bg-slate-50 text-slate-800'
                                         : 'text-slate-400 hover:text-slate-600'}"
                                     onclick={() => toggleExportCardType(t)}
@@ -520,7 +520,7 @@
             <PermissionGuard requireEdit>
                 <Button
                     variant="primary"
-                    class="flex items-center gap-2.5 h-10 px-6 shadow-lg shadow-blue-500/20"
+                    class="flex items-center gap-2.5 h-11 sm:h-10 px-6 shadow-lg shadow-blue-500/20"
                     onclick={onOpenAddModal}
                     disabled={!networkStore.isOnline}
                 >

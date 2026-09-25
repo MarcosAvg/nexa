@@ -53,7 +53,12 @@
     // Valores pequeños = movimiento pequeño de tablet → trazos grandes en canvas.
     const ZONE_W = 600; // px of screen width mapped to canvas
     const ZONE_H = 350; // px of screen height mapped to canvas
-    let captureZone: { left: number; top: number } | null = null;
+    let captureZone: {
+        left: number;
+        top: number;
+        width: number;
+        height: number;
+    } | null = null;
 
     function resetCaptureZone() {
         captureZone = null;
@@ -61,50 +66,81 @@
 
     function ensureCaptureZone(e: PointerEvent) {
         if (captureZone) return;
+        // La zona nunca puede ser mayor que el viewport: en teléfonos (< 600px)
+        // usar el ancho real evita que la franja derecha del lienzo sea inalcanzable.
+        const zoneW = Math.min(ZONE_W, window.innerWidth);
+        const zoneH = Math.min(ZONE_H, window.innerHeight);
     // Offset para que el primer toque se asigne a (1/3 ancho, 2/3 alto) del canvas.
     // Horizontal: 1/3 desde la izquierda, dejando espacio para firmar hacia la derecha.
     // Vertical: 2/3 desde arriba (1/3 desde abajo), línea base natural inferior.
         captureZone = {
             left: Math.max(
                 0,
-                Math.min(e.clientX - ZONE_W * 0.25, window.innerWidth - ZONE_W),
+                Math.min(e.clientX - zoneW * 0.25, window.innerWidth - zoneW),
             ),
             top: Math.max(
                 0,
-                Math.min(
-                    e.clientY - ZONE_H * 0.75,
-                    window.innerHeight - ZONE_H,
-                ),
+                Math.min(e.clientY - zoneH * 0.75, window.innerHeight - zoneH),
             ),
+            width: zoneW,
+            height: zoneH,
         };
     }
 
     // ─── Canvas Init ────────────────────────────────────────────────────
+    let resizeObserver: ResizeObserver | null = null;
+
     onMount(() => {
         setTimeout(initCanvas, 50);
+        // Re-inicializa el lienzo cuando cambia su tamaño (rotación/cambio de layout),
+        // preservando la firma ya dibujada.
+        if (typeof ResizeObserver !== "undefined" && canvasEl) {
+            resizeObserver = new ResizeObserver(() => {
+                if (!isDrawing) reinitCanvasPreservingSignature();
+            });
+            resizeObserver.observe(canvasEl);
+        }
     });
 
     onDestroy(() => {
+        resizeObserver?.disconnect();
+        resizeObserver = null;
         destroyOverlay();
     });
 
     function initCanvas() {
         if (!canvasEl) return;
-        ctx = canvasEl.getContext("2d", { desynchronized: true });
-        if (ctx) {
-            ctx.strokeStyle = "#000";
-            ctx.lineCap = "round";
-            ctx.lineJoin = "round";
-        }
 
         const dpr = window.devicePixelRatio || 1;
         const rect = canvasEl.getBoundingClientRect();
         const width = rect.width || 800;
         const height = rect.height || 380;
 
-        canvasEl.width = width * dpr;
-        canvasEl.height = height * dpr;
-        ctx?.scale(dpr, dpr);
+        // Asignar width/height resetea el estado del contexto (incluido el transform).
+        canvasEl.width = Math.round(width * dpr);
+        canvasEl.height = Math.round(height * dpr);
+
+        ctx = canvasEl.getContext("2d", { desynchronized: true });
+        if (!ctx) return;
+        // setTransform es idempotente (a diferencia de scale, que se acumularía).
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.strokeStyle = "#000";
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+    }
+
+    function reinitCanvasPreservingSignature() {
+        if (!canvasEl) return;
+        const data = hasSignature ? canvasEl.toDataURL("image/png") : null;
+        initCanvas();
+        if (!data || !ctx || !canvasEl) return;
+        const dpr = window.devicePixelRatio || 1;
+        const img = new Image();
+        img.onload = () => {
+            if (!ctx || !canvasEl) return;
+            ctx.drawImage(img, 0, 0, canvasEl.width / dpr, canvasEl.height / dpr);
+        };
+        img.src = data;
     }
 
     // ─── Pointer-to-canvas coordinate mapping ───────────────────────────
@@ -119,8 +155,8 @@
 
         if (tabletMode && captureZone) {
             // Mapear zona de captura → canvas proporcionalmente
-            const x = ((e.clientX - captureZone.left) / ZONE_W) * rect.width;
-            const y = ((e.clientY - captureZone.top) / ZONE_H) * rect.height;
+            const x = ((e.clientX - captureZone.left) / captureZone.width) * rect.width;
+            const y = ((e.clientY - captureZone.top) / captureZone.height) * rect.height;
 
             // Limitar a bordes del canvas (permitir ligero exceso para trazos de borde)
             const pad = 5;

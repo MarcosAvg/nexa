@@ -1,5 +1,28 @@
 @import "tailwindcss";
 
+@layer base {
+    html,
+    body {
+        height: 100%;
+    }
+
+    body {
+        /* Evita el rebote/scroll elástico que desplaza el layout de la PWA. */
+        overscroll-behavior-y: none;
+        /* Elimina el flash azul/gris al tocar en iOS/Android. */
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Evita el auto-zoom de iOS al enfocar campos con font-size < 16px. */
+    @media (max-width: 1023px) {
+        input,
+        select,
+        textarea {
+            font-size: 16px;
+        }
+    }
+}
+
 @keyframes shimmer {
     0% { transform: translateX(-100%); }
     100% { transform: translateX(100%); }
@@ -7,4 +30,16 @@
 
 .animate-shimmer {
     animation: shimmer 2s ease-in-out infinite;
+}
+
+/* Utilidad para ocultar la barra de scroll manteniendo el desplazamiento. */
+.scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
 }

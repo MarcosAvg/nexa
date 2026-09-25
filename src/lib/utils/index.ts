@@ -9,6 +9,7 @@ export type { DbError } from './batchPaginate';
 // directamente vía Supabase Realtime y llamadas a stores.
 
 export { dbCache } from './dbCache';
+export { scrollLock } from './scrollLock';
 export { catalogCache } from './catalogCache';
 export { generateLegalHash } from './crypto';
 export { generateCardPdf, generateResponsivaPdf } from './pdfGenerator';

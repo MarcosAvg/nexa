@@ -774,7 +774,7 @@ async function loadFloors() {
                                     </div>
                                 </div>
                                 <div
-                                    class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    class="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                                 >
                                     <button
                                         class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"

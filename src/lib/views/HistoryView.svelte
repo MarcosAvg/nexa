@@ -162,6 +162,29 @@
     </Badge>
 {/snippet}
 
+{#snippet mobileHistoryCard(row: HistoryLog)}
+    <article class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-4 space-y-2.5">
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                {@render renderEntity(row)}
+            </div>
+            <div class="shrink-0">
+                {@render renderHistoryAction(row)}
+            </div>
+        </div>
+        <p class="text-sm text-slate-600 break-words">
+            {cleanMessage(row)}
+        </p>
+        <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+            <span class="inline-flex items-center gap-1 min-w-0">
+                <User size={11} class="text-slate-400 shrink-0" />
+                <span class="truncate">{row.performed_by_name || "—"}</span>
+            </span>
+            <span class="whitespace-nowrap">{formatDateTime(row.timestamp)}</span>
+        </div>
+    </article>
+{/snippet}
+
 {#snippet renderStoryStep(step: HistoryLog, isLast: boolean)}
     <div class="relative flex gap-3 pl-10 pr-5 py-3">
         <!-- Punto de la línea de tiempo (alineado con la línea continua) -->
@@ -269,14 +292,14 @@
             <div class="flex items-center gap-1 p-1 rounded-xl bg-slate-100/80">
                 <button
                     type="button"
-                    class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-extrabold uppercase tracking-wider transition-colors {viewMode === 'flow' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}"
+                    class="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-[11px] font-extrabold uppercase tracking-wider transition-colors {viewMode === 'flow' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}"
                     onclick={() => (viewMode = "flow")}
                 >
                     <Layers size={13} /> Por flujo
                 </button>
                 <button
                     type="button"
-                    class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-extrabold uppercase tracking-wider transition-colors {viewMode === 'individual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}"
+                    class="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-[11px] font-extrabold uppercase tracking-wider transition-colors {viewMode === 'individual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}"
                     onclick={() => (viewMode = "individual")}
                 >
                     <List size={13} /> Individual
@@ -285,7 +308,7 @@
 
             <Button
                 variant="outline"
-                class="flex items-center gap-2.5 h-10 px-4 group"
+                class="flex items-center gap-2.5 h-11 sm:h-10 px-4 group"
                 disabled={viewMode === "flow" ? storiesLoading : historyState.pagination.isLoading}
                 onclick={() => (viewMode === "flow" ? historyState.refreshFlows(1) : historyState.refresh(1))}
             >
@@ -302,7 +325,7 @@
 
             <Button
                 variant="soft-emerald"
-                class="flex items-center gap-2.5 h-10 px-6"
+                class="flex items-center gap-2.5 h-11 sm:h-10 px-6"
                 disabled={!networkStore.isOnline}
                 onclick={async () => {
                     const loadingToast = toast.loading(
@@ -386,6 +409,7 @@
                             width: "350px",
                         },
                     ]}
+                    mobileCard={mobileHistoryCard}
                 />
             {/if}
         {/snippet}

@@ -2,7 +2,7 @@
     import { link } from "svelte-spa-router";
     import active from "svelte-spa-router/active";
     import { uiState } from "../stores/ui.svelte"; // Ruta correcta al store
-    import { userState } from "../stores";
+    import { userState, mediaState } from "../stores";
     import { versionState } from "../stores/version.svelte";
     import Modal from "./Modal.svelte";
     import Logo from "./Logo.svelte";
@@ -94,7 +94,7 @@
                 class="group relative flex items-center gap-4 rounded-2xl {uiState.isSidebarCondensed ? 'px-0 justify-center w-12 mx-auto' : 'px-5'} py-3.5 text-[13.5px] font-extrabold transition-all duration-300 text-slate-400 hover:bg-white/[0.02] hover:text-white tracking-tight"
                 title={uiState.isSidebarCondensed ? item.label : undefined}
                 onclick={() => {
-                    if (window.innerWidth < 1024) {
+                    if (!mediaState.isDesktop.matches) {
                         uiState.toggleSidebar();
                     }
                 }}

@@ -235,7 +235,7 @@
                     <button
                         type="button"
                         onclick={toggleMode}
-                        class="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+                        class="w-full min-h-11 px-4 py-3 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-colors active:scale-[0.99]"
                     >
                         {isSignUp
                             ? "¿Ya tienes cuenta? Inicia sesión"

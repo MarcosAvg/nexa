@@ -17,7 +17,7 @@
 </script>
 
 <div
-    class="flex items-center gap-2 {variant === 'underline' ? 'border-b border-slate-200' : 'overflow-x-auto pb-1'} {className}"
+    class="flex items-center gap-2 overflow-x-auto scrollbar-none {variant === 'underline' ? 'border-b border-slate-200' : 'pb-1'} {className}"
 >
     {#each tabs as tab}
         <button

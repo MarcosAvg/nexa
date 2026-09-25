@@ -280,7 +280,7 @@
                             type="text"
                             placeholder="Filtrar por tipo o folio..."
                             bind:value={searchQuery}
-                            class="pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs w-56 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300"
+                            class="pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs w-full sm:w-56 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300"
                         />
                     </div>
                     <select bind:value={statusFilter} class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium">
@@ -304,7 +304,8 @@
             </div>
 
             <!-- Tabla profesional -->
-            <div class="rounded-xl border border-slate-200 overflow-hidden bg-white">
+            <div class="rounded-xl border border-slate-200 overflow-x-auto bg-white">
+              <div class="min-w-[560px]">
                 <div class="grid grid-cols-[44px_1fr_1fr_160px_44px] gap-px bg-slate-200 text-[10px] font-bold uppercase tracking-wider">
                     <div class="bg-slate-50 px-2 py-2.5 text-center">#</div>
                     <div class="bg-slate-50 px-3 py-2.5">Tipo <span class="normal-case font-normal text-slate-400">(desplegable)</span></div>
@@ -351,6 +352,7 @@
                     <span>Mostrando {filteredValidation.length} de {validation.length} filas</span>
                     <span class="hidden sm:inline">Tip: usa el desplegable “Tipo” de la plantilla para evitar errores de escritura.</span>
                 </div>
+              </div>
             </div>
 
             {#if totalConflict > 0}

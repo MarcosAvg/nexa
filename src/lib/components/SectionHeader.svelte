@@ -55,7 +55,7 @@
                     {#if actions}
                         <button
                             type="button"
-                            class="sm:hidden flex items-center justify-center p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 active:scale-95 transition-all duration-200
+                            class="sm:hidden flex items-center justify-center h-11 w-11 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 active:scale-95 transition-all duration-200
                                    {showActions ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-600'}"
                             onclick={() => {
                                 showActions = !showActions;
@@ -71,7 +71,7 @@
                     {#if filters}
                         <button
                             type="button"
-                            class="sm:hidden flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider
+                            class="sm:hidden flex items-center gap-1.5 h-11 px-3.5 rounded-xl text-[11px] font-bold uppercase tracking-wider
                                    {showFilters
                                 ? 'bg-slate-900 text-white shadow-lg'
                                 : 'bg-slate-100 text-slate-600'}"
@@ -94,7 +94,7 @@
                     {#if onSearch}
                         <button
                             type="button"
-                            class="sm:hidden p-2.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 active:scale-95 transition-all duration-200"
+                            class="sm:hidden flex items-center justify-center h-11 w-11 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 active:scale-95 transition-all duration-200"
                             onclick={onSearch}
                             aria-label="Buscar"
                         >
@@ -112,7 +112,14 @@
                     {@render actions()}
                 </div>
             {/if}
-        </div>            <!-- Contenedor de acciones plegable en móvil -->
+        </div>
+
+        <!-- titleExtra en móvil: fila propia para que controles como Tabs sean accesibles -->
+        {#if titleExtra}
+            <div class="md:hidden -mt-1">
+                {@render titleExtra()}
+            </div>
+        {/if}            <!-- Contenedor de acciones plegable en móvil -->
         {#if actions && showActions}
             <div
                 class="sm:hidden pt-4 pb-2 border-t border-slate-150/60"
@@ -125,7 +132,7 @@
         {/if}            <!-- Filtros (plegables en móvil) -->
         {#if filters}
             <div
-                class="sm:block {showFilters ? 'block' : 'hidden'} sm:pt-0 pt-2"
+                class="{showFilters ? '' : 'max-sm:hidden'} sm:pt-0 pt-2"
                 transition:slide={{ duration: 300 }}
             >
                 <div

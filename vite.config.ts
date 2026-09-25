@@ -12,8 +12,14 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        cleanupOutdatedCaches: true,
+        navigateFallback: 'index.html',
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        // No se cachean respuestas de la API de Supabase: son datos autenticados
+        // y el Cache Storage de Workbox no varía por cabeceras, lo que provocaría
+        // fuga de datos entre usuarios en un dispositivo compartido.
       },
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'maskable-icon.svg'],
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'maskable-icon-512x512.png'],
       // Habilitar SW en modo dev para que el prompt de instalación funcione en localhost
       devOptions: {
         enabled: true,
@@ -23,6 +29,8 @@ export default defineConfig({
         name: 'Nexa',
         short_name: 'Nexa',
         description: 'Sistema Profesional de Control de Accesos y Personal',
+        lang: 'es',
+        dir: 'ltr',
         start_url: '/',
         scope: '/',
         theme_color: '#f8fafc',
@@ -41,18 +49,40 @@ export default defineConfig({
           {
             src: 'pwa-192x192.png',
             sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
           },
           {
             src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'maskable-icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'maskable'
+          }
+        ],
+        shortcuts: [
+          {
+            name: 'Pendientes',
+            short_name: 'Pendientes',
+            url: '/tickets',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }]
+          },
+          {
+            name: 'Personal',
+            short_name: 'Personal',
+            url: '/personal',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }]
+          },
+          {
+            name: 'Tarjetas',
+            short_name: 'Tarjetas',
+            url: '/cards',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }]
           }
         ]
       }

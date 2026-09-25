@@ -1282,10 +1282,10 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         >
                                                             <!-- Tabla comparativa -->
                                                             <div
-                                                                class="rounded-lg border border-slate-200 overflow-hidden"
+                                                                class="rounded-lg border border-slate-200 overflow-x-auto"
                                                             >
                                                                 <div
-                                                                    class="grid grid-cols-[1fr_1fr_1fr_auto] gap-px bg-slate-200 text-[10px]"
+                                                                    class="grid grid-cols-[1fr_1fr_1fr_auto] min-w-[420px] gap-px bg-slate-200 text-[10px]"
                                                                 >
                                                                     <div
                                                                         class="bg-slate-50 px-3 py-2 font-bold text-slate-500 uppercase tracking-wider"
@@ -1608,10 +1608,10 @@ function cardStatusBadge(status: string): { text: string; color: "emerald" | "ro
                                                         >
                                                             <!-- Tabla de cambios -->
                                                             <div
-                                                                class="rounded-lg border border-amber-200 overflow-hidden"
+                                                                class="rounded-lg border border-amber-200 overflow-x-auto"
                                                             >
                                                                 <div
-                                                                    class="grid grid-cols-[1fr_1fr_1fr_auto] gap-px bg-amber-200 text-[10px]"
+                                                                    class="grid grid-cols-[1fr_1fr_1fr_auto] min-w-[420px] gap-px bg-amber-200 text-[10px]"
                                                                 >
                                                                     <div
                                                                         class="bg-amber-50 px-3 py-2 font-bold text-amber-700 uppercase tracking-wider"

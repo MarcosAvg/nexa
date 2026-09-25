@@ -188,7 +188,7 @@
                 {row.personName}
             </div>
             <div
-                class="opacity-0 group-hover/name:opacity-100 -translate-x-2 group-hover/name:translate-x-0 transition-all text-blue-500"
+                class="opacity-100 lg:opacity-0 -translate-x-0 lg:-translate-x-2 lg:group-hover/name:opacity-100 lg:group-hover/name:translate-x-0 transition-all text-blue-500"
             >
                 <User size={12} />
             </div>
@@ -209,6 +209,103 @@
             <ResponsivaProgramBadges responsiva_status={row.responsiva_status} programming_status={row.programming_status} />
         {/if}
     </div>
+{/snippet}
+
+{#snippet rowActions(row: any)}
+    <div class="flex flex-wrap items-center justify-end gap-1">
+        {#if row.person_id}
+            <button
+                type="button"
+                class="flex items-center justify-center h-11 w-11 sm:h-8 sm:w-8 rounded-full text-slate-400 hover:text-blue-600 hover:bg-blue-50 active:bg-blue-100 transition-colors"
+                onclick={() => onViewPerson(row)}
+                title="Ver Dueño"
+            >
+                <User size={16} />
+            </button>
+        {/if}
+
+        <PermissionGuard requireEdit>
+            {#if row.status === "inactive"}
+                <button
+                    type="button"
+                    class="flex items-center justify-center h-11 w-11 sm:h-8 sm:w-8 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 active:bg-emerald-100' : 'text-slate-300 cursor-not-allowed opacity-50'}"
+                    onclick={() => onBlockCard(row)}
+                    disabled={!networkStore.isOnline}
+                    title="Reactivar Tarjeta"
+                >
+                    <RefreshCw size={16} />
+                </button>
+            {:else}
+                <button
+                    type="button"
+                    class="flex items-center justify-center h-11 w-11 sm:h-8 sm:w-8 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 active:bg-amber-100' : 'text-slate-300 cursor-not-allowed opacity-50'}"
+                    onclick={() => onBlockCard(row)}
+                    disabled={!networkStore.isOnline}
+                    title={row.status === "blocked" ? "Desbloquear" : "Bloquear"}
+                >
+                    <Lock size={16} />
+                </button>
+            {/if}
+
+            {#if row.person_id && row.status !== "inactive"}
+                <button
+                    type="button"
+                    class="flex items-center justify-center h-11 w-11 sm:h-8 sm:w-8 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 active:bg-indigo-100' : 'text-slate-300 cursor-not-allowed opacity-50'}"
+                    onclick={() => onReplaceCard(row)}
+                    disabled={!networkStore.isOnline}
+                    title="Reposición por extravío"
+                >
+                    <RefreshCw size={16} />
+                </button>
+
+                <button
+                    type="button"
+                    class="flex items-center justify-center h-11 w-11 sm:h-8 sm:w-8 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-50 active:bg-rose-100' : 'text-slate-300 cursor-not-allowed opacity-50'}"
+                    onclick={() => onUnassignCard(row)}
+                    disabled={!networkStore.isOnline}
+                    title="Dar de baja (Desvincular)"
+                >
+                    <Ban size={16} />
+                </button>
+            {/if}
+
+            <button
+                type="button"
+                class="flex items-center justify-center h-11 w-11 sm:h-8 sm:w-8 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-100 active:bg-rose-200' : 'text-slate-300 cursor-not-allowed opacity-50'}"
+                onclick={() => onDeleteCard(row)}
+                disabled={!networkStore.isOnline}
+                title={row.status === "inactive" ? "Eliminar permanentemente" : "Dar de baja (Inactivar)"}
+            >
+                <Trash2 size={16} />
+            </button>
+        </PermissionGuard>
+    </div>
+{/snippet}
+
+{#snippet mobileCard(row: any)}
+    <article class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-4 space-y-3">
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                {@render renderCardType(row)}
+                <div class="mt-1.5">
+                    {@render renderCardFolio(row)}
+                </div>
+                <div class="mt-1">
+                    {#if row.personName === "Sin asignar"}
+                        <span class="text-slate-400 italic text-sm">{row.personName}</span>
+                    {:else}
+                        {@render renderCardPerson(row)}
+                    {/if}
+                </div>
+            </div>
+            <div class="shrink-0">
+                {@render renderCardStatus(row)}
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-1 pt-2.5 border-t border-slate-100">
+            {@render rowActions(row)}
+        </div>
+    </article>
 {/snippet}
 
 <div class="space-y-6">
@@ -330,77 +427,9 @@ data={cards}
                     { key: "personName", label: "Asignada a", render: renderCardPerson },
                     { key: "status", label: "Estado", render: renderCardStatus },
                 ]}
+                actions={rowActions}
+                mobileCard={mobileCard}
             >
-                {#snippet actions(row: any)}
-                    <div class="flex items-center justify-end gap-1">
-                        {#if row.person_id}
-                            <button
-                                type="button"
-                                class="p-1.5 rounded-full text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                onclick={() => onViewPerson(row)}
-                                title="Ver Dueño"
-                            >
-                                <User size={16} />
-                            </button>
-                        {/if}
-
-                        <PermissionGuard requireEdit>
-                            {#if row.status === "inactive"}
-                                <button
-                                    type="button"
-                                    class="p-1.5 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50' : 'text-slate-300 cursor-not-allowed opacity-50'}"
-                                    onclick={() => onBlockCard(row)}
-                                    disabled={!networkStore.isOnline}
-                                    title="Reactivar Tarjeta"
-                                >
-                                    <RefreshCw size={16} />
-                                </button>
-                            {:else}
-                                <button
-                                    type="button"
-                                    class="p-1.5 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50' : 'text-slate-300 cursor-not-allowed opacity-50'}"
-                                    onclick={() => onBlockCard(row)}
-                                    disabled={!networkStore.isOnline}
-                                    title={row.status === "blocked" ? "Desbloquear" : "Bloquear"}
-                                >
-                                    <Lock size={16} />
-                                </button>
-                            {/if}
-
-                            {#if row.person_id && row.status !== "inactive"}
-                                <button
-                                    type="button"
-                                    class="p-1.5 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50' : 'text-slate-300 cursor-not-allowed opacity-50'}"
-                                    onclick={() => onReplaceCard(row)}
-                                    disabled={!networkStore.isOnline}
-                                    title="Reposición por extravío"
-                                >
-                                    <RefreshCw size={16} />
-                                </button>
-
-                                <button
-                                    type="button"
-                                    class="p-1.5 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-50' : 'text-slate-300 cursor-not-allowed opacity-50'}"
-                                    onclick={() => onUnassignCard(row)}
-                                    disabled={!networkStore.isOnline}
-                                    title="Dar de baja (Desvincular)"
-                                >
-                                    <Ban size={16} />
-                                </button>
-                            {/if}
-
-                            <button
-                                type="button"
-                                class="p-1.5 rounded-full transition-colors {networkStore.isOnline ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-100' : 'text-slate-300 cursor-not-allowed opacity-50'}"
-                                onclick={() => onDeleteCard(row)}
-                                disabled={!networkStore.isOnline}
-                                title={row.status === "inactive" ? "Eliminar permanentemente" : "Dar de baja (Inactivar)"}
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        </PermissionGuard>
-                    </div>
-                {/snippet}
             </DataTable>
         {/snippet}
 

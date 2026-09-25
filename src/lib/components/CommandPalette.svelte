@@ -17,16 +17,31 @@
         ChevronRight
     } from "lucide-svelte";
     import { personnelService } from "../services/personnel";
-    import { personnelState } from "../stores";
-    import { handleError, fullName } from "../utils";
+    import { personnelState, uiState } from "../stores";
+    import { handleError, fullName, scrollLock } from "../utils";
     import { push } from "svelte-spa-router";
 
-    let isOpen = $state(false);
+    const isOpen = $derived(uiState.isCommandPaletteOpen);
     let query = $state("");
     let results = $state<any[]>([]);
     let isLoading = $state(false);
     let selectedIndex = $state(0);
     let inputElement = $state<HTMLInputElement | null>(null);
+
+    // Reinicia búsqueda cada vez que se abre (incluye apertura táctil externa).
+    $effect(() => {
+        if (isOpen) {
+            query = "";
+            selectedIndex = 0;
+        }
+    });
+
+    // Bloquea scroll de fondo mientras está abierto.
+    $effect(() => {
+        if (!isOpen) return;
+        scrollLock.lock();
+        return () => scrollLock.unlock();
+    });
 
     // Auto-foco al input al abrir
     $effect(() => {
@@ -171,11 +186,8 @@
     function handleKeydown(e: KeyboardEvent) {
         if ((e.ctrlKey || e.metaKey) && e.key === "k") {
             e.preventDefault();
-            isOpen = !isOpen;
-            if (isOpen) {
-                query = "";
-                selectedIndex = 0;
-            }
+            uiState.toggleCommandPalette();
+            return;
         }
 
         if (!isOpen) return;
@@ -224,7 +236,7 @@
     }
 
     function close() {
-        isOpen = false;
+        uiState.closeCommandPalette();
         query = "";
         results = [];
         selectedIndex = 0;
@@ -243,7 +255,7 @@
     <!-- Fondo con desenfoque premium -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] p-4 flex justify-center items-start pt-[12vh]"
+        class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] p-4 flex justify-center items-start pt-[max(1rem,env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))] sm:pt-[12vh]"
         role="presentation"
         onclick={close}
     >
@@ -285,7 +297,7 @@
             </div>
 
             <!-- Lista de resultados -->
-            <div class="max-h-[50vh] overflow-y-auto p-3 scrollbar-hide">
+            <div class="max-h-[60dvh] sm:max-h-[50vh] overflow-y-auto p-3 scrollbar-hide">
                 {#if allResults.length > 0}
                     {#each allResults as item, i}
                         {@const isSelected = selectedIndex === i}

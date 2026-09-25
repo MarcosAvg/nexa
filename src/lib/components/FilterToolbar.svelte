@@ -53,7 +53,7 @@
         {#if overflow}
             <button
                 type="button"
-                class="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95 shrink-0 {showMore
+                class="inline-flex items-center justify-center gap-1.5 h-11 sm:h-9 px-3 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95 shrink-0 {showMore
                     ? 'bg-slate-900 text-white shadow-lg'
                     : 'bg-slate-100 text-slate-600 hover:text-slate-900'}"
                 onclick={() => (showMore = !showMore)}
@@ -81,7 +81,7 @@
         {#if chips.length > 0 && onClearAll}
             <button
                 type="button"
-                class="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-xl text-[11px] font-bold uppercase tracking-wider text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all active:scale-95 shrink-0"
+                class="inline-flex items-center justify-center gap-1.5 h-11 sm:h-9 px-3 rounded-xl text-[11px] font-bold uppercase tracking-wider text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all active:scale-95 shrink-0"
                 onclick={onClearAll}
                 title="Limpiar todos los filtros"
             >

@@ -575,7 +575,7 @@
 
                         {#if entryChanged}
                             <div
-                                class="grid grid-cols-[1fr_auto_1fr] gap-4 items-center"
+                                class="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] gap-2 sm:gap-4 items-stretch sm:items-center"
                             >
                                 <div
                                     class="p-3 rounded-lg border border-slate-300 bg-slate-50"
@@ -591,7 +591,7 @@
                                 </div>
                                 <div class="flex items-center justify-center">
                                     <div
-                                        class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"
+                                        class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center rotate-90 sm:rotate-0"
                                     >
                                         <ArrowRight
                                             size={14}
@@ -618,7 +618,7 @@
 
                         {#if exitChanged}
                             <div
-                                class="grid grid-cols-[1fr_auto_1fr] gap-4 items-center"
+                                class="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] gap-2 sm:gap-4 items-stretch sm:items-center"
                             >
                                 <div
                                     class="p-3 rounded-lg border border-slate-300 bg-slate-50"
@@ -634,7 +634,7 @@
                                 </div>
                                 <div class="flex items-center justify-center">
                                     <div
-                                        class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"
+                                        class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center rotate-90 sm:rotate-0"
                                     >
                                         <ArrowRight
                                             size={14}
@@ -673,7 +673,7 @@
                     </p>
 
                     <div
-                        class="grid grid-cols-[1fr_auto_1fr] gap-4 items-start"
+                        class="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] gap-2 sm:gap-4 items-stretch sm:items-start"
                     >
                         <!-- Current Accesses -->
                         <div
@@ -705,7 +705,7 @@
                         <!-- Arrow -->
                         <div class="flex items-center justify-center pt-3">
                             <div
-                                class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"
+                                class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center rotate-90 sm:rotate-0"
                             >
                                 <ArrowRight size={14} class="text-amber-600" />
                             </div>
@@ -765,7 +765,7 @@
                         </p>
 
                         <div
-                            class="grid grid-cols-[1fr_auto_1fr] gap-4 items-start"
+                            class="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] gap-2 sm:gap-4 items-stretch sm:items-start"
                         >
                             <!-- Current Floors -->
                             <div
@@ -799,7 +799,7 @@
                             <!-- Arrow -->
                             <div class="flex items-center justify-center pt-3">
                                 <div
-                                    class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"
+                                    class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center rotate-90 sm:rotate-0"
                                 >
                                     <ArrowRight
                                         size={14}

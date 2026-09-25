@@ -36,17 +36,17 @@
 </script>
 
 <div
-    class="flex h-screen overflow-hidden bg-[#f8fafc] bg-radial-[at_top_right,_var(--tw-gradient-stops)] from-blue-50/20 via-slate-50 to-slate-50"
+    class="flex h-dvh overflow-hidden bg-[#f8fafc] bg-radial-[at_top_right,_var(--tw-gradient-stops)] from-blue-50/20 via-slate-50 to-slate-50"
 >
     <Sidebar items={sidebarItems} {user} {onLogout} />
 
     <div
         class="flex flex-1 flex-col overflow-hidden transition-all duration-300 {uiState.isSidebarCondensed ? 'lg:pl-20' : 'lg:pl-72'}"
     >
-        <!-- Área segura WCO para móvil -->
+        <!-- Área segura WCO/notch para móvil -->
         <div
             class="lg:hidden flex-shrink-0"
-            style="height: env(titlebar-area-height, 0px); -webkit-app-region: drag;"
+            style="height: max(env(titlebar-area-height, 0px), env(safe-area-inset-top, 0px)); -webkit-app-region: drag;"
         ></div>
 
         <!-- Región de arrastre para escritorio (invisible pero funcional para WCO) -->
@@ -55,7 +55,7 @@
             style="height: env(titlebar-area-height, 0px); -webkit-app-region: drag;"
         ></div>
 
-        <main class="flex-1 overflow-y-auto p-4 pb-24 lg:p-10 lg:pb-10">
+        <main class="flex-1 overflow-y-auto p-4 pb-[calc(6rem_+_env(safe-area-inset-bottom,0px))] lg:p-10 lg:pb-10">
             <div class="mx-auto max-w-[1600px] h-full space-y-8">
                 {@render children?.()}
             </div>
@@ -63,5 +63,5 @@
     </div>
 
     <!-- Navegación inferior para móvil -->
-    <BottomNav />
+    <BottomNav items={sidebarItems} />
 </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
     import { type Snippet } from "svelte";
     import { X } from "lucide-svelte";
+    import { scrollLock } from "../utils";
 
     /**
      * Modal — Modal genérico con footer, tamaños y cierre con Escape/backdrop.
@@ -62,6 +63,13 @@
     function handleKeydown(e: KeyboardEvent) {
         if (e.key === "Escape") close();
     }
+
+    // Bloquea el scroll de fondo mientras el modal está abierto.
+    $effect(() => {
+        if (!isOpen) return;
+        scrollLock.lock();
+        return () => scrollLock.unlock();
+    });
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -85,8 +93,8 @@
         <div
             class="pointer-events-auto w-full {sizeClasses[size]} {size !==
             'full'
-                ? 'max-h-[95vh] max-sm:max-h-[90vh] rounded-[24px] max-sm:rounded-t-[32px] max-sm:rounded-b-none'
-                : 'h-screen'} flex flex-col bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200/50 overflow-hidden ring-1 ring-black/5 transition-all duration-300"
+                ? 'max-h-[95dvh] max-sm:max-h-[90dvh] rounded-[24px] max-sm:rounded-t-[32px] max-sm:rounded-b-none'
+                : 'h-dvh'} flex flex-col bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200/50 overflow-hidden ring-1 ring-black/5 transition-all duration-300"
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-title"
@@ -139,7 +147,7 @@
             <!-- Pie -->
             {#if footer && size !== "full"}
                 <div
-                    class="flex items-center justify-end gap-3 p-8 pt-6 border-t border-slate-100 bg-slate-50/40 backdrop-blur-sm"
+                    class="flex items-center justify-end gap-3 p-8 pt-6 max-sm:pb-[max(1.5rem,env(safe-area-inset-bottom))] border-t border-slate-100 bg-slate-50/40 backdrop-blur-sm"
                 >
                     {@render footer()}
                 </div>

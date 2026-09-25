@@ -260,13 +260,15 @@
             </div>
         </div>
 
-        <Badge
-            variant={priorityColor}
-            class="px-2 py-0.5 text-[9px] uppercase font-black tracking-tight rounded-lg shadow-sm"
-        >
-            {ticket.priority}
-        </Badge>
-        <TicketStateBadge status={ticket.status} followup={(ticket.payload as any)?.estado} type={ticket.type} />
+        <div class="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
+            <Badge
+                variant={priorityColor}
+                class="px-2 py-0.5 text-[9px] uppercase font-black tracking-tight rounded-lg shadow-sm"
+            >
+                {ticket.priority}
+            </Badge>
+            <TicketStateBadge status={ticket.status} followup={(ticket.payload as any)?.estado} type={ticket.type} />
+        </div>
     </div>
 
     <!-- Cuerpo: Título y descripción -->
@@ -303,9 +305,9 @@
             </div>
         </div>                <!-- Metadatos secundarios (fecha y recursos) -->
         <div
-            class="flex items-center justify-between text-[10px] font-bold px-1"
+            class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 text-[10px] font-bold px-1"
         >
-            <div class="flex items-center gap-2 text-slate-400">
+            <div class="flex flex-wrap items-center gap-2 text-slate-400 min-w-0">
                 <div class="flex items-center gap-1.5">
                     <Calendar size={12} />
                     <span>{formatDate(ticket.created_at)}</span>
@@ -327,10 +329,10 @@
 
             {#if ticket.cardFolio}
                 <div
-                    class="flex items-center gap-1.5 text-slate-600 bg-slate-100/60 px-2 py-0.5 rounded-md"
+                    class="flex items-center gap-1.5 text-slate-600 bg-slate-100/60 px-2 py-0.5 rounded-md min-w-0 max-w-full"
                 >
-                    <CreditCard size={12} />
-                    <span>{ticket.cardType} · {ticket.cardFolio}</span>
+                    <CreditCard size={12} class="shrink-0" />
+                    <span class="truncate">{ticket.cardType} · {ticket.cardFolio}</span>
                 </div>
             {/if}
         </div>

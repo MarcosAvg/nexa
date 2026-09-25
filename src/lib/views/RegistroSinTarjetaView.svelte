@@ -328,13 +328,13 @@
         </div>
         <div class="px-4 py-3 bg-slate-50/50 border-t border-slate-100 flex justify-end gap-2">
             <PermissionGuard allowedRoles={["admin", "operator"]}>
-                <Button variant="soft-blue" size="sm" class="h-9 px-4 rounded-xl" onclick={() => openEditModal(row)}>
+                <Button variant="soft-blue" size="sm" class="h-11 px-4 rounded-xl" onclick={() => openEditModal(row)}>
                     Editar
                 </Button>
                 <Button
                     variant="ghost"
                     size="sm"
-                    class="h-9 px-3 rounded-xl text-rose-600 hover:bg-rose-50"
+                    class="h-11 px-3.5 rounded-xl text-rose-600 hover:bg-rose-50"
                     onclick={() => requestDelete(row)}
                     disabled={!networkStore.isOnline}
                 >
@@ -374,7 +374,7 @@
                             placeholder="Nombre o # empleado..."
                             bind:value={cardlessRegistryState.filters.search}
                             oninput={() => {}}
-                            class="h-9 text-xs font-bold w-48"
+                            class="h-9 text-xs font-bold w-full sm:w-48"
                         />
                     </div>
                 {/snippet}

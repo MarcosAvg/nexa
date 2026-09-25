@@ -3,6 +3,8 @@
     import { fly } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
     import { X } from "lucide-svelte";
+    import { mediaState } from "../stores";
+    import { scrollLock } from "../utils";
 
     /**
      * SidePanel — Panel lateral deslizante (bottom sheet en móvil, side panel en desktop).
@@ -44,6 +46,13 @@
     function handleKeydown(e: KeyboardEvent) {
         if (e.key === "Escape") close();
     }
+
+    // Bloquea el scroll de fondo mientras el panel está abierto.
+    $effect(() => {
+        if (!isOpen) return;
+        scrollLock.lock();
+        return () => scrollLock.unlock();
+    });
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -52,18 +61,21 @@
     <!-- Side Panel / Bottom Sheet -->
     <div
         class="fixed z-50 flex flex-col bg-white shadow-2xl transition-all duration-300
-               bottom-0 left-0 right-0 w-full h-[85vh] rounded-t-[32px] border-t border-slate-200
+               bottom-0 left-0 right-0 w-full h-[85dvh] rounded-t-[32px] border-t border-slate-200
                sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:w-full sm:max-w-lg sm:h-full sm:rounded-none sm:border-l"
         role="dialog"
         aria-modal="true"
         aria-labelledby="sidepanel-title"
         transition:fly={{
-            y: window.innerWidth < 640 ? 600 : 0,
-            x: window.innerWidth >= 640 ? 400 : 0,
+            y: mediaState.isMobile.matches ? 600 : 0,
+            x: mediaState.isMobile.matches ? 0 : 400,
             duration: 400,
             easing: cubicOut,
         }}
     >
+        <!-- Indicador de arrastre superior para móvil -->
+        <div class="sm:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 mb-0.5 flex-shrink-0"></div>
+
         <!-- Header -->
         <header
             class="flex items-start justify-between gap-4 p-6 border-b border-slate-100 bg-slate-50/50"
@@ -97,7 +109,7 @@
         <!-- Footer -->
         {#if footer}
             <footer
-                class="flex items-center justify-end gap-3 p-6 border-t border-slate-100 bg-slate-50/50"
+                class="flex items-center justify-end gap-3 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] border-t border-slate-100 bg-slate-50/50"
             >
                 {@render footer()}
             </footer>
