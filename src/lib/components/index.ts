@@ -5,6 +5,7 @@ export { default as IconButton } from './IconButton.svelte';
 export { default as StatusBadge } from './StatusBadge.svelte';
 export { default as SwipeActions } from './SwipeActions.svelte';
 export { default as Card } from './Card.svelte';
+export { default as Collapsible } from './Collapsible.svelte';
 export { default as CardItem } from './CardItem.svelte';
 export { default as Input } from './Input.svelte';
 export { default as Modal } from './Modal.svelte';

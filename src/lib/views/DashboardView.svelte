@@ -1,6 +1,18 @@
 <script lang="ts">
     import { personnelState, ticketState, userState, historyState } from '../stores';
-    import { Card, Badge, Button, Input, Tabs, EmptyState, SectionHeader } from '../components';
+    import { pullRefresh } from '../stores';
+    import {
+        Card,
+        Badge,
+        Button,
+        Input,
+        Tabs,
+        EmptyState,
+        SectionHeader,
+        Collapsible,
+        DataList,
+        BottomSheet,
+    } from '../components';
     import {
         CreditCard,
         FileSignature,
@@ -20,11 +32,7 @@
     } from 'lucide-svelte';
     import { onMount } from 'svelte';
     import { push } from 'svelte-spa-router';
-    import {
-        mediaTypeVariant,
-        mediaTypeBarClasses,
-        mediaTypeStockClasses,
-    } from '../utils/mediaTypeAppearance';
+    import { mediaTypeBarClasses, mediaTypeStockClasses } from '../utils/mediaTypeAppearance';
     import { timeAgo, fullName } from '../utils/format';
     import { DASHBOARD_EXCLUDED_TICKET_TYPES } from '../constants/tickets';
     import { PERSONNEL_STATUS_META } from '../constants/status';
@@ -71,8 +79,24 @@
 
     // Crecimiento de personal
     let growth = $derived(personnelState.growth);
-    let growthLoading = $derived(personnelState.growthLoading);
     let growthTab = $state<'edificio' | 'dependencia' | 'piso'>('edificio');
+    let showGrowthSheet = $state(false);
+
+    // Pull-to-refresh del dashboard.
+    $effect(() =>
+        pullRefresh.register(async () => {
+            await Promise.all([
+                personnelState.refreshDashboardStats(),
+                personnelState.refreshDashboardMetrics(),
+                personnelState.refreshDashboardGrowth(),
+            ]);
+        }),
+    );
+
+    // Filas aplanadas de "personas por piso" para el DataList móvil.
+    let buildingFloorRows = $derived(
+        metrics.buildingFloors.flatMap((b) => b.floors.map((f) => ({ ...f, buildingName: b.name }))),
+    );
 
     function growthSign(p: number | null): string {
         if (p == null || p === 0) return '0';
@@ -139,7 +163,7 @@
 
     const statusConfig = PERSONNEL_STATUS_META;
 
-    function actionMeta(action: string, entity: string) {
+    function actionMeta(action: string, _entity: string) {
         const a = (action || '').toLowerCase();
         if (a.includes('create') || a.includes('alta'))
             return { color: 'text-emerald-600', bg: 'bg-emerald-50', icon: 'plus' };
@@ -274,11 +298,11 @@
     </div>
 {/snippet}
 
-<div class="space-y-5">
+<div class="flex flex-col gap-4">
     <!-- Cabecera unificada (móvil con buscador; hero solo en desktop) -->
     <SectionHeader title="Dashboard" />
 
-    <!-- ── HERO ── -->
+    <!-- ── HERO (desktop) ── -->
     <section class="hidden lg:flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div class="min-w-0">
             <div class="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
@@ -326,79 +350,89 @@
     </section>
 
     <!-- ── KPIs ── -->
-    <section class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+    <section class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 lg:gap-4">
         <Card
-            class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
+            class="p-4 lg:p-5 relative overflow-hidden group bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
             interactive
             onclick={() => goPersonnel('Activo/a')}
         >
-            <div class="flex items-center gap-3.5">
+            <div class="flex items-center gap-3">
                 <div
-                    class="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-110 transition-transform duration-300"
+                    class="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0"
                 >
-                    <Users size={22} strokeWidth={2} />
+                    <Users size={18} strokeWidth={2} />
                 </div>
-                <div>
-                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">
+                <div class="min-w-0">
+                    <div
+                        class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.12em] mb-0.5 truncate"
+                    >
                         Personal Activo
                     </div>
-                    <div class="text-2xl font-black text-slate-900 tabular-nums">{activePersonnelCount}</div>
+                    <div class="text-xl lg:text-2xl font-black text-slate-900 tabular-nums">
+                        {activePersonnelCount}
+                    </div>
                 </div>
             </div>
-            <div class="mt-2 text-[10px] font-medium text-slate-400">
+            <div class="hidden lg:block mt-2 text-[10px] font-medium text-slate-400">
                 Incluye: Activo/a, Parcial y Media de otro edificio
             </div>
             <div
-                class="absolute -right-4 -bottom-4 text-emerald-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+                class="hidden lg:block absolute -right-4 -bottom-4 text-emerald-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
             >
                 <Users size={96} />
             </div>
         </Card>
 
         <Card
-            class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
+            class="p-4 lg:p-5 relative overflow-hidden group bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
             interactive
             onclick={() => goPersonnel('No Activos')}
         >
-            <div class="flex items-center gap-3.5">
+            <div class="flex items-center gap-3">
                 <div
-                    class="p-3 bg-rose-50 text-rose-600 rounded-xl group-hover:scale-110 transition-transform duration-300"
+                    class="p-2.5 bg-rose-50 text-rose-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0"
                 >
-                    <Shield size={22} strokeWidth={2} />
+                    <Shield size={18} strokeWidth={2} />
                 </div>
-                <div>
-                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">
+                <div class="min-w-0">
+                    <div
+                        class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.12em] mb-0.5 truncate"
+                    >
                         No Activos
                     </div>
-                    <div class="text-2xl font-black text-slate-900 tabular-nums">{metrics.noActivos}</div>
+                    <div class="text-xl lg:text-2xl font-black text-slate-900 tabular-nums">
+                        {metrics.noActivos}
+                    </div>
                 </div>
             </div>
-            <div class="mt-2 text-[10px] font-medium text-slate-400">
-                Sin acceso utilizable (en proceso, otro edificio en proceso, sin acceso, bloqueado o baja)
+            <div class="hidden lg:block mt-2 text-[10px] font-medium text-slate-400">
+                Sin acceso utilizable
             </div>
             <div
-                class="absolute -right-4 -bottom-4 text-rose-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+                class="hidden lg:block absolute -right-4 -bottom-4 text-rose-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
             >
                 <Shield size={96} />
             </div>
         </Card>
 
         <Card
-            class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
+            class="p-4 lg:p-5 relative overflow-hidden group bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
             interactive
             onclick={() => goTickets('General')}
         >
-            <div class="flex items-center gap-3.5">
+            <div class="flex items-center gap-3">
                 <div
-                    class="p-3 bg-amber-50 text-amber-600 rounded-xl group-hover:scale-110 transition-transform duration-300"
+                    class="p-2.5 bg-amber-50 text-amber-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0"
                 >
-                    <FileText size={22} strokeWidth={2} />
+                    <FileText size={18} strokeWidth={2} />
                 </div>
-                <div>
-                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">
+                <div class="min-w-0">
+                    <div
+                        class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.12em] mb-0.5 truncate"
+                    >
                         Tickets Pendientes
                     </div>
-                    <div class="text-2xl font-black text-slate-900 tabular-nums">
+                    <div class="text-xl lg:text-2xl font-black text-slate-900 tabular-nums">
                         {operationalTickets.length}
                     </div>
                 </div>
@@ -407,67 +441,71 @@
                 {#each ticketPriorityList as item}
                     <Badge
                         variant={item.label === 'Alta' ? 'rose' : item.label === 'Media' ? 'amber' : 'slate'}
-                        class="text-[9px] font-extrabold px-1.5 py-0.5 hidden sm:inline-flex"
+                        class="text-[9px] font-extrabold px-1.5 py-0.5 hidden xl:inline-flex"
                         >{item.label} {item.count}</Badge
                     >
                 {/each}
             </div>
             <div
-                class="absolute -right-4 -bottom-4 text-amber-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+                class="hidden lg:block absolute -right-4 -bottom-4 text-amber-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
             >
                 <FileText size={96} />
             </div>
         </Card>
 
         <Card
-            class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
+            class="p-4 lg:p-5 relative overflow-hidden group bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
             interactive
             onclick={() => goTickets('Responsivas')}
         >
-            <div class="flex items-center gap-3.5">
+            <div class="flex items-center gap-3">
                 <div
-                    class="p-3 bg-violet-50 text-violet-600 rounded-xl group-hover:scale-110 transition-transform duration-300"
+                    class="p-2.5 bg-violet-50 text-violet-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0"
                 >
-                    <FileSignature size={22} strokeWidth={2} />
+                    <FileSignature size={18} strokeWidth={2} />
                 </div>
-                <div>
-                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">
+                <div class="min-w-0">
+                    <div
+                        class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.12em] mb-0.5 truncate"
+                    >
                         Firmas Pendientes
                     </div>
-                    <div class="text-2xl font-black text-slate-900 tabular-nums">
+                    <div class="text-xl lg:text-2xl font-black text-slate-900 tabular-nums">
                         {pendingSignaturesCount}
                     </div>
                 </div>
             </div>
             <div
-                class="absolute -right-4 -bottom-4 text-violet-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+                class="hidden lg:block absolute -right-4 -bottom-4 text-violet-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
             >
                 <FileSignature size={96} />
             </div>
         </Card>
 
         <Card
-            class="p-5 relative overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
+            class="p-4 lg:p-5 relative overflow-hidden group bg-white/50 backdrop-blur-md border border-slate-200/50 transition-all duration-300"
             interactive
             onclick={() => goTickets('General', 'Programación')}
         >
-            <div class="flex items-center gap-3.5">
+            <div class="flex items-center gap-3">
                 <div
-                    class="p-3 bg-cyan-50 text-cyan-600 rounded-xl group-hover:scale-110 transition-transform duration-300"
+                    class="p-2.5 bg-cyan-50 text-cyan-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shrink-0"
                 >
-                    <Cpu size={22} strokeWidth={2} />
+                    <Cpu size={18} strokeWidth={2} />
                 </div>
-                <div>
-                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5">
+                <div class="min-w-0">
+                    <div
+                        class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.12em] mb-0.5 truncate"
+                    >
                         Programación
                     </div>
-                    <div class="text-2xl font-black text-slate-900 tabular-nums">
+                    <div class="text-xl lg:text-2xl font-black text-slate-900 tabular-nums">
                         {pendingProgrammingCount}
                     </div>
                 </div>
             </div>
             <div
-                class="absolute -right-4 -bottom-4 text-cyan-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
+                class="hidden lg:block absolute -right-4 -bottom-4 text-cyan-500/5 rotate-12 group-hover:rotate-0 transition-transform duration-500"
             >
                 <Cpu size={96} />
             </div>
@@ -475,9 +513,9 @@
     </section>
 
     {#if metricsLoading}
-        <section class="grid lg:grid-cols-3 gap-6">
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {#each [1, 2, 3] as _}
-                <Card class="p-8 border border-slate-200/50 bg-white/50 backdrop-blur-md rounded-2xl">
+                <Card class="p-6 border border-slate-200/50 bg-white/50 backdrop-blur-md rounded-2xl">
                     <div class="animate-pulse space-y-4">
                         <div class="h-5 bg-slate-200 rounded w-1/3"></div>
                         <div class="h-4 bg-slate-100 rounded w-full"></div>
@@ -488,29 +526,160 @@
             {/each}
         </section>
     {:else if metrics.totalPersonnel > 0}
-        <!-- ── FILA A: Estados + Cobertura + Calidad ── -->
-        <section class="grid lg:grid-cols-3 gap-6">
-            <!-- Donut de estados -->
-            <Card
-                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Tickets prioritarios (móvil: 2 · desktop: 8) -->
+            <Collapsible
+                title="Tickets Prioritarios"
+                subtitle="Urgencia alta"
+                icon={Zap}
+                iconBgClass="bg-rose-50 text-rose-600"
+                defaultOpen
+                class="max-lg:order-2 lg:order-8 lg:col-span-1"
             >
-                <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                            <BarChart3 size={18} strokeWidth={2.5} />
+                <DataList items={urgentTickets} key={(t: any) => t.id} onOpen={() => goTickets('General')}>
+                    {#snippet title(t: any)}
+                        <span>{t.title || t.type}</span>
+                    {/snippet}
+                    {#snippet subtitle(t: any)}
+                        <span>
+                            {t.personName ||
+                                fullName(t.personnel?.first_name, t.personnel?.last_name) ||
+                                t.cardFolio ||
+                                t.type}
+                        </span>
+                    {/snippet}
+                    {#snippet trailing(t: any)}
+                        <span
+                            class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded uppercase"
+                            >{t.type}</span
+                        >
+                    {/snippet}
+                </DataList>
+
+                <div class="hidden lg:block divide-y divide-slate-100/60 max-h-[360px] overflow-y-auto">
+                    {#each urgentTickets as tk}
+                        <div class="px-6 py-3 flex items-center gap-3 hover:bg-rose-50/30 transition-colors">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-[12px] font-bold text-slate-800 truncate">
+                                    {tk.title || tk.type}
+                                </p>
+                                <p class="text-[10px] font-medium text-slate-400 truncate">
+                                    {#if tk.personName || tk.personnel}
+                                        {tk.personName ||
+                                            fullName(tk.personnel?.first_name, tk.personnel?.last_name)}
+                                    {:else}
+                                        {tk.cardFolio || tk.type}
+                                    {/if}
+                                </p>
+                            </div>
+                            <span
+                                class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded uppercase shrink-0"
+                                >{tk.type}</span
+                            >
                         </div>
-                        <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
-                                Por Estado
-                            </h2>
-                            <p class="text-[11px] text-slate-400 font-medium">
-                                {metrics.totalPersonnel} registrados
-                            </p>
-                        </div>
-                    </div>
+                    {:else}
+                        {@render dashEmpty('Sin tickets prioritarios')}
+                    {/each}
                 </div>
-                <div class="p-6">
-                    <div class="relative h-40 w-40 sm:h-44 sm:w-44 mx-auto">
+                {#if operationalTickets.length > 0}
+                    <a
+                        href="/tickets"
+                        class="flex items-center justify-center gap-1 py-3 text-[11px] font-bold text-sky-600 hover:text-sky-800 transition-colors border-t border-slate-100/60"
+                    >
+                        Ver todos los tickets <ChevronRight size={13} />
+                    </a>
+                {/if}
+            </Collapsible>
+
+            <!-- Actividad (móvil: 9 · desktop: 7) -->
+            <Collapsible
+                title="Actividad Reciente"
+                subtitle="Últimos eventos del sistema"
+                icon={Activity}
+                class="max-lg:order-9 lg:order-7 lg:col-span-2"
+            >
+                <DataList items={activityFeed} key={(e: any) => e.id}>
+                    {#snippet leading(e: any)}
+                        {@const meta = actionMeta(e.action, e.entity_type)}
+                        <div class="w-8 h-8 rounded-lg {meta.bg} flex items-center justify-center">
+                            <span class="text-[11px] font-black {meta.color} uppercase">
+                                {meta.icon === 'plus'
+                                    ? '+'
+                                    : meta.icon === 'minus'
+                                      ? '−'
+                                      : meta.icon === 'swap'
+                                        ? '↔'
+                                        : meta.icon === 'pen'
+                                          ? '✎'
+                                          : '•'}
+                            </span>
+                        </div>
+                    {/snippet}
+                    {#snippet title(e: any)}
+                        <span>{e.entity_name || e.entity_type}</span>
+                    {/snippet}
+                    {#snippet subtitle(e: any)}
+                        <span>{e.action.replace(/_/g, ' ')} · {e.performed_by_name || 'Sistema'}</span>
+                    {/snippet}
+                    {#snippet trailing(e: any)}
+                        <span class="text-[10px] font-medium text-slate-400">{timeAgo(e.timestamp)}</span>
+                    {/snippet}
+                </DataList>
+
+                <div class="hidden lg:block divide-y divide-slate-100/60">
+                    {#each activityFeed as evt}
+                        {@const meta = actionMeta(evt.action, evt.entity_type)}
+                        <div class="px-6 py-3 flex items-center gap-3 hover:bg-slate-50/60 transition-colors">
+                            <div
+                                class="w-8 h-8 rounded-lg {meta.bg} flex items-center justify-center shrink-0"
+                            >
+                                <span class="text-[11px] font-black {meta.color} uppercase"
+                                    >{meta.icon === 'plus'
+                                        ? '+'
+                                        : meta.icon === 'minus'
+                                          ? '−'
+                                          : meta.icon === 'swap'
+                                            ? '↔'
+                                            : meta.icon === 'pen'
+                                              ? '✎'
+                                              : '•'}</span
+                                >
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-[12px] font-bold text-slate-700 truncate">
+                                    {evt.entity_name || evt.entity_type}
+                                </p>
+                                <p class="text-[10px] font-medium text-slate-400 truncate">
+                                    {evt.action.replace(/_/g, ' ')} · {evt.performed_by_name || 'Sistema'}
+                                </p>
+                            </div>
+                            <span class="text-[10px] font-medium text-slate-400 shrink-0"
+                                >{timeAgo(evt.timestamp)}</span
+                            >
+                        </div>
+                    {:else}
+                        {@render dashEmpty('Sin actividad reciente')}
+                    {/each}
+                </div>
+            </Collapsible>
+
+            <!-- Estados (móvil: 3 · desktop: 1) -->
+            <Collapsible
+                title="Por Estado"
+                subtitle="{metrics.totalPersonnel} registrados"
+                icon={BarChart3}
+                iconBgClass="bg-blue-50 text-blue-600"
+                class="max-lg:order-3 lg:order-1 lg:col-span-1"
+                onToggle={(o) => {
+                    if (o)
+                        requestAnimationFrame(() => {
+                            chartState?.resize();
+                            chartQuality?.resize();
+                        });
+                }}
+            >
+                <div class="p-4 lg:p-6">
+                    <div class="relative h-36 w-36 sm:h-44 sm:w-44 mx-auto">
                         <canvas bind:this={stateCanvas}></canvas>
                     </div>
                     <div class="mt-5 grid grid-cols-2 gap-2">
@@ -534,28 +703,17 @@
                         {/each}
                     </div>
                 </div>
-            </Card>
+            </Collapsible>
 
-            <!-- Cobertura tarjetas + stock -->
-            <Card
-                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+            <!-- Cobertura (móvil: 4 · desktop: 2) -->
+            <Collapsible
+                title="Cobertura Tarjetas"
+                subtitle="{metrics.operativos} operativos"
+                icon={Shield}
+                iconBgClass="bg-amber-50 text-amber-600"
+                class="max-lg:order-4 lg:order-2 lg:col-span-1"
             >
-                <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2 bg-amber-50 text-amber-600 rounded-xl">
-                            <Shield size={18} strokeWidth={2.5} />
-                        </div>
-                        <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
-                                Cobertura Tarjetas
-                            </h2>
-                            <p class="text-[11px] text-slate-400 font-medium">
-                                {metrics.operativos} operativos
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div class="p-6 space-y-5">
+                <div class="p-4 lg:p-6 space-y-5">
                     {#each metrics.cardCoverage as cov}
                         {@const cls = mediaTypeBarClasses(cov.name)}
                         <div>
@@ -597,28 +755,22 @@
                         </div>
                     </div>
                 </div>
-            </Card>
+            </Collapsible>
 
-            <!-- Calidad de datos -->
-            <Card
-                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+            <!-- Calidad (móvil: 5 · desktop: 3) -->
+            <Collapsible
+                title="Calidad de Datos"
+                subtitle="Campos incompletos"
+                icon={AlertTriangle}
+                iconBgClass="bg-rose-50 text-rose-600"
+                class="max-lg:order-5 lg:order-3 lg:col-span-1"
+                onToggle={(o) => {
+                    if (o) requestAnimationFrame(() => chartQuality?.resize());
+                }}
             >
-                <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2 bg-rose-50 text-rose-600 rounded-xl">
-                            <AlertTriangle size={18} strokeWidth={2.5} />
-                        </div>
-                        <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
-                                Calidad de Datos
-                            </h2>
-                            <p class="text-[11px] text-slate-400 font-medium">Campos incompletos</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="p-6 space-y-4">
+                <div class="p-4 lg:p-6 space-y-4">
                     <div class="flex items-center gap-4">
-                        <div class="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0">
+                        <div class="relative h-20 w-20 shrink-0">
                             <canvas bind:this={qualityCanvas}></canvas>
                         </div>
                         <div>
@@ -665,161 +817,20 @@
                         {/each}
                     </div>
                 </div>
-            </Card>
-        </section>
+            </Collapsible>
 
-        <!-- ── FILA B: Dependencias + Edificios ── -->
-        <section class="grid lg:grid-cols-3 gap-6">
-            <Card
-                class="lg:col-span-1 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+            <!-- Crecimiento (móvil: 6 · desktop: 6) -->
+            <Collapsible
+                title="Crecimiento de Personal"
+                subtitle="Incremento de plantilla por rango de fechas"
+                icon={TrendingUp}
+                iconBgClass="bg-emerald-50 text-emerald-600"
+                class="max-lg:order-6 lg:order-6 lg:col-span-3"
+                headerBorder={false}
             >
-                <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2 bg-violet-50 text-violet-600 rounded-xl">
-                            <Building2 size={18} strokeWidth={2.5} />
-                        </div>
-                        <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
-                                Dependencias
-                            </h2>
-                            <p class="text-[11px] text-slate-400 font-medium">
-                                {metrics.topDependencies.length} registradas
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div class="divide-y divide-slate-100/60 max-h-[420px] overflow-y-auto">
-                    {#each metrics.topDependencies as dep, i}
-                        {@const barWidth = pct(dep.total, metrics.totalPersonnel)}
-                        {@const activePct = pct(dep.activos, dep.total)}
-                        <div class="px-6 py-3 hover:bg-blue-50/30 transition-all duration-200 relative">
-                            <div
-                                class="absolute inset-y-0 left-0 bg-violet-50/40 transition-all duration-700"
-                                style="width: {barWidth}%"
-                            ></div>
-                            <div class="relative flex items-center justify-between">
-                                <div class="flex items-center gap-2.5 min-w-0">
-                                    <span class="text-[10px] font-black text-violet-400 tabular-nums w-5"
-                                        >{i + 1}</span
-                                    >
-                                    <span class="text-[12px] font-bold text-slate-800 truncate"
-                                        >{dep.name}</span
-                                    >
-                                </div>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    <Badge variant="slate" class="text-[9px] font-extrabold px-1.5 py-0.5"
-                                        >{dep.total}</Badge
-                                    >
-                                    <Badge
-                                        variant={activePct >= 80
-                                            ? 'emerald'
-                                            : activePct >= 50
-                                              ? 'amber'
-                                              : 'rose'}
-                                        class="text-[9px] font-extrabold px-1.5 py-0.5"
-                                        >{activePct}% op.</Badge
-                                    >
-                                </div>
-                            </div>
-                        </div>
-                    {:else}
-                        {@render dashEmpty('Sin datos')}
-                    {/each}
-                </div>
-            </Card>
-
-            <Card
-                class="lg:col-span-2 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
-            >
-                <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2 bg-cyan-50 text-cyan-600 rounded-xl">
-                            <Building2 size={18} strokeWidth={2.5} />
-                        </div>
-                        <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
-                                Personas por Piso
-                            </h2>
-                            <p class="text-[11px] text-slate-400 font-medium">
-                                Radicación: edificio + piso base
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div class="divide-y divide-slate-100/60 max-h-[420px] overflow-y-auto">
-                    {#each metrics.buildingFloors as bldg}
-                        {@const bldgTotal = bldg.floors.reduce((s, f) => s + f.people, 0)}
-                        <div class="px-6 py-4 relative">
-                            <div class="flex items-center justify-between mb-2">
-                                <span
-                                    class="text-[12px] font-extrabold text-slate-800 flex items-center gap-2"
-                                >
-                                    <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
-                                    {bldg.name}
-                                </span>
-                                <Badge variant="slate" class="text-[10px] font-extrabold px-2 py-0.5"
-                                    >{bldgTotal} personas</Badge
-                                >
-                            </div>
-                            <div class="space-y-1.5">
-                                {#each bldg.floors as floor}
-                                    {@const pisoBarWidth = bldgTotal > 0 ? pct(floor.people, bldgTotal) : 0}
-                                    {@const pisoPct = bldgTotal > 0 ? pct(floor.people, bldgTotal) : 0}
-                                    <div class="flex items-center gap-2 sm:gap-3">
-                                        <span
-                                            class="text-[11px] font-bold text-slate-600 w-16 sm:w-24 shrink-0 truncate"
-                                            >{floor.label}</span
-                                        >
-                                        <div
-                                            class="flex-1 min-w-0 h-2 bg-slate-100 rounded-full overflow-hidden"
-                                        >
-                                            <div
-                                                class="bg-cyan-500 h-full rounded-full transition-all duration-700"
-                                                style="width: {pisoBarWidth}%"
-                                            ></div>
-                                        </div>
-                                        <span
-                                            class="text-[10px] font-black text-slate-700 tabular-nums w-8 shrink-0 text-right"
-                                            >{floor.people}</span
-                                        >
-                                        <span
-                                            class="text-[9px] font-bold text-cyan-600 tabular-nums w-10 shrink-0 text-right"
-                                            >{pisoPct}%</span
-                                        >
-                                    </div>
-                                {/each}
-                            </div>
-                        </div>
-                    {:else}
-                        {@render dashEmpty('Sin datos')}
-                    {/each}
-                </div>
-            </Card>
-        </section>
-
-        <!-- ── FILA CRECIMIENTO: Crecimiento de Personal ── -->
-        <section class="transition-opacity duration-300" class:opacity-60={growthLoading}>
-            <Card
-                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
-            >
-                <div
-                    class="px-6 pt-5 pb-4 border-b border-slate-100/60 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4"
-                >
-                    <div class="flex items-center gap-3">
-                        <div class="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                            <TrendingUp size={18} strokeWidth={2.5} />
-                        </div>
-                        <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
-                                Crecimiento de Personal
-                            </h2>
-                            <p class="text-[11px] text-slate-400 font-medium">
-                                Incremento de plantilla por rango de fechas
-                            </p>
-                        </div>
-                    </div>
-                    <div class="flex items-end gap-2 flex-wrap w-full xl:w-auto">
-                        <div class="flex-1 min-w-[140px] sm:w-40 sm:flex-none">
+                {#snippet headerActions()}
+                    <div class="hidden lg:flex items-end gap-2 flex-wrap">
+                        <div class="w-40">
                             <label
                                 for="growth-start"
                                 class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1 ml-1"
@@ -834,7 +845,7 @@
                                 class="h-9"
                             />
                         </div>
-                        <div class="flex-1 min-w-[140px] sm:w-40 sm:flex-none">
+                        <div class="w-40">
                             <label
                                 for="growth-end"
                                 class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1 ml-1"
@@ -853,11 +864,17 @@
                             >Desde creación</Button
                         >
                     </div>
-                </div>
+                    <button
+                        type="button"
+                        class="lg:hidden flex items-center gap-1.5 px-3 h-9 rounded-xl bg-slate-100 text-slate-600 text-[11px] font-bold active:scale-95 transition-all"
+                        onclick={() => (showGrowthSheet = true)}
+                    >
+                        <Calendar size={14} /> Rango de fechas
+                    </button>
+                {/snippet}
 
-                <!-- Totales -->
                 <div
-                    class="px-6 py-4 flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-slate-100/60"
+                    class="px-4 lg:px-6 py-4 flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-slate-100/60"
                 >
                     <div>
                         <div
@@ -880,8 +897,7 @@
                     </Badge>
                 </div>
 
-                <!-- Desglose: edificios / dependencias / pisos -->
-                <div class="px-6 pt-4">
+                <div class="px-4 lg:px-6 pt-4">
                     <Tabs
                         variant="pill"
                         tabs={[
@@ -893,7 +909,52 @@
                         onSelect={(id) => (growthTab = id)}
                     />
                 </div>
-                <div class="divide-y divide-slate-100/60 max-h-[400px] overflow-y-auto">
+
+                <!-- Móvil: DataList por pestaña -->
+                {#if growthTab === 'edificio'}
+                    <DataList items={growth.byBuilding} key={(b: any) => b.name}>
+                        {#snippet title(b: any)}<span>{b.name}</span>{/snippet}
+                        {#snippet subtitle(b: any)}
+                            <span class="tabular-nums">{b.initial} → {b.final}</span>
+                        {/snippet}
+                        {#snippet trailing(b: any)}
+                            <Badge
+                                variant={growthVariant(b.percent)}
+                                class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                >{growthSign(b.increment)} · {growthPct(b.percent)}</Badge
+                            >
+                        {/snippet}
+                    </DataList>
+                {:else if growthTab === 'dependencia'}
+                    <DataList items={growth.byDependency} key={(d: any) => d.name}>
+                        {#snippet title(d: any)}<span>{d.name}</span>{/snippet}
+                        {#snippet subtitle(d: any)}
+                            <span class="tabular-nums">{d.initial} → {d.final}</span>
+                        {/snippet}
+                        {#snippet trailing(d: any)}
+                            <Badge
+                                variant={growthVariant(d.percent)}
+                                class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                >{growthSign(d.increment)} · {growthPct(d.percent)}</Badge
+                            >
+                        {/snippet}
+                    </DataList>
+                {:else}
+                    <DataList items={growth.byFloor} key={(f: any) => `${f.buildingId}-${f.label}`}>
+                        {#snippet title(f: any)}<span>{f.label}</span>{/snippet}
+                        {#snippet subtitle(f: any)}<span>{f.buildingName}</span>{/snippet}
+                        {#snippet trailing(f: any)}
+                            <Badge
+                                variant={growthVariant(f.percent)}
+                                class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                >{growthSign(f.increment)} · {growthPct(f.percent)}</Badge
+                            >
+                        {/snippet}
+                    </DataList>
+                {/if}
+
+                <!-- Desktop: listas -->
+                <div class="hidden lg:block divide-y divide-slate-100/60 max-h-[400px] overflow-y-auto">
                     {#if growthTab === 'edificio'}
                         {#each growth.byBuilding as bldg}
                             <div class="px-6 py-3 flex items-center justify-between gap-3">
@@ -960,115 +1021,134 @@
                         {/each}
                     {/if}
                 </div>
-            </Card>
-        </section>
+            </Collapsible>
 
-        <!-- ── FILA C: Actividad reciente + Tickets urgentes ── -->
-        <section class="grid lg:grid-cols-3 gap-6">
-            <Card
-                class="lg:col-span-2 p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
+            <!-- Dependencias (móvil: 7 · desktop: 4) -->
+            <Collapsible
+                title="Dependencias"
+                subtitle="{metrics.topDependencies.length} registradas"
+                icon={Building2}
+                iconBgClass="bg-violet-50 text-violet-600"
+                class="max-lg:order-7 lg:order-4 lg:col-span-1"
             >
-                <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2 bg-slate-50 text-slate-600 rounded-xl">
-                            <Activity size={18} strokeWidth={2.5} />
-                        </div>
-                        <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
-                                Actividad Reciente
-                            </h2>
-                            <p class="text-[11px] text-slate-400 font-medium">Últimos eventos del sistema</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="divide-y divide-slate-100/60">
-                    {#each activityFeed as evt}
-                        {@const meta = actionMeta(evt.action, evt.entity_type)}
-                        <div class="px-6 py-3 flex items-center gap-3 hover:bg-slate-50/60 transition-colors">
+                <DataList items={metrics.topDependencies} key={(d: any) => d.name}>
+                    {#snippet title(d: any)}<span>{d.name}</span>{/snippet}
+                    {#snippet subtitle(d: any)}
+                        <span>{pct(d.activos, d.total)}% operativos</span>
+                    {/snippet}
+                    {#snippet trailing(d: any)}
+                        <Badge variant="slate" class="text-[9px] font-extrabold px-1.5 py-0.5"
+                            >{d.total}</Badge
+                        >
+                    {/snippet}
+                </DataList>
+
+                <div class="hidden lg:block divide-y divide-slate-100/60 max-h-[420px] overflow-y-auto">
+                    {#each metrics.topDependencies as dep, i}
+                        {@const barWidth = pct(dep.total, metrics.totalPersonnel)}
+                        {@const activePct = pct(dep.activos, dep.total)}
+                        <div class="px-6 py-3 hover:bg-blue-50/30 transition-all duration-200 relative">
                             <div
-                                class="w-8 h-8 rounded-lg {meta.bg} flex items-center justify-center shrink-0"
-                            >
-                                <span class="text-[11px] font-black {meta.color} uppercase"
-                                    >{meta.icon === 'plus'
-                                        ? '+'
-                                        : meta.icon === 'minus'
-                                          ? '−'
-                                          : meta.icon === 'swap'
-                                            ? '↔'
-                                            : meta.icon === 'pen'
-                                              ? '✎'
-                                              : '•'}</span
+                                class="absolute inset-y-0 left-0 bg-violet-50/40 transition-all duration-700"
+                                style="width: {barWidth}%"
+                            ></div>
+                            <div class="relative flex items-center justify-between">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <span class="text-[10px] font-black text-violet-400 tabular-nums w-5"
+                                        >{i + 1}</span
+                                    >
+                                    <span class="text-[12px] font-bold text-slate-800 truncate"
+                                        >{dep.name}</span
+                                    >
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <Badge variant="slate" class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                        >{dep.total}</Badge
+                                    >
+                                    <Badge
+                                        variant={activePct >= 80
+                                            ? 'emerald'
+                                            : activePct >= 50
+                                              ? 'amber'
+                                              : 'rose'}
+                                        class="text-[9px] font-extrabold px-1.5 py-0.5"
+                                        >{activePct}% op.</Badge
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    {:else}
+                        {@render dashEmpty('Sin datos')}
+                    {/each}
+                </div>
+            </Collapsible>
+
+            <!-- Personas por Piso (móvil: 8 · desktop: 5) -->
+            <Collapsible
+                title="Personas por Piso"
+                subtitle="Radicación: edificio + piso base"
+                icon={Building2}
+                iconBgClass="bg-cyan-50 text-cyan-600"
+                class="max-lg:order-8 lg:order-5 lg:col-span-2"
+            >
+                <DataList items={buildingFloorRows} key={(f: any) => `${f.buildingName}-${f.label}`}>
+                    {#snippet title(f: any)}<span>{f.label}</span>{/snippet}
+                    {#snippet subtitle(f: any)}<span>{f.buildingName}</span>{/snippet}
+                    {#snippet trailing(f: any)}
+                        <span class="text-[11px] font-black text-slate-700 tabular-nums">{f.people}</span>
+                    {/snippet}
+                </DataList>
+
+                <div class="hidden lg:block divide-y divide-slate-100/60 max-h-[420px] overflow-y-auto">
+                    {#each metrics.buildingFloors as bldg}
+                        {@const bldgTotal = bldg.floors.reduce((s, f) => s + f.people, 0)}
+                        <div class="px-6 py-4 relative">
+                            <div class="flex items-center justify-between mb-2">
+                                <span
+                                    class="text-[12px] font-extrabold text-slate-800 flex items-center gap-2"
+                                >
+                                    <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
+                                    {bldg.name}
+                                </span>
+                                <Badge variant="slate" class="text-[10px] font-extrabold px-2 py-0.5"
+                                    >{bldgTotal} personas</Badge
                                 >
                             </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-[12px] font-bold text-slate-700 truncate">
-                                    {evt.entity_name || evt.entity_type}
-                                </p>
-                                <p class="text-[10px] font-medium text-slate-400 truncate">
-                                    {evt.action.replace(/_/g, ' ')} · {evt.performed_by_name || 'Sistema'}
-                                </p>
+                            <div class="space-y-1.5">
+                                {#each bldg.floors as floor}
+                                    {@const pisoBarWidth = bldgTotal > 0 ? pct(floor.people, bldgTotal) : 0}
+                                    {@const pisoPct = bldgTotal > 0 ? pct(floor.people, bldgTotal) : 0}
+                                    <div class="flex items-center gap-2 sm:gap-3">
+                                        <span
+                                            class="text-[11px] font-bold text-slate-600 w-16 sm:w-24 shrink-0 truncate"
+                                            >{floor.label}</span
+                                        >
+                                        <div
+                                            class="flex-1 min-w-0 h-2 bg-slate-100 rounded-full overflow-hidden"
+                                        >
+                                            <div
+                                                class="bg-cyan-500 h-full rounded-full transition-all duration-700"
+                                                style="width: {pisoBarWidth}%"
+                                            ></div>
+                                        </div>
+                                        <span
+                                            class="text-[10px] font-black text-slate-700 tabular-nums w-8 shrink-0 text-right"
+                                            >{floor.people}</span
+                                        >
+                                        <span
+                                            class="text-[9px] font-bold text-cyan-600 tabular-nums w-10 shrink-0 text-right"
+                                            >{pisoPct}%</span
+                                        >
+                                    </div>
+                                {/each}
                             </div>
-                            <span class="text-[10px] font-medium text-slate-400 shrink-0"
-                                >{timeAgo(evt.timestamp)}</span
-                            >
                         </div>
                     {:else}
-                        {@render dashEmpty('Sin actividad reciente')}
+                        {@render dashEmpty('Sin datos')}
                     {/each}
                 </div>
-            </Card>
-
-            <Card
-                class="p-0 overflow-hidden border border-slate-200/50 shadow-sm bg-white/50 backdrop-blur-md rounded-2xl"
-            >
-                <div class="px-6 pt-5 pb-3 border-b border-slate-100/60">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2 bg-rose-50 text-rose-600 rounded-xl">
-                            <Zap size={18} strokeWidth={2.5} />
-                        </div>
-                        <div>
-                            <h2 class="text-[13px] font-extrabold text-slate-900 uppercase tracking-wider">
-                                Tickets Prioritarios
-                            </h2>
-                            <p class="text-[11px] text-slate-400 font-medium">Urgencia alta</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="divide-y divide-slate-100/60 max-h-[360px] overflow-y-auto">
-                    {#each urgentTickets as tk}
-                        <div class="px-6 py-3 flex items-center gap-3 hover:bg-rose-50/30 transition-colors">
-                            <div class="flex-1 min-w-0">
-                                <p class="text-[12px] font-bold text-slate-800 truncate">
-                                    {tk.title || tk.type}
-                                </p>
-                                <p class="text-[10px] font-medium text-slate-400 truncate">
-                                    {#if tk.personName || tk.personnel}
-                                        {tk.personName ||
-                                            fullName(tk.personnel?.first_name, tk.personnel?.last_name)}
-                                    {:else}
-                                        {tk.cardFolio || tk.type}
-                                    {/if}
-                                </p>
-                            </div>
-                            <span
-                                class="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded uppercase shrink-0"
-                                >{tk.type}</span
-                            >
-                        </div>
-                    {:else}
-                        {@render dashEmpty('Sin tickets prioritarios')}
-                    {/each}
-                </div>
-                {#if operationalTickets.length > 0}
-                    <a
-                        href="/tickets"
-                        class="flex items-center justify-center gap-1 py-3 text-[11px] font-bold text-sky-600 hover:text-sky-800 transition-colors border-t border-slate-100/60"
-                    >
-                        Ver todos los tickets <ChevronRight size={13} />
-                    </a>
-                {/if}
-            </Card>
-        </section>
+            </Collapsible>
+        </div>
     {:else}
         <Card class="p-2 border border-slate-200/50 bg-white/50 backdrop-blur-md rounded-2xl">
             <EmptyState
@@ -1080,4 +1160,40 @@
             </EmptyState>
         </Card>
     {/if}
+
+    <!-- Filtros de crecimiento (móvil) -->
+    <BottomSheet bind:isOpen={showGrowthSheet} title="Rango de fechas">
+        <div class="flex flex-col gap-4">
+            <div>
+                <label
+                    for="growth-start-m"
+                    class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1"
+                    ><Calendar size={12} /> Desde</label
+                >
+                <Input
+                    id="growth-start-m"
+                    type="date"
+                    bind:value={personnelState.growthStartDate}
+                    min={growth.minCreatedAt ?? undefined}
+                    onchange={applyGrowthRange}
+                />
+            </div>
+            <div>
+                <label
+                    for="growth-end-m"
+                    class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1"
+                    ><Calendar size={12} /> Hasta</label
+                >
+                <Input
+                    id="growth-end-m"
+                    type="date"
+                    bind:value={personnelState.growthEndDate}
+                    min={personnelState.growthStartDate || undefined}
+                    onchange={applyGrowthRange}
+                />
+            </div>
+            <Button variant="soft-slate" class="w-full" onclick={resetGrowthToCreation}>Desde creación</Button
+            >
+        </div>
+    </BottomSheet>
 </div>
