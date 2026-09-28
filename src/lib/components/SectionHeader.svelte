@@ -55,7 +55,7 @@
 <div
     class="relative z-30 bg-white sticky top-0 border-b border-slate-200 shadow-sm
            -mx-4 px-4 py-2.5
-           lg:static lg:mx-0 lg:bg-white/80 lg:backdrop-blur-md lg:p-7 lg:rounded-2xl lg:border lg:border-slate-200/50 lg:shadow-sm lg:transition-all lg:duration-300 lg:hover:shadow-md"
+           lg:relative lg:mx-0 lg:bg-white/80 lg:backdrop-blur-md lg:p-7 lg:rounded-2xl lg:border lg:border-slate-200/50 lg:shadow-sm lg:transition-all lg:duration-300 lg:hover:shadow-md"
 >
     <div class="flex flex-col gap-4 lg:gap-6">
         <!-- Fila de título + toolbar -->
