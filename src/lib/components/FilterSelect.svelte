@@ -1,8 +1,10 @@
 <script lang="ts">
-    import Select from './Select.svelte';
+    import Combobox from './Combobox.svelte';
 
     /**
      * FilterSelect — Select compacto con label para filtros de vista.
+     *
+     * Usa `Combobox` (con buscador) para permitir buscar dentro de la lista.
      *
      * @example
      * <FilterSelect label="Dependencia" options={deps} bind:value={depFilter} />
@@ -32,6 +34,11 @@
     }: Props = $props();
 
     const selectId = $derived(`filter-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
+
+    function handleChange(next: string | number) {
+        value = String(next);
+        onchange?.(String(next));
+    }
 </script>
 
 <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto sm:flex-1">
@@ -42,21 +49,14 @@
         {label}
     </label>
     <div class="flex-1">
-        <Select
+        <Combobox
             id={selectId}
-            bind:value
+            {value}
+            {options}
             {placeholder}
             {disabled}
             class="h-11 font-bold bg-slate-50/50 backdrop-blur-sm border-slate-200/50 text-[13px] rounded-2xl"
-            onchange={() => onchange?.(value)}
-        >
-            {#each options as option}
-                {#if typeof option === 'string'}
-                    <option value={option}>{option}</option>
-                {:else}
-                    <option value={option.value}>{option.label}</option>
-                {/if}
-            {/each}
-        </Select>
+            onchange={handleChange}
+        />
     </div>
 </div>

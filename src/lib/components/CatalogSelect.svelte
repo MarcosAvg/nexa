@@ -1,9 +1,9 @@
 <script lang="ts">
-    import Select from './Select.svelte';
+    import Combobox from './Combobox.svelte';
     import type { CatalogItem } from '../types';
 
     /**
-     * CatalogSelect — Select genérico para catálogos del sistema.
+     * CatalogSelect — Select genérico para catálogos del sistema, con buscador.
      *
      * @example
      * <CatalogSelect catalog={catalogState.dependencies} bind:value={dep} />
@@ -19,9 +19,10 @@
         disabled?: boolean;
         /** Clases CSS adicionales. */
         class?: string;
-        /** ID para asociar con <label for>. */
+        /** ID para asociar con `<label for>`. */
         id?: string;
-        onchange?: (e: Event) => void;
+        /** Callback al cambiar la selección. */
+        onchange?: (value: string) => void;
     };
 
     let {
@@ -33,10 +34,13 @@
         id,
         onchange,
     }: Props = $props();
+
+    let options = $derived(catalog.map((item) => item.name));
+
+    function handleChange(next: string | number) {
+        value = String(next);
+        onchange?.(String(next));
+    }
 </script>
 
-<Select bind:value {placeholder} {disabled} class={className} {id} {onchange}>
-    {#each catalog as item}
-        <option value={item.name}>{item.name}</option>
-    {/each}
-</Select>
+<Combobox {id} {value} {options} {placeholder} {disabled} class={className} onchange={handleChange} inline />

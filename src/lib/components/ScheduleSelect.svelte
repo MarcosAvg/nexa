@@ -19,7 +19,7 @@
         class?: string;
         /** ID para asociar con <label for>. */
         id?: string;
-        onchange?: (e: Event) => void;
+        onchange?: (value: string) => void;
     };
 
     let {

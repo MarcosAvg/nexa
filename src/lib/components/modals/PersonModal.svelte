@@ -5,7 +5,7 @@
     import Input from '../Input.svelte';
     import ToggleGroup from '../ToggleGroup.svelte';
     import AddCardModal from './AddCardModal.svelte';
-    import Select from '../Select.svelte';
+    import Combobox from '../Combobox.svelte';
     import { Plus, CreditCard, Trash2, AlertTriangle } from 'lucide-svelte';
     import { untrack } from 'svelte';
     import FormSection from '../FormSection.svelte';
@@ -950,16 +950,16 @@
                     />
                 </FormField>
                 <FormField label="Piso Base" for="pisoBase" error={errors.floor}>
-                    <Select
+                    <Combobox
                         id="pisoBase"
-                        bind:value={pisoBase}
+                        value={pisoBase}
+                        options={availableFloors}
+                        placeholder="Seleccionar piso"
                         disabled={!edificio}
                         class={errors.floor ? 'border-red-500 ring-red-200' : ''}
-                    >
-                        {#each availableFloors as f}
-                            <option value={f}>{f}</option>
-                        {/each}
-                    </Select>
+                        onchange={(v) => (pisoBase = String(v))}
+                        inline
+                    />
                 </FormField>
             </div>
 

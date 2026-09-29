@@ -2,7 +2,7 @@
     import Modal from '../Modal.svelte';
     import Button from '../Button.svelte';
     import Input from '../Input.svelte';
-    import Select from '../Select.svelte';
+    import Combobox from '../Combobox.svelte';
     import { User, X, LinkIcon } from 'lucide-svelte';
     import { cardlessRegistryService } from '../../services/cardlessRegistry';
     import { personnelService } from '../../services/personnel';
@@ -473,12 +473,14 @@
                     <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-dependency"
                         >Dependencia <span class="text-rose-500">*</span></label
                     >
-                    <Select
+                    <Combobox
                         id="reg-dependency"
+                        value={manualDependency}
                         options={dependencyNames}
-                        bind:value={manualDependency}
                         placeholder="Seleccionar dependencia"
                         disabled={!!selectedPerson}
+                        onchange={(v) => (manualDependency = String(v))}
+                        inline
                     />
                 </div>
             </div>
@@ -611,24 +613,28 @@
                 <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-building"
                     >Edificio <span class="text-rose-500">*</span></label
                 >
-                <Select
+                <Combobox
                     id="reg-building"
+                    value={manualBuilding}
                     options={buildingNames}
-                    bind:value={manualBuilding}
                     placeholder="Seleccionar edificio"
                     disabled={!!selectedPerson}
+                    onchange={(v) => (manualBuilding = String(v))}
+                    inline
                 />
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-floor"
                     >Piso Base <span class="text-rose-500">*</span></label
                 >
-                <Select
+                <Combobox
                     id="reg-floor"
+                    value={manualFloor}
                     options={availableFloors}
-                    bind:value={manualFloor}
                     placeholder="Seleccionar piso"
                     disabled={!manualBuilding || !!selectedPerson}
+                    onchange={(v) => (manualFloor = String(v))}
+                    inline
                 />
             </div>
         </div>
@@ -639,11 +645,13 @@
                 <label class="block text-sm font-medium text-slate-700 mb-1" for="reg-reason"
                     >Motivo <span class="text-rose-500">*</span></label
                 >
-                <Select
+                <Combobox
                     id="reg-reason"
+                    value={selectedReason}
                     options={reasons}
-                    bind:value={selectedReason}
                     placeholder="Seleccionar motivo"
+                    onchange={(v) => (selectedReason = String(v))}
+                    inline
                 />
             </div>
             <div>

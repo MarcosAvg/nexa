@@ -11,6 +11,7 @@ export { default as Input } from './Input.svelte';
 export { default as Modal } from './Modal.svelte';
 export { default as Pagination } from './Pagination.svelte';
 export { default as Select } from './Select.svelte';
+export { default as Combobox } from './Combobox.svelte';
 export { default as SkeletonTable } from './SkeletonTable.svelte';
 export { default as EmptyState } from './EmptyState.svelte';
 export { default as SkeletonCard } from './SkeletonCard.svelte';
