@@ -19,6 +19,7 @@
         RegistrosImportModal,
         BulkDeletePersonnelModal,
         DataList,
+        PageSizeControl,
     } from '../components';
     import { FileSpreadsheet, Plus, Upload, FileStack, FolderArchive, Users, Check } from 'lucide-svelte';
     import { personnelService } from '../services/personnel';
@@ -197,7 +198,14 @@
         personnelState.filters.mediaTypeId;
 
         clearTimeout(filterDebounce);
-        filterDebounce = setTimeout(() => personnelState.refresh(1), FILTER_DEBOUNCE_MS);
+        filterDebounce = setTimeout(() => {
+            // Nueva consulta => se vuelve a la paginación común.
+            if (tablePageSize !== DEFAULT_TABLE_PAGE_SIZE) {
+                tablePageSize = DEFAULT_TABLE_PAGE_SIZE;
+                personnelState.pagination.pageSize = DEFAULT_TABLE_PAGE_SIZE;
+            }
+            personnelState.refresh(1);
+        }, FILTER_DEBOUNCE_MS);
     });
 
     /* Pagination Helpers */
@@ -349,11 +357,93 @@
     // ─── Selección múltiple y acciones masivas ───────────────────────────
     let selectedPeople = $state<any[]>([]);
 
-    $effect(() => pullRefresh.register(() => personnelState.refresh(1)));
+    $effect(() => pullRefresh.register(() => reloadPersonnelTable()));
+
+    // Cantidad de filas visibles al seleccionar (50/100/250/500/Todos).
+    // Solo vive mientras hay selección; al vaciarse se restaura a 50.
+    const DEFAULT_TABLE_PAGE_SIZE = 50;
+    const TABLE_ALL_CONFIRM_THRESHOLD = 2000;
+    let tablePageSize = $state<number | 'all'>(DEFAULT_TABLE_PAGE_SIZE);
 
     function clearPeopleSelection() {
         selectedPeople = [];
+        resetTablePageSize();
     }
+
+    /** Restaura la paginación común (50/pág.). Sin refresh: el caller refresca. */
+    function resetTablePageSize() {
+        tablePageSize = DEFAULT_TABLE_PAGE_SIZE;
+        personnelState.pagination.pageSize = DEFAULT_TABLE_PAGE_SIZE;
+    }
+
+    /** Recarga respetando la cantidad expandida (rama 'Todos' por lotes). */
+    function reloadPersonnelTable() {
+        if (tablePageSize === 'all') return doLoadAllPersonnelRows();
+        return personnelState.refresh(1);
+    }
+
+    async function applyTablePageSize(next: number | 'all') {
+        if (!networkStore.isOnline) {
+            toast.error('Sin conexión: no se puede cambiar la cantidad.');
+            return;
+        }
+        tablePageSize = next;
+        if (next === 'all') {
+            await doLoadAllPersonnelRows();
+            return;
+        }
+        personnelState.pagination.pageSize = next;
+        await personnelState.refresh(1);
+    }
+
+    async function doLoadAllPersonnelRows() {
+        const total = personnelState.pagination.totalRecords;
+        if (total > TABLE_ALL_CONFIRM_THRESHOLD) {
+            confirm.open({
+                title: `¿Cargar los ${total} registros?`,
+                description:
+                    'Mostrar todos los registros puede tardar en cargarse y en mostrarse en la tabla.',
+                variant: 'info',
+                confirmText: 'Cargar todo',
+                onConfirm: () => void doLoadAllPersonnelRows(),
+            });
+            return;
+        }
+        personnelState.pagination.setLoading(true);
+        try {
+            const depId = dependencies.find((d) => d.name === dependencyFilter)?.id || '';
+            const bldgId =
+                buildingFilter === 'Sin Edificio'
+                    ? '__none__'
+                    : buildings.find((b) => b.name === buildingFilter)?.id || '';
+            const data = await personnelService.fetchForExport(
+                personnelState.filters.search,
+                personnelState.filters.status,
+                depId,
+                bldgId,
+                floorFilter,
+                personnelState.filters.mediaTypeId,
+            );
+            if (selectedPeople.length === 0) return; // selección liberada durante la carga
+            const rows = data as any[];
+            personnelState.pagination.pageSize = Math.max(rows.length, 1);
+            personnelState.pagination.setItems(rows, rows.length);
+            personnelState.pagination.currentPage = 1;
+        } catch (e) {
+            handleError(e, 'Cargar todos los registros');
+            resetTablePageSize();
+        } finally {
+            personnelState.pagination.setLoading(false);
+        }
+    }
+
+    // Si la selección se vacía manualmente, se vuelve a la paginación común.
+    $effect(() => {
+        if (selectedPeople.length === 0 && tablePageSize !== DEFAULT_TABLE_PAGE_SIZE) {
+            resetTablePageSize();
+            void personnelState.refresh(1);
+        }
+    });
 
     function bulkSetStatus(status: 'blocked' | 'active' | 'inactive') {
         if (!networkStore.isOnline) {
@@ -793,6 +883,11 @@
                 {selectedPeople.length} persona(s) seleccionada(s)
             </span>
             <div class="flex flex-wrap items-center gap-2 ml-auto">
+                <PageSizeControl
+                    value={tablePageSize}
+                    onchange={applyTablePageSize}
+                    disabled={!networkStore.isOnline || personnelState.pagination.isLoading}
+                />
                 <Button variant="soft-slate" size="sm" onclick={clearPeopleSelection}>Limpiar</Button>
                 <Button
                     variant="soft-blue"

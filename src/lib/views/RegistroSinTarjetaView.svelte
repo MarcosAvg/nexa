@@ -20,9 +20,11 @@
         ExportMenuItem,
         CardlessRegistryModal,
         ConfirmationModal,
+        PageSizeControl,
     } from '../components';
     import { FileSpreadsheet, Plus, Loader2, Trash2, FolderArchive, FileX } from 'lucide-svelte';
     import { cardlessRegistryService } from '../services/cardlessRegistry';
+    import { confirm } from '../utils/confirmModal.svelte';
     import { handleError, formatDate } from '../utils';
     import { reasonVariant } from '../constants/appearance';
     import type { CardlessRegistry } from '../types';
@@ -31,7 +33,7 @@
     import { networkStore } from '../stores/network.svelte';
     let registries = $derived(cardlessRegistryState.pagination.items);
 
-    $effect(() => pullRefresh.register(() => cardlessRegistryState.refresh(1)));
+    $effect(() => pullRefresh.register(() => reloadRegistryTable()));
     let totalCount = $derived(cardlessRegistryState.pagination.totalRecords);
     let currentPage = $derived(cardlessRegistryState.pagination.currentPage);
     let pageSize = $derived(cardlessRegistryState.pagination.pageSize);
@@ -101,9 +103,78 @@
     // Selección masiva (solo admin, igual que Personal/Tarjetas).
     let selectedRegistries = $state<CardlessRegistry[]>([]);
 
+    // Cantidad de filas visibles al seleccionar (50/100/250/500/Todos).
+    // Solo vive mientras hay selección; al vaciarse se restaura a 50.
+    const DEFAULT_TABLE_PAGE_SIZE = 50;
+    const TABLE_ALL_CONFIRM_THRESHOLD = 2000;
+    let tablePageSize = $state<number | 'all'>(DEFAULT_TABLE_PAGE_SIZE);
+
     function clearRegistrySelection() {
         selectedRegistries = [];
+        resetTablePageSize();
     }
+
+    /** Restaura la paginación común (50/pág.). Sin refresh: el caller refresca. */
+    function resetTablePageSize() {
+        tablePageSize = DEFAULT_TABLE_PAGE_SIZE;
+        cardlessRegistryState.pagination.pageSize = DEFAULT_TABLE_PAGE_SIZE;
+    }
+
+    /** Recarga respetando la cantidad expandida (rama 'Todos' por lotes). */
+    function reloadRegistryTable() {
+        if (tablePageSize === 'all') return doLoadAllRegistryRows();
+        return cardlessRegistryState.refresh(1);
+    }
+
+    async function applyTablePageSize(next: number | 'all') {
+        if (!networkStore.isOnline) {
+            toast.error('Sin conexión: no se puede cambiar la cantidad.');
+            return;
+        }
+        tablePageSize = next;
+        if (next === 'all') {
+            await doLoadAllRegistryRows();
+            return;
+        }
+        cardlessRegistryState.pagination.pageSize = next;
+        await cardlessRegistryState.refresh(1);
+    }
+
+    async function doLoadAllRegistryRows() {
+        const total = cardlessRegistryState.pagination.totalRecords;
+        if (total > TABLE_ALL_CONFIRM_THRESHOLD) {
+            confirm.open({
+                title: `¿Cargar los ${total} registros?`,
+                description:
+                    'Mostrar todos los registros puede tardar en cargarse y en mostrarse en la tabla.',
+                variant: 'info',
+                confirmText: 'Cargar todo',
+                onConfirm: () => void doLoadAllRegistryRows(),
+            });
+            return;
+        }
+        cardlessRegistryState.pagination.setLoading(true);
+        try {
+            const data = await cardlessRegistryService.fetchAllMatching(cardlessRegistryState.filters);
+            if (selectedRegistries.length === 0) return; // selección liberada durante la carga
+            cardlessRegistryState.pagination.pageSize = Math.max(data.length, 1);
+            cardlessRegistryState.pagination.setItems(data, data.length);
+            cardlessRegistryState.pagination.currentPage = 1;
+        } catch {
+            toast.error('Error al cargar todos los registros');
+            resetTablePageSize();
+        } finally {
+            cardlessRegistryState.pagination.setLoading(false);
+        }
+    }
+
+    // Si la selección se vacía manualmente, se vuelve a la paginación común.
+    $effect(() => {
+        if (selectedRegistries.length === 0 && tablePageSize !== DEFAULT_TABLE_PAGE_SIZE) {
+            resetTablePageSize();
+            void cardlessRegistryState.refresh(1);
+        }
+    });
 
     // No onMount necesario: el $effect debounced dispara la carga inicial automáticamente
 
@@ -143,6 +214,11 @@
                 )
             ) {
                 dateRangeError = '';
+                // Nueva consulta => se vuelve a la paginación común.
+                if (tablePageSize !== DEFAULT_TABLE_PAGE_SIZE) {
+                    tablePageSize = DEFAULT_TABLE_PAGE_SIZE;
+                    cardlessRegistryState.pagination.pageSize = DEFAULT_TABLE_PAGE_SIZE;
+                }
                 cardlessRegistryState.refresh(1);
             }
         }, 400);
@@ -234,7 +310,6 @@
                 search: cardlessRegistryState.filters.search || undefined,
             });
             toast.success(`Selección exportada (${selectedRegistries.length} registros)`);
-            clearRegistrySelection();
         } catch {
             toast.error('Error al exportar');
         } finally {
@@ -678,6 +753,11 @@
                 {selectedRegistries.length} registro(s) seleccionado(s)
             </span>
             <div class="flex flex-wrap items-center gap-2 ml-auto">
+                <PageSizeControl
+                    value={tablePageSize}
+                    onchange={applyTablePageSize}
+                    disabled={!networkStore.isOnline || isLoading}
+                />
                 <Button variant="soft-slate" size="sm" onclick={clearRegistrySelection}>Limpiar</Button>
                 <Button
                     variant="soft-blue"
