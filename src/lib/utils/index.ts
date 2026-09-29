@@ -60,7 +60,15 @@ export type { FloorAction } from './floorActions';
 
 export { normalizeFloorLabel, resolveFloorLabel, resolveFloorList, buildFloorResolver } from './floorMatch';
 
-export { capitalize, fullName, personDisplayName, formatDate, formatDateTime, timeAgo } from './format';
+export {
+    capitalize,
+    fullName,
+    personDisplayName,
+    formatDate,
+    formatDateTime,
+    timeAgo,
+    normalizeSearch,
+} from './format';
 
 export { updateWithLock, fetchCurrentVersion } from './optimisticLock';
 

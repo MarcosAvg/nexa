@@ -27,10 +27,19 @@ BEGIN
       )
       OR
       -- Opción 2: Si un término está vacío, buscar el otro en ambos campos
+      -- (incluye también el número de empleado).
       (
-        (search_term_1 = '' AND (lower(unaccent(p.last_name)) ILIKE '%' || search_term_2 || '%' OR lower(unaccent(p.first_name)) ILIKE '%' || search_term_2 || '%'))
+        (search_term_1 = '' AND (
+          lower(unaccent(p.last_name)) ILIKE '%' || search_term_2 || '%'
+          OR lower(unaccent(p.first_name)) ILIKE '%' || search_term_2 || '%'
+          OR lower(unaccent(coalesce(p.employee_no, ''))) ILIKE '%' || search_term_2 || '%'
+        ))
         OR
-        (search_term_2 = '' AND (lower(unaccent(p.last_name)) ILIKE '%' || search_term_1 || '%' OR lower(unaccent(p.first_name)) ILIKE '%' || search_term_1 || '%'))
+        (search_term_2 = '' AND (
+          lower(unaccent(p.last_name)) ILIKE '%' || search_term_1 || '%'
+          OR lower(unaccent(p.first_name)) ILIKE '%' || search_term_1 || '%'
+          OR lower(unaccent(coalesce(p.employee_no, ''))) ILIKE '%' || search_term_1 || '%'
+        ))
       )
     )
   ORDER BY

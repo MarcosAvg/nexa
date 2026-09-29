@@ -7,6 +7,7 @@ import {
     withTimeout,
     dbCache,
     batchPaginate,
+    normalizeSearch,
 } from '../utils';
 import { computePersonStatus } from '../utils/personStatus';
 import {
@@ -381,11 +382,9 @@ export const personnelService = {
                     );
 
                 if (search) {
-                    const terms = search.trim().split(/\s+/).filter(Boolean);
+                    const terms = normalizeSearch(search).split(' ').filter(Boolean);
                     for (const term of terms) {
-                        query = query.or(
-                            `first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`,
-                        );
+                        query = query.ilike('search_text', `%${term}%`);
                     }
                 }
                 if (statusFilter === 'No Activos')
@@ -575,13 +574,6 @@ export const personnelService = {
                         .select(
                             `*, ${mediaRelation}, access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name))), buildings(name), dependencies(name), schedules(*)`,
                         );
-                    if (search) {
-                        const terms = search.trim().split(/\s+/).filter(Boolean);
-                        for (const term of terms)
-                            q = q.or(
-                                `first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`,
-                            );
-                    }
                     if (statusFilter !== 'Todos')
                         q = dbStatusMap[statusFilter]
                             ? q.eq('status', dbStatusMap[statusFilter])
@@ -597,7 +589,16 @@ export const personnelService = {
                     return q.order('first_name', { ascending: true }).range(from, to);
                 });
 
-                const mapped = allData.map((p) => mapPersonRecord(p));
+                let mapped = allData.map((p) => mapPersonRecord(p));
+                // El filtro de búsqueda se aplica en cliente para ser insensible
+                // a acentos (la tabla base no expone un texto normalizado).
+                const searchTerms = normalizeSearch(search).split(' ').filter(Boolean);
+                if (searchTerms.length > 0) {
+                    mapped = mapped.filter((p) => {
+                        const hay = normalizeSearch(`${p.first_name} ${p.last_name} ${p.employee_no ?? ''}`);
+                        return searchTerms.every((term) => hay.includes(term));
+                    });
+                }
                 return isComputedStatus ? mapped.filter((p) => p.status === statusFilter) : mapped;
             },
             'Fetch Personnel for Export',
@@ -632,49 +633,30 @@ export const personnelService = {
                 const cleanNombres = (nombres || '').trim();
                 if (!cleanApellidos && !cleanNombres) return [];
 
-                let peopleQuery;
-                let rpcIds: string[] | null = null;
+                // Búsqueda fuzzy vía RPC: insensible a acentos y soporta un solo
+                // término (cuando uno de los campos va vacío).
+                const { data, error } = await supabase.rpc('search_personnel_fuzzy', {
+                    p_last_name: cleanApellidos,
+                    p_first_name: cleanNombres,
+                    p_limit: 20,
+                });
+                if (error) throw error;
+                if (!data || data.length === 0) return [];
 
-                if (!cleanApellidos || !cleanNombres) {
-                    const queryStr = cleanApellidos || cleanNombres;
-                    const terms = queryStr.split(/\s+/).filter(Boolean);
-                    if (terms.length === 0) return [];
-
-                    peopleQuery = supabase
-                        .from('personnel')
-                        .select(
-                            '*, access_media(*, access_media_types(name, has_floors, requires_responsiva)), access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name))), buildings(name), dependencies(name), schedules(*)',
-                        );
-                    for (const term of terms)
-                        peopleQuery = peopleQuery.or(
-                            `first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_no.ilike.%${term}%`,
-                        );
-                    peopleQuery = peopleQuery.order('first_name', { ascending: true }).limit(20);
-                } else {
-                    const { data, error } = await supabase.rpc('search_personnel_fuzzy', {
-                        p_last_name: cleanApellidos,
-                        p_first_name: cleanNombres,
-                        p_limit: 20,
-                    });
-                    if (error) throw error;
-                    if (!data || data.length === 0) return [];
-                    rpcIds = data.map((p: { id: string }) => p.id);
-                    peopleQuery = supabase
-                        .from('personnel')
-                        .select(
-                            '*, access_media(*, access_media_types(name, has_floors, requires_responsiva)), access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name))), buildings(name), dependencies(name), schedules(*)',
-                        )
-                        .in('id', rpcIds ?? []);
-                }
+                const rpcIds = data.map((p: { id: string }) => p.id);
+                const peopleQuery = supabase
+                    .from('personnel')
+                    .select(
+                        '*, access_media(*, access_media_types(name, has_floors, requires_responsiva)), access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name))), buildings(name), dependencies(name), schedules(*)',
+                    )
+                    .in('id', rpcIds);
 
                 const { data: fullPeople, error: fetchError } = await peopleQuery;
                 if (fetchError) throw fetchError;
 
-                let orderedPeople = fullPeople || [];
-                if (rpcIds) {
-                    const idToData = Object.fromEntries(fullPeople.map((p) => [p.id, p]));
-                    orderedPeople = rpcIds.map((id) => idToData[id]).filter(Boolean);
-                }
+                const people = (fullPeople ?? []) as any[];
+                const idToData: Record<string, any> = Object.fromEntries(people.map((p: any) => [p.id, p]));
+                const orderedPeople: any[] = rpcIds.map((id: string) => idToData[id]).filter(Boolean);
 
                 return orderedPeople.map((p) => {
                     const access = deriveAccessFromAssignments(p.access_assignments);

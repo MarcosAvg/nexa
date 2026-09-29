@@ -13,6 +13,20 @@ export function fullName(first?: string | null, last?: string | null): string {
     return [first, last].filter(Boolean).join(' ');
 }
 
+/**
+ * Normaliza un texto para búsquedas: quita acentos/diacríticos, pasa a
+ * minúsculas y colapsa espacios. Debe coincidir con `unaccent(lower(...))`
+ * del lado de la base de datos.
+ */
+export function normalizeSearch(value: string): string {
+    return (value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 /** Devuelve el nombre legible de una persona desde un objeto persona/payload. */
 export function personDisplayName(
     p:

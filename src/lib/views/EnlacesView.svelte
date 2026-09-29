@@ -3,7 +3,7 @@
     import { enlaceService } from '../services/enlaces';
     import type { Enlace } from '../types';
     import { confirm } from '../utils/confirmModal.svelte';
-    import { fullName } from '../utils';
+    import { fullName, normalizeSearch } from '../utils';
     import {
         SectionHeader,
         FloatingActionButton,
@@ -30,11 +30,13 @@
     let isAddModalOpen = $state(false);
     let searchQuery = $state('');
     let filterDependency = $state('');
+    let filterBuilding = $state('');
     let filterFloor = $state('');
 
     function clearEnlaceFilters() {
         searchQuery = '';
         filterDependency = '';
+        filterBuilding = '';
         filterFloor = '';
     }
 
@@ -46,6 +48,13 @@
                 label: 'Dependencia',
                 value: filterDependency,
                 onClear: () => (filterDependency = ''),
+            });
+        }
+        if (filterBuilding) {
+            chips.push({
+                label: 'Edificio',
+                value: filterBuilding,
+                onClear: () => (filterBuilding = ''),
             });
         }
         if (filterFloor) {
@@ -60,6 +69,11 @@
     let dependencies = $derived(catalogState.dependencies);
     let buildings = $derived(catalogState.buildings);
     let dependencyNames = $derived(dependencies.map((d) => d.name));
+    let buildingNames = $derived(
+        buildings
+            .map((b) => b.name)
+            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })),
+    );
 
     let availableFloors = $derived.by(() => {
         const floors = new Set(
@@ -111,24 +125,19 @@
         });
 
         if (searchQuery.trim()) {
-            const terms = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+            const terms = normalizeSearch(searchQuery).split(' ').filter(Boolean);
             list = list.filter((e) => {
-                const name = e.name.toLowerCase();
-                const email = e.email.toLowerCase();
-                const ext = (e.extension || '').toLowerCase();
-                const depName = e.dependency.toLowerCase();
-                return terms.every(
-                    (term) =>
-                        name.includes(term) ||
-                        email.includes(term) ||
-                        ext.includes(term) ||
-                        depName.includes(term),
-                );
+                const haystack = normalizeSearch(`${e.name} ${e.email} ${e.extension || ''} ${e.dependency}`);
+                return terms.every((term) => haystack.includes(term));
             });
         }
 
         if (filterDependency) {
             list = list.filter((e) => e.dependency === filterDependency);
+        }
+
+        if (filterBuilding) {
+            list = list.filter((e) => e.building === filterBuilding);
         }
 
         if (filterFloor) {
@@ -401,6 +410,12 @@
                 {/snippet}
                 {#snippet overflow()}
                     <FilterSelect
+                        label="Edificio"
+                        options={buildingNames}
+                        placeholder="Todos"
+                        bind:value={filterBuilding}
+                    />
+                    <FilterSelect
                         label="Piso Base"
                         options={availableFloors}
                         placeholder="Todos"
@@ -447,7 +462,7 @@
         emptyDescriptionFiltered="No encontramos enlaces con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={Link2}
         emptyIconBgClass="from-violet-50 to-violet-100 ring-1 ring-violet-200/50 text-violet-400"
-        hasFilters={!!(searchQuery || filterDependency || filterFloor)}
+        hasFilters={!!(searchQuery || filterDependency || filterBuilding || filterFloor)}
         onClearFilters={() => {
             clearEnlaceFilters();
         }}
