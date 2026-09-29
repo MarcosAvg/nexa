@@ -61,86 +61,18 @@
     // ─── Selección múltiple y acciones masivas ───────────────────────────
     let selectedCards = $state<any[]>([]);
 
-    $effect(() => pullRefresh.register(() => reloadCardsTable()));
-
-    // Cantidad de filas visibles al seleccionar (50/100/250/500/Todos).
-    // Solo vive mientras hay selección; al vaciarse se restaura a 50.
-    const DEFAULT_TABLE_PAGE_SIZE = 50;
-    const TABLE_ALL_CONFIRM_THRESHOLD = 2000;
-    let tablePageSize = $state<number | 'all'>(DEFAULT_TABLE_PAGE_SIZE);
+    $effect(() => pullRefresh.register(() => cardState.refresh(1)));
 
     function clearSelection() {
         selectedCards = [];
-        resetTablePageSize();
     }
 
-    /** Restaura la paginación común (50/pág.). Sin refresh: el caller refresca. */
-    function resetTablePageSize() {
-        tablePageSize = DEFAULT_TABLE_PAGE_SIZE;
-        cardState.pagination.pageSize = DEFAULT_TABLE_PAGE_SIZE;
+    /** Cambia las filas por página (control junto a la paginación). */
+    function changePageSize(size: number) {
+        if (size === cardState.pagination.pageSize) return;
+        cardState.pagination.pageSize = size;
+        void cardState.refresh(1);
     }
-
-    /** Recarga respetando la cantidad expandida (rama 'Todos' por lotes). */
-    function reloadCardsTable() {
-        if (tablePageSize === 'all') return doLoadAllCardsRows();
-        return cardState.refresh(1);
-    }
-
-    async function applyTablePageSize(next: number | 'all') {
-        if (!networkStore.isOnline) {
-            toast.error('Sin conexión: no se puede cambiar la cantidad.');
-            return;
-        }
-        tablePageSize = next;
-        if (next === 'all') {
-            await doLoadAllCardsRows();
-            return;
-        }
-        cardState.pagination.pageSize = next;
-        await cardState.refresh(1);
-    }
-
-    async function doLoadAllCardsRows() {
-        const total = cardState.pagination.totalRecords;
-        if (total > TABLE_ALL_CONFIRM_THRESHOLD) {
-            confirm.open({
-                title: `¿Cargar los ${total} registros?`,
-                description:
-                    'Mostrar todos los registros puede tardar en cargarse y en mostrarse en la tabla.',
-                variant: 'info',
-                confirmText: 'Cargar todo',
-                onConfirm: () => void doLoadAllCardsRows(),
-            });
-            return;
-        }
-        cardState.pagination.setLoading(true);
-        try {
-            const data = await cardService.fetchForExport(
-                searchFilter,
-                typeFilter,
-                statusFilter,
-                depNameFilter ? String(dependencies.find((d) => d.name === depNameFilter)?.id ?? '') : '',
-            );
-            if (selectedCards.length === 0) return; // selección liberada durante la carga
-            const rows = data as any[];
-            cardState.pagination.pageSize = Math.max(rows.length, 1);
-            cardState.pagination.setItems(rows, rows.length);
-            cardState.pagination.currentPage = 1;
-        } catch (e) {
-            handleError(e, 'Cargar todos los registros');
-            resetTablePageSize();
-        } finally {
-            cardState.pagination.setLoading(false);
-        }
-    }
-
-    // Si la selección se vacía manualmente, se vuelve a la paginación común.
-    $effect(() => {
-        if (selectedCards.length === 0 && tablePageSize !== DEFAULT_TABLE_PAGE_SIZE) {
-            resetTablePageSize();
-            void cardState.refresh(1);
-        }
-    });
 
     function bulkSetStatus(status: 'blocked' | 'active') {
         if (!networkStore.isOnline) {
@@ -345,11 +277,6 @@
                 : '';
             cardState.setFilters(typeFilter, statusFilter, depId);
             cardState.setSearch(searchFilter);
-            // Nueva consulta => se vuelve a la paginación común.
-            if (tablePageSize !== DEFAULT_TABLE_PAGE_SIZE) {
-                tablePageSize = DEFAULT_TABLE_PAGE_SIZE;
-                cardState.pagination.pageSize = DEFAULT_TABLE_PAGE_SIZE;
-            }
             cardState.refresh(1);
         }, 300);
     });
@@ -740,11 +667,6 @@
                 {selectedCards.length} tarjeta(s) seleccionada(s)
             </span>
             <div class="flex flex-wrap items-center gap-2 ml-auto">
-                <PageSizeControl
-                    value={tablePageSize}
-                    onchange={applyTablePageSize}
-                    disabled={!networkStore.isOnline || cardState.pagination.isLoading}
-                />
                 <Button variant="soft-slate" size="sm" onclick={clearSelection}>Limpiar</Button>
                 <Button
                     variant="soft-blue"
@@ -864,7 +786,16 @@
         onPrevPage={() => cardState.prevPage()}
         onNextPage={() => cardState.nextPage()}
         onGoToPage={(page) => cardState.goToPage(page)}
-    />
+        isLoading={cardState.pagination.isLoading}
+    >
+        {#snippet sizeControl()}
+            <PageSizeControl
+                value={pageSize}
+                onchange={changePageSize}
+                disabled={!networkStore.isOnline || cardState.pagination.isLoading}
+            />
+        {/snippet}
+    </Pagination>
 </div>
 
 <AddCardModal

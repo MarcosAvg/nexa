@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { type Snippet } from 'svelte';
     import Button from './Button.svelte';
 
     /**
@@ -25,6 +26,8 @@
         onGoToPage: (page: number) => void;
         /** Deshabilita botones durante carga. */
         isLoading?: boolean;
+        /** Control opcional de filas por página (junto al contador). */
+        sizeControl?: Snippet;
     };
 
     let {
@@ -35,6 +38,7 @@
         onNextPage,
         onGoToPage,
         isLoading = false,
+        sizeControl,
     }: Props = $props();
 
     let totalPages = $derived(Math.ceil(totalRecords / pageSize));
@@ -71,14 +75,19 @@
 
 {#if totalRecords > 0}
     <div class="flex flex-col sm:flex-row justify-between items-center gap-4 py-4">
-        <div class="text-sm text-slate-500">
-            Mostrando
-            <span class="font-medium text-slate-900">{startRecord}</span>
-            a
-            <span class="font-medium text-slate-900">{endRecord}</span>
-            de
-            <span class="font-medium text-slate-900">{totalRecords}</span>
-            registros
+        <div class="flex items-center justify-between gap-4 w-full sm:w-auto">
+            <div class="text-sm text-slate-500">
+                Mostrando
+                <span class="font-medium text-slate-900">{startRecord}</span>
+                a
+                <span class="font-medium text-slate-900">{endRecord}</span>
+                de
+                <span class="font-medium text-slate-900">{totalRecords}</span>
+                registros
+            </div>
+            {#if sizeControl}
+                {@render sizeControl()}
+            {/if}
         </div>
 
         <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:gap-4 w-full sm:w-auto">

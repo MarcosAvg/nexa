@@ -360,7 +360,7 @@ export const personnelService = {
     ): Promise<{ data: Person[]; count: number }> {
         return withErrorHandlingSafe(
             async () => {
-                const cacheKey = `personnel_page_${page}_${statusFilter}_${dependencyId}_${buildingId}_${floor}_${mediaTypeId}_${search}`;
+                const cacheKey = `personnel_page_${page}_${limit}_${statusFilter}_${dependencyId}_${buildingId}_${floor}_${mediaTypeId}_${search}`;
                 if (!networkStore.isOnline) {
                     const cachedData = await dbCache.load<{ data: Person[]; count: number }>(cacheKey);
                     if (cachedData) return cachedData;

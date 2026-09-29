@@ -75,7 +75,7 @@ export const cardService = {
     ): Promise<{ data: Card[]; count: number }> {
         return withErrorHandlingSafe(
             async () => {
-                const cacheKey = `cards_page_${page}_${typeFilter}_${statusFilter}_${search}_${depId}`;
+                const cacheKey = `cards_page_${page}_${limit}_${typeFilter}_${statusFilter}_${search}_${depId}`;
                 if (!networkStore.isOnline) {
                     const cachedData = await dbCache.load<{ data: Card[]; count: number }>(cacheKey);
                     if (cachedData) return cachedData;
