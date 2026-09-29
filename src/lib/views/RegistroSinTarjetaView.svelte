@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { cardlessRegistryState, catalogState } from '../stores';
+    import { cardlessRegistryState, catalogState, userState } from '../stores';
     import { pullRefresh } from '../stores';
     import {
         SectionHeader,
@@ -96,6 +96,14 @@
 
     let isConfirmDeleteOpen = $state(false);
     let registryToDelete = $state<CardlessRegistry | null>(null);
+    let registriesToDelete = $state<CardlessRegistry[]>([]);
+
+    // Selección masiva (solo admin, igual que Personal/Tarjetas).
+    let selectedRegistries = $state<CardlessRegistry[]>([]);
+
+    function clearRegistrySelection() {
+        selectedRegistries = [];
+    }
 
     // No onMount necesario: el $effect debounced dispara la carga inicial automáticamente
 
@@ -161,29 +169,82 @@
 
     function requestDelete(registry: CardlessRegistry) {
         registryToDelete = registry;
+        registriesToDelete = [];
         isConfirmDeleteOpen = true;
     }
 
-    function handleDeleteFromModal(registry: CardlessRegistry) {
-        isModalOpen = false;
-        requestDelete(registry);
+    function requestBulkDelete() {
+        if (selectedRegistries.length === 0) return;
+        registryToDelete = null;
+        registriesToDelete = [...selectedRegistries];
+        isConfirmDeleteOpen = true;
+    }
+
+    function bulkDeleteTargets(): CardlessRegistry[] {
+        return registryToDelete ? [registryToDelete] : registriesToDelete;
+    }
+
+    function bulkDeleteDescription(): string {
+        if (registryToDelete)
+            return `¿Eliminar el registro de ${registryDisplayName(registryToDelete)}? Esta acción no se puede deshacer.`;
+        return `¿Eliminar ${registriesToDelete.length} registro(s) seleccionado(s)? Esta acción no se puede deshacer.`;
     }
 
     async function handleDeleteConfirm() {
-        if (!registryToDelete) return;
+        const targets = bulkDeleteTargets();
+        if (targets.length === 0) return;
+        if (!networkStore.isOnline) {
+            toast.error('Sin conexión: no se pueden eliminar registros.');
+            return;
+        }
 
-        const ok = await cardlessRegistryService.delete(registryToDelete.id);
-        if (!ok) return;
+        const results = await Promise.allSettled(targets.map((r) => cardlessRegistryService.delete(r.id)));
+        const ok = results.filter((res) => res.status === 'fulfilled' && res.value === true).length;
+        const failed = results.length - ok;
+        if (failed > 0) {
+            toast.error(`${ok} registro(s) eliminado(s), ${failed} con error`);
+        } else {
+            toast.success(targets.length === 1 ? 'Registro eliminado' : `${ok} registro(s) eliminado(s)`);
+        }
 
-        toast.success('Registro eliminado');
-
-        const remaining = Math.max(0, totalCount - 1);
+        const remaining = Math.max(0, totalCount - ok);
         const maxPage = Math.max(1, Math.ceil(remaining / pageSize) || 1);
         if (currentPage > maxPage) {
             cardlessRegistryState.pagination.currentPage = maxPage;
         }
         registryToDelete = null;
+        registriesToDelete = [];
+        clearRegistrySelection();
         await refreshData();
+    }
+
+    async function handleExportSelected() {
+        if (selectedRegistries.length === 0) return;
+        if (!networkStore.isOnline) {
+            toast.error('Sin conexión: no se puede exportar.');
+            return;
+        }
+        isExporting = true;
+        try {
+            await cardlessRegistryService.exportToExcel([...selectedRegistries], {
+                startDate: cardlessRegistryState.filters.startDate || undefined,
+                endDate: cardlessRegistryState.filters.endDate || undefined,
+                reason: cardlessRegistryState.filters.reason || undefined,
+                dependency: depNameFilter || undefined,
+                search: cardlessRegistryState.filters.search || undefined,
+            });
+            toast.success(`Selección exportada (${selectedRegistries.length} registros)`);
+            clearRegistrySelection();
+        } catch {
+            toast.error('Error al exportar');
+        } finally {
+            isExporting = false;
+        }
+    }
+
+    function handleDeleteFromModal(registry: CardlessRegistry) {
+        isModalOpen = false;
+        requestDelete(registry);
     }
 
     async function handleExport() {
@@ -423,6 +484,8 @@
     <DataList
         items={rows}
         key={(r: CardlessRegistry) => r.id}
+        selectable={userState.isAdmin}
+        bind:selectedRows={selectedRegistries}
         sheetTitle={(r: CardlessRegistry) => r.personName}
         sheetSubtitle={(r: CardlessRegistry) => r.reason}
     >
@@ -607,6 +670,36 @@
         {/snippet}
     </SectionHeader>
 
+    {#if userState.isAdmin && selectedRegistries.length > 0}
+        <div
+            class="flex flex-wrap items-center gap-3 p-3 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur max-lg:fixed max-lg:inset-x-3 max-lg:bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] max-lg:z-40 max-lg:shadow-2xl"
+        >
+            <span class="text-sm font-extrabold text-blue-800">
+                {selectedRegistries.length} registro(s) seleccionado(s)
+            </span>
+            <div class="flex flex-wrap items-center gap-2 ml-auto">
+                <Button variant="soft-slate" size="sm" onclick={clearRegistrySelection}>Limpiar</Button>
+                <Button
+                    variant="soft-blue"
+                    size="sm"
+                    disabled={!networkStore.isOnline || isExporting}
+                    onclick={handleExportSelected}
+                >
+                    <FileSpreadsheet size={15} class="mr-1.5" />
+                    Exportar selección
+                </Button>
+                <Button
+                    variant="danger"
+                    size="sm"
+                    disabled={!networkStore.isOnline}
+                    onclick={requestBulkDelete}
+                >
+                    Eliminar
+                </Button>
+            </div>
+        </div>
+    {/if}
+
     <Card class="overflow-hidden relative min-h-[200px]">
         <ContentView
             {isLoading}
@@ -625,6 +718,8 @@
                 <DataTable
                     data={registries}
                     actionsWidth="140px"
+                    selectable={userState.isAdmin}
+                    bind:selectedRows={selectedRegistries}
                     columns={[
                         {
                             key: 'personName',
@@ -732,12 +827,13 @@
 
 <ConfirmationModal
     bind:isOpen={isConfirmDeleteOpen}
-    title="Eliminar registro"
-    description={`¿Eliminar el registro de ${registryDisplayName(registryToDelete)}? Esta acción no se puede deshacer.`}
+    title={registryToDelete ? 'Eliminar registro' : `Eliminar ${registriesToDelete.length} registros`}
+    description={bulkDeleteDescription()}
     confirmText="Eliminar"
     variant="danger"
     onConfirm={handleDeleteConfirm}
     onCancel={() => {
         registryToDelete = null;
+        registriesToDelete = [];
     }}
 />
