@@ -495,7 +495,7 @@ Control de Accesos - Nexa`;
                     <Button
                         variant="primary"
                         onclick={handleSign}
-                        class="col-span-2 sm:w-auto"
+                        class="col-span-2 sm:w-auto max-sm:h-12 max-sm:text-[15px] max-sm:shadow-lg max-sm:shadow-blue-500/25"
                         loading={isSigning}
                         disabled={isDownloading}
                     >

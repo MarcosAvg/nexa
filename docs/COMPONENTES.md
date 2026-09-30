@@ -609,10 +609,7 @@ Modal que muestra la previsualización de una Carta Responsiva. Incluye:
 - Canvas con soporte para mouse, touch y stylus
 - Grosor de trazo adaptativo: usa presión del lápiz si disponible, velocidad como fallback
 - Suavizado con curvas cuadráticas
-- **Modo Tableta:** Overlay de pantalla completa con zona de captura adaptativa — el primer toque define el centro, ideal para firmar en tablet
-- Toolbar flotante con botones Limpiar, Confirmar, Cerrar
 - Soporte High-DPI (devicePixelRatio)
-- Cancelación con Escape
 
 ---
 
