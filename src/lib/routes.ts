@@ -23,11 +23,19 @@ const lazy = (path: string, asyncComponent: () => Promise<any>): any =>
     wrap({ asyncComponent, loadingComponent: RouteFallback as any, conditions: [guard(path)] });
 
 // Rutas de módulos compilados: se re-envuelven para aplicar el mismo guard
-// (generated.ts no se edita a mano).
+// (generated.ts no se edita a mano). OJO: `wrap()` devuelve el loader en
+// `component` (no en `asyncComponent`); hay que reinyectarlo como
+// `asyncComponent` o el router renderiza en blanco.
 const guardedModuleRoutes: Record<string, any> = Object.fromEntries(
     Object.entries(moduleRoutes).map(([path, route]: [string, any]) => [
         path,
-        wrap({ ...(route as object), conditions: [guard(path)] }),
+        wrap({
+            asyncComponent: route.component ?? route.asyncComponent,
+            loadingComponent: RouteFallback as any,
+            ...(route.userData ? { userData: route.userData } : {}),
+            ...(route.props ? { props: route.props } : {}),
+            conditions: [guard(path)],
+        }),
     ]),
 );
 
