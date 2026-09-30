@@ -14,6 +14,8 @@ import { BUILT_MODULES } from '../modules/generated';
 export type ModuleConfig = {
     enabled?: boolean;
     mediaKey?: string;
+    /** Medios seleccionados (keys de `access_media_types`). Reemplaza a `mediaKey`. */
+    mediaKeys?: string[];
     usageThreshold?: number;
 };
 
@@ -21,7 +23,7 @@ export type ModuleId = (typeof BUILT_MODULES)[number];
 
 const DEFAULTS: Record<string, ModuleConfig> = {
     conteo_uso: { mediaKey: 'kone', usageThreshold: 10 },
-    registro_sin_tarjeta: { mediaKey: 'kone' },
+    registro_sin_tarjeta: { mediaKeys: ['kone'] },
 };
 
 export class ModuleState {
@@ -43,6 +45,21 @@ export class ModuleState {
     /** Config efectiva de un módulo (defaults fusionados). */
     config(id: string): ModuleConfig {
         return { ...(DEFAULTS[id] ?? {}), ...(this.state[id] ?? {}) };
+    }
+
+    /**
+     * Medios configurados de un módulo (keys de `access_media_types`).
+     * Migra el formato anterior de un solo medio (`mediaKey`) y aplica el
+     * default si no hay nada guardado.
+     */
+    moduleMediaKeys(id: string): string[] {
+        const cfg = this.config(id);
+        if (Array.isArray(cfg.mediaKeys) && cfg.mediaKeys.length > 0) return [...cfg.mediaKeys];
+        if (typeof cfg.mediaKey === 'string' && cfg.mediaKey) return [cfg.mediaKey];
+        const fallback = DEFAULTS[id]?.mediaKeys;
+        if (Array.isArray(fallback) && fallback.length > 0) return [...fallback];
+        const fallbackKey = DEFAULTS[id]?.mediaKey;
+        return typeof fallbackKey === 'string' && fallbackKey ? [fallbackKey] : [];
     }
 
     async loadFromServer() {

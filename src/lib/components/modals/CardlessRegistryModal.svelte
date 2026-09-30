@@ -7,6 +7,8 @@
     import { cardlessRegistryService } from '../../services/cardlessRegistry';
     import { personnelService } from '../../services/personnel';
     import { catalogState } from '../../stores';
+    import { moduleState } from '../../stores/module.svelte';
+    import { isMediaAllowed } from '../../utils';
     import type { CardlessRegistry, Person } from '../../types';
     import { toast } from 'svelte-sonner';
     import { networkStore } from '../../stores/network.svelte';
@@ -213,14 +215,22 @@
         return buildings.find((b) => b.name === manualBuilding)?.floors || [];
     });
 
+    /** Medios configurados para Sin Tarjeta (vacío = todos). Reactivo a la config. */
+    let configuredMediaKeys = $derived(moduleState.moduleMediaKeys('registro_sin_tarjeta'));
+
+    /** Tarjeta con responsiva de los medios configurados (o null si no hay). */
+    function findResponsivaCard(cards: any[] | null | undefined) {
+        return (cards ?? []).find(
+            (c) => c.requires_responsiva === true && isMediaAllowed(c.media_key, configuredMediaKeys),
+        );
+    }
+
     let hasPendingResponsiva = $derived.by(() => {
         if (!selectedPerson) return false;
         if (editingRegistry && selectedPerson.id === editingRegistry.person_id) {
             return !!editingRegistry.pendingResponsiva;
         }
-        const responsivaCard = selectedPerson.cards?.find(
-            (c) => c.requires_responsiva !== false && c.requires_responsiva === true,
-        );
+        const responsivaCard = findResponsivaCard(selectedPerson.cards);
         return !!(
             responsivaCard &&
             responsivaCard.responsiva_status !== 'signed' &&
@@ -230,9 +240,9 @@
 
     /**
      * Three-value snapshot for responsiva_status_at_registration:
-     *   true  → tiene tarjeta del medio asignada y pendiente de firma
-     *   false → tiene tarjeta del medio asignada y ya firmada (digital o legacy)
-     *   null  → no tiene tarjeta del medio asignada (o persona no vinculada)
+     *   true  → tiene tarjeta de un medio configurado asignada y pendiente de firma
+     *   false → tiene tarjeta de un medio configurado asignada y ya firmada (digital o legacy)
+     *   null  → no tiene tarjeta de un medio configurado asignada (o persona no vinculada)
      */
     let responsivaStatusSnapshot = $derived.by((): boolean | null => {
         if (!selectedPerson) return null;
@@ -240,9 +250,7 @@
         if (editingRegistry && selectedPerson.id === editingRegistry.person_id) {
             return editingRegistry.responsiva_status_at_registration ?? null;
         }
-        const responsivaCard = selectedPerson.cards?.find(
-            (c) => c.requires_responsiva !== false && c.requires_responsiva === true,
-        );
+        const responsivaCard = findResponsivaCard(selectedPerson.cards);
         // Sin tarjeta que requiera responsiva asignada
         if (!responsivaCard) return null;
         // Tiene tarjeta del medio — verificar si responsiva sigue pendiente

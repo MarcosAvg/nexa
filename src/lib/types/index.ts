@@ -56,6 +56,8 @@ export interface Card {
     responsiva_status: string | null;
     has_floors?: boolean;
     requires_responsiva?: boolean;
+    /** Key estable del tipo de medio (`access_media_types.key`). */
+    media_key?: string;
     // Propiedades calculadas/combinadas
     personName?: string;
     personStatus?: string;

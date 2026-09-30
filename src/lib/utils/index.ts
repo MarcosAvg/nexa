@@ -36,6 +36,7 @@ export type { UndoToastOptions } from './undoToast';
 export { catalogCache } from './catalogCache';
 export { generateLegalHash } from './crypto';
 export { mediaTypeVariant, mediaTypeDotClass, mediaTypeRgb } from './mediaTypeAppearance';
+export { resolveMediaTypeIds, isMediaAllowed } from './mediaKeys';
 export { personnelActions } from './personnelActions';
 export { initGlobalRealtime, destroyGlobalRealtime } from './realtime';
 export { createSimpleDebounce } from './search.svelte';

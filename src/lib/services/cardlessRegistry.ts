@@ -1,8 +1,10 @@
 import { supabase } from '../supabase';
-import { withErrorHandling, withErrorHandlingSafe } from '../utils';
+import { withErrorHandling, withErrorHandlingSafe, resolveMediaTypeIds } from '../utils';
 import type { CardlessRegistry } from '../types';
 import type { CardlessRegistryExportFilters } from '../utils';
 import { networkStore } from '../stores/network.svelte';
+import { moduleState } from '../stores/module.svelte';
+import { catalogState } from '../stores/catalogs.svelte';
 
 const REASONS = [
     'No se le ha entregado',
@@ -63,16 +65,36 @@ const SELECT_WITH_RELATIONS = `
 `;
 
 /**
- * Returns the set of person IDs that have at least one pending "Firma Responsiva"
- * ticket linked to a card requiring a responsiva.
+ * Medios configurados para Sin Tarjeta (ids de `access_media_types`).
+ * `null` = sin filtro (todos los medios): preserva el comportamiento anterior
+ * cuando no hay configuración o el catálogo aún no cargó.
  */
-async function fetchPendingResponsivaSet(personIds: string[]): Promise<Set<string>> {
+function getConfiguredMediaTypeIds(): string[] | null {
+    const keys = moduleState.moduleMediaKeys('registro_sin_tarjeta');
+    if (keys.length === 0) return null;
+    const ids = resolveMediaTypeIds(
+        keys,
+        (catalogState.mediaTypes ?? []).map((m: any) => ({ key: m.key, id: m.id })),
+    );
+    return ids.length > 0 ? ids : null;
+}
+
+/**
+ * Returns the set of person IDs that have at least one pending "Firma Responsiva"
+ * ticket linked to a card requiring a responsiva, limitado a los medios dados.
+ */
+async function fetchPendingResponsivaSet(
+    personIds: string[],
+    mediaTypeIds?: string[] | null,
+): Promise<Set<string>> {
     const unique = [...new Set(personIds.filter(Boolean))];
     if (unique.length === 0) return new Set();
 
     const { data, error } = await supabase
         .from('tickets')
-        .select('person_id, access_media!access_media_id(access_media_types(requires_responsiva))')
+        .select(
+            'person_id, access_media!access_media_id(media_type_id, access_media_types(requires_responsiva))',
+        )
         .eq('type', 'Firma Responsiva')
         .eq('status', 'pending')
         .in('person_id', unique);
@@ -84,13 +106,21 @@ async function fetchPendingResponsivaSet(personIds: string[]): Promise<Set<strin
             data as {
                 person_id: string;
                 access_media?:
-                    { access_media_types?: { requires_responsiva?: boolean | null } | null }[] | null;
+                    | {
+                          media_type_id?: string | null;
+                          access_media_types?: { requires_responsiva?: boolean | null } | null;
+                      }[]
+                    | null;
             }[]
         )
-            .filter(
-                (t) =>
-                    t.access_media?.some?.((c) => c.access_media_types?.requires_responsiva === true) ??
-                    false,
+            .filter((t) =>
+                (t.access_media ?? []).some?.(
+                    (c) =>
+                        c.access_media_types?.requires_responsiva === true &&
+                        (!mediaTypeIds ||
+                            mediaTypeIds.length === 0 ||
+                            (c.media_type_id != null && mediaTypeIds.includes(String(c.media_type_id)))),
+                ),
             )
             .map((t) => t.person_id),
     );
@@ -146,10 +176,11 @@ const mapCardlessRegistryRecord = (r: RegistryRow): CardlessRegistry => {
 
 async function enrichWithResponsiva(
     registries: CardlessRegistry[],
-    mediaTypeId?: string,
+    mediaTypeIds?: string[] | null,
 ): Promise<CardlessRegistry[]> {
-    // mediaTypeId identifica el tipo de medio; no se usa en la consulta porque
-    // fetchPendingResponsivaSet no filtra por tipo de medio (solo se renombra).
+    // Medios configurados en Configuración → Módulos; por defecto (undefined)
+    // se resuelven aquí. `null` explícito = todos (sin filtro).
+    const filterIds = mediaTypeIds === undefined ? getConfiguredMediaTypeIds() : mediaTypeIds;
     // Solo consultar estado actual de ticket para registros sin snapshot almacenado
     // (i.e. pre-migration records where responsiva_status_at_registration is null).
     const legacyIds = registries
@@ -158,7 +189,7 @@ async function enrichWithResponsiva(
 
     let pendingSet = new Set<string>();
     if (legacyIds.length > 0) {
-        pendingSet = await fetchPendingResponsivaSet(legacyIds);
+        pendingSet = await fetchPendingResponsivaSet(legacyIds, filterIds);
     }
 
     return registries.map((r) => {

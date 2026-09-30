@@ -144,6 +144,40 @@
                                             <option value={m.key}>{m.name}</option>
                                         {/each}
                                     </Select>
+                                {:else if field.type === 'media-multi-select'}
+                                    <div
+                                        class="space-y-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 p-2"
+                                    >
+                                        {#each mediaTypes as m}
+                                            {@const selectedKeys = Array.isArray(field.value)
+                                                ? field.value
+                                                : []}
+                                            <label
+                                                class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    class="w-4 h-4 accent-emerald-600 shrink-0"
+                                                    checked={selectedKeys.includes(m.key)}
+                                                    onchange={(e) => {
+                                                        const checked = (e.currentTarget as HTMLInputElement)
+                                                            .checked;
+                                                        const next = checked
+                                                            ? [...selectedKeys, m.key]
+                                                            : selectedKeys.filter((k: string) => k !== m.key);
+                                                        saveField(id, field.key, next);
+                                                    }}
+                                                />
+                                                <span class="text-[13px] font-bold text-slate-700"
+                                                    >{m.name}</span
+                                                >
+                                            </label>
+                                        {/each}
+                                    </div>
+                                    <p class="text-[11px] font-bold text-slate-500 mt-1">
+                                        {(Array.isArray(field.value) ? field.value : []).length}
+                                        seleccionado(s)
+                                    </p>
                                 {:else if field.type === 'number'}
                                     <Input
                                         id={fieldId}

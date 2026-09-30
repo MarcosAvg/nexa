@@ -81,6 +81,7 @@ function toCardsShape(media: any[] | null | undefined): Card[] {
         responsiva_status: m.responsiva_status,
         has_floors: m.access_media_types?.has_floors,
         requires_responsiva: m.access_media_types?.requires_responsiva,
+        media_key: m.access_media_types?.key ?? '',
     }));
 }
 
@@ -647,7 +648,7 @@ export const personnelService = {
                 const peopleQuery = supabase
                     .from('personnel')
                     .select(
-                        '*, access_media(*, access_media_types(name, has_floors, requires_responsiva)), access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name))), buildings(name), dependencies(name), schedules(*)',
+                        '*, access_media(*, access_media_types(name, key, has_floors, requires_responsiva)), access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name))), buildings(name), dependencies(name), schedules(*)',
                     )
                     .in('id', rpcIds);
 

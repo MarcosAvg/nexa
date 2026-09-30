@@ -15,8 +15,8 @@
 export type ModuleField = {
     key: string;
     label: string;
-    type: 'media-select' | 'number' | 'boolean' | 'text';
-    default?: string | number | boolean;
+    type: 'media-select' | 'media-multi-select' | 'number' | 'boolean' | 'text';
+    default?: string | number | boolean | string[];
     help?: string;
 };
 
@@ -51,7 +51,15 @@ export const MODULE_DEFINITIONS: ModuleDef[] = [
         kind: 'route',
         path: '/registro-sin-tarjeta',
         icon: 'clipboard-x',
-        fields: [{ key: 'mediaKey', label: 'Medio', type: 'media-select' }],
+        fields: [
+            {
+                key: 'mediaKeys',
+                label: 'Medios',
+                type: 'media-multi-select',
+                default: ['kone'],
+                help: 'Medios de acceso de los que se toma el estado de responsiva.',
+            },
+        ],
     },
 ];
 
