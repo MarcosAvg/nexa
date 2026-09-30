@@ -17,8 +17,9 @@
         ChevronRight,
     } from 'lucide-svelte';
     import { personnelService } from '../services/personnel';
-    import { personnelState, uiState } from '../stores';
+    import { personnelState, uiState, userState } from '../stores';
     import { handleError, fullName, scrollLock, overlayHistory } from '../utils';
+    import { canAccessRoute, type AppRole } from '../routeAccess';
     import { push } from 'svelte-spa-router';
 
     const isOpen = $derived(uiState.isCommandPaletteOpen);
@@ -87,7 +88,17 @@
         }
     });
 
-    const quickActions = [
+    type QuickAction = {
+        title: string;
+        subtitle: string;
+        icon: any;
+        category: string;
+        /** Roles que pueden ver esta acción. Omitido = todos. */
+        roles?: AppRole[];
+        action: () => void;
+    };
+
+    const quickActions: QuickAction[] = [
         {
             title: 'Nueva Alta de Personal',
             subtitle: 'Registrar un nuevo colaborador',
@@ -113,6 +124,7 @@
             subtitle: 'Catálogos y preferencias',
             icon: Settings,
             category: 'Navegación',
+            roles: ['admin'] as AppRole[],
             action: () => {
                 push('/settings');
                 close();
@@ -255,11 +267,16 @@
               }))),
         ...quickActions.filter(
             (item) =>
-                item.title.toLowerCase().includes(query.toLowerCase()) ||
-                item.subtitle.toLowerCase().includes(query.toLowerCase()),
+                (!item.roles || item.roles.includes(userState.profile?.role as AppRole)) &&
+                (item.title.toLowerCase().includes(query.toLowerCase()) ||
+                    item.subtitle.toLowerCase().includes(query.toLowerCase())),
         ),
         ...navItems
-            .filter((item) => item.title.toLowerCase().includes(query.toLowerCase()))
+            .filter(
+                (item) =>
+                    canAccessRoute(item.path, userState.profile?.role) &&
+                    item.title.toLowerCase().includes(query.toLowerCase()),
+            )
             .map((item) => ({
                 ...item,
                 subtitle: `Ir a ${item.title}`,

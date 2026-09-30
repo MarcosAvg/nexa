@@ -2,6 +2,7 @@
     import { push, location } from 'svelte-spa-router';
     import { supabase } from '../supabase';
     import { uiState, userState, moduleState } from '../stores';
+    import { canAccessRoute } from '../routeAccess';
     import DashboardLayout from './DashboardLayout.svelte';
     import {
         LayoutDashboard,
@@ -15,8 +16,10 @@
     } from 'lucide-svelte';
     import { onMount } from 'svelte';
 
-    // Elementos de navegación filtrados por rol
+    // Elementos de navegación filtrados por rol (las vistas no autorizadas
+    // ni siquiera aparecen en Sidebar/BottomNav).
     const sidebarItems = $derived.by(() => {
+        const role = userState.profile?.role;
         const items = [
             { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
             { label: 'Personal', href: '/personal', icon: Users },
@@ -24,10 +27,10 @@
             { label: 'Pendientes', href: '/tickets', icon: ClipboardList },
             { label: 'Enlaces', href: '/enlaces', icon: Contact },
             { label: 'Historial', href: '/history', icon: History },
-        ];
+        ].filter((i) => canAccessRoute(i.href, role));
 
-        // Módulos: "Registro sin tarjeta" solo si está compilado y activo.
-        if (moduleState.isEnabled('registro_sin_tarjeta')) {
+        // Módulos: "Registro sin tarjeta" solo si está compilado, activo y con rol.
+        if (moduleState.isEnabled('registro_sin_tarjeta') && canAccessRoute('/registro-sin-tarjeta', role)) {
             const idx = items.findIndex((i) => i.href === '/history');
             items.splice(idx < 0 ? items.length : idx, 0, {
                 label: 'Sin Tarjeta',
@@ -36,7 +39,7 @@
             });
         }
 
-        if (userState.isAdmin) {
+        if (canAccessRoute('/settings', role)) {
             items.push({
                 label: 'Configuración',
                 href: '/settings',
@@ -70,9 +73,15 @@
         };
     });
 
-    // Sincronizar página activa con ruta para el título del encabezado
+    // Sincronizar página activa con ruta para el título del encabezado.
+    // Red de seguridad: si la ruta actual no es visible para el rol
+    // (p. ej. bookmark directo o cambio de rol en caliente), volver al Dashboard.
     $effect(() => {
         const path = $location;
+        if (!canAccessRoute(path, userState.profile?.role)) {
+            void push('/');
+            return;
+        }
         if (path.includes('dashboard')) uiState.setActivePage('Dashboard');
         else if (path.includes('personal')) uiState.setActivePage('Personal');
         else if (path.includes('cards')) uiState.setActivePage('Tarjetas');
