@@ -50,6 +50,30 @@ const PERSONNEL_STATUS_BY_LABEL: Record<string, PersonnelStatusMeta> = Object.fr
     PERSONNEL_STATUS_META.map((m) => [m.label, m]),
 );
 
+/**
+ * Etiquetas que cuentan como "activo" para el filtro agregado "No Activos".
+ * "No Activos" = todos los estados de personal EXCEPTO estos.
+ */
+export const ACTIVE_PERSONNEL_STATUSES = ['Activo/a', 'Parcial', 'Media de otro edificio'];
+
+/**
+ * Expande una selección múltiple de estados de UI a valores reales de
+ * `computed_status`, resolviendo el agregado "No Activos".
+ *
+ * @example
+ * expandPersonnelStatusFilter(['No Activos']) // → todos menos Activo/a, Parcial, Media de otro edificio
+ * expandPersonnelStatusFilter(['Baja', 'Activo/a']) // → ['Baja', 'Activo/a']
+ */
+export function expandPersonnelStatusFilter(statuses: string[]): string[] {
+    const result = new Set(statuses.filter((s) => s !== 'No Activos'));
+    if (statuses.includes('No Activos')) {
+        for (const meta of PERSONNEL_STATUS_META) {
+            if (!ACTIVE_PERSONNEL_STATUSES.includes(meta.label)) result.add(meta.label);
+        }
+    }
+    return [...result];
+}
+
 /** Variante de Badge para cada estado de personal. */
 export function getPersonnelStatusVariant(status: string): StatusVariant {
     const meta = PERSONNEL_STATUS_BY_LABEL[status];

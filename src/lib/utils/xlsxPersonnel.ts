@@ -107,11 +107,11 @@ export interface ExportPersonnelData {
 
 export interface ExportOptions {
     filters?: {
-        status?: string;
-        dependency?: string;
-        building?: string;
-        floor?: string;
-        mediaType?: string;
+        status?: string | string[];
+        dependency?: string | string[];
+        building?: string | string[];
+        floor?: string | string[];
+        mediaType?: string | string[];
         search?: string;
     };
     splitByDependency?: boolean;
@@ -932,7 +932,13 @@ export async function exportPersonnelToExcel(
     const fileNameParts: string[] = ['Directorio'];
 
     if (options?.filters) {
-        const { status, dependency, building, floor, mediaType, search } = options.filters;
+        const joinFilter = (v?: string | string[]): string => (!v ? '' : Array.isArray(v) ? v.join(', ') : v);
+        const status = joinFilter(options.filters.status);
+        const dependency = joinFilter(options.filters.dependency);
+        const building = joinFilter(options.filters.building);
+        const floor = joinFilter(options.filters.floor);
+        const mediaType = joinFilter(options.filters.mediaType);
+        const search = options.filters.search ?? '';
         const activeFilters: string[] = [];
         if (status && status !== 'Todos') {
             activeFilters.push(`Estado: ${status}`);

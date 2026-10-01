@@ -69,13 +69,15 @@ export const cardService = {
         page: number = 1,
         limit: number = 50,
         search: string = '',
-        typeFilter: string = 'Todos',
-        statusFilter: string = 'Todas',
-        depId: string = '',
+        typeFilters: string[] = [],
+        statusFilters: string[] = [],
+        depIds: string[] = [],
     ): Promise<{ data: Card[]; count: number }> {
         return withErrorHandlingSafe(
             async () => {
-                const cacheKey = `cards_page_${page}_${limit}_${typeFilter}_${statusFilter}_${search}_${depId}`;
+                const cacheKey = `cards_page_${page}_${limit}_${typeFilters.join('|')}_${statusFilters.join(
+                    '|',
+                )}_${search}_${depIds.join('|')}`;
                 if (!networkStore.isOnline) {
                     const cachedData = await dbCache.load<{ data: Card[]; count: number }>(cacheKey);
                     if (cachedData) return cachedData;
@@ -107,28 +109,31 @@ export const cardService = {
                     }
                 }
 
-                if (typeFilter !== 'Todos') {
-                    const media = catalogState.mediaTypes.find((m) => m.name === typeFilter);
-                    if (media) query = query.eq('media_type_id', media.id);
+                if (typeFilters.length > 0) {
+                    const mediaIds = typeFilters
+                        .map((name) => catalogState.mediaTypes.find((m) => m.name === name)?.id)
+                        .filter((id): id is string => Boolean(id));
+                    if (mediaIds.length > 0) query = query.in('media_type_id', mediaIds);
                 }
 
-                if (statusFilter !== 'Todas') {
+                if (statusFilters.length > 0) {
                     const statusMap: Record<string, string> = {
                         Activa: 'active',
                         Bloqueada: 'blocked',
                         Baja: 'inactive',
                         Disponible: 'available',
                     };
-                    if (statusMap[statusFilter]) {
-                        query = query.eq('status', statusMap[statusFilter]);
-                    }
+                    const statuses = statusFilters
+                        .map((s) => statusMap[s])
+                        .filter((s): s is string => Boolean(s));
+                    if (statuses.length > 0) query = query.in('status', statuses);
                 }
 
-                if (depId) {
+                if (depIds.length > 0) {
                     const { data: people } = await supabase
                         .from('personnel')
                         .select('id')
-                        .eq('dependency_id', depId);
+                        .in('dependency_id', depIds);
                     const personIds = people?.map((p) => p.id) || [];
                     if (personIds.length > 0) {
                         query = query.in('person_id', personIds);
@@ -155,9 +160,9 @@ export const cardService = {
 
     async fetchForExport(
         search: string = '',
-        typeFilter: string = 'Todos',
-        statusFilter: string = 'Todas',
-        depId: string = '',
+        typeFilters: string[] = [],
+        statusFilters: string[] = [],
+        depIds: string[] = [],
     ): Promise<Card[]> {
         return withErrorHandlingSafe(
             async () => {
@@ -168,11 +173,11 @@ export const cardService = {
                 }
 
                 let depPersonIds: string[] | null = null;
-                if (depId) {
+                if (depIds.length > 0) {
                     const { data: people } = await supabase
                         .from('personnel')
                         .select('id')
-                        .eq('dependency_id', depId);
+                        .in('dependency_id', depIds);
                     depPersonIds = people?.map((p) => p.id) || [];
                 }
 
@@ -192,18 +197,23 @@ export const cardService = {
                             q = q.ilike('identifier', st);
                         }
                     }
-                    if (typeFilter !== 'Todos') {
-                        const media = catalogState.mediaTypes.find((m) => m.name === typeFilter);
-                        if (media) q = q.eq('media_type_id', media.id);
+                    if (typeFilters.length > 0) {
+                        const mediaIds = typeFilters
+                            .map((name) => catalogState.mediaTypes.find((m) => m.name === name)?.id)
+                            .filter((id): id is string => Boolean(id));
+                        if (mediaIds.length > 0) q = q.in('media_type_id', mediaIds);
                     }
-                    if (statusFilter !== 'Todas') {
+                    if (statusFilters.length > 0) {
                         const sm: Record<string, string> = {
                             Activa: 'active',
                             Bloqueada: 'blocked',
                             Baja: 'inactive',
                             Disponible: 'available',
                         };
-                        if (sm[statusFilter]) q = q.eq('status', sm[statusFilter]);
+                        const statuses = statusFilters
+                            .map((s) => sm[s])
+                            .filter((s): s is string => Boolean(s));
+                        if (statuses.length > 0) q = q.in('status', statuses);
                     }
                     if (depPersonIds !== null && depPersonIds.length > 0) {
                         q = q.in('person_id', depPersonIds);

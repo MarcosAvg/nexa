@@ -187,11 +187,12 @@ En móvil, los filtros se colapsan detrás de un botón de "Filtros" y las accio
 
 ---
 
-### `FilterSelect` — Select con label
+### `FilterSelect` — Select con label (simple o múltiple)
 
 **Ubicación:** `src/lib/components/FilterSelect.svelte`
 
 ```svelte
+<!-- Selección simple -->
 <FilterSelect
     label="Dependencia"
     options={catalogState.dependencies.map(d => d.name)}
@@ -199,17 +200,30 @@ En móvil, los filtros se colapsan detrás de un botón de "Filtros" y las accio
     placeholder="Todas"
     onchange={onFilterChange}
 />
+
+<!-- Selección múltiple (todos los filtros categóricos de las vistas) -->
+<FilterSelect
+    label="Tipo"
+    multiple
+    options={mediaTypeNames}
+    bind:values={typeFilters}
+    placeholder="Todos"
+/>
 ```
 
 | Prop | Tipo | Default |
 |---|---|---|
 | `label` | `string` | — |
-| `options` | `string[]` | `[]` |
-| `value` | `string` (bindable) | — |
+| `options` | `(string \| { value, label })[]` | `[]` |
+| `multiple` | `boolean` | `false` |
+| `value` | `string` (bindable, modo simple) | — |
+| `values` | `string[]` (bindable, modo múltiple) | `[]` |
 | `placeholder` | `string` | `"Seleccionar..."` |
-| `onchange` | `() => void` | — |
+| `disabled` | `boolean` | `false` |
+| `onchange` | `(value) => void` | — |
+| `onchangeMulti` | `(values) => void` | — |
 
-Select compacto con label arriba. Usado en los headers de filtros de las vistas.
+Select compacto con label. En modo múltiple la selección vacía significa "sin filtro" (el trigger muestra el placeholder, p. ej. "Todos"), el menú permanece abierto y cada opción lleva checkbox.
 
 ---
 
@@ -559,20 +573,20 @@ Configuración visual por tipo de ticket (icono, color de borde/fondo/texto).
 ```svelte
 <HistoryFilters
     bind:personName
-    bind:cardType
+    bind:cardTypes
     bind:cardFolio
-    bind:action
+    bind:actions
 />
 ```
 
 | Prop | Tipo (bindable) |
 |---|---|
 | `personName` | `string` |
-| `cardType` | `string` |
+| `cardTypes` | `string[]` |
 | `cardFolio` | `string` |
-| `action` | `string` |
+| `actions` | `string[]` |
 
-Cuatro campos de filtro: Persona (input con Search), Tipo de Tarjeta (Select), Folio (input), Acción (Select con `ACTION_NAMES` ordenados alfabéticamente).
+Cuatro campos de filtro: Persona (input con Search), Tipo de Tarjeta (multi-select), Folio (input), Acción (multi-select con `ACTION_NAMES`).
 
 ---
 

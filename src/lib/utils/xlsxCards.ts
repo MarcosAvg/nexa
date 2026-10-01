@@ -3,7 +3,7 @@ import { settingsState } from '../stores';
 
 export async function exportCardsToExcel(
     data: any[],
-    options?: { filters?: { type?: string; status?: string; dependency?: string; search?: string } },
+    options?: { filters?: { type?: string[]; status?: string[]; dependency?: string[]; search?: string } },
 ) {
     const [ExcelJSModule, { saveAs: saveAsFunction }] = await Promise.all([
         import('exceljs'),
@@ -30,14 +30,14 @@ export async function exportCardsToExcel(
     if (options?.filters?.search) {
         filterDescription = `      -  Búsqueda: "${options.filters.search}"`;
     }
-    if (options?.filters?.type && options.filters.type !== 'Todos') {
-        filterDescription += `  |  Tipo: ${options.filters.type}`;
+    if (options?.filters?.type && options.filters.type.length > 0) {
+        filterDescription += `  |  Tipo: ${options.filters.type.join(', ')}`;
     }
-    if (options?.filters?.status && options.filters.status !== 'Todas') {
-        filterDescription += `  |  Estado: ${options.filters.status}`;
+    if (options?.filters?.status && options.filters.status.length > 0) {
+        filterDescription += `  |  Estado: ${options.filters.status.join(', ')}`;
     }
-    if (options?.filters?.dependency) {
-        filterDescription += `  |  Dependencia: ${options.filters.dependency}`;
+    if (options?.filters?.dependency && options.filters.dependency.length > 0) {
+        filterDescription += `  |  Dependencia: ${options.filters.dependency.join(', ')}`;
     }
 
     worksheet.columns = [

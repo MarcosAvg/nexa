@@ -27,6 +27,7 @@
     import { toast } from 'svelte-sonner';
     import { handleError, formatDateTime } from '../utils';
     import { HistoryService } from '../services/history';
+    import { ACTION_NAMES } from '../constants/history';
     import { networkStore } from '../stores/network.svelte';
     import {
         ACTION_NAMES as actionNames,
@@ -75,11 +76,11 @@
                 onClear: () => historyState.setFilters({ person: '' }),
             });
         }
-        if (f.cardType !== 'Todos') {
+        for (const value of f.cardType) {
             chips.push({
                 label: 'Tarjeta',
-                value: f.cardType,
-                onClear: () => historyState.setFilters({ cardType: 'Todos' }),
+                value,
+                onClear: () => historyState.setFilters({ cardType: f.cardType.filter((v) => v !== value) }),
             });
         }
         if (f.folio) {
@@ -89,11 +90,11 @@
                 onClear: () => historyState.setFilters({ folio: '' }),
             });
         }
-        if (f.action !== 'Todas') {
+        for (const value of f.action) {
             chips.push({
                 label: 'Acción',
-                value: f.action,
-                onClear: () => historyState.setFilters({ action: 'Todas' }),
+                value: ACTION_NAMES[value] ?? value,
+                onClear: () => historyState.setFilters({ action: f.action.filter((v) => v !== value) }),
             });
         }
         if (f.startDate || f.endDate) {
@@ -365,9 +366,9 @@
                 {#snippet primary()}
                     <HistoryFilters
                         bind:personName={historyState.filters.person}
-                        bind:cardType={historyState.filters.cardType}
+                        bind:cardTypes={historyState.filters.cardType}
                         bind:cardFolio={historyState.filters.folio}
-                        bind:action={historyState.filters.action}
+                        bind:actions={historyState.filters.action}
                         bind:startDate={historyState.filters.startDate}
                         bind:endDate={historyState.filters.endDate}
                     />

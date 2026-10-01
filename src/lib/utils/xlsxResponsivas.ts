@@ -49,18 +49,18 @@ export function matchesResponsivaFilters(
         cardType?: string;
         cards?: { type?: string };
     },
-    movementTypeFilter: string,
-    responsivaFilter: string,
+    movementTypeFilter: string[],
+    responsivaFilter: string[],
     warnDays: number,
-    mediaFilter: string = 'Todas',
+    mediaFilter: string[] = [],
 ): boolean {
-    if (mediaFilter !== 'Todas' && (t.cardType || t.cards?.type || '') !== mediaFilter) return false;
-    if (movementTypeFilter !== 'Todas' && t.movementType !== movementTypeFilter) return false;
-    if (responsivaFilter === 'Todas') return true;
+    if (mediaFilter.length > 0 && !mediaFilter.includes(t.cardType || t.cards?.type || '')) return false;
+    if (movementTypeFilter.length > 0 && !movementTypeFilter.includes(t.movementType ?? '')) return false;
+    if (responsivaFilter.length === 0) return true;
     if (t.type !== 'Firma Responsiva' || t.daysElapsed == null) return false;
-    if (t.needsBaja) return responsivaFilter === 'Baja de Registro';
-    if (t.daysElapsed >= warnDays) return responsivaFilter === 'Por vencer';
-    return responsivaFilter === 'Pendiente';
+    if (t.needsBaja) return responsivaFilter.includes('Baja de Registro');
+    if (t.daysElapsed >= warnDays) return responsivaFilter.includes('Por vencer');
+    return responsivaFilter.includes('Pendiente');
 }
 
 export function computeResponsivaManagement(

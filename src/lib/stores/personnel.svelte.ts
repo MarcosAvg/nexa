@@ -4,11 +4,11 @@ import { PaginatedListState } from './paginatedList.svelte';
 
 export type PersonnelFilters = {
     search: string;
-    status: string;
-    dependencyId: string;
-    buildingId: string;
-    floor: string;
-    mediaTypeId: string;
+    status: string[];
+    dependencyId: string[];
+    buildingId: string[];
+    floor: string[];
+    mediaTypeId: string[];
 };
 
 export class PersonnelState {
@@ -27,11 +27,11 @@ export class PersonnelState {
     /** Filtros unificados. Las vistas pueden bindear directamente. */
     filters: PersonnelFilters = $state({
         search: '',
-        status: 'Todos',
-        dependencyId: '',
-        buildingId: '',
-        floor: '',
-        mediaTypeId: '',
+        status: [],
+        dependencyId: [],
+        buildingId: [],
+        floor: [],
+        mediaTypeId: [],
     });
 
     dashboardStats = $state<DashboardStats>({

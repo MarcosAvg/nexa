@@ -45,17 +45,17 @@
     let dependencyNames = $derived(dependencies.map((d) => d.name));
 
     // Estado local de filtros (determinista: se escribe al store justo antes de refrescar).
-    let typeFilter = $state('Todos');
-    let statusFilter = $state('Todas');
+    let typeFilter = $state<string[]>([]);
+    let statusFilter = $state<string[]>([]);
     let searchFilter = $state('');
     // Nombre de dependencia → ID (mapeo local)
-    let depNameFilter = $state('');
+    let depNameFilter = $state<string[]>([]);
 
     function clearCardFilters() {
-        typeFilter = 'Todos';
-        statusFilter = 'Todas';
+        typeFilter = [];
+        statusFilter = [];
         searchFilter = '';
-        depNameFilter = '';
+        depNameFilter = [];
     }
 
     // ─── Selección múltiple y acciones masivas ───────────────────────────
@@ -233,14 +233,26 @@
     // Chips de filtros activos para el toolbar.
     let cardChips = $derived.by(() => {
         const chips: { label: string; value: string; onClear: () => void }[] = [];
-        if (typeFilter !== 'Todos') {
-            chips.push({ label: 'Tipo', value: typeFilter, onClear: () => (typeFilter = 'Todos') });
+        for (const value of typeFilter) {
+            chips.push({
+                label: 'Tipo',
+                value,
+                onClear: () => (typeFilter = typeFilter.filter((v) => v !== value)),
+            });
         }
-        if (statusFilter !== 'Todas') {
-            chips.push({ label: 'Estado', value: statusFilter, onClear: () => (statusFilter = 'Todas') });
+        for (const value of statusFilter) {
+            chips.push({
+                label: 'Estado',
+                value,
+                onClear: () => (statusFilter = statusFilter.filter((v) => v !== value)),
+            });
         }
-        if (depNameFilter) {
-            chips.push({ label: 'Dependencia', value: depNameFilter, onClear: () => (depNameFilter = '') });
+        for (const value of depNameFilter) {
+            chips.push({
+                label: 'Dependencia',
+                value,
+                onClear: () => (depNameFilter = depNameFilter.filter((v) => v !== value)),
+            });
         }
         return chips;
     });
@@ -272,10 +284,10 @@
 
         clearTimeout(filterDebounce);
         filterDebounce = setTimeout(() => {
-            const depId = depNameFilter
-                ? String(dependencies.find((d) => d.name === depNameFilter)?.id ?? '')
-                : '';
-            cardState.setFilters(typeFilter, statusFilter, depId);
+            const depIds = depNameFilter
+                .map((name) => String(dependencies.find((d) => d.name === name)?.id ?? ''))
+                .filter(Boolean);
+            cardState.setFilters(typeFilter, statusFilter, depIds);
             cardState.setSearch(searchFilter);
             cardState.refresh(1);
         }, 300);
@@ -570,13 +582,17 @@
                 {#snippet primary()}
                     <FilterSelect
                         label="Tipo"
-                        options={['Todos', ...mediaTypeNames]}
-                        bind:value={typeFilter}
+                        multiple
+                        options={mediaTypeNames}
+                        placeholder="Todos"
+                        bind:values={typeFilter}
                     />
                     <FilterSelect
                         label="Estado"
-                        options={['Todas', 'Disponible', 'Activa', 'Bloqueada', 'Baja']}
-                        bind:value={statusFilter}
+                        multiple
+                        options={['Disponible', 'Activa', 'Bloqueada', 'Baja']}
+                        placeholder="Todas"
+                        bind:values={statusFilter}
                     />
                     <div class="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-[200px] w-full">
                         <span
@@ -594,9 +610,10 @@
                 {#snippet overflow()}
                     <FilterSelect
                         label="Dependencia"
+                        multiple
                         options={dependencyNames}
                         placeholder="Todas"
-                        bind:value={depNameFilter}
+                        bind:values={depNameFilter}
                     />
                 {/snippet}
             </FilterToolbar>
@@ -618,13 +635,14 @@
                 onclick={async () => {
                     const loadingToast = toast.loading('Preparando exportación...');
                     try {
+                        const depIds = depNameFilter
+                            .map((name) => String(dependencies.find((d) => d.name === name)?.id ?? ''))
+                            .filter(Boolean);
                         const data = await cardService.fetchForExport(
                             searchFilter,
                             typeFilter,
                             statusFilter,
-                            depNameFilter
-                                ? String(dependencies.find((d) => d.name === depNameFilter)?.id ?? '')
-                                : '',
+                            depIds,
                         );
                         const m = await import('../utils/xlsxExport');
                         m.exportCardsToExcel(data, {
@@ -738,7 +756,12 @@
         emptyDescriptionFiltered="No encontramos tarjetas con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={CreditCard}
         emptyIconBgClass="from-slate-100 to-slate-200 text-slate-400"
-        hasFilters={!!(searchFilter || typeFilter !== 'Todos' || statusFilter !== 'Todas' || depNameFilter)}
+        hasFilters={!!(
+            searchFilter ||
+            typeFilter.length > 0 ||
+            statusFilter.length > 0 ||
+            depNameFilter.length > 0
+        )}
         onClearFilters={() => {
             clearCardFilters();
             // El $effect se encarga de refrescar

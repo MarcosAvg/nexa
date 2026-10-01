@@ -7,9 +7,9 @@ export type { HistoryStory };
 
 export type HistoryFilters = {
     person: string;
-    cardType: string;
+    cardType: string[];
     folio: string;
-    action: string;
+    action: string[];
     startDate: string;
     endDate: string;
 };
@@ -22,9 +22,9 @@ export class HistoryState {
 
     filters: HistoryFilters = $state({
         person: '',
-        cardType: 'Todos',
+        cardType: [],
         folio: '',
-        action: 'Todas',
+        action: [],
         startDate: '',
         endDate: '',
     });
@@ -71,9 +71,9 @@ export class HistoryState {
     clearFilters() {
         this.filters = {
             person: '',
-            cardType: 'Todos',
+            cardType: [],
             folio: '',
-            action: 'Todas',
+            action: [],
             startDate: '',
             endDate: '',
         };

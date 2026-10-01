@@ -94,7 +94,7 @@
     <!-- Chips de filtros activos -->
     {#if chips.length > 0}
         <div class="flex flex-wrap gap-1.5">
-            {#each chips as chip (chip.label)}
+            {#each chips as chip, i (chip.label + ':' + chip.value + ':' + i)}
                 <button
                     type="button"
                     class="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold hover:bg-blue-100 transition-colors"

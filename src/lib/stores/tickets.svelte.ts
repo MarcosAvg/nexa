@@ -2,12 +2,12 @@ import type { Ticket } from '../types';
 import { PaginatedListState } from './paginatedList.svelte';
 
 export type TicketFilters = {
-    type: string;
-    priority: string;
+    type: string[];
+    priority: string[];
     search: string;
-    dependencyId: string;
-    buildingId: string;
-    floor: string;
+    dependencyId: string[];
+    buildingId: string[];
+    floor: string[];
     section: string;
 };
 
@@ -16,12 +16,12 @@ export class TicketState {
 
     /** Filtros unificados. */
     filters: TicketFilters = $state({
-        type: 'Todos',
-        priority: 'Todas',
+        type: [],
+        priority: [],
         search: '',
-        dependencyId: '',
-        buildingId: '',
-        floor: '',
+        dependencyId: [],
+        buildingId: [],
+        floor: [],
         section: 'General',
     });
 

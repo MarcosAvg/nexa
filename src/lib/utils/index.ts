@@ -61,6 +61,8 @@ export type { FloorAction } from './floorActions';
 
 export { normalizeFloorLabel, resolveFloorLabel, resolveFloorList, buildFloorResolver } from './floorMatch';
 
+export { quotePostgrestValue, postgrestInList, orWithNone } from './filters';
+
 export {
     capitalize,
     fullName,

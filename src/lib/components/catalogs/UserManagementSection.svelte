@@ -33,17 +33,22 @@
 
     // Buscador y filtro por rol (cliente; la lista de usuarios es pequeña).
     let userSearch = $state('');
-    let userRoleFilter = $state('Todos');
-    let userActiveFilter = $state('Todos');
+    let userRoleFilter = $state<string[]>([]);
+    let userActiveFilter = $state<string[]>([]);
 
     let isUserActive = (u: any) => u.is_active !== false;
 
     let filteredUsers = $derived.by(() => {
         const terms = normalizeSearch(userSearch).split(' ').filter(Boolean);
         return users.filter((u: any) => {
-            if (userRoleFilter !== 'Todos' && u.role !== userRoleFilter) return false;
-            if (userActiveFilter === 'Activos' && !isUserActive(u)) return false;
-            if (userActiveFilter === 'Inactivos' && isUserActive(u)) return false;
+            if (userRoleFilter.length > 0 && !userRoleFilter.includes(u.role)) return false;
+            const active = isUserActive(u);
+            if (userActiveFilter.length > 0) {
+                const wantsActive = userActiveFilter.includes('Activos');
+                const wantsInactive = userActiveFilter.includes('Inactivos');
+                if (wantsActive && !wantsInactive && !active) return false;
+                if (wantsInactive && !wantsActive && active) return false;
+            }
             if (terms.length === 0) return true;
             const hay = normalizeSearch(`${u.full_name ?? ''} ${u.email ?? ''}`);
             return terms.every((t) => hay.includes(t));
@@ -243,26 +248,26 @@
             <div class="sm:w-56">
                 <FilterSelect
                     label="Rol"
+                    multiple
                     options={[
-                        { value: 'Todos', label: 'Todos' },
                         { value: 'admin', label: 'Administrador' },
                         { value: 'operator', label: 'Operador' },
                         { value: 'viewer', label: 'Visor' },
                     ]}
-                    placeholder=""
-                    bind:value={userRoleFilter}
+                    placeholder="Todos"
+                    bind:values={userRoleFilter}
                 />
             </div>
             <div class="sm:w-44">
                 <FilterSelect
                     label="Estado"
+                    multiple
                     options={[
-                        { value: 'Todos', label: 'Todos' },
                         { value: 'Activos', label: 'Activos' },
                         { value: 'Inactivos', label: 'Inactivos' },
                     ]}
-                    placeholder=""
-                    bind:value={userActiveFilter}
+                    placeholder="Todos"
+                    bind:values={userActiveFilter}
                 />
             </div>
         </div>

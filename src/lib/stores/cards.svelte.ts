@@ -4,10 +4,10 @@ import type { Card } from '../types';
 import { PaginatedListState } from './paginatedList.svelte';
 
 export type CardFilters = {
-    type: string;
-    status: string;
+    type: string[];
+    status: string[];
     search: string;
-    dependencyId: string;
+    dependencyId: string[];
 };
 
 export class CardState {
@@ -15,10 +15,10 @@ export class CardState {
 
     /** Filtros unificados. */
     filters: CardFilters = $state({
-        type: 'Todos',
-        status: 'Todas',
+        type: [],
+        status: [],
         search: '',
-        dependencyId: '',
+        dependencyId: [],
     });
 
     /** Carga la primera página con los filtros actuales. */
@@ -70,10 +70,10 @@ export class CardState {
         }
     }
 
-    setFilters(type: string, status: string, depId: string = '') {
+    setFilters(type: string[], status: string[], depIds: string[] = []) {
         this.filters.type = type;
         this.filters.status = status;
-        this.filters.dependencyId = depId;
+        this.filters.dependencyId = depIds;
         this.pagination.currentPage = 1;
     }
 

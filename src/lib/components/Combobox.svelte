@@ -10,6 +10,11 @@
      * Reemplaza al `<select>` nativo en filtros y formularios donde conviene
      * buscar dentro de la lista (sensible a mayúsculas/acentos).
      *
+     * Modos:
+     * - Simple (por defecto): usa `bind:value` (string/number).
+     * - Múltiple (`multiple`): usa `bind:values` (array). El menú permanece
+     *   abierto al marcar y el trigger resume la selección.
+     *
      * Modo de despliegue:
      * - `overlay` (por defecto en desktop): lista flotante `absolute`.
      * - `inline`: la lista se expande en flujo (empuja el contenido). Se usa en
@@ -17,12 +22,17 @@
      *
      * @example
      * <Combobox bind:value={dep} options={deps} placeholder="Todas" />
+     * <Combobox multiple bind:values={depsSel} options={deps} placeholder="Todas" />
      */
     type Option = string | number | { value: string | number; label: string };
 
     type Props = {
-        /** Valor seleccionado (two-way bindable). */
+        /** Valor seleccionado en modo simple (two-way bindable). */
         value?: string | number;
+        /** Valores seleccionados en modo múltiple (two-way bindable). */
+        values?: (string | number)[];
+        /** Activa la selección múltiple. @default false */
+        multiple?: boolean;
         /** Opciones: strings/números u objetos `{ value, label }`. */
         options?: Option[];
         /** Texto mostrado cuando no hay selección. @default "Seleccionar..." */
@@ -33,20 +43,25 @@
         class?: string;
         /** ID del trigger (para asociar `<label for>`). */
         id?: string;
-        /** Callback al cambiar la selección. */
+        /** Callback al cambiar la selección (modo simple). */
         onchange?: (value: string | number) => void;
+        /** Callback al cambiar la selección (modo múltiple). */
+        onchangeMulti?: (values: (string | number)[]) => void;
         /** Fuerza la lista en flujo (sin overlay). Ideal en modales. */
         inline?: boolean;
     };
 
     let {
         value = $bindable(),
+        values = $bindable([]),
+        multiple = false,
         options = [],
         placeholder = 'Seleccionar...',
         disabled = false,
         class: className = '',
         id,
         onchange,
+        onchangeMulti,
         inline = false,
     }: Props = $props();
 
@@ -74,20 +89,45 @@
         return normalized.filter((o) => terms.every((t) => o.haystack.includes(t)));
     });
 
-    let selectedLabel = $derived(normalized.find((o) => String(o.value) === String(value))?.label ?? '');
+    /** Valores seleccionados normalizados a string. */
+    let selectedStrings = $derived(
+        multiple
+            ? values.map(String)
+            : value === undefined || value === null || value === ''
+              ? []
+              : [String(value)],
+    );
+
+    let triggerLabel = $derived.by(() => {
+        if (!multiple) {
+            return normalized.find((o) => String(o.value) === String(value))?.label ?? '';
+        }
+        const labels = normalized
+            .filter((o) => selectedStrings.includes(String(o.value)))
+            .map((o) => o.label);
+        if (labels.length === 0) return '';
+        if (labels.length === 1) return labels[0];
+        return `${labels.length} seleccionados`;
+    });
 
     let useOverlay = $derived(!inline && mediaState.isDesktop.matches);
 
     const menuId = `combobox-list-${Math.random().toString(36).slice(2, 9)}`;
 
+    function isSelected(opt: Norm): boolean {
+        return selectedStrings.includes(String(opt.value));
+    }
+
     function open() {
         if (disabled) return;
         isOpen = true;
         query = '';
-        activeIndex = Math.max(
-            0,
-            normalized.findIndex((o) => String(o.value) === String(value)),
-        );
+        activeIndex = multiple
+            ? 0
+            : Math.max(
+                  0,
+                  normalized.findIndex((o) => String(o.value) === String(value)),
+              );
     }
 
     function close() {
@@ -95,15 +135,35 @@
         query = '';
     }
 
-    function toggle() {
+    function toggleOpen() {
         if (isOpen) close();
         else open();
     }
 
-    function select(opt: Norm) {
+    function selectSingle(opt: Norm) {
         value = opt.value;
         onchange?.(opt.value);
         close();
+    }
+
+    function toggleValue(opt: Norm) {
+        const v = String(opt.value);
+        const current = values.map(String);
+        const next = current.includes(v) ? current.filter((x) => x !== v) : [...current, v];
+        // Conserva el tipo original de cada valor (number vs string).
+        const nextRaw = next.map((s) => normalized.find((o) => String(o.value) === s)?.value ?? s);
+        values = nextRaw;
+        onchangeMulti?.(nextRaw);
+    }
+
+    function handleOption(opt: Norm) {
+        if (multiple) toggleValue(opt);
+        else selectSingle(opt);
+    }
+
+    function clearValues() {
+        values = [];
+        onchangeMulti?.([]);
     }
 
     function move(delta: number) {
@@ -134,7 +194,7 @@
             move(-1);
         } else if (e.key === 'Enter') {
             e.preventDefault();
-            if (filtered[activeIndex]) select(filtered[activeIndex]);
+            if (filtered[activeIndex]) handleOption(filtered[activeIndex]);
         } else if (e.key === 'Home') {
             e.preventDefault();
             activeIndex = 0;
@@ -170,10 +230,10 @@
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={isOpen ? menuId : undefined}
-        onclick={toggle}
+        onclick={toggleOpen}
         onkeydown={handleTriggerKeydown}
     >
-        <span class="truncate {selectedLabel ? '' : 'text-slate-400'}">{selectedLabel || placeholder}</span>
+        <span class="truncate {triggerLabel ? '' : 'text-slate-400'}">{triggerLabel || placeholder}</span>
         <ChevronDown
             size={16}
             class="shrink-0 text-slate-400 transition-transform {isOpen ? 'rotate-180' : ''}"
@@ -187,6 +247,7 @@
                 ? 'absolute z-50 mt-2 w-full'
                 : 'mt-2 w-full'} bg-white rounded-xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden"
             role="listbox"
+            aria-multiselectable={multiple}
             aria-label={placeholder}
             tabindex="-1"
             onkeydown={handleListKeydown}
@@ -215,22 +276,47 @@
                             type="button"
                             id="{menuId}-opt-{i}"
                             role="option"
-                            aria-selected={String(opt.value) === String(value)}
+                            aria-selected={isSelected(opt)}
                             class="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium transition-colors {i ===
                             activeIndex
                                 ? 'bg-blue-50 text-blue-800'
                                 : 'text-slate-700 hover:bg-slate-50'}"
                             onmouseenter={() => (activeIndex = i)}
-                            onclick={() => select(opt)}
+                            onclick={() => handleOption(opt)}
                         >
-                            <span class="truncate">{opt.label}</span>
-                            {#if String(opt.value) === String(value)}
+                            {#if multiple}
+                                <span
+                                    class="shrink-0 w-4 h-4 rounded-[5px] border flex items-center justify-center transition-colors {isSelected(
+                                        opt,
+                                    )
+                                        ? 'bg-blue-600 border-blue-600 text-white'
+                                        : 'border-slate-300 bg-white'}"
+                                >
+                                    {#if isSelected(opt)}
+                                        <Check size={11} strokeWidth={3} />
+                                    {/if}
+                                </span>
+                            {/if}
+                            <span class="truncate flex-1">{opt.label}</span>
+                            {#if !multiple && isSelected(opt)}
                                 <Check size={15} class="shrink-0 text-blue-600" />
                             {/if}
                         </button>
                     {/each}
                 {/if}
             </div>
+
+            {#if multiple && selectedStrings.length > 0}
+                <div class="border-t border-slate-100 px-3 py-2">
+                    <button
+                        type="button"
+                        class="text-[11px] font-bold uppercase tracking-wider text-slate-400 hover:text-rose-600 transition-colors"
+                        onclick={clearValues}
+                    >
+                        Limpiar selección
+                    </button>
+                </div>
+            {/if}
         </div>
     {/if}
 </div>

@@ -35,7 +35,7 @@
     let dependencies = $derived(catalogState.dependencies);
     let buildings = $derived(catalogState.buildings);
 
-    let mediaFilter = $state('');
+    let mediaFilter = $state<string[]>([]);
     let dependencyNames = $derived(dependencies.map((d) => d.name));
     let buildingNames = $derived([...buildings.map((b) => b.name), 'Sin Edificio']);
     let mediaTypeOptions = $derived.by(() => {
@@ -51,11 +51,10 @@
         }
         return [...options, { value: '__none__', label: 'Sin tarjeta' }];
     });
-    let mediaTypeName = $derived(
-        mediaFilter === '__none__'
-            ? 'Sin tarjeta'
-            : (catalogState.mediaTypes.find((media) => String(media.id) === mediaFilter)?.name ?? ''),
-    );
+    function mediaTypeLabel(value: string): string {
+        if (value === '__none__') return 'Sin tarjeta';
+        return catalogState.mediaTypes.find((media) => String(media.id) === value)?.name ?? value;
+    }
 
     // Tipos de acceso (medios) para las columnas/KPIs de la exportación Excel.
     let exportCardTypes = $state<string[]>([]);
@@ -77,28 +76,32 @@
             : [...exportCardTypes, type];
     }
 
-    let dependencyFilter = $state('');
-    let buildingFilter = $state('');
-    let floorFilter = $state('');
+    let dependencyFilter = $state<string[]>([]);
+    let buildingFilter = $state<string[]>([]);
+    let floorFilter = $state<string[]>([]);
 
-    // Pisos canónicos del edificio seleccionado (dependencia directa del filtro de edificio).
+    // Pisos canónicos de los edificios seleccionados (unión).
     let selectedBuildingFloors = $derived.by(() => {
-        if (buildingFilter === '' || buildingFilter === 'Sin Edificio') return [] as string[];
-        const building = buildings.find((b) => b.name === buildingFilter);
-        const floors = (building as { floors?: unknown } | undefined)?.floors;
-        if (!Array.isArray(floors)) return [] as string[];
-        return floors.filter((floor): floor is string => typeof floor === 'string');
+        const floors = new Set<string>();
+        for (const name of buildingFilter) {
+            if (name === 'Sin Edificio') continue;
+            const building = buildings.find((b) => b.name === name);
+            const bf = (building as { floors?: unknown } | undefined)?.floors;
+            if (Array.isArray(bf)) {
+                for (const floor of bf) if (typeof floor === 'string') floors.add(floor);
+            }
+        }
+        return [...floors];
     });
     let floorOptions = $derived([
         ...selectedBuildingFloors.map((floor) => ({ value: floor, label: floor })),
         { value: '__none__', label: 'Sin piso base' },
     ]);
-    let isFloorFilterEnabled = $derived(buildingFilter !== '' && buildingFilter !== 'Sin Edificio');
-    let floorFilterLabel = $derived(floorFilter === '__none__' ? 'Sin piso base' : floorFilter);
+    let isFloorFilterEnabled = $derived(buildingFilter.some((name) => name !== 'Sin Edificio'));
     let floorPlaceholder = $derived(
-        buildingFilter === ''
+        buildingFilter.length === 0
             ? 'Selecciona un edificio'
-            : buildingFilter === 'Sin Edificio'
+            : buildingFilter.every((name) => name === 'Sin Edificio')
               ? 'No aplica sin edificio'
               : selectedBuildingFloors.length > 0
                 ? 'Todos los pisos'
@@ -107,76 +110,85 @@
 
     // Sincronizar los filtros de nombre → ID con el store
     $effect(() => {
-        const bldgId =
-            buildingFilter === 'Sin Edificio'
-                ? '__none__'
-                : buildings.find((b) => b.name === buildingFilter)?.id || '';
-        personnelState.filters.buildingId = bldgId;
-        if (
-            (!bldgId ||
-                bldgId === '__none__' ||
-                (floorFilter !== '__none__' && !selectedBuildingFloors.includes(floorFilter))) &&
-            floorFilter !== ''
-        ) {
-            floorFilter = '';
-        }
+        const bldgIds = buildingFilter
+            .map((name) =>
+                name === 'Sin Edificio'
+                    ? '__none__'
+                    : String(buildings.find((b) => b.name === name)?.id ?? ''),
+            )
+            .filter(Boolean);
+        personnelState.filters.buildingId = bldgIds;
+        // Purgar pisos que ya no pertenecen a los edificios seleccionados.
+        const allowed = [...selectedBuildingFloors, '__none__'];
+        const pruned = floorFilter.filter((f) => allowed.includes(f));
+        if (pruned.length !== floorFilter.length) floorFilter = pruned;
     });
     $effect(() => {
         personnelState.filters.floor = floorFilter;
     });
     $effect(() => {
-        const media = catalogState.mediaTypes.find((item) => String(item.id) === mediaFilter);
-        if (mediaFilter && mediaFilter !== '__none__' && !media) {
-            mediaFilter = '';
-        }
+        const valid = mediaFilter.filter(
+            (value) =>
+                value === '__none__' || catalogState.mediaTypes.some((item) => String(item.id) === value),
+        );
+        if (valid.length !== mediaFilter.length) mediaFilter = valid;
         personnelState.filters.mediaTypeId = mediaFilter;
     });
     $effect(() => {
-        const depId = dependencies.find((d) => d.name === dependencyFilter)?.id || '';
-        personnelState.filters.dependencyId = depId;
+        const depIds = dependencyFilter
+            .map((name) => String(dependencies.find((d) => d.name === name)?.id ?? ''))
+            .filter(Boolean);
+        personnelState.filters.dependencyId = depIds;
     });
 
     function clearPersonnelFilters() {
-        personnelState.filters.status = 'Todos';
+        personnelState.filters.status = [];
         personnelState.filters.search = '';
-        dependencyFilter = '';
-        buildingFilter = '';
-        floorFilter = '';
-        mediaFilter = '';
+        dependencyFilter = [];
+        buildingFilter = [];
+        floorFilter = [];
+        mediaFilter = [];
     }
 
     // Chips de filtros activos para el toolbar.
     let personnelChips = $derived.by(() => {
         const chips: { label: string; value: string; onClear: () => void }[] = [];
-        if (personnelState.filters.status !== 'Todos') {
+        for (const value of personnelState.filters.status) {
             chips.push({
                 label: 'Estado',
-                value: personnelState.filters.status,
-                onClear: () => (personnelState.filters.status = 'Todos'),
+                value,
+                onClear: () =>
+                    (personnelState.filters.status = personnelState.filters.status.filter(
+                        (v) => v !== value,
+                    )),
             });
         }
-        if (dependencyFilter) {
+        for (const value of dependencyFilter) {
             chips.push({
                 label: 'Dependencia',
-                value: dependencyFilter,
-                onClear: () => (dependencyFilter = ''),
+                value,
+                onClear: () => (dependencyFilter = dependencyFilter.filter((v) => v !== value)),
             });
         }
-        if (buildingFilter) {
-            chips.push({ label: 'Edificio', value: buildingFilter, onClear: () => (buildingFilter = '') });
+        for (const value of buildingFilter) {
+            chips.push({
+                label: 'Edificio',
+                value,
+                onClear: () => (buildingFilter = buildingFilter.filter((v) => v !== value)),
+            });
         }
-        if (floorFilter) {
+        for (const value of floorFilter) {
             chips.push({
                 label: 'Piso',
-                value: floorFilterLabel || floorFilter,
-                onClear: () => (floorFilter = ''),
+                value: value === '__none__' ? 'Sin piso base' : value,
+                onClear: () => (floorFilter = floorFilter.filter((v) => v !== value)),
             });
         }
-        if (mediaFilter) {
+        for (const value of mediaFilter) {
             chips.push({
                 label: 'Tarjeta',
-                value: mediaTypeName || mediaFilter,
-                onClear: () => (mediaFilter = ''),
+                value: mediaTypeLabel(value),
+                onClear: () => (mediaFilter = mediaFilter.filter((v) => v !== value)),
             });
         }
         return chips;
@@ -272,16 +284,21 @@
     async function handleExportExcel(splitByDependency: boolean = false) {
         const loadingToast = toast.loading('Preparando exportación...');
         try {
-            const depId = dependencies.find((d) => d.name === dependencyFilter)?.id || '';
-            const bldgId =
-                buildingFilter === 'Sin Edificio'
-                    ? '__none__'
-                    : buildings.find((b) => b.name === buildingFilter)?.id || '';
+            const depIds = dependencyFilter
+                .map((name) => String(dependencies.find((d) => d.name === name)?.id ?? ''))
+                .filter(Boolean);
+            const bldgIds = buildingFilter
+                .map((name) =>
+                    name === 'Sin Edificio'
+                        ? '__none__'
+                        : String(buildings.find((b) => b.name === name)?.id ?? ''),
+                )
+                .filter(Boolean);
             const data = await personnelService.fetchForExport(
                 personnelState.filters.search,
                 personnelState.filters.status,
-                depId,
-                bldgId,
+                depIds,
+                bldgIds,
                 floorFilter,
                 personnelState.filters.mediaTypeId,
             );
@@ -292,8 +309,8 @@
                     status: personnelState.filters.status,
                     dependency: dependencyFilter,
                     building: buildingFilter,
-                    floor: floorFilterLabel,
-                    mediaType: mediaTypeName,
+                    floor: floorFilter.map((f) => (f === '__none__' ? 'Sin piso base' : f)),
+                    mediaType: mediaFilter.map(mediaTypeLabel),
                     search: personnelState.filters.search,
                 },
                 splitByDependency,
@@ -312,10 +329,13 @@
             toast.error('No hay dependencias registradas');
             return;
         }
-        const zipBldgId =
-            buildingFilter === 'Sin Edificio'
-                ? '__none__'
-                : buildings.find((b) => b.name === buildingFilter)?.id || '';
+        const zipBldgIds = buildingFilter
+            .map((name) =>
+                name === 'Sin Edificio'
+                    ? '__none__'
+                    : String(buildings.find((b) => b.name === name)?.id ?? ''),
+            )
+            .filter(Boolean);
         isZipExporting = true;
         const loadingToast = toast.loading('Preparando ZIP...');
         try {
@@ -325,12 +345,12 @@
                 {
                     status: personnelState.filters.status,
                     search: personnelState.filters.search,
-                    buildingId: zipBldgId,
+                    buildingId: zipBldgIds,
                     buildingName: buildingFilter,
                     floor: floorFilter,
-                    floorName: floorFilterLabel,
+                    floorName: floorFilter.map((f) => (f === '__none__' ? 'Sin piso base' : f)),
                     mediaTypeId: personnelState.filters.mediaTypeId,
-                    mediaTypeName,
+                    mediaTypeName: mediaFilter.map(mediaTypeLabel),
                 },
                 (_current, _total, label) => {
                     toast.loading(`Procesando: ${label}`, { id: loadingToast });
@@ -504,16 +524,21 @@
         if (ids.size === 0) return;
         const loadingToast = toast.loading('Preparando exportación...');
         try {
-            const depId = dependencies.find((d) => d.name === dependencyFilter)?.id || '';
-            const bldgId =
-                buildingFilter === 'Sin Edificio'
-                    ? '__none__'
-                    : buildings.find((b) => b.name === buildingFilter)?.id || '';
+            const depIds = dependencyFilter
+                .map((name) => String(dependencies.find((d) => d.name === name)?.id ?? ''))
+                .filter(Boolean);
+            const bldgIds = buildingFilter
+                .map((name) =>
+                    name === 'Sin Edificio'
+                        ? '__none__'
+                        : String(buildings.find((b) => b.name === name)?.id ?? ''),
+                )
+                .filter(Boolean);
             const all = await personnelService.fetchForExport(
                 personnelState.filters.search,
                 personnelState.filters.status,
-                depId,
-                bldgId,
+                depIds,
+                bldgIds,
                 floorFilter,
                 personnelState.filters.mediaTypeId,
             );
@@ -524,8 +549,8 @@
                     status: personnelState.filters.status,
                     dependency: dependencyFilter,
                     building: buildingFilter,
-                    floor: floorFilterLabel,
-                    mediaType: mediaTypeName,
+                    floor: floorFilter.map((f) => (f === '__none__' ? 'Sin piso base' : f)),
+                    mediaType: mediaFilter.map(mediaTypeLabel),
                     search: personnelState.filters.search,
                 },
                 cardTypes: exportCardTypes,
@@ -628,8 +653,8 @@
                 {#snippet primary()}
                     <FilterSelect
                         label="Estado"
+                        multiple
                         options={[
-                            'Todos',
                             'Activo/a',
                             'No Activos',
                             'Parcial',
@@ -640,13 +665,15 @@
                             'Bloqueado/a',
                             'Baja',
                         ]}
-                        bind:value={personnelState.filters.status}
+                        placeholder="Todos"
+                        bind:values={personnelState.filters.status}
                     />
                     <FilterSelect
                         label="Edificio"
+                        multiple
                         options={buildingNames}
                         placeholder="Todos los edificios"
-                        bind:value={buildingFilter}
+                        bind:values={buildingFilter}
                     />
                     <div class="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-[200px] w-full">
                         <span
@@ -664,22 +691,25 @@
                 {#snippet overflow()}
                     <FilterSelect
                         label="Dependencia"
+                        multiple
                         options={dependencyNames}
                         placeholder="Todas las dependencias"
-                        bind:value={dependencyFilter}
+                        bind:values={dependencyFilter}
                     />
                     <FilterSelect
                         label="Piso base"
+                        multiple
                         options={isFloorFilterEnabled ? floorOptions : []}
                         placeholder={floorPlaceholder}
-                        bind:value={floorFilter}
+                        bind:values={floorFilter}
                         disabled={!isFloorFilterEnabled}
                     />
                     <FilterSelect
                         label="Tipo de tarjeta"
+                        multiple
                         options={mediaTypeOptions}
                         placeholder="Todos los tipos"
-                        bind:value={mediaFilter}
+                        bind:values={mediaFilter}
                     />
                 {/snippet}
             </FilterToolbar>

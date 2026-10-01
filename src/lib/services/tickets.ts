@@ -7,6 +7,7 @@ import {
     withErrorHandlingConditional,
     batchPaginate,
     handleError,
+    orWithNone,
 } from '../utils';
 import { ticketState, settingsState } from '../stores';
 import { RESPONSIVA_TICKET_TYPES } from '../constants/tickets';
@@ -207,13 +208,13 @@ export const ticketService = {
     async fetchPaginated(
         page: number = 1,
         limit: number = 50,
-        typeFilter: string = 'Todos',
-        priorityFilter: string = 'Todas',
+        typeFilters: string[] = [],
+        priorityFilters: string[] = [],
         search: string = '',
         section: string = 'General',
-        dependencyId: string = '',
-        buildingId: string = '',
-        floor: string = '',
+        dependencyIds: string[] = [],
+        buildingIds: string[] = [],
+        floors: string[] = [],
     ): Promise<{ data: Ticket[]; count: number }> {
         return withErrorHandlingSafe(
             async () => {
@@ -222,7 +223,7 @@ export const ticketService = {
 
                 // Al filtrar por persona (dependencia/edificio/piso) se usa
                 // personnel!inner, por lo que los tickets sin persona quedan fuera.
-                const useInner = Boolean(dependencyId || buildingId || floor);
+                const useInner = dependencyIds.length > 0 || buildingIds.length > 0 || floors.length > 0;
                 let selectString = '*, personnel(first_name, last_name, dependency_id, building_id, floor)';
                 if (useInner) {
                     selectString =
@@ -243,25 +244,23 @@ export const ticketService = {
                     query = applySectionFilter(query, 'Responsivas');
                 } else {
                     query = applySectionFilter(query, 'General');
-                    if (typeFilter && typeFilter !== 'Todos') {
-                        query = query.eq('type', typeFilter);
+                    if (typeFilters.length > 0) {
+                        query = query.in('type', typeFilters);
                     }
                 }
-                if (priorityFilter && priorityFilter !== 'Todas') {
-                    query = query.ilike('priority', priorityFilter);
+                if (priorityFilters.length > 0) {
+                    query = query.in('priority', priorityFilters);
                 }
-                if (dependencyId) {
-                    query = query.eq('personnel.dependency_id', dependencyId);
+                if (dependencyIds.length > 0) {
+                    query = query.in('personnel.dependency_id', dependencyIds);
                 }
-                if (buildingId === '__none__') {
-                    query = query.is('personnel.building_id', null);
-                } else if (buildingId) {
-                    query = query.eq('personnel.building_id', buildingId);
+                if (buildingIds.length > 0) {
+                    query = query.or(orWithNone('building_id', buildingIds), {
+                        foreignTable: 'personnel',
+                    });
                 }
-                if (floor === '__none__') {
-                    query = query.or('floor.is.null,floor.eq.', { foreignTable: 'personnel' });
-                } else if (floor) {
-                    query = query.eq('personnel.floor', floor);
+                if (floors.length > 0) {
+                    query = query.or(orWithNone('floor', floors), { foreignTable: 'personnel' });
                 }
                 if (search) {
                     const terms = search.trim().split(/\s+/).filter(Boolean);
@@ -322,14 +321,14 @@ export const ticketService = {
     },
 
     async fetchResponsivasForExport(
-        dependencyId: string = '',
+        dependencyIds: string[] = [],
         search: string = '',
-        buildingId: string = '',
-        floor: string = '',
+        buildingIds: string[] = [],
+        floors: string[] = [],
     ): Promise<(Ticket & { movementType: string; assignmentDate: string })[]> {
         return withErrorHandlingSafe(
             async () => {
-                const useInner = Boolean(dependencyId || buildingId || floor);
+                const useInner = dependencyIds.length > 0 || buildingIds.length > 0 || floors.length > 0;
                 const personnelSelect = useInner
                     ? 'personnel!inner(id, first_name, last_name, employee_no, dependency_id, building_id, floor, created_at, dependencies(name))'
                     : 'personnel(id, first_name, last_name, employee_no, dependency_id, building_id, floor, created_at, dependencies(name))';
@@ -356,18 +355,16 @@ export const ticketService = {
 
                     query = applySectionFilter(query, 'Responsivas');
 
-                    if (dependencyId) {
-                        query = query.eq('personnel.dependency_id', dependencyId);
+                    if (dependencyIds.length > 0) {
+                        query = query.in('personnel.dependency_id', dependencyIds);
                     }
-                    if (buildingId === '__none__') {
-                        query = query.is('personnel.building_id', null);
-                    } else if (buildingId) {
-                        query = query.eq('personnel.building_id', buildingId);
+                    if (buildingIds.length > 0) {
+                        query = query.or(orWithNone('building_id', buildingIds), {
+                            foreignTable: 'personnel',
+                        });
                     }
-                    if (floor === '__none__') {
-                        query = query.or('floor.is.null,floor.eq.', { foreignTable: 'personnel' });
-                    } else if (floor) {
-                        query = query.eq('personnel.floor', floor);
+                    if (floors.length > 0) {
+                        query = query.or(orWithNone('floor', floors), { foreignTable: 'personnel' });
                     }
                     if (search) {
                         const searchTerm = `%${search}%`;

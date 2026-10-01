@@ -30,9 +30,9 @@ export type CardlessRegistryReason = (typeof REASONS)[number];
 export type CardlessRegistryFilters = {
     startDate?: string;
     endDate?: string;
-    reason?: string;
+    reason?: string[];
     search?: string;
-    dependencyId?: string | number;
+    dependencyId?: string[];
 };
 
 export type CardlessRegistryInput = {
@@ -210,6 +210,7 @@ interface FilterQuery<T> {
     gte(col: string, val: string): T;
     lte(col: string, val: string): T;
     eq(col: string, val: string | number): T;
+    in(col: string, vals: (string | number)[]): T;
     or(filter: string): T;
 }
 
@@ -230,8 +231,8 @@ function applyFilters<T extends FilterQuery<T>>(query: T, filters: CardlessRegis
         query = query.lte('recorded_at', `${end}T23:59:59.999`);
     }
 
-    if (filters.reason) {
-        query = query.eq('reason', filters.reason);
+    if (filters.reason && filters.reason.length > 0) {
+        query = query.in('reason', filters.reason);
     }
 
     if (filters.search && filters.search.trim()) {
@@ -239,8 +240,8 @@ function applyFilters<T extends FilterQuery<T>>(query: T, filters: CardlessRegis
         query = query.or(`first_name.ilike.${term},last_name.ilike.${term},employee_no.ilike.${term}`);
     }
 
-    if (filters.dependencyId !== undefined && filters.dependencyId !== '' && filters.dependencyId !== null) {
-        query = query.eq('dependency_id', filters.dependencyId);
+    if (filters.dependencyId && filters.dependencyId.length > 0) {
+        query = query.in('dependency_id', filters.dependencyId);
     }
 
     return query;

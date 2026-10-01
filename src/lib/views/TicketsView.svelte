@@ -42,58 +42,55 @@
     let isZipExporting = $state(false);
 
     // Filtros de UI que mapean nombre → ID antes de aplicar
-    let depNameFilter = $state('Todas');
-    let buildingNameFilter = $state('Todos');
-    let floorFilter = $state('Todos');
+    let depNameFilter = $state<string[]>([]);
+    let buildingNameFilter = $state<string[]>([]);
+    let floorFilter = $state<string[]>([]);
 
-    let responsivaFilter = $state('Todas');
-    let movementTypeFilter = $state('Todas');
-    let mediaFilter = $state('Todas');
-    let mediaOptions = $derived(['Todas', ...catalogState.activeMediaTypeNames()]);
+    let responsivaFilter = $state<string[]>([]);
+    let movementTypeFilter = $state<string[]>([]);
+    let mediaFilter = $state<string[]>([]);
+    let mediaOptions = $derived(catalogState.activeMediaTypeNames());
 
     // Sincronizar nombre de dependencia → ID en el store
     $effect(() => {
-        const depId =
-            depNameFilter === 'Todas'
-                ? ''
-                : catalogState.dependencies.find((d) => d.name === depNameFilter)?.id || '';
-        ticketState.filters.dependencyId = depId;
+        const depIds = depNameFilter
+            .map((name) => String(catalogState.dependencies.find((d) => d.name === name)?.id ?? ''))
+            .filter(Boolean);
+        ticketState.filters.dependencyId = depIds;
     });
 
     // Sincronizar edificio/piso (radicación de la persona) → store.
     // Piso dependiente del edificio, como en Personal.
     let buildings = $derived(catalogState.buildings);
     let selectedBuildingFloors = $derived.by(() => {
-        if (buildingNameFilter === 'Todos' || buildingNameFilter === 'Sin Edificio') return [] as string[];
-        const building = buildings.find((b) => b.name === buildingNameFilter);
-        const floors = (building as { floors?: unknown } | undefined)?.floors;
-        if (!Array.isArray(floors)) return [] as string[];
-        return floors.filter((f): f is string => typeof f === 'string');
-    });
-    let floorOptions = $derived(['Todos', ...selectedBuildingFloors, 'Sin piso base']);
-    let isFloorFilterEnabled = $derived(
-        buildingNameFilter !== 'Todos' && buildingNameFilter !== 'Sin Edificio',
-    );
-    $effect(() => {
-        const bldgId =
-            buildingNameFilter === 'Todos'
-                ? ''
-                : buildingNameFilter === 'Sin Edificio'
-                  ? '__none__'
-                  : buildings.find((b) => b.name === buildingNameFilter)?.id || '';
-        ticketState.filters.buildingId = bldgId;
-        if (
-            (!bldgId ||
-                bldgId === '__none__' ||
-                (floorFilter !== 'Sin piso base' && !selectedBuildingFloors.includes(floorFilter))) &&
-            floorFilter !== 'Todos'
-        ) {
-            floorFilter = 'Todos';
+        const floors = new Set<string>();
+        for (const name of buildingNameFilter) {
+            if (name === 'Sin Edificio') continue;
+            const building = buildings.find((b) => b.name === name);
+            const bf = (building as { floors?: unknown } | undefined)?.floors;
+            if (Array.isArray(bf)) {
+                for (const floor of bf) if (typeof floor === 'string') floors.add(floor);
+            }
         }
+        return [...floors];
+    });
+    let floorOptions = $derived([...selectedBuildingFloors, 'Sin piso base']);
+    let isFloorFilterEnabled = $derived(buildingNameFilter.some((name) => name !== 'Sin Edificio'));
+    $effect(() => {
+        const bldgIds = buildingNameFilter
+            .map((name) =>
+                name === 'Sin Edificio'
+                    ? '__none__'
+                    : String(buildings.find((b) => b.name === name)?.id ?? ''),
+            )
+            .filter(Boolean);
+        ticketState.filters.buildingId = bldgIds;
+        const allowed = [...selectedBuildingFloors, 'Sin piso base'];
+        const pruned = floorFilter.filter((f) => allowed.includes(f));
+        if (pruned.length !== floorFilter.length) floorFilter = pruned;
     });
     $effect(() => {
-        ticketState.filters.floor =
-            floorFilter === 'Todos' ? '' : floorFilter === 'Sin piso base' ? '__none__' : floorFilter;
+        ticketState.filters.floor = floorFilter.map((f) => (f === 'Sin piso base' ? '__none__' : f));
     });
 
     // Debounced auto-refresh cuando cambian los filtros
@@ -116,59 +113,72 @@
     $effect(() => pullRefresh.register(() => ticketState.refresh(1)));
 
     function clearTicketFilters() {
-        ticketState.filters.type = 'Todos';
+        ticketState.filters.type = [];
         ticketState.filters.search = '';
-        responsivaFilter = 'Todas';
-        movementTypeFilter = 'Todas';
-        mediaFilter = 'Todas';
-        depNameFilter = 'Todas';
-        buildingNameFilter = 'Todos';
-        floorFilter = 'Todos';
+        responsivaFilter = [];
+        movementTypeFilter = [];
+        mediaFilter = [];
+        depNameFilter = [];
+        buildingNameFilter = [];
+        floorFilter = [];
     }
 
     // Chips de filtros activos para el toolbar.
     let ticketChips = $derived.by(() => {
         const chips: { label: string; value: string; onClear: () => void }[] = [];
-        if (currentSection === 'General' && ticketState.filters.type !== 'Todos') {
-            chips.push({
-                label: 'Tipo',
-                value: ticketState.filters.type,
-                onClear: () => (ticketState.filters.type = 'Todos'),
-            });
+        if (currentSection === 'General') {
+            for (const value of ticketState.filters.type) {
+                chips.push({
+                    label: 'Tipo',
+                    value,
+                    onClear: () =>
+                        (ticketState.filters.type = ticketState.filters.type.filter((v) => v !== value)),
+                });
+            }
         }
-        if (currentSection === 'Responsivas' && movementTypeFilter !== 'Todas') {
-            chips.push({
-                label: 'Tipo',
-                value: movementTypeFilter,
-                onClear: () => (movementTypeFilter = 'Todas'),
-            });
+        if (currentSection === 'Responsivas') {
+            for (const value of movementTypeFilter) {
+                chips.push({
+                    label: 'Tipo',
+                    value,
+                    onClear: () => (movementTypeFilter = movementTypeFilter.filter((v) => v !== value)),
+                });
+            }
+            for (const value of responsivaFilter) {
+                chips.push({
+                    label: 'Estado',
+                    value,
+                    onClear: () => (responsivaFilter = responsivaFilter.filter((v) => v !== value)),
+                });
+            }
+            for (const value of mediaFilter) {
+                chips.push({
+                    label: 'Medio',
+                    value,
+                    onClear: () => (mediaFilter = mediaFilter.filter((v) => v !== value)),
+                });
+            }
+            for (const value of depNameFilter) {
+                chips.push({
+                    label: 'Dependencia',
+                    value,
+                    onClear: () => (depNameFilter = depNameFilter.filter((v) => v !== value)),
+                });
+            }
         }
-        if (currentSection === 'Responsivas' && responsivaFilter !== 'Todas') {
-            chips.push({
-                label: 'Estado',
-                value: responsivaFilter,
-                onClear: () => (responsivaFilter = 'Todas'),
-            });
-        }
-        if (currentSection === 'Responsivas' && mediaFilter !== 'Todas') {
-            chips.push({ label: 'Medio', value: mediaFilter, onClear: () => (mediaFilter = 'Todas') });
-        }
-        if (currentSection === 'Responsivas' && depNameFilter !== 'Todas') {
-            chips.push({
-                label: 'Dependencia',
-                value: depNameFilter,
-                onClear: () => (depNameFilter = 'Todas'),
-            });
-        }
-        if (buildingNameFilter !== 'Todos') {
+        for (const value of buildingNameFilter) {
             chips.push({
                 label: 'Edificio',
-                value: buildingNameFilter,
-                onClear: () => (buildingNameFilter = 'Todos'),
+                value,
+                onClear: () => (buildingNameFilter = buildingNameFilter.filter((v) => v !== value)),
             });
         }
-        if (floorFilter !== 'Todos') {
-            chips.push({ label: 'Piso', value: floorFilter, onClear: () => (floorFilter = 'Todos') });
+        for (const value of floorFilter) {
+            chips.push({
+                label: 'Piso',
+                value,
+                onClear: () => (floorFilter = floorFilter.filter((v) => v !== value)),
+            });
         }
         return chips;
     });
@@ -176,14 +186,14 @@
     function switchSection(section: 'General' | 'Responsivas') {
         if (ticketState.filters.section === section) return;
         ticketState.filters.section = section;
-        ticketState.filters.type = 'Todos';
+        ticketState.filters.type = [];
         ticketState.filters.search = '';
-        depNameFilter = 'Todas';
-        buildingNameFilter = 'Todos';
-        floorFilter = 'Todos';
-        movementTypeFilter = 'Todas';
-        responsivaFilter = 'Todas';
-        mediaFilter = 'Todas';
+        depNameFilter = [];
+        buildingNameFilter = [];
+        floorFilter = [];
+        movementTypeFilter = [];
+        responsivaFilter = [];
+        mediaFilter = [];
         // El $effect debounced dispara refresh(1) automáticamente
     }
 
@@ -269,7 +279,7 @@
     );
 
     import { GENERAL_TICKET_TYPES } from '../constants/tickets';
-    const ticketTypes = ['Todos', ...GENERAL_TICKET_TYPES];
+    const ticketTypes = [...GENERAL_TICKET_TYPES];
 
     import { supabase } from '../supabase';
 
@@ -417,7 +427,7 @@
 
             // Aplicar los mismos filtros de la vista (tipo de movimiento + estado + medio),
             // enriqueciendo cada ticket con needsBaja/daysElapsed como hace filteredTickets.
-            if (movementTypeFilter !== 'Todas' || responsivaFilter !== 'Todas' || mediaFilter !== 'Todas') {
+            if (movementTypeFilter.length > 0 || responsivaFilter.length > 0 || mediaFilter.length > 0) {
                 data = data
                     .map((t: any) => {
                         let needsBaja = false;
@@ -455,7 +465,7 @@
             const { exportResponsivasToExcel } = await import('../utils/xlsxExport');
             await exportResponsivasToExcel(
                 data,
-                depNameFilter,
+                depNameFilter.join(', ') || undefined,
                 undefined,
                 settingsState.responsivaPickupDays,
             );
@@ -514,9 +524,10 @@
                         <div class="w-full xl:w-auto">
                             <FilterSelect
                                 label="Tipo"
+                                multiple
                                 options={ticketTypes}
-                                placeholder=""
-                                bind:value={ticketState.filters.type}
+                                placeholder="Todos"
+                                bind:values={ticketState.filters.type}
                             />
                         </div>
                     {/if}
@@ -526,15 +537,10 @@
                         <div class="w-full xl:w-auto">
                             <FilterSelect
                                 label="Tipo"
-                                options={[
-                                    'Todas',
-                                    'Alta de Personal',
-                                    'Reposición',
-                                    'Asignación',
-                                    'Sin clasificar',
-                                ]}
-                                placeholder=""
-                                bind:value={movementTypeFilter}
+                                multiple
+                                options={['Alta de Personal', 'Reposición', 'Asignación', 'Sin clasificar']}
+                                placeholder="Todas"
+                                bind:values={movementTypeFilter}
                             />
                         </div>
                     {/if}
@@ -544,8 +550,10 @@
                         <div class="w-full xl:w-auto">
                             <FilterSelect
                                 label="Estado"
-                                options={['Todas', 'Pendiente', 'Por vencer', 'Baja de Registro']}
-                                bind:value={responsivaFilter}
+                                multiple
+                                options={['Pendiente', 'Por vencer', 'Baja de Registro']}
+                                placeholder="Todas"
+                                bind:values={responsivaFilter}
                             />
                         </div>
                     {/if}
@@ -555,9 +563,10 @@
                         <div class="w-full xl:w-auto">
                             <FilterSelect
                                 label="Medio"
+                                multiple
                                 options={mediaOptions}
-                                placeholder=""
-                                bind:value={mediaFilter}
+                                placeholder="Todas"
+                                bind:values={mediaFilter}
                             />
                         </div>
                     {/if}
@@ -579,9 +588,10 @@
                         <div class="w-full">
                             <FilterSelect
                                 label="Dependencia"
-                                options={['Todas', ...dependencies.map((d) => d.name)]}
-                                placeholder=""
-                                bind:value={depNameFilter}
+                                multiple
+                                options={dependencies.map((d) => d.name)}
+                                placeholder="Todas"
+                                bind:values={depNameFilter}
                             />
                         </div>
                     {/if}
@@ -590,9 +600,10 @@
                     <div class="w-full">
                         <FilterSelect
                             label="Edificio"
-                            options={['Todos', ...buildings.map((b) => b.name), 'Sin Edificio']}
-                            placeholder=""
-                            bind:value={buildingNameFilter}
+                            multiple
+                            options={[...buildings.map((b) => b.name), 'Sin Edificio']}
+                            placeholder="Todos"
+                            bind:values={buildingNameFilter}
                         />
                     </div>
 
@@ -600,11 +611,12 @@
                     <div class="w-full">
                         <FilterSelect
                             label="Piso"
+                            multiple
                             options={floorOptions}
-                            placeholder={buildingNameFilter === 'Todos'
+                            placeholder={buildingNameFilter.length === 0
                                 ? 'Elige edificio'
                                 : 'Todos los pisos'}
-                            bind:value={floorFilter}
+                            bind:values={floorFilter}
                             disabled={!isFloorFilterEnabled}
                         />
                     </div>
@@ -662,25 +674,25 @@
         emptyDescription="No hay tickets pendientes en este momento. Todo está en orden."
         emptyDescriptionFiltered="No encontramos tickets con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={ClipboardList}
-        emptyIconBgClass={ticketState.filters.type !== 'Todos' ||
+        emptyIconBgClass={ticketState.filters.type.length > 0 ||
         ticketState.filters.search ||
-        responsivaFilter !== 'Todas' ||
-        movementTypeFilter !== 'Todas' ||
-        mediaFilter !== 'Todas' ||
-        depNameFilter !== 'Todas' ||
-        buildingNameFilter !== 'Todos' ||
-        floorFilter !== 'Todos'
+        responsivaFilter.length > 0 ||
+        movementTypeFilter.length > 0 ||
+        mediaFilter.length > 0 ||
+        depNameFilter.length > 0 ||
+        buildingNameFilter.length > 0 ||
+        floorFilter.length > 0
             ? 'from-slate-50 to-slate-100 ring-1 ring-slate-200/60 text-slate-400'
             : 'from-emerald-50 to-emerald-100 ring-1 ring-emerald-200/60 text-emerald-400'}
         hasFilters={!!(
-            ticketState.filters.type !== 'Todos' ||
+            ticketState.filters.type.length > 0 ||
             ticketState.filters.search ||
-            responsivaFilter !== 'Todas' ||
-            movementTypeFilter !== 'Todas' ||
-            mediaFilter !== 'Todas' ||
-            depNameFilter !== 'Todas' ||
-            buildingNameFilter !== 'Todos' ||
-            floorFilter !== 'Todos'
+            responsivaFilter.length > 0 ||
+            movementTypeFilter.length > 0 ||
+            mediaFilter.length > 0 ||
+            depNameFilter.length > 0 ||
+            buildingNameFilter.length > 0 ||
+            floorFilter.length > 0
         )}
         onClearFilters={() => {
             clearTicketFilters();

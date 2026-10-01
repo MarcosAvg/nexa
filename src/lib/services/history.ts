@@ -16,9 +16,9 @@ let _activeFlowId: string | undefined;
 /** Filtros comunes aceptados por fetchAll y fetchForExport. */
 export type HistoryFilters = {
     person?: string;
-    cardType?: string;
+    cardType?: string[];
     folio?: string;
-    action?: string;
+    action?: string[];
     startDate?: string;
     endDate?: string;
 };
@@ -40,14 +40,15 @@ function applyFilters(q: any, filters: HistoryFilters) {
     if (filters.person) {
         q = q.ilike('entity_name', `%${filters.person}%`);
     }
-    if (filters.cardType && filters.cardType !== 'Todos') {
-        q = q.eq('entity_type', 'CARD').ilike('entity_name', `${filters.cardType}%`);
+    if (filters.cardType && filters.cardType.length > 0) {
+        q = q.eq('entity_type', 'CARD');
+        q = q.or(filters.cardType.map((type) => `entity_name.ilike.${type}%`).join(','));
     }
     if (filters.folio) {
         q = q.ilike('entity_name', `%${filters.folio}%`);
     }
-    if (filters.action && filters.action !== 'Todas') {
-        q = q.eq('action', filters.action);
+    if (filters.action && filters.action.length > 0) {
+        q = q.in('action', filters.action);
     }
     if (filters.startDate) {
         q = q.gte('timestamp', filters.startDate);

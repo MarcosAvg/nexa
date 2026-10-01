@@ -25,9 +25,9 @@ export const accessMediaService = {
         page: number = 1,
         limit: number = 50,
         search: string = '',
-        typeName: string = 'Todos',
-        statusFilter: string = 'Todas',
-        depId: string = '',
+        typeNames: string[] = [],
+        statusFilters: string[] = [],
+        depIds: string[] = [],
     ): Promise<{ data: AccessMedia[]; count: number }> {
         return withErrorHandlingSafe(
             async () => {
@@ -63,26 +63,29 @@ export const accessMediaService = {
                     }
                 }
 
-                if (typeName !== 'Todos') {
-                    const media = catalogState.mediaTypes.find((m) => m.name === typeName);
-                    if (media) query = query.eq('media_type_id', media.id);
+                if (typeNames.length > 0) {
+                    const mediaIds = typeNames
+                        .map((name) => catalogState.mediaTypes.find((m) => m.name === name)?.id)
+                        .filter((id): id is string => Boolean(id));
+                    if (mediaIds.length > 0) query = query.in('media_type_id', mediaIds);
                 }
 
-                if (statusFilter !== 'Todas') {
+                if (statusFilters.length > 0) {
                     const map: Record<string, string> = {
                         Activa: 'active',
                         Bloqueada: 'blocked',
                         Baja: 'inactive',
                         Disponible: 'available',
                     };
-                    if (map[statusFilter]) query = query.eq('status', map[statusFilter]);
+                    const statuses = statusFilters.map((s) => map[s]).filter((s): s is string => Boolean(s));
+                    if (statuses.length > 0) query = query.in('status', statuses);
                 }
 
-                if (depId) {
+                if (depIds.length > 0) {
                     const { data: people } = await supabase
                         .from('personnel')
                         .select('id')
-                        .eq('dependency_id', depId);
+                        .in('dependency_id', depIds);
                     const personIds = people?.map((p) => p.id) || [];
                     if (personIds.length > 0) {
                         query = query.in('person_id', personIds);

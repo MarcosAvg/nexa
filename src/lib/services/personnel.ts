@@ -8,8 +8,11 @@ import {
     dbCache,
     batchPaginate,
     normalizeSearch,
+    orWithNone,
+    postgrestInList,
 } from '../utils';
 import { computePersonStatus } from '../utils/personStatus';
+import { expandPersonnelStatusFilter } from '../constants/status';
 import {
     deriveAccessFromAssignments,
     buildPermissionPlan,
@@ -354,27 +357,29 @@ export const personnelService = {
         page: number = 1,
         limit: number = 50,
         search: string = '',
-        statusFilter: string = 'Todos',
-        dependencyId: string = '',
-        buildingId: string = '',
-        floor: string = '',
-        mediaTypeId: string = '',
+        statusFilters: string[] = [],
+        dependencyIds: string[] = [],
+        buildingIds: string[] = [],
+        floors: string[] = [],
+        mediaTypeIds: string[] = [],
     ): Promise<{ data: Person[]; count: number }> {
         return withErrorHandlingSafe(
             async () => {
-                const cacheKey = `personnel_page_${page}_${limit}_${statusFilter}_${dependencyId}_${buildingId}_${floor}_${mediaTypeId}_${search}`;
+                const cacheKey = `personnel_page_${page}_${limit}_${statusFilters.join('|')}_${dependencyIds.join(
+                    '|',
+                )}_${buildingIds.join('|')}_${floors.join('|')}_${mediaTypeIds.join('|')}_${search}`;
                 if (!networkStore.isOnline) {
                     const cachedData = await dbCache.load<{ data: Person[]; count: number }>(cacheKey);
                     if (cachedData) return cachedData;
                     return { data: [], count: 0 };
                 }
 
+                const hasNoneMedia = mediaTypeIds.includes('__none__');
+                const realMediaIds = mediaTypeIds.filter((id) => id !== '__none__');
                 const mediaRelation =
-                    mediaTypeId && mediaTypeId !== '__none__'
+                    realMediaIds.length > 0 && !hasNoneMedia
                         ? 'access_media!inner(id, identifier, status, programming_status, responsiva_status, access_media_types(name, has_floors, requires_responsiva))'
-                        : mediaTypeId === '__none__'
-                          ? 'access_media!left(id, identifier, status, programming_status, responsiva_status, access_media_types(name, has_floors, requires_responsiva))'
-                          : 'access_media(id, identifier, status, programming_status, responsiva_status, access_media_types(name, has_floors, requires_responsiva))';
+                        : 'access_media!left(id, identifier, status, programming_status, responsiva_status, access_media_types(name, has_floors, requires_responsiva))';
                 let query = supabase
                     .from('personnel_with_status')
                     .select(
@@ -388,21 +393,22 @@ export const personnelService = {
                         query = query.ilike('search_text', `%${term}%`);
                     }
                 }
-                if (statusFilter === 'No Activos')
-                    query = query.not(
-                        'computed_status',
-                        'in',
-                        '("Activo/a","Parcial","Media de otro edificio")',
-                    );
-                else if (statusFilter !== 'Todos') query = query.eq('computed_status', statusFilter);
-                if (dependencyId) query = query.eq('dependency_id', dependencyId);
-                if (buildingId === '__none__') query = query.is('building_id', null);
-                else if (buildingId) query = query.eq('building_id', buildingId);
-                if (floor === '__none__') query = query.or('floor.is.null,floor.eq.');
-                else if (floor) query = query.eq('floor', floor);
-                if (mediaTypeId && mediaTypeId !== '__none__')
-                    query = query.eq('access_media.media_type_id', mediaTypeId);
-                else if (mediaTypeId === '__none__') query = query.is('access_media.id', null);
+                const expandedStatuses = expandPersonnelStatusFilter(statusFilters);
+                if (expandedStatuses.length > 0) query = query.in('computed_status', expandedStatuses);
+                if (dependencyIds.length > 0) query = query.in('dependency_id', dependencyIds);
+                if (buildingIds.length > 0) query = query.or(orWithNone('building_id', buildingIds));
+                if (floors.length > 0) query = query.or(orWithNone('floor', floors));
+                if (mediaTypeIds.length > 0) {
+                    if (hasNoneMedia && realMediaIds.length > 0) {
+                        query = query.or(`id.is.null,media_type_id.in.${postgrestInList(realMediaIds)}`, {
+                            foreignTable: 'access_media',
+                        });
+                    } else if (hasNoneMedia) {
+                        query = query.is('access_media.id', null);
+                    } else {
+                        query = query.in('access_media.media_type_id', realMediaIds);
+                    }
+                }
 
                 const from = (page - 1) * limit;
                 const { data, count, error } = await query
@@ -415,11 +421,11 @@ export const personnelService = {
                         page,
                         limit,
                         search,
-                        statusFilter,
-                        dependencyId,
-                        buildingId,
-                        floor,
-                        mediaTypeId,
+                        statusFilters,
+                        dependencyIds,
+                        buildingIds,
+                        floors,
+                        mediaTypeIds,
                     );
                 }
 
@@ -437,18 +443,25 @@ export const personnelService = {
         page: number,
         limit: number,
         search: string,
-        statusFilter: string,
-        dependencyId: string,
-        buildingId: string,
-        floor: string = '',
-        mediaTypeId: string = '',
+        statusFilters: string[],
+        dependencyIds: string[],
+        buildingIds: string[],
+        floors: string[] = [],
+        mediaTypeIds: string[] = [],
     ) {
-        const isComputedStatus = ['Activo/a', 'Parcial', 'Sin Acceso'].includes(statusFilter);
-        const isNoActivos = statusFilter === 'No Activos';
         const dbStatusMap: Record<string, string> = {
             'Bloqueado/a': 'blocked',
             Baja: 'inactive',
         };
+        const expandedStatuses = expandPersonnelStatusFilter(statusFilters);
+        // Si TODOS los estados elegidos son mapeables a la columna `status`, se
+        // filtra en servidor; si hay alguno calculado (o "No Activos"), se
+        // calcula por fila y se filtra en cliente (como ya hacía el fallback).
+        const onlyDbStatuses = statusFilters.length > 0 && statusFilters.every((s) => s in dbStatusMap);
+        const needsClientStatusFilter = !onlyDbStatuses && expandedStatuses.length > 0;
+
+        const hasNoneMedia = mediaTypeIds.includes('__none__');
+        const realMediaIds = mediaTypeIds.filter((id) => id !== '__none__');
 
         // Construir query sin .range() — Supabase muta .range() in-place,
         // así que construimos una vez y encadenamos diferentes .range() por página en batchPaginate.
@@ -459,11 +472,9 @@ export const personnelService = {
                 q = q.select('*', { count: 'exact', head: true });
             } else {
                 const mediaRelation =
-                    mediaTypeId && mediaTypeId !== '__none__'
+                    realMediaIds.length > 0 && !hasNoneMedia
                         ? 'access_media!inner(*, access_media_types(name, has_floors, requires_responsiva))'
-                        : mediaTypeId === '__none__'
-                          ? 'access_media!left(*, access_media_types(name, has_floors, requires_responsiva))'
-                          : 'access_media(*, access_media_types(name, has_floors, requires_responsiva))';
+                        : 'access_media!left(*, access_media_types(name, has_floors, requires_responsiva))';
                 q = q.select(
                     `*, ${mediaRelation}, access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name))), buildings(name), dependencies(name), schedules(*)`,
                 );
@@ -479,37 +490,38 @@ export const personnelService = {
                 }
             }
 
-            if (statusFilter !== 'Todos' && !isNoActivos) {
-                if (dbStatusMap[statusFilter]) {
-                    q = q.eq('status', dbStatusMap[statusFilter]);
-                } else if (isComputedStatus) {
-                    q = q.eq('status', 'active');
-                }
+            if (onlyDbStatuses) {
+                q = q.in(
+                    'status',
+                    statusFilters.map((s) => dbStatusMap[s]),
+                );
             }
 
-            if (dependencyId) q = q.eq('dependency_id', dependencyId);
-            if (buildingId === '__none__') q = q.is('building_id', null);
-            else if (buildingId) q = q.eq('building_id', buildingId);
-            if (floor === '__none__') q = q.or('floor.is.null,floor.eq.');
-            else if (floor) q = q.eq('floor', floor);
-            if (mediaTypeId && mediaTypeId !== '__none__')
-                q = q.eq('access_media.media_type_id', mediaTypeId);
-            else if (mediaTypeId === '__none__') q = q.is('access_media.id', null);
+            if (dependencyIds.length > 0) q = q.in('dependency_id', dependencyIds);
+            if (buildingIds.length > 0) q = q.or(orWithNone('building_id', buildingIds));
+            if (floors.length > 0) q = q.or(orWithNone('floor', floors));
+            if (mediaTypeIds.length > 0) {
+                if (hasNoneMedia && realMediaIds.length > 0) {
+                    q = q.or(`id.is.null,media_type_id.in.${postgrestInList(realMediaIds)}`, {
+                        foreignTable: 'access_media',
+                    });
+                } else if (hasNoneMedia) {
+                    q = q.is('access_media.id', null);
+                } else {
+                    q = q.in('access_media.media_type_id', realMediaIds);
+                }
+            }
 
             return q;
         };
 
-        if (isComputedStatus || isNoActivos) {
+        if (needsClientStatusFilter) {
             const allData = await batchPaginate<any>(async (from, to) => {
                 return buildBaseQuery().order('first_name', { ascending: true }).range(from, to);
             });
 
             const allMapped = allData.map((p) => mapPersonRecord(p));
-            const filtered = allMapped.filter((p) =>
-                isNoActivos
-                    ? !['Activo/a', 'Parcial', 'Media de otro edificio'].includes(p.status)
-                    : p.status === statusFilter,
-            );
+            const filtered = allMapped.filter((p) => expandedStatuses.includes(p.status));
             const from = (page - 1) * limit;
             return { data: filtered.slice(from, from + limit), count: filtered.length };
         } else {
@@ -549,44 +561,54 @@ export const personnelService = {
 
     async fetchForExport(
         search: string = '',
-        statusFilter: string = 'Todos',
-        dependencyId: string = '',
-        buildingId: string = '',
-        floor: string = '',
-        mediaTypeId: string = '',
+        statusFilters: string[] = [],
+        dependencyIds: string[] = [],
+        buildingIds: string[] = [],
+        floors: string[] = [],
+        mediaTypeIds: string[] = [],
     ): Promise<Person[]> {
         return withErrorHandlingSafe(
             async () => {
-                const isComputedStatus = ['Activo/a', 'Parcial', 'Sin Acceso'].includes(statusFilter);
                 const dbStatusMap: Record<string, string> = {
                     'Bloqueado/a': 'blocked',
                     Baja: 'inactive',
                 };
+                const expandedStatuses = expandPersonnelStatusFilter(statusFilters);
+                const onlyDbStatuses =
+                    statusFilters.length > 0 && statusFilters.every((s) => s in dbStatusMap);
+                const needsClientStatusFilter = !onlyDbStatuses && expandedStatuses.length > 0;
+                const hasNoneMedia = mediaTypeIds.includes('__none__');
+                const realMediaIds = mediaTypeIds.filter((id) => id !== '__none__');
 
                 const allData = await batchPaginate<any>(async (from, to) => {
                     const mediaRelation =
-                        mediaTypeId && mediaTypeId !== '__none__'
+                        realMediaIds.length > 0 && !hasNoneMedia
                             ? 'access_media!inner(*, access_media_types(name, has_floors, requires_responsiva))'
-                            : mediaTypeId === '__none__'
-                              ? 'access_media!left(*, access_media_types(name, has_floors, requires_responsiva))'
-                              : 'access_media(*, access_media_types(name, has_floors, requires_responsiva))';
+                            : 'access_media!left(*, access_media_types(name, has_floors, requires_responsiva))';
                     let q = supabase
                         .from('personnel')
                         .select(
                             `*, ${mediaRelation}, access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name))), buildings(name), dependencies(name), schedules(*)`,
                         );
-                    if (statusFilter !== 'Todos')
-                        q = dbStatusMap[statusFilter]
-                            ? q.eq('status', dbStatusMap[statusFilter])
-                            : q.eq('status', 'active');
-                    if (dependencyId) q = q.eq('dependency_id', dependencyId);
-                    if (buildingId === '__none__') q = q.is('building_id', null);
-                    else if (buildingId) q = q.eq('building_id', buildingId);
-                    if (floor === '__none__') q = q.or('floor.is.null,floor.eq.');
-                    else if (floor) q = q.eq('floor', floor);
-                    if (mediaTypeId && mediaTypeId !== '__none__')
-                        q = q.eq('access_media.media_type_id', mediaTypeId);
-                    else if (mediaTypeId === '__none__') q = q.is('access_media.id', null);
+                    if (onlyDbStatuses)
+                        q = q.in(
+                            'status',
+                            statusFilters.map((s) => dbStatusMap[s]),
+                        );
+                    if (dependencyIds.length > 0) q = q.in('dependency_id', dependencyIds);
+                    if (buildingIds.length > 0) q = q.or(orWithNone('building_id', buildingIds));
+                    if (floors.length > 0) q = q.or(orWithNone('floor', floors));
+                    if (mediaTypeIds.length > 0) {
+                        if (hasNoneMedia && realMediaIds.length > 0) {
+                            q = q.or(`id.is.null,media_type_id.in.${postgrestInList(realMediaIds)}`, {
+                                foreignTable: 'access_media',
+                            });
+                        } else if (hasNoneMedia) {
+                            q = q.is('access_media.id', null);
+                        } else {
+                            q = q.in('access_media.media_type_id', realMediaIds);
+                        }
+                    }
                     return q.order('first_name', { ascending: true }).range(from, to);
                 });
 
@@ -600,7 +622,9 @@ export const personnelService = {
                         return searchTerms.every((term) => hay.includes(term));
                     });
                 }
-                return isComputedStatus ? mapped.filter((p) => p.status === statusFilter) : mapped;
+                return needsClientStatusFilter
+                    ? mapped.filter((p) => expandedStatuses.includes(p.status))
+                    : mapped;
             },
             'Fetch Personnel for Export',
             [],

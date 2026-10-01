@@ -48,13 +48,13 @@
 
     // Navegación desde los contadores: pre-aplican el filtro en el store de destino.
     function goPersonnel(status: string) {
-        personnelState.filters.status = status;
+        personnelState.filters.status = status && status !== 'Todos' ? [status] : [];
         personnelState.filters.search = '';
         push('/personal');
     }
     function goTickets(section: 'General' | 'Responsivas', type: string = 'Todos') {
         ticketState.filters.section = section;
-        ticketState.filters.type = type;
+        ticketState.filters.type = type && type !== 'Todos' ? [type] : [];
         ticketState.filters.search = '';
         push('/tickets');
     }

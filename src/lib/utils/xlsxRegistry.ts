@@ -25,8 +25,8 @@ export type CardlessRegistryExportRow = {
 export type CardlessRegistryExportFilters = {
     startDate?: string;
     endDate?: string;
-    reason?: string;
-    dependency?: string;
+    reason?: string[];
+    dependency?: string[];
     search?: string;
 };
 
@@ -813,8 +813,10 @@ export async function exportCardlessRegistryToExcel(
     const filterParts: string[] = [];
     if (filters?.startDate) filterParts.push(`Desde: ${filters.startDate}`);
     if (filters?.endDate) filterParts.push(`Hasta: ${filters.endDate}`);
-    if (filters?.reason) filterParts.push(`Motivo: ${filters.reason}`);
-    if (filters?.dependency) filterParts.push(`Dependencia: ${filters.dependency}`);
+    if (filters?.reason && filters.reason.length > 0)
+        filterParts.push(`Motivo: ${filters.reason.join(', ')}`);
+    if (filters?.dependency && filters.dependency.length > 0)
+        filterParts.push(`Dependencia: ${filters.dependency.join(', ')}`);
     if (filters?.search) filterParts.push(`Búsqueda: "${filters.search}"`);
     const filterDescription = filterParts.length ? `  |  ${filterParts.join('  |  ')}` : '';
 
@@ -1070,8 +1072,8 @@ export async function exportCardlessRegistryToExcel(
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 4 }];
 
     const fileNameParts = [`Registro_Sin_Tarjeta_${settingsState.orgName.replace(/\s+/g, '_')}`];
-    if (filters?.dependency) {
-        fileNameParts.push(filters.dependency.replace(/\s+/g, '_'));
+    if (filters?.dependency && filters.dependency.length > 0) {
+        fileNameParts.push(filters.dependency.join('_').replace(/\s+/g, '_'));
     }
     fileNameParts.push(new Date().toISOString().split('T')[0]);
     const finalFileName = `${fileNameParts.join('_')}.xlsx`;

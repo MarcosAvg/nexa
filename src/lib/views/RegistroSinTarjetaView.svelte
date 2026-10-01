@@ -41,13 +41,13 @@
     let dateRangeError = $state('');
 
     // Filtros que mapean nombre → ID antes de aplicar
-    let depNameFilter = $state('');
+    let depNameFilter = $state<string[]>([]);
 
     $effect(() => {
-        const depId = depNameFilter
-            ? String(dependencies.find((d) => d.name === depNameFilter)?.id ?? '')
-            : '';
-        cardlessRegistryState.filters.dependencyId = depId;
+        const depIds = depNameFilter
+            .map((name) => String(dependencies.find((d) => d.name === name)?.id ?? ''))
+            .filter(Boolean);
+        cardlessRegistryState.filters.dependencyId = depIds;
     });
 
     let buildings = $derived(catalogState.buildings);
@@ -56,13 +56,13 @@
     let reasons = $derived(cardlessRegistryService.REASONS);
 
     function clearRegistroFilters() {
-        depNameFilter = '';
+        depNameFilter = [];
         cardlessRegistryState.setFilters({
             startDate: '',
             endDate: '',
-            reason: '',
+            reason: [],
             search: '',
-            dependencyId: '',
+            dependencyId: [],
         });
     }
 
@@ -77,14 +77,21 @@
                 onClear: () => cardlessRegistryState.setFilters({ startDate: '', endDate: '' }),
             });
         }
-        if (depNameFilter) {
-            chips.push({ label: 'Dependencia', value: depNameFilter, onClear: () => (depNameFilter = '') });
+        for (const value of depNameFilter) {
+            chips.push({
+                label: 'Dependencia',
+                value,
+                onClear: () => (depNameFilter = depNameFilter.filter((v) => v !== value)),
+            });
         }
-        if (f.reason) {
+        for (const value of f.reason) {
             chips.push({
                 label: 'Motivo',
-                value: f.reason,
-                onClear: () => cardlessRegistryState.setFilters({ reason: '' }),
+                value,
+                onClear: () =>
+                    cardlessRegistryState.setFilters({
+                        reason: f.reason.filter((v) => v !== value),
+                    }),
             });
         }
         return chips;
@@ -624,15 +631,17 @@
                 {#snippet overflow()}
                     <FilterSelect
                         label="Dependencia"
+                        multiple
                         options={dependencyNames}
                         placeholder="Todas"
-                        bind:value={depNameFilter}
+                        bind:values={depNameFilter}
                     />
                     <FilterSelect
                         label="Motivo"
+                        multiple
                         options={reasons}
                         placeholder="Todos"
-                        bind:value={cardlessRegistryState.filters.reason}
+                        bind:values={cardlessRegistryState.filters.reason}
                     />
                 {/snippet}
             </FilterToolbar>

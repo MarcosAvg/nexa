@@ -1,22 +1,27 @@
 <script lang="ts">
     /**
-     * FilterGroup — Botones tipo pill para filtro de selección única.
+     * FilterGroup — Botones tipo pill para filtro de selección múltiple.
      *
      * @example
-     * <FilterGroup label="Estado" options={["Todos", "Activo"]} bind:value={statusFilter} />
+     * <FilterGroup label="Estado" options={["Activo", "Baja"]} bind:values={statusFilters} />
      */
     type Props = {
         /** Label del grupo de filtros. */
         label: string;
         /** Opciones del filtro. */
         options: string[];
-        /** Valor seleccionado (two-way bindable). */
-        value: string;
+        /** Valores seleccionados (two-way bindable). */
+        values: string[];
         /** Callback al cambiar selección. */
-        onchange?: (value: string) => void;
+        onchange?: (values: string[]) => void;
     };
 
-    let { label, options, value = $bindable(), onchange }: Props = $props();
+    let { label, options, values = $bindable([]), onchange }: Props = $props();
+
+    function toggle(option: string) {
+        values = values.includes(option) ? values.filter((v) => v !== option) : [...values, option];
+        onchange?.(values);
+    }
 </script>
 
 <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
@@ -29,14 +34,12 @@
         {#each options as option}
             <button
                 type="button"
+                aria-pressed={values.includes(option)}
                 class="px-4 py-1.5 text-xs font-extrabold rounded-xl transition-all duration-300 active:scale-95 select-none whitespace-nowrap
-                    {value === option
+                    {values.includes(option)
                     ? 'bg-slate-900 text-white shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/30'
                     : 'text-slate-500 hover:text-slate-900 hover:bg-white/60'}"
-                onclick={() => {
-                    value = option;
-                    onchange?.(option);
-                }}
+                onclick={() => toggle(option)}
             >
                 {option}
             </button>

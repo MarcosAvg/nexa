@@ -5,9 +5,9 @@ import { cardlessRegistryService } from '../services/cardlessRegistry';
 export type CardlessRegistryFilters = {
     startDate: string;
     endDate: string;
-    reason: string;
+    reason: string[];
     search: string;
-    dependencyId: string;
+    dependencyId: string[];
 };
 
 export class CardlessRegistryState {
@@ -17,9 +17,9 @@ export class CardlessRegistryState {
     filters: CardlessRegistryFilters = $state({
         startDate: '',
         endDate: '',
-        reason: '',
+        reason: [],
         search: '',
-        dependencyId: '',
+        dependencyId: [],
     });
 
     /** Carga la primera página con los filtros actuales. */

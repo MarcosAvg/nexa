@@ -48,14 +48,14 @@ async function buildZip(files: { buffer: ArrayBuffer; filename: string }[], zipN
 export async function exportPersonnelAllDependenciesAsZip(
     dependencies: { id: string; name: string }[],
     globalFilters: {
-        status?: string;
+        status?: string[];
         search?: string;
-        buildingId?: string;
-        buildingName?: string;
-        floor?: string;
-        floorName?: string;
-        mediaTypeId?: string;
-        mediaTypeName?: string;
+        buildingId?: string[];
+        buildingName?: string[];
+        floor?: string[];
+        floorName?: string[];
+        mediaTypeId?: string[];
+        mediaTypeName?: string[];
     } = {},
     onProgress?: ZipProgressCallback,
     cardTypes?: CardType[],
@@ -71,11 +71,11 @@ export async function exportPersonnelAllDependenciesAsZip(
 
         const data = await personnelService.fetchForExport(
             globalFilters.search ?? '',
-            globalFilters.status ?? 'Todos',
-            dep.id,
-            globalFilters.buildingId ?? '',
-            globalFilters.floor ?? '',
-            globalFilters.mediaTypeId ?? '',
+            globalFilters.status ?? [],
+            [dep.id],
+            globalFilters.buildingId ?? [],
+            globalFilters.floor ?? [],
+            globalFilters.mediaTypeId ?? [],
         );
 
         if (data.length === 0) continue;
@@ -122,7 +122,7 @@ export async function exportResponsivasAllDependenciesAsZip(
         const dep = dependencies[i];
         onProgress?.(i, total, dep.name);
 
-        const data = await ticketService.fetchResponsivasForExport(dep.id);
+        const data = await ticketService.fetchResponsivasForExport([dep.id]);
         if (data.length === 0) continue;
 
         const result = await exportResponsivasToExcel(data, dep.name, true);
@@ -146,7 +146,7 @@ export async function exportCardlessRegistryAllDependenciesAsZip(
     baseFilters: {
         startDate?: string;
         endDate?: string;
-        reason?: string;
+        reason?: string[];
         search?: string;
     } = {},
     onProgress?: ZipProgressCallback,
@@ -161,7 +161,7 @@ export async function exportCardlessRegistryAllDependenciesAsZip(
 
         const rows = await cardlessRegistryService.fetchAllMatching({
             ...baseFilters,
-            dependencyId: dep.id,
+            dependencyId: [dep.id],
         });
         if (rows.length === 0) continue;
 
@@ -169,7 +169,7 @@ export async function exportCardlessRegistryAllDependenciesAsZip(
             rows,
             {
                 ...baseFilters,
-                dependency: dep.name,
+                dependency: [dep.name],
             },
             true,
         );

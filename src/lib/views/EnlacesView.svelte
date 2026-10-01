@@ -29,36 +29,40 @@
     let loadError = $state<string | null>(null);
     let isAddModalOpen = $state(false);
     let searchQuery = $state('');
-    let filterDependency = $state('');
-    let filterBuilding = $state('');
-    let filterFloor = $state('');
+    let filterDependency = $state<string[]>([]);
+    let filterBuilding = $state<string[]>([]);
+    let filterFloor = $state<string[]>([]);
 
     function clearEnlaceFilters() {
         searchQuery = '';
-        filterDependency = '';
-        filterBuilding = '';
-        filterFloor = '';
+        filterDependency = [];
+        filterBuilding = [];
+        filterFloor = [];
     }
 
     // Chips de filtros activos para el toolbar.
     let enlaceChips = $derived.by(() => {
         const chips: { label: string; value: string; onClear: () => void }[] = [];
-        if (filterDependency) {
+        for (const value of filterDependency) {
             chips.push({
                 label: 'Dependencia',
-                value: filterDependency,
-                onClear: () => (filterDependency = ''),
+                value,
+                onClear: () => (filterDependency = filterDependency.filter((v) => v !== value)),
             });
         }
-        if (filterBuilding) {
+        for (const value of filterBuilding) {
             chips.push({
                 label: 'Edificio',
-                value: filterBuilding,
-                onClear: () => (filterBuilding = ''),
+                value,
+                onClear: () => (filterBuilding = filterBuilding.filter((v) => v !== value)),
             });
         }
-        if (filterFloor) {
-            chips.push({ label: 'Piso', value: filterFloor, onClear: () => (filterFloor = '') });
+        for (const value of filterFloor) {
+            chips.push({
+                label: 'Piso',
+                value,
+                onClear: () => (filterFloor = filterFloor.filter((v) => v !== value)),
+            });
         }
         return chips;
     });
@@ -132,16 +136,16 @@
             });
         }
 
-        if (filterDependency) {
-            list = list.filter((e) => e.dependency === filterDependency);
+        if (filterDependency.length > 0) {
+            list = list.filter((e) => filterDependency.includes(e.dependency));
         }
 
-        if (filterBuilding) {
-            list = list.filter((e) => e.building === filterBuilding);
+        if (filterBuilding.length > 0) {
+            list = list.filter((e) => filterBuilding.includes(e.building));
         }
 
-        if (filterFloor) {
-            list = list.filter((e) => e.floor === filterFloor);
+        if (filterFloor.length > 0) {
+            list = list.filter((e) => filterFloor.includes(e.floor));
         }
 
         // Orden por defecto: "Piso base"
@@ -392,9 +396,10 @@
                 {#snippet primary()}
                     <FilterSelect
                         label="Dependencia"
+                        multiple
                         options={dependencyNames}
                         placeholder="Todas"
-                        bind:value={filterDependency}
+                        bind:values={filterDependency}
                     />
                     <div class="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-[200px] w-full">
                         <span
@@ -411,15 +416,17 @@
                 {#snippet overflow()}
                     <FilterSelect
                         label="Edificio"
+                        multiple
                         options={buildingNames}
                         placeholder="Todos"
-                        bind:value={filterBuilding}
+                        bind:values={filterBuilding}
                     />
                     <FilterSelect
                         label="Piso Base"
+                        multiple
                         options={availableFloors}
                         placeholder="Todos"
-                        bind:value={filterFloor}
+                        bind:values={filterFloor}
                     />
                 {/snippet}
             </FilterToolbar>
@@ -462,7 +469,12 @@
         emptyDescriptionFiltered="No encontramos enlaces con los filtros actuales. Intenta ajustar tu búsqueda."
         emptyIcon={Link2}
         emptyIconBgClass="from-violet-50 to-violet-100 ring-1 ring-violet-200/50 text-violet-400"
-        hasFilters={!!(searchQuery || filterDependency || filterBuilding || filterFloor)}
+        hasFilters={!!(
+            searchQuery ||
+            filterDependency.length > 0 ||
+            filterBuilding.length > 0 ||
+            filterFloor.length > 0
+        )}
         onClearFilters={() => {
             clearEnlaceFilters();
         }}

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Search, Filter, Calendar } from 'lucide-svelte';
-    import Select from './Select.svelte';
+    import FilterSelect from './FilterSelect.svelte';
     import { catalogState } from '../stores';
 
     /**
@@ -8,19 +8,19 @@
      *
      * @example
      * <HistoryFilters
-     *     bind:personName bind:cardType bind:cardFolio
-     *     bind:action bind:startDate bind:endDate
+     *     bind:personName bind:cardTypes bind:cardFolio
+     *     bind:actions bind:startDate bind:endDate
      * />
      */
     type Props = {
         /** Nombre de persona a buscar. */
         personName: string;
-        /** Tipo de tarjeta (Todos, P2000, KONE). */
-        cardType: string;
+        /** Tipos de tarjeta seleccionados (KONE, P2000, ...). */
+        cardTypes: string[];
         /** Folio de tarjeta. */
         cardFolio: string;
-        /** Acción en el historial (ACTION_NAMES). */
-        action: string;
+        /** Acciones seleccionadas en el historial (ACTION_NAMES). */
+        actions: string[];
         /** Fecha inicio (YYYY-MM-DD). */
         startDate: string;
         /** Fecha fin (YYYY-MM-DD). */
@@ -29,9 +29,9 @@
 
     let {
         personName = $bindable(),
-        cardType = $bindable(),
+        cardTypes = $bindable([]),
         cardFolio = $bindable(),
-        action = $bindable(),
+        actions = $bindable([]),
         startDate = $bindable(),
         endDate = $bindable(),
     }: Props = $props();
@@ -39,6 +39,7 @@
     import { FILTERED_ACTIONS } from '../constants/history';
 
     let mediaTypeNames = $derived(catalogState.activeMediaTypeNames());
+    let actionOptions = $derived(FILTERED_ACTIONS.map(([value, label]) => ({ value, label })));
 </script>
 
 <div class="flex flex-col lg:flex-row gap-4 w-full flex-wrap">
@@ -60,17 +61,15 @@
         </div>
     </div>
 
-    <!-- Tipo de Tarjeta Select -->
-    <div class="w-full lg:w-44">
-        <label for="filter-type" class="block text-xs font-semibold text-slate-500 mb-1 ml-1"
-            >Tipo de Tarjeta</label
-        >
-        <Select id="filter-type" bind:value={cardType} placeholder="">
-            <option value="Todos">Todos</option>
-            {#each mediaTypeNames as t}
-                <option value={t}>{t}</option>
-            {/each}
-        </Select>
+    <!-- Tipo de Tarjeta -->
+    <div class="w-full lg:w-52">
+        <FilterSelect
+            label="Tipo de Tarjeta"
+            multiple
+            options={mediaTypeNames}
+            placeholder="Todos"
+            bind:values={cardTypes}
+        />
     </div>
 
     <!-- Input de folio -->
@@ -91,14 +90,14 @@
     </div>
 
     <!-- Select de acción -->
-    <div class="w-full lg:w-52">
-        <label for="filter-action" class="block text-xs font-semibold text-slate-500 mb-1 ml-1">Acción</label>
-        <Select id="filter-action" bind:value={action} placeholder="">
-            <option value="Todas">Todas</option>
-            {#each FILTERED_ACTIONS as [key, label]}
-                <option value={key}>{label}</option>
-            {/each}
-        </Select>
+    <div class="w-full lg:w-56">
+        <FilterSelect
+            label="Acción"
+            multiple
+            options={actionOptions}
+            placeholder="Todas"
+            bind:values={actions}
+        />
     </div>
 
     <!-- Rango de fechas -->
