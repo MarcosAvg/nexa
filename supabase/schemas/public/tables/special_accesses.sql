@@ -39,3 +39,5 @@ create policy "Special accesses viewable by everyone" on "public"."special_acces
   using ((( select auth.role() as role) = 'authenticated'::text));
 
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "public"."special_accesses" to "authenticated", "postgres", "service_role";
+
+create policy "Active users only" on "public"."special_accesses" as restrictive for all to public using (public.current_user_is_active());

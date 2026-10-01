@@ -16,6 +16,9 @@ alter table "public"."profiles"
 alter table "public"."profiles"
   add column "role" public.app_role not null default 'viewer'::public.app_role;
 
+alter table "public"."profiles"
+  add column "is_active" boolean not null default true;
+
 create policy "Admins update all profiles" on "public"."profiles"
   for update
   to PUBLIC
@@ -27,5 +30,9 @@ create policy "Profiles viewable by everyone" on "public"."profiles"
   for select
   to PUBLIC
   using ((( select auth.role() as role) = 'authenticated'::text));
+
+create policy "Active users only" on "public"."profiles"
+  as restrictive for all to public
+  using (public.current_user_is_active());
 
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "public"."profiles" to "authenticated", "postgres", "service_role";

@@ -36,3 +36,5 @@ create policy "Dependencies viewable by everyone" on "public"."dependencies"
   using ((( select auth.role() as role) = 'authenticated'::text));
 
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "public"."dependencies" to "authenticated", "postgres", "service_role";
+
+create policy "Active users only" on "public"."dependencies" as restrictive for all to public using (public.current_user_is_active());

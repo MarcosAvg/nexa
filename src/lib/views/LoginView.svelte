@@ -1,21 +1,17 @@
 <script lang="ts">
     import { supabase } from '../supabase';
     import { Button, Input, Card } from '../components';
-    import { LogIn, UserPlus, Mail, Lock, AlertCircle, ChevronLeft } from 'lucide-svelte';
+    import { LogIn, Mail, Lock, AlertCircle } from 'lucide-svelte';
 
     let email = $state('');
     let password = $state('');
-    let fullName = $state('');
-    let isSignUp = $state(false);
     let loading = $state(false);
     let errorMessage = $state('');
-    let message = $state('');
 
     async function handleLogin(e: Event) {
         e.preventDefault();
         loading = true;
         errorMessage = '';
-        message = '';
 
         const { error } = await supabase.auth.signInWithPassword({
             email,
@@ -26,52 +22,6 @@
             errorMessage = error.message;
         }
         loading = false;
-    }
-
-    async function handleAction(e: Event) {
-        if (isSignUp) {
-            handleSignUp(e);
-        } else {
-            handleLogin(e);
-        }
-    }
-
-    async function handleSignUp(e: Event) {
-        e.preventDefault();
-        loading = true;
-        errorMessage = '';
-        message = '';
-
-        if (!fullName.trim()) {
-            errorMessage = 'El nombre completo es requerido';
-            loading = false;
-            return;
-        }
-
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: fullName,
-                },
-            },
-        });
-
-        if (error) {
-            errorMessage = error.message;
-        } else if (data.user && data.session) {
-            message = '¡Registro exitoso! Iniciando sesión...';
-        } else {
-            message = 'Registro enviado. Por favor, verifica tu correo electrónico para confirmar tu cuenta.';
-        }
-        loading = false;
-    }
-
-    function toggleMode() {
-        isSignUp = !isSignUp;
-        errorMessage = '';
-        message = '';
     }
 </script>
 
@@ -89,34 +39,8 @@
         </div>
 
         <Card class="p-8 shadow-xl border-slate-200/60 bg-white/80 backdrop-blur-sm">
-            <form onsubmit={handleAction} class="space-y-6">
+            <form onsubmit={handleLogin} class="space-y-6">
                 <div class="space-y-4">
-                    {#if isSignUp}
-                        <div class="space-y-2 animate-in fade-in slide-in-from-top-2">
-                            <label
-                                for="fullName"
-                                class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1"
-                            >
-                                Nombre Completo
-                            </label>
-                            <div class="relative">
-                                <div
-                                    class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                                >
-                                    <UserPlus size={18} />
-                                </div>
-                                <Input
-                                    id="fullName"
-                                    type="text"
-                                    bind:value={fullName}
-                                    placeholder="Nombre completo"
-                                    class="h-12 pl-11 text-sm"
-                                    required={isSignUp}
-                                />
-                            </div>
-                        </div>
-                    {/if}
-
                     <div class="space-y-2">
                         <label
                             for="email"
@@ -179,28 +103,6 @@
                     </div>
                 {/if}
 
-                {#if message}
-                    <div
-                        role="status"
-                        aria-live="polite"
-                        class="p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2"
-                    >
-                        <div class="text-emerald-600 mt-0.5">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M5 13l4 4L19 7"
-                                />
-                            </svg>
-                        </div>
-                        <p class="text-xs font-medium text-emerald-800">
-                            {message}
-                        </p>
-                    </div>
-                {/if}
-
                 <Button
                     variant="primary"
                     class="w-full h-12 rounded-xl text-base shadow-lg shadow-slate-900/10"
@@ -208,21 +110,15 @@
                     type="submit"
                 >
                     {#if loading}
-                        {isSignUp ? 'Registrando...' : 'Iniciando sesión...'}
+                        Iniciando sesión...
                     {:else}
-                        {isSignUp ? 'Crear Cuenta' : 'Entrar al Sistema'}
+                        Entrar al Sistema
                     {/if}
                 </Button>
 
-                <div class="pt-2 text-center">
-                    <button
-                        type="button"
-                        onclick={toggleMode}
-                        class="w-full min-h-11 px-4 py-3 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-colors active:scale-[0.99]"
-                    >
-                        {isSignUp ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'}
-                    </button>
-                </div>
+                <p class="pt-2 text-center text-xs font-medium text-slate-400">
+                    El acceso es solo por invitación. Pide a un administrador que te registre.
+                </p>
             </form>
         </Card>
 

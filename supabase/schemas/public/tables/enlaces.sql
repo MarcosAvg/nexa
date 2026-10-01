@@ -43,3 +43,5 @@ create policy "Authenticated users view enlaces" on "public"."enlaces"
   using (true);
 
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "public"."enlaces" to "authenticated", "postgres", "service_role";
+
+create policy "Active users only" on "public"."enlaces" as restrictive for all to public using (public.current_user_is_active());

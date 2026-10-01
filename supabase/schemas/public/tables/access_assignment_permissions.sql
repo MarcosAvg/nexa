@@ -57,3 +57,5 @@ create policy "Admins and operators delete access assignment permissions"
    where ((profiles.id = ( select auth.uid() as uid)) AND (profiles.role = ANY (ARRAY['admin'::public.app_role, 'operator'::public.app_role]))))));
 
 grant select, insert, update, delete on table "public"."access_assignment_permissions" to "authenticated";
+
+create policy "Active users only" on "public"."access_assignment_permissions" as restrictive for all to public using (public.current_user_is_active());

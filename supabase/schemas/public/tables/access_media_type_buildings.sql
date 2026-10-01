@@ -38,3 +38,5 @@ create policy "Admins delete media type buildings"
    where ((profiles.id = ( select auth.uid() as uid)) AND (profiles.role = 'admin'::public.app_role)))));
 
 grant select, insert, update, delete on table "public"."access_media_type_buildings" to "authenticated";
+
+create policy "Active users only" on "public"."access_media_type_buildings" as restrictive for all to public using (public.current_user_is_active());

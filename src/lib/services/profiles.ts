@@ -14,9 +14,47 @@ export const profileService = {
             [],
         );
     },
+    /**
+     * Invita un usuario por email con rol preasignado vía Edge Function
+     * `invite-user` (solo admins). Lanza si el servidor lo rechaza.
+     */
+    async inviteUser(email: string, full_name: string, role: string) {
+        return withErrorHandling(async () => {
+            const { data, error } = await supabase.functions.invoke('invite-user', {
+                body: { email, full_name, role },
+            });
+            if (error) throw error;
+            if (data && (data as any).error) throw new Error((data as any).error);
+            await HistoryService.log('SYSTEM', (data as any)?.id ?? email, 'INVITE_USER', {
+                message: `Invitación enviada a ${email} (${role})`,
+                entityName: `Invitación (${email}) — ${role}`,
+            });
+            return data;
+        }, 'Invite User');
+    },
+    async setActive(userId: string, active: boolean) {
+        return withErrorHandling(async () => {
+            const { error } = await supabase.rpc('set_user_active', {
+                target_id: userId,
+                active,
+            });
+            if (error) throw error;
+            await HistoryService.log('SYSTEM', userId, active ? 'ACTIVATE_USER' : 'DEACTIVATE_USER', {
+                message: active ? 'Usuario activado' : 'Usuario desactivado',
+                entityName: `Usuario (${userId.slice(0, 8)}...)`,
+            });
+        }, 'Update User Active');
+    },
+    /**
+     * Cambia el rol vía RPC `set_user_role` (SECURITY DEFINER), que impide
+     * quedarse sin administradores. Lanza si el servidor lo rechaza.
+     */
     async updateRole(userId: string, role: string) {
         return withErrorHandling(async () => {
-            const { error } = await supabase.from('profiles').update({ role }).eq('id', userId);
+            const { error } = await supabase.rpc('set_user_role', {
+                target_id: userId,
+                new_role: role,
+            });
             if (error) throw error;
             await HistoryService.log('SYSTEM', userId, 'UPDATE_ROLE', {
                 message: `Rol actualizado a ${role}`,

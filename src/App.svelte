@@ -33,6 +33,8 @@
 
     let loadingAuth = $state(true);
     let initError = $state(false);
+    // Mensaje cuando una cuenta desactivada intenta entrar.
+    let accountDisabledMessage = $state('');
     // Flag para evitar doble fetch: onAuthStateChange dispara SIGNED_IN justo después
     // de getSession() al inicio, lo que ejecutaría initData dos veces para el mismo usuario.
     let appInitialized = $state(false);
@@ -48,8 +50,15 @@
 
         if (initialSession) {
             const { data: profile } = await auth.getProfile(initialSession.user.id);
-            userState.setProfile(profile);
-            await initData();
+            if (profile && profile.is_active === false) {
+                await supabase.auth.signOut();
+                userState.clear();
+                accountDisabledMessage = 'Tu cuenta fue desactivada. Contacta a un administrador.';
+            } else {
+                accountDisabledMessage = '';
+                userState.setProfile(profile);
+                await initData();
+            }
         }
 
         loadingAuth = false;
@@ -76,8 +85,15 @@
                 }
 
                 const { data: profile } = await auth.getProfile(newSession.user.id);
-                userState.setProfile(profile);
-                initData(true);
+                if (profile && profile.is_active === false) {
+                    await supabase.auth.signOut();
+                    userState.clear();
+                    accountDisabledMessage = 'Tu cuenta fue desactivada. Contacta a un administrador.';
+                } else {
+                    accountDisabledMessage = '';
+                    userState.setProfile(profile);
+                    initData(true);
+                }
             } else {
                 userState.clear();
                 // Limpiar userId cache para que el siguiente login no herede usuario anterior
@@ -200,6 +216,13 @@
         </div>
     </div>
 {:else if !userState.profile}
+    {#if accountDisabledMessage}
+        <div
+            class="mx-auto mt-6 max-w-md rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-center text-sm font-bold text-rose-700"
+        >
+            {accountDisabledMessage}
+        </div>
+    {/if}
     <LoginView />
 {:else}
     <!-- Backdrop global para sidepanel — fuera del MainLayoutWrapper para evitar clipping de backdrop-filter por overflow-hidden -->

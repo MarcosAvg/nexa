@@ -51,3 +51,5 @@ create policy "Admins delete document templates"
    where ((profiles.id = ( select auth.uid() as uid)) AND (profiles.role = 'admin'::public.app_role)))));
 
 grant select, insert, update, delete on table "public"."document_templates" to "authenticated";
+
+create policy "Active users only" on "public"."document_templates" as restrictive for all to public using (public.current_user_is_active());

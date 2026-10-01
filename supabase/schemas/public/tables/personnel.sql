@@ -83,3 +83,5 @@ create policy "Personnel viewable by everyone" on "public"."personnel"
   using ((( select auth.role() as role) = 'authenticated'::text));
 
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "public"."personnel" to "authenticated", "postgres", "service_role";
+
+create policy "Active users only" on "public"."personnel" as restrictive for all to public using (public.current_user_is_active());

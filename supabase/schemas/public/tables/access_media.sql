@@ -54,3 +54,5 @@ create policy "Admins and operators delete access media"
    where ((profiles.id = ( select auth.uid() as uid)) AND (profiles.role = ANY (ARRAY['admin'::public.app_role, 'operator'::public.app_role]))))));
 
 grant select, insert, update, delete on table "public"."access_media" to "authenticated";
+
+create policy "Active users only" on "public"."access_media" as restrictive for all to public using (public.current_user_is_active());

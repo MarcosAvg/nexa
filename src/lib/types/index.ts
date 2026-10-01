@@ -106,6 +106,7 @@ export interface UserProfile {
     full_name: string;
     email: string;
     avatar_url?: string;
+    is_active: boolean;
 }
 
 export interface CatalogItem {

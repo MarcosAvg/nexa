@@ -37,3 +37,5 @@ create policy "Buildings viewable by everyone" on "public"."buildings"
   using ((( select auth.role() as role) = 'authenticated'::text));
 
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "public"."buildings" to "authenticated", "postgres", "service_role";
+
+create policy "Active users only" on "public"."buildings" as restrictive for all to public using (public.current_user_is_active());

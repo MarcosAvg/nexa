@@ -33,3 +33,5 @@ create policy "Admins insert app settings"
    where ((profiles.id = ( select auth.uid() as uid)) AND (profiles.role = 'admin'::public.app_role)))));
 
 grant select, insert, update, delete on table "public"."app_settings" to "authenticated";
+
+create policy "Active users only" on "public"."app_settings" as restrictive for all to public using (public.current_user_is_active());

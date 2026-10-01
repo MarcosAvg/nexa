@@ -68,3 +68,5 @@ create policy "Cardless registry viewable by operators" on "public"."cardless_re
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "public"."cardless_registry" to "authenticated", "postgres", "service_role";
 
 comment on column "public"."cardless_registry"."kone_status_at_registration" is 'Snapshot: TRUE si la persona tenía un ticket "Firma Responsiva" pendiente para una tarjeta KONE al momento de hacer este registro. NULL = registro manual sin person_id vinculado, o registro pre-migración sin datos suficientes.';
+
+create policy "Active users only" on "public"."cardless_registry" as restrictive for all to public using (public.current_user_is_active());

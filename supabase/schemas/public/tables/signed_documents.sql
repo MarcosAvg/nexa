@@ -44,3 +44,5 @@ create policy "Admins delete signed documents"
    where ((profiles.id = ( select auth.uid() as uid)) AND (profiles.role = 'admin'::public.app_role)))));
 
 grant select, insert, update, delete on table "public"."signed_documents" to "authenticated";
+
+create policy "Active users only" on "public"."signed_documents" as restrictive for all to public using (public.current_user_is_active());
