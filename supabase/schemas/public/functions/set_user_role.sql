@@ -1,4 +1,8 @@
-create or replace function public.set_user_role(target_id uuid, new_role public.app_role)
+create or replace function public.set_user_role(
+  target_id uuid,
+  new_role public.app_role,
+  p_full_name text default null
+)
 returns void
   language plpgsql
   security definer
@@ -34,11 +38,13 @@ begin
     end if;
 
     update public.profiles
-    set role = new_role, updated_at = now()
+    set role = new_role,
+        full_name = coalesce(p_full_name, public.profiles.full_name),
+        updated_at = now()
     where id = target_id;
 end;
 $function$;
 
-revoke all on function "public"."set_user_role"(uuid, "public"."app_role") from public, anon;
+revoke all on function "public"."set_user_role"(uuid, "public"."app_role", text) from public, anon;
 
-grant execute on function "public"."set_user_role"(uuid, "public"."app_role") to "authenticated", "postgres", "service_role";
+grant execute on function "public"."set_user_role"(uuid, "public"."app_role", text) to "authenticated", "postgres", "service_role";

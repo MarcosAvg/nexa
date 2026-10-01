@@ -180,15 +180,8 @@
         }
 
         try {
-            await profileService.updateRole(editingId.toString(), userRole);
-
-            const { supabase: sb } = await import('../../supabase');
-            const { error: nameError } = await sb
-                .from('profiles')
-                .update({ full_name: userName })
-                .eq('id', editingId);
-
-            if (nameError) throw nameError;
+            // Todo por RPC: el cliente no emite UPDATEs directos sobre profiles.
+            await profileService.updateRole(editingId.toString(), userRole, userName);
 
             await fetchUsers();
             isUserModalOpen = false;

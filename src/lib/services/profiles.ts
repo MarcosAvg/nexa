@@ -46,14 +46,17 @@ export const profileService = {
         }, 'Update User Active');
     },
     /**
-     * Cambia el rol vía RPC `set_user_role` (SECURITY DEFINER), que impide
-     * quedarse sin administradores. Lanza si el servidor lo rechaza.
+     * Cambia rol (+ nombre opcional) vía RPC `set_user_role` (SECURITY
+     * DEFINER), que impide quedarse sin administradores. Toda la escritura
+     * va por el RPC: el cliente no emite UPDATEs directos sobre profiles.
+     * Lanza si el servidor lo rechaza.
      */
-    async updateRole(userId: string, role: string) {
+    async updateRole(userId: string, role: string, fullName?: string) {
         return withErrorHandling(async () => {
             const { error } = await supabase.rpc('set_user_role', {
                 target_id: userId,
                 new_role: role,
+                p_full_name: fullName?.trim() ? fullName.trim() : null,
             });
             if (error) throw error;
             await HistoryService.log('SYSTEM', userId, 'UPDATE_ROLE', {

@@ -19,13 +19,6 @@ alter table "public"."profiles"
 alter table "public"."profiles"
   add column "is_active" boolean not null default true;
 
-create policy "Admins update all profiles" on "public"."profiles"
-  for update
-  to PUBLIC
-  using ((exists ( select 1
-   from public.profiles profiles_1
-  where ((profiles_1.id = ( select auth.uid() as uid)) AND (profiles_1.role = 'admin'::public.app_role)))));
-
 create policy "Profiles viewable by everyone" on "public"."profiles"
   for select
   to PUBLIC
