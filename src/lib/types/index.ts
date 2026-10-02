@@ -124,14 +124,18 @@ export interface MediaStockEntry {
     stock: number;
 }
 
-/** Cobertura de un tipo de medio entre el personal operativo. */
+/** Cobertura de un tipo de medio entre su población elegible. */
 export interface CoverageEntry {
     mediaTypeId: string;
     name: string;
-    /** Personas operativas que tienen el medio activo. */
+    /** Personas elegibles: operativos radicados en los edificios asignados al medio. */
+    total: number;
+    /** Elegibles que tienen el medio activo. */
     con: number;
-    /** Operativos que no lo tienen. */
+    /** Elegibles que no lo tienen (`total - con`). */
     sin: number;
+    /** Nombres de los edificios asignados al medio. */
+    buildings: string[];
 }
 
 export interface DashboardStats {

@@ -1,5 +1,8 @@
 -- Dashboard: contador "No Activos" + todas las dependencias + personas por piso
 -- Estado por edificio de radicación (máquina de 8): operativos = activo + parcial + media_otro_edificio.
+-- Cobertura por medio: el denominador ("total") son los operativos radicados
+-- en los edificios asignados al medio (access_media_type_buildings), no el
+-- total global de operativos.
 
 create or replace function public.get_dashboard_metrics()
   returns json
@@ -31,6 +34,7 @@ BEGIN
     pm AS (
         SELECT p.id,
                p.status AS db_status,
+               p.building_id,
                count(DISTINCT am.media_type_id) FILTER (
                    WHERE am.media_type_id = ANY(coalesce(r.ids, '{}'::uuid[]))
                      AND am.status = 'active'
@@ -47,9 +51,10 @@ BEGIN
         FROM personnel p
         LEFT JOIN req r ON r.building_id = p.building_id
         LEFT JOIN access_media am ON am.person_id = p.id
-        GROUP BY p.id, p.status, r.cnt
+        GROUP BY p.id, p.status, p.building_id, r.cnt
     )
     SELECT id,
+        building_id,
         CASE
             WHEN db_status = 'blocked' THEN 'bloqueado'
             WHEN db_status IN ('inactive', 'baja') THEN 'baja'
@@ -83,29 +88,54 @@ BEGIN
         'baja', COUNT(*) FILTER (WHERE final_status = 'baja')
     ) INTO status_counts FROM tmp_person_status;
 
-    DROP TABLE IF EXISTS tmp_person_status;
-
     no_activos_count := GREATEST(0, total_count - operativos_count);
 
-    SELECT COALESCE(json_agg(y ORDER BY y.sort_order), '[]'::json)
+    SELECT COALESCE(json_agg(z ORDER BY z.sort_order, z.name), '[]'::json)
     INTO card_coverage
     FROM (
-        SELECT t.id AS "mediaTypeId",
-               t.name,
-               t.sort_order,
-               (SELECT COUNT(DISTINCT am2.person_id)
-                  FROM access_media am2
-                 WHERE am2.media_type_id = t.id
-                   AND am2.status = 'active'
-                   AND am2.person_id IS NOT NULL) AS con,
-               GREATEST(0, operativos_count - (SELECT COUNT(DISTINCT am3.person_id)
-                  FROM access_media am3
-                 WHERE am3.media_type_id = t.id
-                   AND am3.status = 'active'
-                   AND am3.person_id IS NOT NULL)) AS sin
-        FROM access_media_types t
-        WHERE t.active
-    ) y;
+        SELECT y."mediaTypeId",
+               y.name,
+               y.sort_order,
+               y.buildings,
+               y.total,
+               y.con,
+               GREATEST(0, y.total - y.con) AS sin
+        FROM (
+            SELECT t.id AS "mediaTypeId",
+                   t.name,
+                   t.sort_order,
+                   COALESCE((
+                       SELECT json_agg(b.name ORDER BY b.name)
+                       FROM access_media_type_buildings mtb
+                       JOIN buildings b ON b.id = mtb.building_id
+                       WHERE mtb.media_type_id = t.id
+                   ), '[]'::json) AS buildings,
+                   (SELECT COUNT(*)
+                    FROM tmp_person_status s
+                    WHERE s.final_status IN ('activo', 'parcial', 'media_otro_edificio')
+                      AND s.building_id IN (
+                          SELECT mtb.building_id
+                          FROM access_media_type_buildings mtb
+                          WHERE mtb.media_type_id = t.id
+                      )) AS total,
+                   (SELECT COUNT(DISTINCT am2.person_id)
+                    FROM access_media am2
+                    JOIN tmp_person_status s2 ON s2.id = am2.person_id
+                      AND s2.final_status IN ('activo', 'parcial', 'media_otro_edificio')
+                    JOIN personnel p2 ON p2.id = am2.person_id
+                    WHERE am2.media_type_id = t.id
+                      AND am2.status = 'active'
+                      AND p2.building_id IN (
+                          SELECT mtb.building_id
+                          FROM access_media_type_buildings mtb
+                          WHERE mtb.media_type_id = t.id
+                      )) AS con
+            FROM access_media_types t
+            WHERE t.active
+        ) y
+    ) z;
+
+    DROP TABLE IF EXISTS tmp_person_status;
 
     SELECT json_agg(t ORDER BY t.sort_order, t.name) INTO top_dependencies FROM (
         SELECT d.name, d.sort_order, COUNT(p.id) as total,
@@ -133,8 +163,8 @@ BEGIN
                    FROM (
                        SELECT fl.id, fl.label, fl.sort_order,
                               (SELECT COUNT(*) FROM personnel p
-                                WHERE p.building_id = fl.building_id
-                                  AND lower(coalesce(p.floor,'')) = lower(coalesce(fl.label,''))) AS people
+                               WHERE p.building_id = fl.building_id
+                                 AND lower(coalesce(p.floor,'')) = lower(coalesce(fl.label,''))) AS people
                        FROM floors fl
                        WHERE fl.building_id = b.id
                    ) f

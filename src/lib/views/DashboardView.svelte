@@ -712,25 +712,31 @@
                 <div class="p-4 lg:p-6 space-y-5">
                     {#each metrics.cardCoverage as cov}
                         {@const cls = mediaTypeBarClasses(cov.name)}
+                        {@const eligible = cov.total ?? metrics.operativos}
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
                                 <span class="text-[12px] font-extrabold {cls.text} flex items-center gap-1.5"
                                     ><CreditCard size={14} /> {cov.name}</span
                                 >
                                 <span class="text-[10px] font-bold {cls.badge} px-2 py-0.5 rounded-lg"
-                                    >{pct(cov.con, metrics.operativos)}%</span
+                                    >{pct(cov.con, eligible)}%</span
                                 >
                             </div>
+                            {#if cov.buildings && cov.buildings.length > 0}
+                                <p class="text-[10px] font-medium text-slate-400 mb-1.5 truncate">
+                                    {cov.buildings.join(' · ')}
+                                </p>
+                            {/if}
                             <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-1.5">
                                 <div
                                     class="{cls.bar} h-full rounded-full transition-all duration-700"
-                                    style="width: {pct(cov.con, metrics.operativos)}%"
+                                    style="width: {pct(cov.con, eligible)}%"
                                 ></div>
                             </div>
                             <div class="flex justify-between text-[10px] font-bold">
                                 <span class="text-emerald-600">✓ {cov.con}</span>
                                 <span class={cov.sin > 0 ? 'text-rose-500' : 'text-emerald-600'}
-                                    >{cov.sin > 0 ? '✗' : '✓'} {cov.sin} sin tarjeta</span
+                                    >{cov.sin > 0 ? '✗' : '✓'} {cov.sin} sin tarjeta de {eligible}</span
                                 >
                             </div>
                         </div>
