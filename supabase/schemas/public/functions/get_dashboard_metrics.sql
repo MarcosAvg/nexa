@@ -3,6 +3,9 @@
 -- Cobertura por medio: el denominador ("total") son los operativos radicados
 -- en los edificios asignados al medio (access_media_type_buildings), no el
 -- total global de operativos.
+--
+-- Rendimiento: building_floors y card_coverage usan una única agregación
+-- (sin subconsultas correlacionadas por piso/medio).
 
 create or replace function public.get_dashboard_metrics()
   returns json
@@ -93,46 +96,38 @@ BEGIN
     SELECT COALESCE(json_agg(z ORDER BY z.sort_order, z.name), '[]'::json)
     INTO card_coverage
     FROM (
-        SELECT y."mediaTypeId",
-               y.name,
-               y.sort_order,
-               y.buildings,
-               y.total,
-               y.con,
-               GREATEST(0, y.total - y.con) AS sin
-        FROM (
-            SELECT t.id AS "mediaTypeId",
-                   t.name,
-                   t.sort_order,
-                   COALESCE((
-                       SELECT json_agg(b.name ORDER BY b.name)
-                       FROM access_media_type_buildings mtb
-                       JOIN buildings b ON b.id = mtb.building_id
-                       WHERE mtb.media_type_id = t.id
-                   ), '[]'::json) AS buildings,
-                   (SELECT COUNT(*)
-                    FROM tmp_person_status s
-                    WHERE s.final_status IN ('activo', 'parcial', 'media_otro_edificio')
-                      AND s.building_id IN (
-                          SELECT mtb.building_id
-                          FROM access_media_type_buildings mtb
-                          WHERE mtb.media_type_id = t.id
-                      )) AS total,
-                   (SELECT COUNT(DISTINCT am2.person_id)
-                    FROM access_media am2
-                    JOIN tmp_person_status s2 ON s2.id = am2.person_id
-                      AND s2.final_status IN ('activo', 'parcial', 'media_otro_edificio')
-                    JOIN personnel p2 ON p2.id = am2.person_id
-                    WHERE am2.media_type_id = t.id
-                      AND am2.status = 'active'
-                      AND p2.building_id IN (
-                          SELECT mtb.building_id
-                          FROM access_media_type_buildings mtb
-                          WHERE mtb.media_type_id = t.id
-                      )) AS con
-            FROM access_media_types t
-            WHERE t.active
-        ) y
+        WITH mb AS (
+            SELECT mtb.media_type_id, mtb.building_id, b.name
+            FROM access_media_type_buildings mtb
+            JOIN buildings b ON b.id = mtb.building_id
+        ),
+        elig AS (
+            SELECT s.building_id, count(*) AS total
+            FROM tmp_person_status s
+            WHERE s.final_status IN ('activo', 'parcial', 'media_otro_edificio')
+            GROUP BY s.building_id
+        ),
+        cons AS (
+            SELECT am.media_type_id, s.building_id, count(DISTINCT am.person_id) AS con
+            FROM access_media am
+            JOIN tmp_person_status s
+              ON s.id = am.person_id
+             AND s.final_status IN ('activo', 'parcial', 'media_otro_edificio')
+            WHERE am.status = 'active'
+            GROUP BY am.media_type_id, s.building_id
+        )
+        SELECT t.id AS "mediaTypeId",
+               t.name,
+               t.sort_order,
+               COALESCE(json_agg(DISTINCT mb.name) FILTER (WHERE mb.name IS NOT NULL), '[]'::json) AS buildings,
+               COALESCE(SUM(elig.total), 0) AS total,
+               COALESCE(SUM(cons.con), 0) AS con
+        FROM access_media_types t
+        LEFT JOIN mb ON mb.media_type_id = t.id
+        LEFT JOIN elig ON elig.building_id = mb.building_id
+        LEFT JOIN cons ON cons.media_type_id = t.id AND cons.building_id = mb.building_id
+        WHERE t.active
+        GROUP BY t.id, t.name, t.sort_order
     ) z;
 
     DROP TABLE IF EXISTS tmp_person_status;
@@ -158,17 +153,23 @@ BEGIN
         SELECT b.id AS "buildingId",
                b.name,
                b.sort_order,
-               (
-                   SELECT COALESCE(json_agg(f ORDER BY f.sort_order, f.label), '[]'::json)
+               COALESCE((
+                   SELECT json_agg(f ORDER BY f.sort_order, f.label)
                    FROM (
-                       SELECT fl.id, fl.label, fl.sort_order,
-                              (SELECT COUNT(*) FROM personnel p
-                               WHERE p.building_id = fl.building_id
-                                 AND lower(coalesce(p.floor,'')) = lower(coalesce(fl.label,''))) AS people
+                       SELECT fl.id, fl.label, fl.sort_order, COALESCE(pc.people, 0) AS people
                        FROM floors fl
+                       LEFT JOIN (
+                           SELECT building_id,
+                                  lower(coalesce(floor, '')) AS fkey,
+                                  count(*) AS people
+                           FROM personnel
+                           WHERE building_id IS NOT NULL
+                           GROUP BY building_id, lower(coalesce(floor, ''))
+                       ) pc ON pc.building_id = fl.building_id
+                            AND pc.fkey = lower(coalesce(fl.label, ''))
                        WHERE fl.building_id = b.id
                    ) f
-               ) AS floors
+               ), '[]'::json) AS floors
         FROM buildings b
     ) x;
 

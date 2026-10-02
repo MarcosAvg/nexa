@@ -22,13 +22,7 @@
     import MainLayoutWrapper from './lib/components/MainLayoutWrapper.svelte';
     import LoginView from './lib/views/LoginView.svelte';
     import { Toaster } from 'svelte-sonner';
-    import {
-        personnelService,
-        catalogService,
-        ticketService,
-        cardService,
-        HistoryService,
-    } from './lib/services';
+    import { catalogService, ticketService, cardService, HistoryService } from './lib/services';
     import GlobalOverlays from './lib/components/GlobalOverlays.svelte';
 
     let loadingAuth = $state(true);
@@ -111,9 +105,9 @@
             }
 
             // 1. Critical data for immediate UI (Dashboard / Catalogs)
-            // Reemplazado el antiguo personnelService.fetchOptions con uno nuevo eficiente si está disponible
-            const [_pOptions, _d, _b, _a, _s, _m] = await Promise.all([
-                personnelService.fetchOptions(true),
+            // `fetchOptions` (autocomplete de personas) se omitió aquí: cargaba
+            // ~3k filas sin consumidor real y bloqueaba el arranque.
+            const [_d, _b, _a, _s, _m] = await Promise.all([
                 catalogService.fetchDependencies(true),
                 catalogService.fetchBuildings(true),
                 catalogService.fetchAccesses(true),
@@ -121,7 +115,6 @@
                 catalogService.fetchMediaTypes(true),
             ]);
 
-            personnelState.setPersonnelOptions(_pOptions);
             catalogState.setDependencies(_d);
             catalogState.setBuildings(_b);
             catalogState.setSpecialAccesses(_a);
@@ -142,9 +135,6 @@
                     personnelState.setCards(_c);
                     ticketState.setTickets(_t);
                     historyState.pagination.setItems(_h.data, _h.count);
-
-                    // Actualizar métricas del dashboard con el nuevo RPC eficiente
-                    personnelState.refreshDashboardMetrics();
 
                     // Inicializar suscripciones Realtime
                     personnelState.initRealtime();

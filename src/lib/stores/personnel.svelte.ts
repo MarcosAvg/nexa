@@ -76,41 +76,71 @@ export class PersonnelState {
     /** Fecha de fin (YYYY-MM-DD). Vacío = hoy. */
     growthEndDate = $state('');
 
+    /** Guardas para evitar llamadas concurrentes/duplicadas al dashboard. */
+    private _metricsInFlight: Promise<void> | null = null;
+    private _statsInFlight: Promise<void> | null = null;
+    private _dashboardDebounce: ReturnType<typeof setTimeout> | null = null;
+
     setPersonnelOptions(data: { id: string; name: string; employee_no: string }[]) {
         this.personnelOptions = data;
     }
 
+    /**
+     * Agenda un refresco del dashboard agrupando ráfagas de eventos Realtime
+     * (evita disparar los RPC en cada cambio individual de `personnel`).
+     */
+    private scheduleDashboardRefresh() {
+        if (this._dashboardDebounce) return;
+        this._dashboardDebounce = setTimeout(() => {
+            this._dashboardDebounce = null;
+            void this.refreshDashboardMetrics();
+            void this.refreshDashboardStats();
+        }, 800);
+    }
+
     async refreshDashboardStats() {
-        try {
-            const { supabase } = await import('../supabase');
-            const { data, error } = await supabase.rpc('get_dashboard_stats');
-            if (error) throw error;
-            if (data) {
-                this.dashboardStats = data;
-                return;
+        if (this._statsInFlight) return this._statsInFlight;
+        this._statsInFlight = (async () => {
+            try {
+                const { supabase } = await import('../supabase');
+                const { data, error } = await supabase.rpc('get_dashboard_stats');
+                if (error) throw error;
+                if (data) {
+                    this.dashboardStats = data;
+                    return;
+                }
+            } catch {
+                // Fallback: usar implementación multi-query si la RPC aún no está disponible
             }
-        } catch {
-            // Fallback: usar implementación multi-query si la RPC aún no está disponible
-        }
-        try {
-            const { personnelService } = await import('../services/personnel');
-            const stats = await personnelService.fetchDashboardStats();
-            this.dashboardStats = stats;
-        } catch (error) {
-            // Manejar error de actualización de estadísticas silenciosamente - reintentará
-        }
+            try {
+                const { personnelService } = await import('../services/personnel');
+                const stats = await personnelService.fetchDashboardStats();
+                this.dashboardStats = stats;
+            } catch (error) {
+                // Manejar error de actualización de estadísticas silenciosamente - reintentará
+            }
+        })().finally(() => {
+            this._statsInFlight = null;
+        });
+        return this._statsInFlight;
     }
 
     async refreshDashboardMetrics() {
+        if (this._metricsInFlight) return this._metricsInFlight;
         this.metricsLoading = true;
-        try {
-            const { personnelService } = await import('../services/personnel');
-            this.dashboardMetrics = await personnelService.fetchDashboardMetrics();
-        } catch (error) {
-            // Manejar error de actualización de métricas silenciosamente - reintentará
-        } finally {
-            this.metricsLoading = false;
-        }
+        this._metricsInFlight = (async () => {
+            try {
+                const { personnelService } = await import('../services/personnel');
+                this.dashboardMetrics = await personnelService.fetchDashboardMetrics();
+            } catch (error) {
+                // Manejar error de actualización de métricas silenciosamente - reintentará
+            } finally {
+                this.metricsLoading = false;
+            }
+        })().finally(() => {
+            this._metricsInFlight = null;
+        });
+        return this._metricsInFlight;
     }
 
     async refreshDashboardGrowth() {
@@ -202,9 +232,8 @@ export class PersonnelState {
         try {
             const { personnelService } = await import('../services/personnel');
             personnelService.subscribeToChanges((payload) => {
-                // Siempre actualizar métricas en cualquier cambio
-                this.refreshDashboardMetrics();
-                this.refreshDashboardStats();
+                // Actualizar métricas del dashboard agrupando ráfagas de cambios
+                this.scheduleDashboardRefresh();
 
                 if (payload.eventType === 'UPDATE') {
                     // Actualizar el array local de personal de forma óptima
