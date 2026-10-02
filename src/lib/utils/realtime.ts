@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
 import { networkStore } from '../stores/network.svelte';
 import { catalogState } from '../stores/catalogs.svelte';
+import { catalogCache } from './catalogCache';
 
 let globalRealtimeStarted = false;
 let channelRef: ReturnType<typeof supabase.channel> | null = null;
@@ -13,6 +14,20 @@ let isReconnecting = false;
 
 let onlineListener: (() => void) | null = null;
 let offlineListener: (() => void) | null = null;
+
+// Debounce por destino para no disparar recargas en ráfaga (importaciones, etc.).
+const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+function debounce(key: string, fn: () => void, ms = 1000) {
+    const existing = debounceTimers.get(key);
+    if (existing) clearTimeout(existing);
+    debounceTimers.set(
+        key,
+        setTimeout(() => {
+            debounceTimers.delete(key);
+            fn();
+        }, ms),
+    );
+}
 
 function logSubscribeStatus(channelName: string, status: string, err?: Error) {
     if (status === 'SUBSCRIBED') {
@@ -83,6 +98,8 @@ function reconnect(channelName: string) {
 /** Refresca una colección de catálogo tras un cambio. */
 async function refreshCatalog(table: string) {
     try {
+        // Invalidar la caché para que el cambio se refleje de inmediato.
+        catalogCache.invalidate(table);
         const { catalogService } = await import('../services/catalogs');
         if (table === 'dependencies') {
             catalogState.setDependencies(await catalogService.fetchDependencies());
@@ -135,7 +152,7 @@ function createChannel(channelName: string) {
             'floors',
         ]) {
             channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
-                refreshCatalog(table);
+                debounce(`catalog:${table}`, () => refreshCatalog(table));
             });
         }
 
@@ -147,7 +164,7 @@ function createChannel(channelName: string) {
             ['cardless_registry', 'cardless_registry'],
         ] as [string, string][]) {
             channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
-                refreshStore(storeName);
+                debounce(`store:${storeName}`, () => refreshStore(storeName));
             });
         }
 

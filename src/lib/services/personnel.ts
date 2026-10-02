@@ -380,12 +380,12 @@ export const personnelService = {
                     realMediaIds.length > 0 && !hasNoneMedia
                         ? 'access_media!inner(id, identifier, status, programming_status, responsiva_status, access_media_types(name, has_floors, requires_responsiva))'
                         : 'access_media!left(id, identifier, status, programming_status, responsiva_status, access_media_types(name, has_floors, requires_responsiva))';
-                let query = supabase
-                    .from('personnel_with_status')
-                    .select(
-                        `*, ${mediaRelation}, access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name)))`,
-                        { count: 'exact' },
-                    );
+                let query = supabase.from('personnel_with_status').select(
+                    // El listado no usa `access_assignments` (solo detalles/export),
+                    // así que se omite para no encarecer la consulta de página.
+                    `*, ${mediaRelation}`,
+                    { count: 'exact' },
+                );
 
                 if (search) {
                     const terms = normalizeSearch(search).split(' ').filter(Boolean);

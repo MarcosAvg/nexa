@@ -114,26 +114,31 @@ async function fetchCardAssignmentTypes(
 }
 
 async function enrichWithAccessMedia(tickets: any[]): Promise<any[]> {
-    const mediaIds = tickets.map((t) => t.access_media_id).filter(Boolean) as string[];
-    if (mediaIds.length === 0) return tickets;
-
-    const uniqueIds = [...new Set(mediaIds)];
-    const { data } = await supabase
-        .from('access_media')
-        .select('id, identifier, access_media_types(name)')
-        .in('id', uniqueIds);
+    // En Responsivas el medio ya viene embebido (`access_media`); solo se
+    // consulta access_media para los tickets que no lo traen (ruta General).
+    const pending = tickets.filter((t) => t.access_media_id && !t.access_media);
+    const ids = [...new Set(pending.map((t) => t.access_media_id).filter(Boolean))] as string[];
 
     const byMediaId = new Map<string, { type: string; folio: string }>();
-    for (const m of data || []) {
-        const rel = m.access_media_types as { name?: string }[] | { name?: string } | null | undefined;
-        const typeName = Array.isArray(rel) ? (rel[0]?.name ?? '') : (rel?.name ?? '');
-        byMediaId.set(m.id, {
-            type: typeName,
-            folio: m.identifier ?? '',
-        });
+    if (ids.length > 0) {
+        const { data } = await supabase
+            .from('access_media')
+            .select('id, identifier, access_media_types(name)')
+            .in('id', ids);
+
+        for (const m of data || []) {
+            const rel = m.access_media_types as { name?: string }[] | { name?: string } | null | undefined;
+            const typeName = Array.isArray(rel) ? (rel[0]?.name ?? '') : (rel?.name ?? '');
+            byMediaId.set(m.id, { type: typeName, folio: m.identifier ?? '' });
+        }
     }
 
     return tickets.map((t) => {
+        const rel = t.access_media?.access_media_types;
+        const embeddedType = Array.isArray(rel) ? (rel[0]?.name ?? '') : (rel?.name ?? '');
+        if (t.access_media) {
+            return { ...t, cardType: embeddedType, cardFolio: t.access_media.identifier ?? '' };
+        }
         if (t.access_media_id && byMediaId.has(t.access_media_id)) {
             const info = byMediaId.get(t.access_media_id)!;
             return { ...t, cardType: info.type, cardFolio: info.folio };

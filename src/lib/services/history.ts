@@ -251,8 +251,9 @@ export const HistoryService = {
 
     /**
      * Página las historias del historial (un flujo = una "historia").
-     * A diferencia de fetchAll (que pagina por fila), aquí se pagina por flujo,
-     * evitando que un flujo se corte entre páginas. Devuelve historias completas.
+     * Usa la RPC `get_history_flows` para paginar las claves de flujo en
+     * servidor (sin transferir todos los history_logs). Si la RPC no está
+     * disponible, cae al método legacy en cliente.
      */
     async fetchFlows(
         page: number = 1,
@@ -261,59 +262,109 @@ export const HistoryService = {
     ): Promise<{ data: HistoryStory[]; count: number }> {
         return withErrorHandlingSafe(
             async () => {
-                // 1) Claves de flujo (flow_id) + su timestamp más reciente, y filas sin flow_id como singletons.
-                let flowQ = supabase.from('history_logs').select('flow_id, timestamp');
-                flowQ = applyFilters(flowQ, filters);
-                const { data: flowRows } = await flowQ
-                    .not('flow_id', 'is', null)
-                    .order('timestamp', { ascending: false });
-
-                let nullQ = supabase.from('history_logs').select('id, timestamp');
-                nullQ = applyFilters(nullQ, filters);
-                const { data: nullRows } = await nullQ
-                    .is('flow_id', null)
-                    .order('timestamp', { ascending: false });
-
-                const flowLatest = new Map<string, string>();
-                for (const r of flowRows || []) {
-                    if (!flowLatest.has(r.flow_id)) flowLatest.set(r.flow_id, r.timestamp);
+                try {
+                    return await this._fetchFlowsViaRpc(page, limit, filters);
+                } catch {
+                    return await this._fetchFlowsLegacy(page, limit, filters);
                 }
-
-                const keys: { key: string; last: string; single?: boolean }[] = [];
-                for (const [key, last] of flowLatest) keys.push({ key, last });
-                for (const r of nullRows || [])
-                    keys.push({ key: `row-${r.id}`, last: r.timestamp, single: true });
-
-                keys.sort((a, b) => b.last.localeCompare(a.last));
-
-                const total = keys.length;
-                const from = (page - 1) * limit;
-                const pageKeys = keys.slice(from, from + limit);
-
-                const flowIds = pageKeys.filter((k) => !k.single).map((k) => k.key);
-                const singleIds = pageKeys
-                    .filter((k) => k.single)
-                    .map((k) => Number(k.key.replace('row-', '')));
-
-                const rows: any[] = [];
-                if (flowIds.length > 0) {
-                    let q = supabase.from('history_logs').select('*');
-                    q = applyFilters(q, filters);
-                    const { data } = await q.in('flow_id', flowIds);
-                    rows.push(...(data || []));
-                }
-                if (singleIds.length > 0) {
-                    let q = supabase.from('history_logs').select('*');
-                    q = applyFilters(q, filters);
-                    const { data } = await q.in('id', singleIds);
-                    rows.push(...(data || []));
-                }
-
-                const enriched = await this._attachUserNames(rows);
-                return { data: this._groupStories(enriched), count: total };
             },
             'Fetch History Flows',
             { data: [], count: 0 },
         );
+    },
+
+    /** Paginación de flujos en servidor vía RPC. */
+    async _fetchFlowsViaRpc(
+        page: number,
+        limit: number,
+        filters: HistoryFilters,
+    ): Promise<{ data: HistoryStory[]; count: number }> {
+        const { data, error } = await supabase.rpc('get_history_flows', {
+            p_person: filters.person || null,
+            p_card_types: filters.cardType && filters.cardType.length ? filters.cardType : null,
+            p_folio: filters.folio || null,
+            p_actions: filters.action && filters.action.length ? filters.action : null,
+            p_start_date: filters.startDate || null,
+            p_end_date: filters.endDate || null,
+            p_page: page,
+            p_size: limit,
+        });
+        if (error) throw error;
+
+        const keys = (data?.keys ?? []) as { key: string; last: string; single: boolean }[];
+        const total = (data?.total ?? 0) as number;
+
+        const flowIds = keys.filter((k) => !k.single).map((k) => k.key);
+        const singleIds = keys.filter((k) => k.single).map((k) => Number(String(k.key).replace('row-', '')));
+
+        const rows: any[] = [];
+        if (flowIds.length > 0) {
+            let q = supabase.from('history_logs').select('*');
+            q = applyFilters(q, filters);
+            const { data: d } = await q.in('flow_id', flowIds);
+            rows.push(...(d || []));
+        }
+        if (singleIds.length > 0) {
+            let q = supabase.from('history_logs').select('*');
+            q = applyFilters(q, filters);
+            const { data: d } = await q.in('id', singleIds);
+            rows.push(...(d || []));
+        }
+
+        const enriched = await this._attachUserNames(rows);
+        return { data: this._groupStories(enriched), count: total };
+    },
+
+    /** Paginación de flujos en cliente (fallback sin RPC). */
+    async _fetchFlowsLegacy(
+        page: number,
+        limit: number,
+        filters: HistoryFilters,
+    ): Promise<{ data: HistoryStory[]; count: number }> {
+        // 1) Claves de flujo (flow_id) + su timestamp más reciente, y filas sin flow_id como singletons.
+        let flowQ = supabase.from('history_logs').select('flow_id, timestamp');
+        flowQ = applyFilters(flowQ, filters);
+        const { data: flowRows } = await flowQ
+            .not('flow_id', 'is', null)
+            .order('timestamp', { ascending: false });
+
+        let nullQ = supabase.from('history_logs').select('id, timestamp');
+        nullQ = applyFilters(nullQ, filters);
+        const { data: nullRows } = await nullQ.is('flow_id', null).order('timestamp', { ascending: false });
+
+        const flowLatest = new Map<string, string>();
+        for (const r of flowRows || []) {
+            if (!flowLatest.has(r.flow_id)) flowLatest.set(r.flow_id, r.timestamp);
+        }
+
+        const keys: { key: string; last: string; single?: boolean }[] = [];
+        for (const [key, last] of flowLatest) keys.push({ key, last });
+        for (const r of nullRows || []) keys.push({ key: `row-${r.id}`, last: r.timestamp, single: true });
+
+        keys.sort((a, b) => b.last.localeCompare(a.last));
+
+        const total = keys.length;
+        const from = (page - 1) * limit;
+        const pageKeys = keys.slice(from, from + limit);
+
+        const flowIds = pageKeys.filter((k) => !k.single).map((k) => k.key);
+        const singleIds = pageKeys.filter((k) => k.single).map((k) => Number(k.key.replace('row-', '')));
+
+        const rows: any[] = [];
+        if (flowIds.length > 0) {
+            let q = supabase.from('history_logs').select('*');
+            q = applyFilters(q, filters);
+            const { data } = await q.in('flow_id', flowIds);
+            rows.push(...(data || []));
+        }
+        if (singleIds.length > 0) {
+            let q = supabase.from('history_logs').select('*');
+            q = applyFilters(q, filters);
+            const { data } = await q.in('id', singleIds);
+            rows.push(...(data || []));
+        }
+
+        const enriched = await this._attachUserNames(rows);
+        return { data: this._groupStories(enriched), count: total };
     },
 };
