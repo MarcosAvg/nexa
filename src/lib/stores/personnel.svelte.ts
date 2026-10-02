@@ -79,6 +79,7 @@ export class PersonnelState {
     /** Guardas para evitar llamadas concurrentes/duplicadas al dashboard. */
     private _metricsInFlight: Promise<void> | null = null;
     private _statsInFlight: Promise<void> | null = null;
+    private _overviewInFlight: Promise<void> | null = null;
     private _dashboardDebounce: ReturnType<typeof setTimeout> | null = null;
 
     setPersonnelOptions(data: { id: string; name: string; employee_no: string }[]) {
@@ -93,9 +94,49 @@ export class PersonnelState {
         if (this._dashboardDebounce) return;
         this._dashboardDebounce = setTimeout(() => {
             this._dashboardDebounce = null;
-            void this.refreshDashboardMetrics();
-            void this.refreshDashboardStats();
+            void this.refreshDashboardOverview();
         }, 800);
+    }
+
+    /**
+     * Carga stats + métricas en una sola RPC (`get_dashboard_overview`).
+     * Si la RPC aún no está disponible, hace fallback a los métodos por separado.
+     */
+    async refreshDashboardOverview() {
+        if (this._overviewInFlight) return this._overviewInFlight;
+        this.metricsLoading = true;
+        this._overviewInFlight = (async () => {
+            try {
+                const { supabase } = await import('../supabase');
+                const { data, error } = await supabase.rpc('get_dashboard_overview');
+                if (error) throw error;
+                if (data) {
+                    this.dashboardStats = {
+                        activePersonnel: data.activePersonnel ?? 0,
+                        stock: data.stock ?? [],
+                    };
+                    this.dashboardMetrics = {
+                        totalPersonnel: data.totalPersonnel ?? 0,
+                        statusCounts: data.statusCounts ?? this.dashboardMetrics.statusCounts,
+                        cardCoverage: data.cardCoverage ?? [],
+                        operativos: data.operativos ?? 0,
+                        noActivos: data.noActivos ?? 0,
+                        topDependencies: data.topDependencies ?? [],
+                        topBuildings: data.topBuildings ?? [],
+                        buildingFloors: data.buildingFloors ?? [],
+                        dataQuality: data.dataQuality ?? this.dashboardMetrics.dataQuality,
+                    };
+                    return;
+                }
+            } catch {
+                // Fallback a los RPC separados si la nueva RPC aún no está desplegada
+            }
+            await Promise.all([this.refreshDashboardStats(), this.refreshDashboardMetrics()]);
+        })().finally(() => {
+            this._overviewInFlight = null;
+            this.metricsLoading = false;
+        });
+        return this._overviewInFlight;
     }
 
     async refreshDashboardStats() {

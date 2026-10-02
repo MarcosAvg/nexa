@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { personnelState, ticketState, userState, historyState } from '../stores';
+    import { personnelState, ticketState, userState, historyState, mediaState } from '../stores';
     import { pullRefresh } from '../stores';
     import {
         Card,
@@ -37,13 +37,11 @@
     import { PERSONNEL_STATUS_META } from '../constants/status';
 
     onMount(() => {
-        personnelState.refreshDashboardStats();
-        personnelState.refreshDashboardMetrics();
-        personnelState.refreshDashboardGrowth();
+        personnelState.refreshDashboardOverview();
     });
     // Las métricas se actualizan automáticamente vía Realtime:
-    // PersonnelState.initRealtime() refresca dashboardStats y dashboardMetrics
-    // en cada cambio detectado en la tabla personnel.
+    // PersonnelState.initRealtime() refresca stats y métricas
+    // en cada cambio detectado en la tabla personnel (con debounce).
 
     // Navegación desde los contadores: pre-aplican el filtro en el store de destino.
     function goPersonnel(status: string) {
@@ -76,19 +74,29 @@
     let metrics = $derived(personnelState.dashboardMetrics);
     let metricsLoading = $derived(personnelState.metricsLoading);
 
-    // Crecimiento de personal
+    // Crecimiento de personal (carga perezosa).
     let growth = $derived(personnelState.growth);
     let growthTab = $state<'edificio' | 'dependencia' | 'piso'>('edificio');
     let showGrowthSheet = $state(false);
+    let growthLoaded = $state(false);
+
+    function ensureGrowth() {
+        if (growthLoaded) return;
+        growthLoaded = true;
+        void personnelState.refreshDashboardGrowth();
+    }
+
+    // En desktop la tarjeta está siempre visible: se carga tras pintar las métricas.
+    // En móvil se carga al expandir (onToggle) para no bloquear el arranque.
+    $effect(() => {
+        if (mediaState.isDesktop.matches && metrics.totalPersonnel > 0) ensureGrowth();
+    });
 
     // Pull-to-refresh del dashboard.
     $effect(() =>
         pullRefresh.register(async () => {
-            await Promise.all([
-                personnelState.refreshDashboardStats(),
-                personnelState.refreshDashboardMetrics(),
-                personnelState.refreshDashboardGrowth(),
-            ]);
+            await personnelState.refreshDashboardOverview();
+            if (growthLoaded) await personnelState.refreshDashboardGrowth();
         }),
     );
 
@@ -829,6 +837,7 @@
                 iconBgClass="bg-emerald-50 text-emerald-600"
                 class="max-lg:order-6 lg:order-6 lg:col-span-3"
                 headerBorder={false}
+                onToggle={(open) => open && ensureGrowth()}
             >
                 {#snippet headerActions()}
                     <div class="hidden lg:flex items-end gap-2 flex-wrap">
