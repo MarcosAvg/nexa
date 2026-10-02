@@ -8,7 +8,6 @@
         Input,
         Tabs,
         EmptyState,
-        SectionHeader,
         Collapsible,
         DataList,
         BottomSheet,
@@ -299,9 +298,6 @@
 {/snippet}
 
 <div class="flex flex-col gap-4">
-    <!-- Cabecera unificada (móvil con buscador; hero solo en desktop) -->
-    <SectionHeader title="Dashboard" />
-
     <!-- ── HERO (desktop) ── -->
     <section class="hidden lg:flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div class="min-w-0">
