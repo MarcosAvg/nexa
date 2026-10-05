@@ -1,6 +1,7 @@
 import type * as ExcelJSTypes from 'exceljs';
 import { addLogoToSheet, calcPct, addTableHeader, addTableRow, autoRowHeight } from './xlsxShared'; // Re-exportar tipos desde aquí
 import { floorsForKey } from '../services/accessAssignments';
+import { ACTIVE_PERSONNEL_STATUSES } from '../constants/status';
 import type { FloorGroup } from '../types';
 import { settingsState } from '../stores';
 
@@ -281,13 +282,16 @@ async function addStatsSheet(
 
     // ── Compute all stats ──
     const total = data.length;
+    const isActiveStatus = (status: string) => ACTIVE_PERSONNEL_STATUSES.includes(status);
     const activos = data.filter((p) => p.status === 'Activo/a').length;
     const parciales = data.filter((p) => p.status === 'Parcial').length;
     const bloqueados = data.filter((p) => p.status === 'Bloqueado/a').length;
     const sinAcceso = data.filter((p) => p.status === 'Sin Acceso').length;
     const bajas = data.filter((p) => p.status === 'Baja').length;
-    const activosOperativos = activos + parciales;
-    const operativos = data.filter((p) => p.status === 'Activo/a' || p.status === 'Parcial');
+    // "Activos operativos" incluye Media de otro edificio (tiene medios activos
+    // en algún edificio). Mismo criterio del dashboard y del filtro "No Activos".
+    const activosOperativos = data.filter((p) => isActiveStatus(p.status)).length;
+    const operativos = data.filter((p) => isActiveStatus(p.status));
     const enProceso = data.filter((p) => p.status === 'En proceso').length;
     const mediaOtro = data.filter((p) => p.status === 'Media de otro edificio').length;
     const otroEnProceso = data.filter((p) => p.status === 'Otro edificio en proceso').length;
@@ -308,7 +312,7 @@ async function addStatsSheet(
         const dep = p.dependency || 'Sin Dependencia';
         if (!depMap[dep]) depMap[dep] = { total: 0, activos: 0, inactivos: 0 };
         depMap[dep].total++;
-        if (p.status === 'Activo/a' || p.status === 'Parcial') depMap[dep].activos++;
+        if (isActiveStatus(p.status)) depMap[dep].activos++;
         else depMap[dep].inactivos++;
     });
     const depEntries = Object.entries(depMap).sort((a, b) => b[1].total - a[1].total);
