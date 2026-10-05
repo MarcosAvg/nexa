@@ -15,6 +15,7 @@
         RefreshCcw,
         CheckCircle2,
         RotateCcw,
+        Loader2,
     } from 'lucide-svelte';
 
     /**
@@ -35,6 +36,17 @@
     let { items, user, onLogout }: Props = $props();
 
     let isUpdateModalOpen = $state(false);
+
+    // Texto del botón de actualización según la fase en curso.
+    let refreshLabel = $derived(
+        versionState.refreshPhase === 'checking'
+            ? 'Comprobando…'
+            : versionState.refreshPhase === 'installing'
+              ? 'Descargando…'
+              : versionState.refreshPhase === 'activating'
+                ? 'Aplicando…'
+                : 'Recargar ahora',
+    );
 
     // Abrir el modal automáticamente cuando se detecte una actualización,
     // a menos que el usuario ya haya descartado esta versión específica.
@@ -301,19 +313,28 @@
 >
     <div class="flex flex-col items-center text-center gap-4 py-2">
         <div class="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
-            <RefreshCcw size={28} strokeWidth={2} class="text-emerald-600" />
+            {#if versionState.isRefreshing}
+                <Loader2 size={28} strokeWidth={2} class="text-emerald-600 animate-spin" />
+            {:else}
+                <RefreshCcw size={28} strokeWidth={2} class="text-emerald-600" />
+            {/if}
         </div>
         <div class="space-y-1">
             <p class="text-sm text-slate-600">
                 Versión actual:
                 <span class="font-bold text-slate-800">{versionState.formattedBuildTime ?? '—'}</span>
             </p>
-            <p class="text-sm text-slate-500">La recarga tomará solo unos segundos.</p>
+            <p class="text-sm text-slate-500">
+                {versionState.isRefreshing
+                    ? 'Aplicando la actualización, no cierres esta ventana…'
+                    : 'La recarga tomará solo unos segundos.'}
+            </p>
         </div>
     </div>
     {#snippet footer()}
         <button
-            class="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-all active:scale-95"
+            class="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            disabled={versionState.isRefreshing}
             onclick={() => {
                 versionState.dismissUpdate();
                 isUpdateModalOpen = false;
@@ -322,11 +343,16 @@
             Después
         </button>
         <button
-            class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/20"
+            class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/20 disabled:opacity-70 disabled:cursor-not-allowed"
+            disabled={versionState.isRefreshing}
             onclick={() => versionState.refreshPage()}
         >
-            <RotateCcw size={16} strokeWidth={2.5} />
-            Recargar ahora
+            {#if versionState.isRefreshing}
+                <Loader2 size={16} strokeWidth={2.5} class="animate-spin" />
+            {:else}
+                <RotateCcw size={16} strokeWidth={2.5} />
+            {/if}
+            {refreshLabel}
         </button>
     {/snippet}
 </Modal>

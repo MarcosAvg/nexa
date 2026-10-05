@@ -20,6 +20,10 @@ export class VersionState {
     lastCheckTime = $state<number>(0);
     /** Build-time de la última versión disponible que el usuario descartó. */
     dismissedBuildTime = $state<string | null>(null);
+    /** true mientras se descarga/aplica una actualización (para el spinner). */
+    isRefreshing = $state(false);
+    /** Fase visible del proceso de actualización. */
+    refreshPhase = $state<'idle' | 'checking' | 'installing' | 'activating'>('idle');
     /** Build-time formateado para mostrar al usuario. */
     formattedBuildTime = $derived.by(() => {
         if (!this.localBuildTime) return null;
@@ -179,6 +183,48 @@ export class VersionState {
     }
 
     /**
+     * Espera a que exista un worker nuevo (instalándose o en espera) tras
+     * `registration.update()`. Evita la carrera de leer `installing`/`waiting`
+     * antes de que el navegador los cree (causa de tener que pulsar 2 veces).
+     */
+    private waitForNewWorker(
+        registration: ServiceWorkerRegistration,
+        timeoutMs: number,
+    ): Promise<ServiceWorker | null> {
+        const existing = registration.installing || registration.waiting;
+        if (existing) return Promise.resolve(existing);
+
+        return new Promise((resolve) => {
+            let done = false;
+            const started = Date.now();
+
+            const onFound = () => {
+                const sw = registration.installing || registration.waiting;
+                if (sw) finish(sw);
+            };
+
+            const interval = setInterval(() => {
+                const sw = registration.installing || registration.waiting;
+                if (sw) {
+                    finish(sw);
+                    return;
+                }
+                if (Date.now() - started >= timeoutMs) finish(null);
+            }, 200);
+
+            const finish = (sw: ServiceWorker | null) => {
+                if (done) return;
+                done = true;
+                registration.removeEventListener('updatefound', onFound);
+                clearInterval(interval);
+                resolve(sw);
+            };
+
+            registration.addEventListener('updatefound', onFound);
+        });
+    }
+
+    /**
      * Fuerza la actualización del Service Worker y recarga.
      *
      * En modo `prompt`, el SW nuevo queda en `waiting`. Se le envía
@@ -189,22 +235,30 @@ export class VersionState {
     async refreshPage() {
         if (this._reloadScheduled) return;
 
+        this.isRefreshing = true;
+        this.refreshPhase = 'checking';
+
         try {
             const registration = await navigator.serviceWorker?.getRegistration();
             if (registration) {
                 await registration.update();
 
-                // Si el SW aún se está instalando, esperar a que termine.
-                const installing = registration.installing;
-                if (installing) {
-                    await this.waitForState(installing, ['installed', 'activated'], 10_000);
-                }
+                // Esperar a que aparezca el worker nuevo (evita recargar en vano).
+                const newWorker = await this.waitForNewWorker(registration, 10_000);
 
-                // El SW nuevo en espera: pedirle que se active y esperar.
-                const waiting = registration.waiting;
-                if (waiting) {
-                    waiting.postMessage({ type: 'SKIP_WAITING' });
-                    await this.waitForState(waiting, ['activated'], 8_000);
+                if (newWorker) {
+                    // Si aún se está instalando, esperar a que termine.
+                    this.refreshPhase = 'installing';
+                    await this.waitForState(newWorker, ['installed', 'activated'], 10_000);
+
+                    // El SW nuevo en espera: pedirle que se active y esperar.
+                    this.refreshPhase = 'activating';
+                    const waiting =
+                        registration.waiting ?? (newWorker.state === 'installed' ? newWorker : null);
+                    if (waiting) {
+                        waiting.postMessage({ type: 'SKIP_WAITING' });
+                        await this.waitForState(waiting, ['activated'], 8_000);
+                    }
                 }
             }
         } catch {
@@ -212,6 +266,9 @@ export class VersionState {
         }
 
         this.reloadOnce();
+        // Si la navegación tardara, no dejar el botón bloqueado indefinidamente.
+        this.isRefreshing = false;
+        this.refreshPhase = 'idle';
     }
 
     destroy() {
