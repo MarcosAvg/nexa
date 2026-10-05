@@ -3,7 +3,7 @@
     import { enlaceService } from '../services/enlaces';
     import type { Enlace } from '../types';
     import { confirm } from '../utils/confirmModal.svelte';
-    import { fullName, normalizeSearch } from '../utils';
+    import { fullName, normalizeSearch, handleError } from '../utils';
     import {
         SectionHeader,
         FloatingActionButton,
@@ -19,16 +19,19 @@
         EditEnlaceModal,
         IconButton,
         Badge,
+        ExportDropdown,
+        ExportMenuItem,
     } from '../components';
     import { catalogState } from '../stores';
     import { pullRefresh } from '../stores';
-    import { Trash2, Contact, UserPlus, Edit, Copy, Mail, Send, Link2 } from 'lucide-svelte';
+    import { Trash2, Contact, UserPlus, Edit, Copy, Mail, Send, Link2, FileSpreadsheet } from 'lucide-svelte';
     import { toast } from 'svelte-sonner';
 
     let enlaces = $state<Enlace[]>([]);
     let isLoading = $state(true);
     let loadError = $state<string | null>(null);
     let isAddModalOpen = $state(false);
+    let isExporting = $state(false);
     let searchQuery = $state('');
     let filterDependency = $state<string[]>([]);
     let filterBuilding = $state<string[]>([]);
@@ -259,6 +262,39 @@
         const s = value == null ? '' : String(value).trim();
         return s === '' || s.toUpperCase() === 'N/A';
     }
+
+    /** Exporta el listado actual (según filtros/búsqueda) a Excel. */
+    async function handleExport() {
+        if (isExporting || filteredEnlaces.length === 0) return;
+        isExporting = true;
+        const loadingToast = toast.loading('Preparando exportación...');
+        try {
+            const rows = filteredEnlaces.map((e) => ({
+                employeeNo: e.personnel?.employee_no,
+                name: e.name,
+                dependency: e.dependency,
+                building: e.building,
+                floor: e.floor,
+                email: e.personnel?.email,
+                extension: e.extension,
+            }));
+            const { exportEnlacesToExcel } = await import('../utils/xlsxExport');
+            await exportEnlacesToExcel(rows, {
+                filters: {
+                    search: searchQuery,
+                    dependency: filterDependency,
+                    building: filterBuilding,
+                    floor: filterFloor,
+                },
+            });
+            toast.success('Exportación completada', { id: loadingToast });
+        } catch (error) {
+            toast.dismiss(loadingToast);
+            handleError(error, 'Exportar Enlaces');
+        } finally {
+            isExporting = false;
+        }
+    }
 </script>
 
 {#snippet renderName(row: Enlace)}
@@ -451,9 +487,23 @@
             </FilterToolbar>
         {/snippet}
         {#snippet actions()}
-            <PermissionGuard requireEdit>
-                {#snippet children({ disabled })}
-                    <div class="w-full xl:w-auto mt-4 xl:mt-0 flex gap-2 justify-end">
+            <div class="w-full xl:w-auto mt-4 xl:mt-0 flex flex-col sm:flex-row gap-2 justify-end">
+                <ExportDropdown
+                    icon={FileSpreadsheet}
+                    label="Exportar Excel"
+                    disabled={isExporting || isLoading || filteredEnlaces.length === 0}
+                    menuWidth="w-64"
+                >
+                    {#snippet items()}
+                        <ExportMenuItem
+                            icon={FileSpreadsheet}
+                            label="Exportar (Filtro actual)"
+                            onclick={handleExport}
+                        />
+                    {/snippet}
+                </ExportDropdown>
+                <PermissionGuard requireEdit>
+                    {#snippet children({ disabled })}
                         <Button
                             variant="secondary"
                             class="flex items-center justify-center gap-2 h-10 px-4 rounded-xl"
@@ -471,9 +521,9 @@
                             <Contact size={18} />
                             Asignar Enlace
                         </Button>
-                    </div>
-                {/snippet}
-            </PermissionGuard>
+                    {/snippet}
+                </PermissionGuard>
+            </div>
         {/snippet}
     </SectionHeader>
 

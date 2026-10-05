@@ -17,6 +17,10 @@ export { exportCardsToExcel } from './xlsxCards';
 
 export { exportHistoryToExcel } from './xlsxHistory';
 
+export type { EnlacesExportRow, EnlacesExportFilters } from './xlsxEnlaces';
+
+export { exportEnlacesToExcel } from './xlsxEnlaces';
+
 export type { CardlessRegistryExportRow, CardlessRegistryExportFilters } from './xlsxRegistry';
 
 export { exportCardlessRegistryToExcel } from './xlsxRegistry';
