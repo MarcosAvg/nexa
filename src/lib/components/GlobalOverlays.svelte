@@ -25,16 +25,16 @@
 
     let selectedPerson = $derived.by(() => {
         if (!selectedPersonId) return null;
-        const pInStore = personnelState.pagination.items.find((p) => p.id === selectedPersonId);
-        if (pInStore) return pInStore;
+        // Preferir el detalle completo recién cargado (medios + accesos).
         if (fetchedPerson && fetchedPerson.id === selectedPersonId) return fetchedPerson;
-        return null;
+        return personnelState.pagination.items.find((p) => p.id === selectedPersonId) ?? null;
     });
 
     $effect(() => {
+        // Al abrir el panel se carga SIEMPRE el detalle completo por id, para no
+        // depender del item del listado (que puede venir recortado por filtros).
         if (isDetailsOpen && selectedPersonId) {
-            const pInStore = personnelState.pagination.items.find((p) => p.id === selectedPersonId);
-            if (!pInStore && (!fetchedPerson || fetchedPerson.id !== selectedPersonId)) {
+            if (!fetchedPerson || fetchedPerson.id !== selectedPersonId) {
                 personnelService
                     .fetchById(selectedPersonId)
                     .then((p) => {
@@ -42,6 +42,8 @@
                     })
                     .catch(console.error);
             }
+        } else if (!isDetailsOpen) {
+            fetchedPerson = null;
         }
     });
 

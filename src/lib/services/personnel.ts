@@ -376,14 +376,21 @@ export const personnelService = {
 
                 const hasNoneMedia = mediaTypeIds.includes('__none__');
                 const realMediaIds = mediaTypeIds.filter((id) => id !== '__none__');
-                const mediaRelation =
-                    realMediaIds.length > 0 && !hasNoneMedia
-                        ? 'access_media!inner(id, identifier, status, programming_status, responsiva_status, access_media_types(name, has_floors, requires_responsiva))'
-                        : 'access_media!left(id, identifier, status, programming_status, responsiva_status, access_media_types(name, has_floors, requires_responsiva))';
+                // El embed de visualización va SIEMPRE sin filtro: cada persona
+                // conserva todos sus medios aunque se filtre por uno.
+                const mediaDisplay: string =
+                    'access_media!left(id, identifier, status, programming_status, responsiva_status, access_media_types(name, has_floors, requires_responsiva))';
+                // El embed con alias gobierna el match de personas sin recortar el anterior.
+                const mediaFilterRelation: string =
+                    mediaTypeIds.length === 0
+                        ? ''
+                        : hasNoneMedia
+                          ? ', mf:access_media!left(media_type_id)'
+                          : ', mf:access_media!inner(media_type_id)';
                 let query = supabase.from('personnel_with_status').select(
                     // El listado no usa `access_assignments` (solo detalles/export),
                     // así que se omite para no encarecer la consulta de página.
-                    `*, ${mediaRelation}`,
+                    `*, ${mediaDisplay}${mediaFilterRelation}`,
                     { count: 'exact' },
                 );
 
@@ -400,13 +407,16 @@ export const personnelService = {
                 if (floors.length > 0) query = query.or(orWithNone('floor', floors));
                 if (mediaTypeIds.length > 0) {
                     if (hasNoneMedia && realMediaIds.length > 0) {
-                        query = query.or(`id.is.null,media_type_id.in.${postgrestInList(realMediaIds)}`, {
-                            foreignTable: 'access_media',
-                        });
+                        query = query.or(
+                            `media_type_id.is.null,media_type_id.in.${postgrestInList(realMediaIds)}`,
+                            {
+                                foreignTable: 'mf',
+                            },
+                        );
                     } else if (hasNoneMedia) {
-                        query = query.is('access_media.id', null);
+                        query = query.is('mf.media_type_id', null);
                     } else {
-                        query = query.in('access_media.media_type_id', realMediaIds);
+                        query = query.in('mf.media_type_id', realMediaIds);
                     }
                 }
 
@@ -429,7 +439,10 @@ export const personnelService = {
                     );
                 }
 
-                const result = { data: (data || []).map((p) => mapPersonRecord(p)), count: count || 0 };
+                const result = {
+                    data: ((data || []) as unknown as PersonnelRow[]).map((p) => mapPersonRecord(p)),
+                    count: count || 0,
+                };
                 await dbCache.save(cacheKey, result);
                 return result;
             },
@@ -462,6 +475,15 @@ export const personnelService = {
 
         const hasNoneMedia = mediaTypeIds.includes('__none__');
         const realMediaIds = mediaTypeIds.filter((id) => id !== '__none__');
+        // Visualización sin filtro + alias de filtrado (no recorta los medios mostrados).
+        const mediaDisplay =
+            'access_media!left(*, access_media_types(name, has_floors, requires_responsiva))';
+        const mediaFilterRelation =
+            mediaTypeIds.length === 0
+                ? ''
+                : hasNoneMedia
+                  ? ', mf:access_media!left(media_type_id)'
+                  : ', mf:access_media!inner(media_type_id)';
 
         // Construir query sin .range() — Supabase muta .range() in-place,
         // así que construimos una vez y encadenamos diferentes .range() por página en batchPaginate.
@@ -469,14 +491,10 @@ export const personnelService = {
             let q: any = supabase.from('personnel');
 
             if (withCount) {
-                q = q.select('*', { count: 'exact', head: true });
+                q = q.select(`*${mediaFilterRelation}`, { count: 'exact', head: true });
             } else {
-                const mediaRelation =
-                    realMediaIds.length > 0 && !hasNoneMedia
-                        ? 'access_media!inner(*, access_media_types(name, has_floors, requires_responsiva))'
-                        : 'access_media!left(*, access_media_types(name, has_floors, requires_responsiva))';
                 q = q.select(
-                    `*, ${mediaRelation}, access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name))), buildings(name), dependencies(name), schedules(*)`,
+                    `*, ${mediaDisplay}${mediaFilterRelation}, access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name))), buildings(name), dependencies(name), schedules(*)`,
                 );
             }
 
@@ -502,13 +520,13 @@ export const personnelService = {
             if (floors.length > 0) q = q.or(orWithNone('floor', floors));
             if (mediaTypeIds.length > 0) {
                 if (hasNoneMedia && realMediaIds.length > 0) {
-                    q = q.or(`id.is.null,media_type_id.in.${postgrestInList(realMediaIds)}`, {
-                        foreignTable: 'access_media',
+                    q = q.or(`media_type_id.is.null,media_type_id.in.${postgrestInList(realMediaIds)}`, {
+                        foreignTable: 'mf',
                     });
                 } else if (hasNoneMedia) {
-                    q = q.is('access_media.id', null);
+                    q = q.is('mf.media_type_id', null);
                 } else {
-                    q = q.in('access_media.media_type_id', realMediaIds);
+                    q = q.in('mf.media_type_id', realMediaIds);
                 }
             }
 
@@ -579,16 +597,22 @@ export const personnelService = {
                 const needsClientStatusFilter = !onlyDbStatuses && expandedStatuses.length > 0;
                 const hasNoneMedia = mediaTypeIds.includes('__none__');
                 const realMediaIds = mediaTypeIds.filter((id) => id !== '__none__');
+                // Visualización sin filtro + alias de filtrado (la exportación
+                // incluye todos los medios de cada persona, no solo el filtrado).
+                const mediaDisplay =
+                    'access_media!left(*, access_media_types(name, has_floors, requires_responsiva))';
+                const mediaFilterRelation =
+                    mediaTypeIds.length === 0
+                        ? ''
+                        : hasNoneMedia
+                          ? ', mf:access_media!left(media_type_id)'
+                          : ', mf:access_media!inner(media_type_id)';
 
                 const allData = await batchPaginate<any>(async (from, to) => {
-                    const mediaRelation =
-                        realMediaIds.length > 0 && !hasNoneMedia
-                            ? 'access_media!inner(*, access_media_types(name, has_floors, requires_responsiva))'
-                            : 'access_media!left(*, access_media_types(name, has_floors, requires_responsiva))';
                     let q = supabase
                         .from('personnel')
                         .select(
-                            `*, ${mediaRelation}, access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name))), buildings(name), dependencies(name), schedules(*)`,
+                            `*, ${mediaDisplay}${mediaFilterRelation}, access_assignments(media_type_id, access_media_types(id, key, name), access_assignment_permissions(resource_type, floors(label), special_accesses(name))), buildings(name), dependencies(name), schedules(*)`,
                         );
                     if (onlyDbStatuses)
                         q = q.in(
@@ -600,13 +624,16 @@ export const personnelService = {
                     if (floors.length > 0) q = q.or(orWithNone('floor', floors));
                     if (mediaTypeIds.length > 0) {
                         if (hasNoneMedia && realMediaIds.length > 0) {
-                            q = q.or(`id.is.null,media_type_id.in.${postgrestInList(realMediaIds)}`, {
-                                foreignTable: 'access_media',
-                            });
+                            q = q.or(
+                                `media_type_id.is.null,media_type_id.in.${postgrestInList(realMediaIds)}`,
+                                {
+                                    foreignTable: 'mf',
+                                },
+                            );
                         } else if (hasNoneMedia) {
-                            q = q.is('access_media.id', null);
+                            q = q.is('mf.media_type_id', null);
                         } else {
-                            q = q.in('access_media.media_type_id', realMediaIds);
+                            q = q.in('mf.media_type_id', realMediaIds);
                         }
                     }
                     return q.order('first_name', { ascending: true }).range(from, to);
