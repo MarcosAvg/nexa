@@ -2,9 +2,27 @@ import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { readFileSync } from 'fs';
+
+/**
+ * Build-time del bundle actual, leído del `public/build-info.json` generado en
+ * `prebuild`/`predev`. Se inyecta como `__BUILD_TIME__` para que la app compare
+ * contra el archivo del servidor sin depender de la caché HTTP.
+ */
+function readLocalBuildTime(): string {
+    try {
+        const raw = readFileSync(new URL('./public/build-info.json', import.meta.url), 'utf-8');
+        return (JSON.parse(raw).buildTime as string) ?? '';
+    } catch {
+        return '';
+    }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
+    define: {
+        __BUILD_TIME__: JSON.stringify(readLocalBuildTime()),
+    },
     build: {
         // Separa vendors grandes en chunks propios para mejorar el cacheo.
         rollupOptions: {
@@ -27,7 +45,10 @@ export default defineConfig({
         svelte(),
         tailwindcss(),
         VitePWA({
-            registerType: 'autoUpdate',
+            // Modo manual: el SW nuevo queda en espera hasta que el usuario pulsa
+            // "Recargar ahora". Evita que un SW nuevo limpie el precache viejo
+            // mientras la página aún ejecuta el JS anterior (chunks rotos).
+            registerType: 'prompt',
             workbox: {
                 maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
                 cleanupOutdatedCaches: true,

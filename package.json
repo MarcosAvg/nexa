@@ -23,11 +23,10 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
-        "postbuild": "node scripts/generate-build-info.js",
         "predev": "node scripts/generate-build-info.js && node scripts/generate-modules.mjs",
         "preview": "vite preview",
         "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
-        "prebuild": "node scripts/generate-modules.mjs",
+        "prebuild": "node scripts/generate-modules.mjs && node scripts/generate-build-info.js",
         "lint": "eslint .",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
