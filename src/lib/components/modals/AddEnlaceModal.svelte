@@ -69,7 +69,7 @@
     }
 
     async function handleSave() {
-        if (!selectedPersonId || !extension.trim() || isSubmitting) return;
+        if (!selectedPersonId || isSubmitting) return;
 
         isSubmitting = true;
         try {
@@ -161,7 +161,7 @@
 
         <div class="space-y-1">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1"
-                >Extensión Telefónica</span
+                >Extensión Telefónica (opcional)</span
             >
             <Input
                 type="text"
@@ -176,12 +176,7 @@
 
     {#snippet footer()}
         <Button variant="ghost" onclick={reset}>Cancelar</Button>
-        <Button
-            variant="primary"
-            onclick={handleSave}
-            disabled={!selectedPersonId || !extension.trim()}
-            loading={isSubmitting}
-        >
+        <Button variant="primary" onclick={handleSave} disabled={!selectedPersonId} loading={isSubmitting}>
             <UserPlus size={16} class="mr-2" />
             Asignar
         </Button>

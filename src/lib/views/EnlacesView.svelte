@@ -18,6 +18,7 @@
         AddEnlaceModal,
         EditEnlaceModal,
         IconButton,
+        Badge,
     } from '../components';
     import { catalogState } from '../stores';
     import { pullRefresh } from '../stores';
@@ -252,6 +253,12 @@
         }
         window.location.href = `mailto:?bcc=${emails.join(',')}`;
     }
+
+    /** ¿El valor está vacío o sin dato? */
+    function isMissing(value: unknown): boolean {
+        const s = value == null ? '' : String(value).trim();
+        return s === '' || s.toUpperCase() === 'N/A';
+    }
 </script>
 
 {#snippet renderName(row: Enlace)}
@@ -263,8 +270,12 @@
 {#snippet renderDependency(row: Enlace)}
     {@const depId = (row.personnel as any)?.dependency_id}
     {@const dep = dependencies.find((d) => d.id === depId)}
-    <div class="flex flex-col">
-        <span class="font-medium text-slate-900">{dep ? dep.name : 'N/A'}</span>
+    <div class="flex flex-col items-start gap-0.5">
+        {#if dep}
+            <span class="font-medium text-slate-900">{dep.name}</span>
+        {:else}
+            <Badge variant="amber">Sin dato</Badge>
+        {/if}
         {#if row.building || row.floor}
             <span class="text-xs text-slate-500"
                 >{row.building || ''}{row.building && row.floor ? ` (${row.floor})` : ''}</span
@@ -274,11 +285,19 @@
 {/snippet}
 
 {#snippet renderEmail(row: Enlace)}
-    <span>{row.personnel?.email || 'N/A'}</span>
+    {#if isMissing(row.personnel?.email)}
+        <Badge variant="amber">Sin dato</Badge>
+    {:else}
+        <span>{row.personnel?.email}</span>
+    {/if}
 {/snippet}
 
 {#snippet renderExtension(row: Enlace)}
-    <span>{row.extension || 'N/A'}</span>
+    {#if isMissing(row.extension)}
+        <Badge variant="amber">Sin dato</Badge>
+    {:else}
+        <span>{row.extension}</span>
+    {/if}
 {/snippet}
 
 {#snippet rowActions(row: Enlace)}
@@ -349,7 +368,7 @@
             {@render renderDependency(r)}
         {/snippet}
         {#snippet trailing(r: Enlace)}
-            <span class="text-xs font-bold text-slate-500">{r.extension || 'N/A'}</span>
+            {@render renderExtension(r)}
         {/snippet}
         {#snippet details(r: Enlace)}
             <div class="space-y-3 text-sm">

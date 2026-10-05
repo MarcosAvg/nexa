@@ -1,7 +1,7 @@
 create table "public"."enlaces" (
   "id"         uuid                     not null default gen_random_uuid(),
   "person_id"  uuid                     not null,
-  "extension"  text                     not null,
+  "extension"  text,
   "created_at" timestamp with time zone default now(),
   constraint "enlaces_person_id_key" unique (person_id),
   constraint "enlaces_pkey" primary key (id),

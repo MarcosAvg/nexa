@@ -40,9 +40,10 @@ export const enlaceService = {
 
     async add(personId: string, extension: string): Promise<Enlace> {
         return withErrorHandling(async () => {
+            const ext = extension?.trim() ? extension.trim() : null;
             const { data, error } = await supabase
                 .from('enlaces')
-                .insert([{ person_id: personId, extension }])
+                .insert([{ person_id: personId, extension: ext }])
                 .select(
                     `
                     id, 
@@ -68,7 +69,7 @@ export const enlaceService = {
 
             const personnelData: any = data.personnel;
             await HistoryService.log('ENLACE', data.id, 'CREATE', {
-                message: `Enlace administrativo asignado (Ext: ${extension})`,
+                message: `Enlace administrativo asignado (Ext: ${ext || 'sin extensión'})`,
                 entityName: `Enlace: ${personnelData.first_name} ${personnelData.last_name}`,
             });
 
@@ -78,9 +79,10 @@ export const enlaceService = {
 
     async update(id: string, extension: string, personName: string) {
         return withErrorHandling(async () => {
+            const ext = extension?.trim() ? extension.trim() : null;
             const { data, error } = await supabase
                 .from('enlaces')
-                .update({ extension })
+                .update({ extension: ext })
                 .eq('id', id)
                 .select()
                 .single();
@@ -88,7 +90,7 @@ export const enlaceService = {
             if (error) throw error;
 
             await HistoryService.log('ENLACE', id, 'UPDATE', {
-                message: `Extensión actualizada a "${extension}"`,
+                message: `Extensión actualizada a "${ext ?? 'sin extensión'}"`,
                 entityName: `Enlace: ${personName}`,
             });
 

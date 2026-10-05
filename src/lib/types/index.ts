@@ -1,7 +1,7 @@
 export interface Enlace {
     id: string;
     person_id: string;
-    extension: string;
+    extension: string | null;
     created_at: string;
     building?: string;
     floor?: string;
