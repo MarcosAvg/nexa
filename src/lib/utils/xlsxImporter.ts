@@ -222,6 +222,16 @@ function cellText(cell: ExcelJS.Cell): string {
         return `${dd}/${mo}/${y}`;
     }
 
+    // Hipervínculo ({ text, hyperlink }) o texto enriquecido ({ richText }).
+    // Sin este trato, `String(objeto)` producía "[object Object]".
+    if (typeof v === 'object') {
+        const link = (v as { hyperlink?: string }).hyperlink;
+        const text = (v as { text?: string }).text ?? (cell as unknown as { text?: string }).text ?? '';
+        // Para enlaces de correo, preferir la dirección del hipervínculo.
+        if (typeof link === 'string' && link.includes('@')) return link.trim();
+        return String(text).trim();
+    }
+
     return String(v).trim();
 }
 
