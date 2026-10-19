@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="nexa-gradient" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2563eb" />
+      <stop offset="1" stop-color="#4338ca" />
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#nexa-gradient)" />
+  <path d="M512 246 L742 379 L742 645 L512 778 L282 645 L282 379 Z"
+        fill="none" stroke="#ffffff" stroke-width="64" stroke-linejoin="round" />
+</svg>

@@ -76,7 +76,13 @@ export default defineConfig({
                 // y el Cache Storage de Workbox no varía por cabeceras, lo que provocaría
                 // fuga de datos entre usuarios en un dispositivo compartido.
             },
-            includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'maskable-icon-512x512.png'],
+            includeAssets: [
+                'favicon.svg',
+                'favicon.ico',
+                'apple-touch-icon.png',
+                'mask-icon.svg',
+                'maskable-icon-512x512.png',
+            ],
             // Habilitar SW en modo dev para que el prompt de instalación funcione en localhost
             devOptions: {
                 enabled: true,
@@ -113,12 +119,6 @@ export default defineConfig({
                 ],
                 icons: [
                     {
-                        src: 'favicon.svg',
-                        sizes: 'any',
-                        type: 'image/svg+xml',
-                        purpose: 'any',
-                    },
-                    {
                         src: 'pwa-192x192.png',
                         sizes: '192x192',
                         type: 'image/png',
@@ -135,6 +135,12 @@ export default defineConfig({
                         sizes: '512x512',
                         type: 'image/png',
                         purpose: 'maskable',
+                    },
+                    {
+                        src: 'monochrome-icon-512x512.png',
+                        sizes: '512x512',
+                        type: 'image/png',
+                        purpose: 'monochrome',
                     },
                 ],
                 shortcuts: [

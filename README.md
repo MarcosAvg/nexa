@@ -121,6 +121,8 @@ supabase/
 | `npm run format` / `npm run format:check` | Formateo con Prettier |
 | `npm run test` | Tests E2E (Playwright; se auto-skip sin credenciales) |
 | `npm run db:setup` / `npm run db:reset` | Bootstrap del esquema vía CLI de Supabase |
+| `./scripts/generate-icons.sh` | Regenera los iconos PWA/app desde los SVG maestros en `scripts/icons/` |
+| `./scripts/check-icons.sh` | Valida tamaños, transparencia y zona segura de los iconos |
 
 ## ⚠️ Aviso y descargo de responsabilidad
 
