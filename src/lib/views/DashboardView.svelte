@@ -6,6 +6,7 @@
         historyState,
         mediaState,
         settingsState,
+        catalogState,
     } from '../stores';
     import { pullRefresh } from '../stores';
     import {
@@ -18,6 +19,7 @@
         Collapsible,
         DataList,
         BottomSheet,
+        Select,
     } from '../components';
     import {
         CreditCard,
@@ -36,6 +38,7 @@
         Calendar,
         Inbox,
         Download,
+        SlidersHorizontal,
     } from 'lucide-svelte';
     import { onMount } from 'svelte';
     import { push } from 'svelte-spa-router';
@@ -90,6 +93,15 @@
     let showGrowthSheet = $state(false);
     let growthLoaded = $state(false);
     let growthExporting = $state(false);
+    let growthMediaTypeOptions = $derived(
+        catalogState.mediaTypes
+            .filter((media) => media.active !== false)
+            .map((media) => ({ value: String(media.id), label: media.name })),
+    );
+    let growthMediaTypeName = $derived(
+        growthMediaTypeOptions.find((option) => option.value === personnelState.growthMediaTypeId)?.label ??
+            '',
+    );
 
     function ensureGrowth() {
         if (growthLoaded) return;
@@ -135,8 +147,12 @@
         if (p < 75) return 'orange';
         return 'emerald';
     }
-    function applyGrowthRange() {
+    function applyGrowthFilters() {
         personnelState.refreshDashboardGrowth();
+    }
+    function applyGrowthMediaType(event: Event) {
+        personnelState.growthMediaTypeId = (event.currentTarget as HTMLSelectElement).value;
+        applyGrowthFilters();
     }
     function resetGrowthToCreation() {
         personnelState.growthStartDate = '';
@@ -153,6 +169,7 @@
             const { exportDashboardGrowthToExcel } = await import('../utils/xlsxGrowth');
             await exportDashboardGrowthToExcel(personnelState.growth, {
                 orgName: settingsState.orgName,
+                mediaTypeName: growthMediaTypeName,
             });
             toast.success('Excel descargado', { id: loadingToast });
         } catch (error) {
@@ -863,7 +880,7 @@
             <!-- Crecimiento (móvil: 6 · desktop: 6) -->
             <Collapsible
                 title="Crecimiento de Personal"
-                subtitle="Incremento de plantilla por rango de fechas"
+                subtitle="Incremento de plantilla por rango de fechas y tipo de tarjeta"
                 icon={TrendingUp}
                 iconBgClass="bg-emerald-50 text-emerald-600"
                 class="max-lg:order-6 lg:order-6 lg:col-span-3"
@@ -883,7 +900,7 @@
                                 type="date"
                                 bind:value={personnelState.growthStartDate}
                                 min={growth.minCreatedAt ?? undefined}
-                                onchange={applyGrowthRange}
+                                onchange={applyGrowthFilters}
                                 class="h-9"
                             />
                         </div>
@@ -898,7 +915,22 @@
                                 type="date"
                                 bind:value={personnelState.growthEndDate}
                                 min={personnelState.growthStartDate || undefined}
-                                onchange={applyGrowthRange}
+                                onchange={applyGrowthFilters}
+                                class="h-9"
+                            />
+                        </div>
+                        <div class="w-44">
+                            <label
+                                for="growth-media"
+                                class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1 ml-1"
+                                ><CreditCard size={12} /> Tipo de tarjeta</label
+                            >
+                            <Select
+                                id="growth-media"
+                                bind:value={personnelState.growthMediaTypeId}
+                                options={growthMediaTypeOptions}
+                                placeholder="Todos los tipos"
+                                onchange={applyGrowthMediaType}
                                 class="h-9"
                             />
                         </div>
@@ -921,7 +953,7 @@
                             class="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-slate-100 text-slate-600 text-[11px] font-bold active:scale-95 transition-all"
                             onclick={() => (showGrowthSheet = true)}
                         >
-                            <Calendar size={14} /> Rango de fechas
+                            <SlidersHorizontal size={14} /> Filtros
                         </button>
                         <Button
                             variant="soft-emerald"
@@ -943,7 +975,9 @@
                         <div
                             class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.14em] mb-0.5"
                         >
-                            Total de personal
+                            {growthMediaTypeName
+                                ? `Personal con ${growthMediaTypeName}`
+                                : 'Total de personal'}
                         </div>
                         <div class="text-3xl font-black text-slate-900 tabular-nums">
                             {growth.totals.final}
@@ -1225,7 +1259,7 @@
     {/if}
 
     <!-- Filtros de crecimiento (móvil) -->
-    <BottomSheet bind:isOpen={showGrowthSheet} title="Rango de fechas">
+    <BottomSheet bind:isOpen={showGrowthSheet} title="Filtros de crecimiento">
         <div class="flex flex-col gap-4">
             <div>
                 <label
@@ -1238,7 +1272,7 @@
                     type="date"
                     bind:value={personnelState.growthStartDate}
                     min={growth.minCreatedAt ?? undefined}
-                    onchange={applyGrowthRange}
+                    onchange={applyGrowthFilters}
                 />
             </div>
             <div>
@@ -1252,7 +1286,21 @@
                     type="date"
                     bind:value={personnelState.growthEndDate}
                     min={personnelState.growthStartDate || undefined}
-                    onchange={applyGrowthRange}
+                    onchange={applyGrowthFilters}
+                />
+            </div>
+            <div>
+                <label
+                    for="growth-media-m"
+                    class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-1"
+                    ><CreditCard size={12} /> Tipo de tarjeta</label
+                >
+                <Select
+                    id="growth-media-m"
+                    bind:value={personnelState.growthMediaTypeId}
+                    options={growthMediaTypeOptions}
+                    placeholder="Todos los tipos"
+                    onchange={applyGrowthMediaType}
                 />
             </div>
             <Button variant="soft-slate" class="w-full" onclick={resetGrowthToCreation}>Desde creación</Button

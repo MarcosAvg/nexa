@@ -95,11 +95,17 @@ function fileSlug(value: string): string {
         .replace(/^_+|_+$/g, '');
 }
 
-/** Nombre del archivo: incluye organización y periodo cuando están disponibles. */
-export function growthExportFileName(growth: DashboardGrowth, orgName: string): string {
+/** Nombre del archivo: incluye organización, tipo de tarjeta y periodo. */
+export function growthExportFileName(
+    growth: DashboardGrowth,
+    orgName: string,
+    mediaTypeName?: string,
+): string {
     const parts = ['Crecimiento', 'Personal'];
     const org = fileSlug(orgName);
     if (org) parts.push(org);
+    const media = fileSlug(mediaTypeName || '');
+    if (media) parts.push(media);
     const start = growth.startDate ?? new Date().toISOString().split('T')[0];
     const end = growth.endDate ?? new Date().toISOString().split('T')[0];
     parts.push(start, end);

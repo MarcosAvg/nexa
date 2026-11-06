@@ -1,11 +1,14 @@
--- Dashboard: crecimiento de personal por rango de fechas.
+-- Dashboard: crecimiento de personal por rango de fechas y tipo de tarjeta.
 -- Incremento = plantilla final - plantilla inicial (solo altas por ahora, vía created_at).
 -- Porcentaje = incremento / plantilla inicial * 100 (null si inicial = 0).
 -- Desglose por: totales, dependencia (con sus edificios), edificio y piso (agrupado por edificio).
+-- Si p_media_type_id es null se considera todo el personal; si no, solo quienes
+-- tienen asignada al menos una tarjeta de ese tipo.
 
 create or replace function public.get_dashboard_growth(
     p_start_date date default null,
-    p_end_date date default null
+    p_end_date date default null,
+    p_media_type_id uuid default null
 )
   returns json
   language plpgsql
@@ -34,9 +37,16 @@ begin
     into totals
     from (
         select
-            count(*) filter (where created_at < v_start) as initial,
-            count(*) filter (where created_at < (v_end + interval '1 day')) as final
-        from personnel
+            count(*) filter (where p.created_at < v_start) as initial,
+            count(*) filter (where p.created_at < (v_end + interval '1 day')) as final
+        from personnel p
+        where p_media_type_id is null
+           or exists (
+               select 1
+               from access_media am
+               where am.person_id = p.id
+                 and am.media_type_id = p_media_type_id
+           )
     ) t;
 
     select coalesce(json_agg(x order by x.sort_order, x.name), '[]'::json)
@@ -56,6 +66,15 @@ begin
                    ) as buildings
             from dependencies d
             left join personnel p on p.dependency_id = d.id
+                 and (
+                     p_media_type_id is null
+                     or exists (
+                         select 1
+                         from access_media am
+                         where am.person_id = p.id
+                           and am.media_type_id = p_media_type_id
+                     )
+                 )
             left join buildings b on b.id = p.building_id
             group by d.id, d.name, d.sort_order
         ) t
@@ -73,6 +92,15 @@ begin
                    count(p.id) filter (where p.created_at < (v_end + interval '1 day')) as final
             from buildings b
             left join personnel p on p.building_id = b.id
+                 and (
+                     p_media_type_id is null
+                     or exists (
+                         select 1
+                         from access_media am
+                         where am.person_id = p.id
+                           and am.media_type_id = p_media_type_id
+                     )
+                 )
             group by b.id, b.name, b.sort_order
         ) t
     ) x;
@@ -93,6 +121,15 @@ begin
             join buildings b on b.id = fl.building_id
             left join personnel p on p.building_id = fl.building_id
                  and lower(coalesce(p.floor, '')) = lower(coalesce(fl.label, ''))
+                 and (
+                     p_media_type_id is null
+                     or exists (
+                         select 1
+                         from access_media am
+                         where am.person_id = p.id
+                           and am.media_type_id = p_media_type_id
+                     )
+                 )
             group by b.id, b.name, b.sort_order, fl.id, fl.label, fl.sort_order
         ) t
     ) x;
@@ -109,5 +146,5 @@ begin
 end;
 $function$;
 
-grant execute on function "public"."get_dashboard_growth"(date, date) to "authenticated", "postgres", "service_role";
-revoke all on function "public"."get_dashboard_growth"(date, date) from public;
+grant execute on function "public"."get_dashboard_growth"(date, date, uuid) to "authenticated", "postgres", "service_role";
+revoke all on function "public"."get_dashboard_growth"(date, date, uuid) from public;

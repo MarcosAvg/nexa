@@ -48,11 +48,11 @@ describe('utils/xlsxGrowth', () => {
     it('genera un libro con resumen y una hoja por corte, incluyendo edificios de la dependencia', async () => {
         const { buffer, filename } = await exportDashboardGrowthToExcel(
             growth,
-            { orgName: 'Gobierno de Nuevo León' },
+            { orgName: 'Gobierno de Nuevo León', mediaTypeName: 'KONE' },
             true,
         );
 
-        expect(filename).toBe('Crecimiento_Personal_Gobierno_de_Nuevo_Leon_2026-01-01_2026-11-06.xlsx');
+        expect(filename).toBe('Crecimiento_Personal_Gobierno_de_Nuevo_Leon_KONE_2026-01-01_2026-11-06.xlsx');
 
         const ExcelJS = (await import('exceljs')).default;
         const workbook = new ExcelJS.Workbook();
@@ -66,6 +66,7 @@ describe('utils/xlsxGrowth', () => {
         ]);
 
         const summarySheet = workbook.getWorksheet('Resumen general');
+        expect(String(summarySheet?.getCell('A2').value)).toContain('Tipo de tarjeta: KONE');
         expect(summarySheet?.getCell('B5').value).toBe(100);
         expect(summarySheet?.getCell('B6').value).toBe(125);
         expect(summarySheet?.getCell('B7').value).toBe(25);

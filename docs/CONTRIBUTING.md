@@ -1861,7 +1861,7 @@ Secciones:
 4. **Calidad de Datos:** % de campos incompletos (email, horario, puesto, área)
 5. **Dependencias:** Ranking con barras de activos
 6. **Edificios:** Ranking con barras de ocupación
-7. **Crecimiento de Personal:** rango de fechas, total y desglose por edificio/dependencia/piso. Exportable a Excel con una hoja por corte (`xlsxGrowth.ts`).
+7. **Crecimiento de Personal:** rango de fechas y filtro por tipo de tarjeta, total y desglose por edificio/dependencia/piso. Exportable a Excel con una hoja por corte (`xlsxGrowth.ts`).
 
 Usa `personnelState.dashboardMetrics` y `personnelState.dashboardStats`. Se actualiza con eventos `PERSONNEL_CHANGED` y `CARDS_CHANGED`.
 

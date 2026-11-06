@@ -128,9 +128,12 @@ describe('utils/growthExportRows', () => {
         });
     });
 
-    it('genera un nombre de archivo con organización y periodo', () => {
+    it('genera un nombre de archivo con organización, tipo de tarjeta y periodo', () => {
         expect(growthExportFileName(growth, 'Gobierno de Nuevo León')).toBe(
             'Crecimiento_Personal_Gobierno_de_Nuevo_Leon_2026-01-01_2026-11-06.xlsx',
+        );
+        expect(growthExportFileName(growth, 'Gobierno de Nuevo León', 'KONE')).toBe(
+            'Crecimiento_Personal_Gobierno_de_Nuevo_Leon_KONE_2026-01-01_2026-11-06.xlsx',
         );
     });
 });

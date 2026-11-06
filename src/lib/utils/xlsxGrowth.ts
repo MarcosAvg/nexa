@@ -86,10 +86,16 @@ function writeTable<T>(
 export interface GrowthExportOptions {
     /** Nombre de la organización mostrado en títulos y nombre del archivo. */
     orgName?: string;
+    /** Tipo de tarjeta aplicado como filtro (vacío = todos). */
+    mediaTypeName?: string;
 }
 
 function orgLabel(options?: GrowthExportOptions): string {
     return (options?.orgName || 'Nexa').toUpperCase();
+}
+
+function mediaFilterLabel(options?: GrowthExportOptions): string {
+    return `Tipo de tarjeta: ${options?.mediaTypeName || 'Todos'}`;
 }
 
 async function addSummarySheet(
@@ -104,6 +110,7 @@ async function addSummarySheet(
         `Plantilla inicial: ${summary.initial}`,
         `Plantilla final: ${summary.final}`,
         `Incremento: ${summary.increment >= 0 ? '+' : ''}${summary.increment}`,
+        mediaFilterLabel(options),
     ];
 
     await addTitleAndMetaRow({
@@ -169,7 +176,11 @@ async function addBuildingSheet(
         workbook,
         title: `CRECIMIENTO POR EDIFICIO - ${orgLabel(options)}`,
         lastCol: 'E',
-        metaLines: [`Periodo: ${growthPeriodLabel(growth)}`, `Edificios: ${rows.length}`],
+        metaLines: [
+            `Periodo: ${growthPeriodLabel(growth)}`,
+            `Edificios: ${rows.length}`,
+            mediaFilterLabel(options),
+        ],
     });
 
     writeTable(
@@ -207,7 +218,11 @@ async function addDependencySheet(
         workbook,
         title: `CRECIMIENTO POR DEPENDENCIA - ${orgLabel(options)}`,
         lastCol: 'F',
-        metaLines: [`Periodo: ${growthPeriodLabel(growth)}`, `Dependencias: ${rows.length}`],
+        metaLines: [
+            `Periodo: ${growthPeriodLabel(growth)}`,
+            `Dependencias: ${rows.length}`,
+            mediaFilterLabel(options),
+        ],
     });
 
     writeTable(
@@ -246,7 +261,11 @@ async function addFloorSheet(
         workbook,
         title: `CRECIMIENTO POR PISO - ${orgLabel(options)}`,
         lastCol: 'F',
-        metaLines: [`Periodo: ${growthPeriodLabel(growth)}`, `Pisos: ${rows.length}`],
+        metaLines: [
+            `Periodo: ${growthPeriodLabel(growth)}`,
+            `Pisos: ${rows.length}`,
+            mediaFilterLabel(options),
+        ],
     });
 
     writeTable(
@@ -298,6 +317,6 @@ export async function exportDashboardGrowthToExcel(
     await addDependencySheet(workbook, growth, options);
     await addFloorSheet(workbook, growth, options);
 
-    const filename = growthExportFileName(growth, options?.orgName || 'Nexa');
+    const filename = growthExportFileName(growth, options?.orgName || 'Nexa', options?.mediaTypeName);
     return saveWorkbook(workbook, filename, returnBuffer as false);
 }

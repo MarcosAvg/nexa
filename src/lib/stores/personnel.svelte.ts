@@ -75,6 +75,8 @@ export class PersonnelState {
     growthStartDate = $state('');
     /** Fecha de fin (YYYY-MM-DD). Vacío = hoy. */
     growthEndDate = $state('');
+    /** Tipo de tarjeta (access_media_types.id). Vacío = todos. */
+    growthMediaTypeId = $state('');
 
     /** Guardas para evitar llamadas concurrentes/duplicadas al dashboard. */
     private _metricsInFlight: Promise<void> | null = null;
@@ -190,7 +192,8 @@ export class PersonnelState {
             const { personnelService } = await import('../services/personnel');
             const startDate = this.growthStartDate || null;
             const endDate = this.growthEndDate || null;
-            this.growth = await personnelService.fetchDashboardGrowth(startDate, endDate);
+            const mediaTypeId = this.growthMediaTypeId || null;
+            this.growth = await personnelService.fetchDashboardGrowth(startDate, endDate, mediaTypeId);
         } catch (error) {
             // Manejar error de actualización de crecimiento silenciosamente
         } finally {

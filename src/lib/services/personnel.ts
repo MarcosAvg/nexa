@@ -1413,12 +1413,17 @@ export const personnelService = {
         );
     },
 
-    async fetchDashboardGrowth(startDate: string | null, endDate: string | null): Promise<DashboardGrowth> {
+    async fetchDashboardGrowth(
+        startDate: string | null,
+        endDate: string | null,
+        mediaTypeId: string | null = null,
+    ): Promise<DashboardGrowth> {
         return withErrorHandlingSafe(
             async () => {
                 const { data, error } = await supabase.rpc('get_dashboard_growth', {
                     p_start_date: startDate,
                     p_end_date: endDate,
+                    p_media_type_id: mediaTypeId,
                 });
                 if (error) throw error;
                 return data as DashboardGrowth;
