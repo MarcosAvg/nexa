@@ -202,6 +202,11 @@ export interface GrowthCategory extends GrowthDelta {
     sort_order?: number | null;
 }
 
+/** Crecimiento por dependencia, incluyendo los edificios donde tiene personal. */
+export interface GrowthDependency extends GrowthCategory {
+    buildings?: string[];
+}
+
 /** Crecimiento por piso, agrupado bajo su edificio. */
 export interface GrowthFloor extends GrowthDelta {
     buildingId: number;
@@ -218,7 +223,7 @@ export interface DashboardGrowth {
     endDate: string | null;
     minCreatedAt: string | null;
     totals: GrowthDelta;
-    byDependency: GrowthCategory[];
+    byDependency: GrowthDependency[];
     byBuilding: GrowthCategory[];
     byFloor: GrowthFloor[];
 }

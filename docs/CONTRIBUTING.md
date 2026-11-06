@@ -1084,6 +1084,7 @@ Usado en todas las vistas para búsqueda con debounce de 300ms.
 | `exportPersonnelToExcel` | `xlsxPersonnel.ts` | Exportar personal a Excel (columnas/KPIs por tipo de tarjeta vía `cardTypes`) |
 | `exportCardsToExcel` | `xlsxCards.ts` | Exportar tarjetas a Excel |
 | `exportHistoryToExcel` | `xlsxHistory.ts` | Exportar historial a Excel |
+| `exportDashboardGrowthToExcel` | `xlsxGrowth.ts` | Exportar crecimiento de personal (resumen + edificio + dependencia + piso) |
 | `exportResponsivasToExcel` | `xlsxResponsivas.ts` | Exportar responsivas a Excel |
 | `exportCardlessRegistryToExcel` | `xlsxRegistry.ts` | Exportar registro sin tarjeta |
 | `exportKoneUsageToExcel` | `xlsxKoneUsage.ts` | Exportar conteo KONE |
@@ -1860,6 +1861,7 @@ Secciones:
 4. **Calidad de Datos:** % de campos incompletos (email, horario, puesto, área)
 5. **Dependencias:** Ranking con barras de activos
 6. **Edificios:** Ranking con barras de ocupación
+7. **Crecimiento de Personal:** rango de fechas, total y desglose por edificio/dependencia/piso. Exportable a Excel con una hoja por corte (`xlsxGrowth.ts`).
 
 Usa `personnelState.dashboardMetrics` y `personnelState.dashboardStats`. Se actualiza con eventos `PERSONNEL_CHANGED` y `CARDS_CHANGED`.
 

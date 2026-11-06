@@ -1,7 +1,7 @@
 -- Dashboard: crecimiento de personal por rango de fechas.
 -- Incremento = plantilla final - plantilla inicial (solo altas por ahora, vía created_at).
 -- Porcentaje = incremento / plantilla inicial * 100 (null si inicial = 0).
--- Desglose por: totales, dependencia, edificio y piso (agrupado por edificio).
+-- Desglose por: totales, dependencia (con sus edificios), edificio y piso (agrupado por edificio).
 
 create or replace function public.get_dashboard_growth(
     p_start_date date default null,
@@ -44,13 +44,19 @@ begin
     from (
         select id, name, sort_order, initial, final,
                (final - initial) as increment,
-               case when initial = 0 then null else round((final - initial) * 100.0 / initial, 1) end as percent
+               case when initial = 0 then null else round((final - initial) * 100.0 / initial, 1) end as percent,
+               buildings
         from (
             select d.id, d.name, d.sort_order,
                    count(p.id) filter (where p.created_at < v_start) as initial,
-                   count(p.id) filter (where p.created_at < (v_end + interval '1 day')) as final
+                   count(p.id) filter (where p.created_at < (v_end + interval '1 day')) as final,
+                   coalesce(
+                       json_agg(DISTINCT b.name ORDER BY b.name) filter (where b.name is not null),
+                       '[]'::json
+                   ) as buildings
             from dependencies d
             left join personnel p on p.dependency_id = d.id
+            left join buildings b on b.id = p.building_id
             group by d.id, d.name, d.sort_order
         ) t
     ) x;

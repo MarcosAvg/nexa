@@ -1,5 +1,12 @@
 <script lang="ts">
-    import { personnelState, ticketState, userState, historyState, mediaState } from '../stores';
+    import {
+        personnelState,
+        ticketState,
+        userState,
+        historyState,
+        mediaState,
+        settingsState,
+    } from '../stores';
     import { pullRefresh } from '../stores';
     import {
         Card,
@@ -28,10 +35,13 @@
         TrendingUp,
         Calendar,
         Inbox,
+        Download,
     } from 'lucide-svelte';
     import { onMount } from 'svelte';
     import { push } from 'svelte-spa-router';
+    import { toast } from 'svelte-sonner';
     import { mediaTypeBarClasses, mediaTypeStockClasses } from '../utils/mediaTypeAppearance';
+    import { handleError } from '../utils';
     import { timeAgo, fullName } from '../utils/format';
     import { DASHBOARD_EXCLUDED_TICKET_TYPES } from '../constants/tickets';
     import { PERSONNEL_STATUS_META } from '../constants/status';
@@ -79,6 +89,7 @@
     let growthTab = $state<'edificio' | 'dependencia' | 'piso'>('edificio');
     let showGrowthSheet = $state(false);
     let growthLoaded = $state(false);
+    let growthExporting = $state(false);
 
     function ensureGrowth() {
         if (growthLoaded) return;
@@ -130,6 +141,26 @@
     function resetGrowthToCreation() {
         personnelState.growthStartDate = '';
         personnelState.refreshDashboardGrowth();
+    }
+    async function handleExportGrowth() {
+        if (growthExporting) return;
+        growthExporting = true;
+        const loadingToast = toast.loading('Generando Excel...');
+        try {
+            // Asegura que el archivo use el mismo rango de fechas que el indicador.
+            growthLoaded = true;
+            await personnelState.refreshDashboardGrowth();
+            const { exportDashboardGrowthToExcel } = await import('../utils/xlsxGrowth');
+            await exportDashboardGrowthToExcel(personnelState.growth, {
+                orgName: settingsState.orgName,
+            });
+            toast.success('Excel descargado', { id: loadingToast });
+        } catch (error) {
+            toast.dismiss(loadingToast);
+            handleError(error, 'Exportar Crecimiento de Personal');
+        } finally {
+            growthExporting = false;
+        }
     }
 
     // Tickets: desglose por prioridad + urgentes (solo operativos)
@@ -874,14 +905,35 @@
                         <Button variant="soft-slate" size="sm" onclick={resetGrowthToCreation}
                             >Desde creación</Button
                         >
+                        <Button
+                            variant="soft-emerald"
+                            size="sm"
+                            class="gap-1.5"
+                            onclick={handleExportGrowth}
+                            loading={growthExporting}
+                        >
+                            <Download size={14} /> Exportar Excel
+                        </Button>
                     </div>
-                    <button
-                        type="button"
-                        class="lg:hidden flex items-center gap-1.5 px-3 h-9 rounded-xl bg-slate-100 text-slate-600 text-[11px] font-bold active:scale-95 transition-all"
-                        onclick={() => (showGrowthSheet = true)}
-                    >
-                        <Calendar size={14} /> Rango de fechas
-                    </button>
+                    <div class="lg:hidden flex items-center gap-2">
+                        <button
+                            type="button"
+                            class="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-slate-100 text-slate-600 text-[11px] font-bold active:scale-95 transition-all"
+                            onclick={() => (showGrowthSheet = true)}
+                        >
+                            <Calendar size={14} /> Rango de fechas
+                        </button>
+                        <Button
+                            variant="soft-emerald"
+                            size="sm"
+                            class="gap-1.5 px-3"
+                            onclick={handleExportGrowth}
+                            loading={growthExporting}
+                            aria-label="Exportar crecimiento de personal a Excel"
+                        >
+                            <Download size={14} />
+                        </Button>
+                    </div>
                 {/snippet}
 
                 <div
